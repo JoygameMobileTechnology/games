@@ -1,0 +1,2506 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Dice Dungeons — Prototype</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 100%; height: 100%;
+    background: #000;
+    font-family: Georgia, 'Times New Roman', serif;
+    color: #e8d9b8;
+    overflow: hidden;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+  #app {
+    position: relative;
+    width: 100vw; height: 100vh;
+    max-width: 480px;
+    margin: 0 auto;
+    background: #1a1410;
+    display: flex; align-items: center; justify-content: center;
+    overflow: hidden;
+    box-shadow: 0 0 40px rgba(0,0,0,0.8);
+  }
+  /* ---------- MENU ---------- */
+  #menu {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+    background:
+      radial-gradient(ellipse at center, #3a2818 0%, #1a0f08 100%);
+    padding: 24px 16px;
+    gap: 14px;
+    overflow-y: auto;
+  }
+  #menu h1 {
+    font-size: 44px;
+    color: #e4c77a;
+    text-shadow: 0 0 20px #000, 0 3px 0 #5a3a1a;
+    letter-spacing: 3px;
+    font-family: 'Trajan Pro', 'Palatino Linotype', Georgia, serif;
+    margin-top: 8px;
+    text-align: center;
+  }
+  #menu h2 {
+    font-size: 14px;
+    color: #b8a070;
+    font-style: italic;
+    margin-top: -6px;
+    text-align: center;
+    padding: 0 8px;
+  }
+  .menu-panel {
+    background: rgba(20,14,8,0.85);
+    border: 2px solid #6b4a20;
+    border-radius: 8px;
+    padding: 14px 18px;
+    width: 100%;
+    max-width: 440px;
+    box-shadow: 0 0 40px rgba(0,0,0,0.8), inset 0 0 20px rgba(0,0,0,0.4);
+  }
+  .menu-panel h3 {
+    color: #e4c77a;
+    border-bottom: 1px solid #6b4a20;
+    padding-bottom: 6px;
+    margin-bottom: 10px;
+    font-size: 16px;
+    letter-spacing: 2px;
+  }
+  .btn {
+    background: linear-gradient(180deg, #8a5a22 0%, #5a3814 100%);
+    border: 2px solid #c39a4a;
+    color: #fde4a8;
+    padding: 10px 22px;
+    font-family: inherit;
+    font-size: 18px;
+    cursor: pointer;
+    border-radius: 4px;
+    letter-spacing: 1px;
+    transition: transform 0.08s, box-shadow 0.08s;
+    text-shadow: 1px 1px 0 #000;
+  }
+  .btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.6); }
+  .btn:active { transform: translateY(1px); }
+  .btn.big { font-size: 22px; padding: 14px 36px; }
+  .btn.ghost { background: transparent; border-color: #6b4a20; color: #b8a070; font-size: 14px; padding: 6px 12px; }
+  .roster-list { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; font-size: 13px; }
+  .roster-row { display: flex; justify-content: space-between; padding: 4px 8px; border-radius: 3px; }
+  .roster-row.owned { background: rgba(80,60,30,0.5); }
+  .roster-row.locked { color: #554030; }
+  .shard-display { color: #c39a4a; font-size: 16px; }
+
+  /* ---------- BATTLE ---------- */
+  #game {
+    position: absolute; inset: 0;
+    display: none;
+    flex-direction: column;
+    background: #0a0706;
+  }
+  #hud {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    grid-template-rows: auto auto;
+    align-items: center;
+    padding: 6px 10px;
+    background: linear-gradient(180deg, #2a1a10 0%, #1a100a 100%);
+    border-bottom: 2px solid #5a3a1a;
+    gap: 4px 10px;
+    flex-shrink: 0;
+  }
+  #hud .wall-row { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; }
+  .hud-block { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+  .hud-label { color: #b8a070; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; }
+  .wall-bar {
+    flex: 1; height: 14px; background: #1a0f08; border: 1px solid #6b4a20;
+    position: relative; overflow: hidden; border-radius: 3px;
+  }
+  .wall-bar-fill {
+    height: 100%;
+    background: linear-gradient(180deg, #6aa3c8 0%, #2a5a80 100%);
+    transition: width 0.3s;
+  }
+  .wall-bar-text {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; color: #fff; text-shadow: 1px 1px 0 #000;
+  }
+  #battlefield {
+    flex: 1;
+    width: 100%;
+    display: block;
+    background: #0a0706;
+  }
+  #squad-tray {
+    display: flex;
+    gap: 4px;
+    padding: 6px 8px;
+    background: linear-gradient(180deg, #1a100a 0%, #2a1a10 100%);
+    border-top: 2px solid #5a3a1a;
+    height: 64px;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    overflow-x: auto;
+  }
+  .hero-chip {
+    width: 48px; height: 54px;
+    background: rgba(40,28,18,0.9);
+    border: 2px solid #6b4a20;
+    border-radius: 4px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-around;
+    padding: 2px;
+    position: relative;
+    font-size: 10px;
+    flex-shrink: 0;
+  }
+  .hero-chip .emoji { font-size: 20px; }
+  .hero-chip .name { font-size: 8px; color: #e8d9b8; text-align: center; line-height: 1; }
+  .hero-chip .rank { position: absolute; top: -4px; right: -4px; background: #5a3a1a; border: 1px solid #c39a4a; border-radius: 50%; width: 14px; height: 14px; font-size: 9px; display: flex; align-items: center; justify-content: center; color: #fde4a8; }
+  .hero-chip.tier-commoner { border-color: #888; }
+  .hero-chip.tier-adventurer { border-color: #4ac34a; }
+  .hero-chip.tier-hero { border-color: #4a8ac3; }
+  .hero-chip.tier-champion { border-color: #a04ac3; box-shadow: 0 0 8px rgba(160,74,195,0.4); }
+  .hero-chip.tier-legendary { border-color: #e4c77a; box-shadow: 0 0 12px rgba(228,199,122,0.5); }
+  .mini-hp { width: 90%; height: 3px; background: #3a0a0a; border-radius: 2px; overflow: hidden; }
+  .mini-hp-fill { height: 100%; background: linear-gradient(90deg, #4ac34a 0%, #c3a04a 100%); }
+
+  /* ---------- DICE OVERLAY ---------- */
+  #dice-overlay {
+    position: absolute; inset: 0;
+    display: none;
+    background: rgba(0,0,0,0.85);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 20px;
+  }
+  #dice-overlay.active { display: flex; }
+  .dice-wrap {
+    position: relative;
+    width: 220px; height: 220px;
+  }
+  #d20 {
+    width: 220px; height: 220px;
+    background: radial-gradient(circle at 30% 30%, #f0d088, #8a6020 80%);
+    border-radius: 20px;
+    clip-path: polygon(50% 0%, 95% 25%, 95% 75%, 50% 100%, 5% 75%, 5% 25%);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 90px; color: #1a0f08; font-weight: bold;
+    text-shadow: 2px 2px 0 #fde4a8;
+    box-shadow: 0 0 60px rgba(228,199,122,0.8), inset 0 0 30px rgba(0,0,0,0.3);
+    transition: transform 0.1s, box-shadow 0.3s;
+  }
+  #d20.rolling {
+    animation: dice-tumble 0.1s infinite;
+  }
+  @keyframes dice-tumble {
+    0% { transform: rotate(0deg) scale(1); }
+    25% { transform: rotate(90deg) scale(1.05); }
+    50% { transform: rotate(180deg) scale(0.95); }
+    75% { transform: rotate(270deg) scale(1.05); }
+    100% { transform: rotate(360deg) scale(1); }
+  }
+  #d20.nat20 {
+    background: radial-gradient(circle at 30% 30%, #fff7a8, #e4c77a 60%, #c39a4a 100%);
+    box-shadow: 0 0 120px #fde4a8, 0 0 40px #fff;
+    animation: nat20-pulse 1s infinite;
+  }
+  #d20.nat1 {
+    background: radial-gradient(circle at 30% 30%, #8a2020, #3a0a0a 100%);
+    box-shadow: 0 0 80px #c33030, inset 0 0 20px #000;
+    color: #ff6060;
+    text-shadow: 2px 2px 0 #000;
+  }
+  @keyframes nat20-pulse {
+    0%, 100% { transform: scale(1); box-shadow: 0 0 120px #fde4a8; }
+    50% { transform: scale(1.08); box-shadow: 0 0 160px #fff7a8; }
+  }
+  .dice-result {
+    font-size: 32px;
+    color: #e4c77a;
+    text-shadow: 0 0 10px #000, 2px 2px 0 #5a3a1a;
+    letter-spacing: 2px;
+    font-style: italic;
+    opacity: 0;
+    transition: opacity 0.5s;
+  }
+  .dice-result.show { opacity: 1; }
+  .dice-result.nat20 { color: #fff7a8; }
+  .dice-result.nat1 { color: #ff6060; }
+  .dice-modifiers {
+    color: #b8a070;
+    font-size: 14px;
+    font-style: italic;
+  }
+
+  /* ---------- CARD OVERLAY ---------- */
+  #card-overlay {
+    position: absolute; inset: 0;
+    display: none;
+    background: rgba(0,0,0,0.9);
+    z-index: 90;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 20px;
+  }
+  #card-overlay.active { display: flex; }
+  .card-title {
+    font-size: 28px;
+    color: #e4c77a;
+    text-shadow: 2px 2px 0 #000;
+    letter-spacing: 2px;
+  }
+  .cards-row {
+    display: flex;
+    gap: 24px;
+  }
+  .card {
+    width: 220px; height: 320px;
+    background: linear-gradient(180deg, #2a1a10 0%, #1a100a 100%);
+    border: 3px solid #6b4a20;
+    border-radius: 10px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.15s;
+    position: relative;
+    overflow: hidden;
+  }
+  .card:hover { transform: translateY(-8px) scale(1.03); box-shadow: 0 12px 30px rgba(0,0,0,0.9); }
+  .card.tier-commoner { border-color: #888; }
+  .card.tier-adventurer { border-color: #4ac34a; box-shadow: 0 0 12px rgba(74,195,74,0.3); }
+  .card.tier-hero { border-color: #4a8ac3; box-shadow: 0 0 16px rgba(74,138,195,0.4); }
+  .card.tier-champion { border-color: #c04ac3; box-shadow: 0 0 20px rgba(192,74,195,0.5); }
+  .card.tier-legendary {
+    border-color: #e4c77a;
+    box-shadow: 0 0 28px rgba(228,199,122,0.7);
+    background: linear-gradient(180deg, #3a2818 0%, #1a100a 100%);
+  }
+  .card-tier {
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    text-align: center;
+    margin-bottom: 8px;
+  }
+  .card-emoji { font-size: 72px; text-align: center; margin: 4px 0; }
+  .card-name { font-size: 18px; color: #e4c77a; text-align: center; margin-bottom: 8px; font-weight: bold; }
+  .card-desc { font-size: 13px; color: #c8b898; text-align: center; flex: 1; line-height: 1.4; }
+  .card-extra { font-size: 11px; color: #b8a070; text-align: center; font-style: italic; margin-top: 4px; }
+
+  .tier-commoner .card-tier { color: #aaa; }
+  .tier-adventurer .card-tier { color: #4ac34a; }
+  .tier-hero .card-tier { color: #4a8ac3; }
+  .tier-champion .card-tier { color: #c04ac3; }
+  .tier-legendary .card-tier { color: #e4c77a; }
+
+  .skip-btn { margin-top: 12px; }
+
+  /* ---------- GAME OVER / VICTORY ---------- */
+  #result-overlay {
+    position: absolute; inset: 0;
+    display: none;
+    background: rgba(0,0,0,0.92);
+    z-index: 80;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 20px;
+  }
+  #result-overlay.active { display: flex; }
+  #result-overlay h2 { font-size: 64px; text-shadow: 4px 4px 0 #000; letter-spacing: 4px; }
+  #result-overlay.victory h2 { color: #e4c77a; }
+  #result-overlay.defeat h2 { color: #c33030; }
+  #result-overlay p { font-size: 18px; color: #c8b898; max-width: 500px; text-align: center; line-height: 1.5; }
+  .rewards {
+    background: rgba(40,28,18,0.9);
+    border: 2px solid #6b4a20;
+    border-radius: 8px;
+    padding: 20px 30px;
+    color: #e4c77a;
+    font-size: 16px;
+    min-width: 300px;
+    text-align: center;
+  }
+
+  /* ---------- FLOATING TEXT ---------- */
+  .float-text {
+    position: absolute;
+    font-weight: bold;
+    font-size: 16px;
+    pointer-events: none;
+    animation: float-up 1s ease-out forwards;
+    text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
+    z-index: 50;
+  }
+  @keyframes float-up {
+    0% { opacity: 1; transform: translateY(0); }
+    100% { opacity: 0; transform: translateY(-40px); }
+  }
+
+  /* Shake */
+  @keyframes shake-sm {
+    0%,100% { transform: translate(0,0); }
+    25% { transform: translate(-3px, 2px); }
+    50% { transform: translate(3px, -2px); }
+    75% { transform: translate(-2px, -3px); }
+  }
+  @keyframes shake-lg {
+    0%,100% { transform: translate(0,0); }
+    20% { transform: translate(-10px, 5px); }
+    40% { transform: translate(10px, -5px); }
+    60% { transform: translate(-8px, -8px); }
+    80% { transform: translate(8px, 8px); }
+  }
+  .shake-sm { animation: shake-sm 0.25s; }
+  .shake-lg { animation: shake-lg 0.5s; }
+
+  /* Start-wave button overlay */
+  #start-wave-overlay {
+    position: absolute;
+    left: 0; right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    pointer-events: none;
+    z-index: 55;
+  }
+  #start-wave-overlay.active { display: flex; }
+  #start-wave-overlay .label {
+    background: rgba(10,6,4,0.85);
+    border: 1px solid #6b4a20;
+    border-radius: 6px;
+    padding: 8px 18px;
+    color: #e4c77a;
+    font-size: 14px;
+    letter-spacing: 1px;
+    text-align: center;
+    pointer-events: none;
+  }
+  #start-wave-overlay .label .sub { display:block; font-size:11px; color:#b8a070; font-style:italic; margin-top:4px; }
+  #start-wave-btn {
+    pointer-events: auto;
+    font-size: 22px;
+    padding: 14px 30px;
+    background: linear-gradient(180deg, #c3a04a 0%, #8a6020 100%);
+    border: 2px solid #fde4a8;
+    color: #1a0f08;
+    text-shadow: 1px 1px 0 rgba(255,255,255,0.3);
+    animation: pulse-btn 1.5s infinite;
+  }
+  @keyframes pulse-btn {
+    0%,100% { box-shadow: 0 0 0 0 rgba(228,199,122,0.6); }
+    50% { box-shadow: 0 0 0 14px rgba(228,199,122,0); }
+  }
+
+  /* Compact dice / card overlays for portrait */
+  #d20 { width: 160px !important; height: 160px !important; font-size: 68px !important; }
+  .dice-wrap { width: 160px !important; height: 160px !important; }
+  .dice-result { font-size: 22px !important; padding: 0 12px; text-align: center; }
+  .card-title { font-size: 20px !important; padding: 0 12px; text-align: center; }
+  .cards-row { flex-direction: column !important; gap: 10px !important; padding: 12px; max-height: 70vh; overflow-y: auto; width: 100%; align-items: center; }
+  .card { width: 90% !important; max-width: 320px; height: auto !important; min-height: 110px; flex-direction: row !important; align-items: center; padding: 10px !important; gap: 10px; }
+  .card .card-tier { position: absolute; top: 4px; right: 8px; margin: 0 !important; font-size: 9px !important; }
+  .card .card-emoji { font-size: 44px !important; margin: 0 !important; flex-shrink: 0; }
+  .card .card-name { font-size: 15px !important; margin-bottom: 2px !important; text-align: left !important; }
+  .card .card-desc { font-size: 11px !important; text-align: left !important; }
+  .card .card-extra { font-size: 10px !important; text-align: left !important; }
+  .card > .card-body { display: flex; flex-direction: column; flex: 1; align-items: flex-start; }
+
+  #result-overlay h2 { font-size: 44px !important; }
+  #result-overlay p { font-size: 14px !important; padding: 0 16px; }
+
+  /* Wave announcement */
+  #wave-announce {
+    position: absolute;
+    top: 40%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 36px;
+    color: #e4c77a;
+    text-shadow: 3px 3px 0 #000, 0 0 20px #000;
+    letter-spacing: 3px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s;
+    z-index: 60;
+    font-style: italic;
+    text-align: center;
+    width: 100%;
+    padding: 0 12px;
+  }
+  #wave-announce.show { opacity: 1; }
+  #wave-announce .sub { display: block; font-size: 14px; color: #b8a070; margin-top: 4px; font-style: normal; }
+
+  .hint { color: #8a7a5a; font-size: 12px; font-style: italic; }
+
+  /* Scrollbar styling */
+  ::-webkit-scrollbar { height: 8px; width: 8px; }
+  ::-webkit-scrollbar-track { background: #1a100a; }
+  ::-webkit-scrollbar-thumb { background: #5a3a1a; border-radius: 4px; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- MAIN MENU -->
+  <div id="menu">
+    <h1>🎲 DICE DUNGEONS</h1>
+    <h2>"In the Shattered Reach, fate is a twenty-sided stone."</h2>
+
+    <div class="menu-panel">
+      <h3>⚔ The Keep</h3>
+      <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+        <span>Soul Shards: <span class="shard-display" id="menu-shards">0</span> 💎</span>
+        <span>Runs Completed: <span id="menu-runs">0</span></span>
+      </div>
+      <div id="chapter-list" style="display:flex; flex-direction:column; gap:8px; margin:12px 0;"></div>
+      <div class="hint">10 waves per chapter. Beat a chapter to unlock the next.</div>
+    </div>
+
+    <div class="menu-panel">
+      <h3>💎 Recruit Heroes</h3>
+      <div id="shop-list" style="display:flex; flex-direction:column; gap:6px;"></div>
+      <div class="hint" style="margin-top:10px;">Unlock heroes with Soul Shards. Heroes drawn from dice rolls during a run are temporary — they vanish when the run ends unless you own them.</div>
+    </div>
+
+    <div class="menu-panel">
+      <h3>🛡 Hero Roster</h3>
+      <div class="roster-list" id="roster-list"></div>
+      <div class="hint" style="margin-top:10px;">Owned heroes may appear as your starting duo. Ranks reset at the end of each run.</div>
+    </div>
+
+    <div style="display:flex; gap:10px;">
+      <button class="btn ghost" id="reset-btn">Reset Save</button>
+    </div>
+  </div>
+
+  <!-- GAME (BATTLE) -->
+  <div id="game">
+    <div id="hud">
+      <div class="hud-block">
+        <span class="hud-label">Wave</span>
+        <span id="wave-text" style="font-size:18px; color:#e4c77a;">1/10</span>
+      </div>
+      <div class="hud-block" style="justify-self:center;">
+        <span class="hud-label">Luck</span>
+        <span id="luck-text" style="color:#e4c77a;">+0</span>
+        <span class="hud-label" style="margin-left:8px;">Insp</span>
+        <span id="insp-text" style="color:#4a8ac3;">0</span>
+      </div>
+      <div class="hud-block">
+        <button class="btn ghost" id="forfeit-btn" style="font-size:11px; padding:4px 8px;">Flee</button>
+      </div>
+      <div class="wall-row">
+        <span class="hud-label">⚔</span>
+        <div class="wall-bar"><div class="wall-bar-fill" id="wall-fill"></div><div class="wall-bar-text" id="wall-text">500 / 500</div></div>
+      </div>
+    </div>
+
+    <canvas id="battlefield"></canvas>
+
+    <div id="squad-tray"></div>
+
+    <div id="wave-announce"></div>
+
+    <div id="start-wave-overlay">
+      <div class="label" id="start-wave-label">Wave 1<span class="sub">Goblin Scouts</span></div>
+      <button class="btn big" id="start-wave-btn">▶ Start Wave</button>
+    </div>
+  </div>
+
+  <!-- DICE ROLL OVERLAY -->
+  <div id="dice-overlay">
+    <div class="dice-wrap"><div id="d20">20</div></div>
+    <div class="dice-modifiers" id="dice-mod"></div>
+    <div class="dice-result" id="dice-result"></div>
+  </div>
+
+  <!-- CARD OVERLAY -->
+  <div id="card-overlay">
+    <div class="card-title" id="card-title">Choose Your Boon</div>
+    <div class="cards-row" id="cards-row"></div>
+    <button class="btn ghost skip-btn" id="card-skip" style="display:none;">Skip (no choice)</button>
+  </div>
+
+  <!-- RESULT OVERLAY -->
+  <div id="result-overlay">
+    <h2 id="result-title">VICTORY</h2>
+    <p id="result-text"></p>
+    <div class="rewards" id="result-rewards"></div>
+    <button class="btn big" id="result-btn">Return to Keep</button>
+  </div>
+
+</div>
+<script>
+"use strict";
+
+// ============================================================================
+// DATA: HEROES
+// ============================================================================
+// role: tank (front melee), dps (back melee/ranged), ranged (back ranged),
+//       healer (back, heals), support (back, buffs)
+const HEROES = {
+  cedric: {
+    id: 'cedric', name: 'Sir Cedric', title: 'Human Fighter',
+    emoji: '🛡️', tier: 'commoner', role: 'tank',
+    hp: 220, atk: 14, spd: 1.2, range: 65, color: '#8a8a9a',
+    skillDesc: 'Shield Wall — Blocks first hit each wave'
+  },
+  halron: {
+    id: 'halron', name: 'Brother Halron', title: 'Dwarf Cleric',
+    emoji: '✨', tier: 'commoner', role: 'healer',
+    hp: 110, atk: 6, spd: 2.0, range: 400, color: '#d8c878',
+    heal: 18,
+    skillDesc: 'Cure Wounds — Heals lowest-HP ally'
+  },
+  pip: {
+    id: 'pip', name: 'Quickshot Pip', title: 'Wood Elf Ranger',
+    emoji: '🏹', tier: 'commoner', role: 'ranged',
+    hp: 90, atk: 16, spd: 1.0, range: 520, color: '#6aa34a',
+    skillDesc: 'Volley — Rapid-fire arrows'
+  },
+  silk: {
+    id: 'silk', name: 'Silk', title: 'Halfling Rogue',
+    emoji: '🗡️', tier: 'adventurer', role: 'dps',
+    hp: 130, atk: 28, spd: 0.75, range: 70, color: '#6a4ac3',
+    skillDesc: 'Sneak Attack — Massive first strike'
+  },
+  kx7: {
+    id: 'kx7', name: 'KX-7 "Rustheart"', title: 'Warforged Sentinel',
+    emoji: '🤖', tier: 'adventurer', role: 'tank',
+    hp: 310, atk: 12, spd: 1.4, range: 65, color: '#c3b06a',
+    regen: 0.8,
+    skillDesc: 'Regeneration Core — Heals 0.8 HP/s'
+  },
+  grimlok: {
+    id: 'grimlok', name: 'Grimlok Ironjaw', title: 'Half-Orc Barbarian',
+    emoji: '🪓', tier: 'hero', role: 'dps',
+    hp: 260, atk: 46, spd: 1.3, range: 70, color: '#c34a4a',
+    skillDesc: 'Reckless Rage — Huge melee DPS'
+  },
+  lyrielle: {
+    id: 'lyrielle', name: 'Lyrielle Songweaver', title: 'Half-Elf Bard',
+    emoji: '🎵', tier: 'hero', role: 'support',
+    hp: 140, atk: 10, spd: 1.5, range: 500, color: '#e890d0',
+    luckBonus: 1, speedAura: 0.15,
+    skillDesc: 'Inspiration — +1 Luck, +15% squad speed'
+  },
+  vaelith: {
+    id: 'vaelith', name: 'Vaelith Moonwhisper', title: 'High Elf Wizard',
+    emoji: '🧙', tier: 'legendary', role: 'ranged',
+    hp: 140, atk: 38, spd: 1.5, range: 560, color: '#6a8ac3',
+    aoe: 90,
+    skillDesc: 'Fireball — AoE spell damage'
+  },
+  brenna: {
+    id: 'brenna', name: 'Brenna Stormhammer', title: 'Hill Dwarf Paladin',
+    emoji: '⚒️', tier: 'commoner', role: 'tank',
+    hp: 240, atk: 12, spd: 1.3, range: 65, color: '#c8b060',
+    regen: 0.4,
+    skillDesc: 'Lay on Hands — Slow self-regen'
+  },
+  ember: {
+    id: 'ember', name: 'Ember Ashfall', title: 'Tiefling Sorcerer',
+    emoji: '🔥', tier: 'adventurer', role: 'ranged',
+    hp: 100, atk: 22, spd: 1.3, range: 480, color: '#e06030',
+    aoe: 60,
+    skillDesc: 'Scorching Ray — Small fire splash'
+  },
+  maeve: {
+    id: 'maeve', name: 'Maeve Brightleaf', title: 'Wood Elf Druid',
+    emoji: '🌿', tier: 'hero', role: 'healer',
+    hp: 170, atk: 12, spd: 1.8, range: 420, color: '#6ac37a',
+    heal: 26,
+    skillDesc: 'Goodberry — Stronger heals'
+  },
+  thane: {
+    id: 'thane', name: 'Thane Darkwood', title: 'Human Blood Hunter',
+    emoji: '🩸', tier: 'champion', role: 'dps',
+    hp: 210, atk: 34, spd: 1.0, range: 75, color: '#a03030',
+    skillDesc: 'Crimson Strike — Heavy melee blows'
+  }
+};
+
+const HERO_IDS = Object.keys(HEROES);
+// Heroes that are always unlocked for a fresh save so Ch 1 is playable.
+const DEFAULT_UNLOCKS = ['cedric', 'pip'];
+// Shard cost to permanently unlock a hero from the main-menu Recruit shop.
+const RECRUIT_COST = { commoner: 40, adventurer: 80, hero: 200, champion: 400, legendary: 700 };
+
+// ============================================================================
+// DATA: ENEMIES
+// ============================================================================
+const ENEMIES = {
+  goblin: {
+    name: 'Goblin', emoji: '👺', hp: 42, atk: 9, spd: 1.0,
+    range: 40, move: 63, color: '#4a6a3a', size: 16
+  },
+  kobold: {
+    name: 'Kobold Archer', emoji: '🦎', hp: 28, atk: 11, spd: 1.6,
+    range: 320, move: 48, color: '#8a6a3a', size: 14
+  },
+  ogre: {
+    name: 'Ogre', emoji: '👹', hp: 180, atk: 28, spd: 2.0,
+    range: 45, move: 39, color: '#6a4a2a', size: 28
+  },
+  gobshaman: {
+    name: 'Goblin Shaman', emoji: '🧟', hp: 60, atk: 18, spd: 2.2,
+    range: 340, move: 45, color: '#3a5a5a', size: 18
+  },
+  grashnak: {
+    name: 'Grashnak the Goblin King', emoji: '👑', hp: 1875, atk: 84, spd: 1.4,
+    range: 55, move: 45, color: '#3a1a4a', size: 42, boss: true,
+    summonInterval: 8
+  },
+  // Chapter 2+ undead
+  skeleton: {
+    name: 'Skeleton Warrior', emoji: '💀', hp: 70, atk: 12, spd: 1.0,
+    range: 42, move: 54, color: '#c8c4b0', size: 16
+  },
+  wraith: {
+    name: 'Wraith', emoji: '👻', hp: 55, atk: 15, spd: 1.8,
+    range: 300, move: 52, color: '#8a9acc', size: 16
+  },
+  skullking: {
+    name: 'Skullking Morvax', emoji: '☠️', hp: 1700, atk: 46, spd: 1.2,
+    range: 280, move: 42, color: '#b0a098', size: 42, boss: true,
+    summonInterval: 7
+  },
+  // Chapter 3+ citadel
+  gargoyle: {
+    name: 'Gargoyle', emoji: '🗿', hp: 155, atk: 22, spd: 1.6,
+    range: 50, move: 42, color: '#5a5a68', size: 22
+  },
+  malachar: {
+    name: 'Lord Malachar', emoji: '🦇', hp: 2300, atk: 54, spd: 1.0,
+    range: 70, move: 48, color: '#60306a', size: 42, boss: true,
+    summonInterval: 9
+  },
+  // Chapter 4+ abyssal
+  imp: {
+    name: 'Imp', emoji: '😈', hp: 42, atk: 11, spd: 0.8,
+    range: 60, move: 72, color: '#c84040', size: 14
+  },
+  hellhound: {
+    name: 'Hellhound', emoji: '🐺', hp: 100, atk: 22, spd: 1.2,
+    range: 45, move: 66, color: '#803020', size: 18
+  },
+  baelzoth: {
+    name: 'Baelzoth the Voidmaw', emoji: '🐉', hp: 3400, atk: 64, spd: 1.3,
+    range: 320, move: 40, color: '#501060', size: 48, boss: true,
+    summonInterval: 6
+  }
+};
+
+// ============================================================================
+// DATA: CHAPTERS (4 chapters, 10 waves each, final boss wave)
+// ============================================================================
+const CHAPTERS = [
+  {
+    id: 1,
+    name: 'The Greenmarch',
+    subtitle: 'Goblin warbands raid the borderlands. Hold the Wardstone.',
+    bossText: '"Grashnak lies slain. The Greenmarch is secure... for now."',
+    waves: [
+      { name: 'Goblin Scouts',       enemies: [{ type: 'goblin', count: 3, delay: 0.8 }] },
+      { name: 'Forest Raiders',      enemies: [{ type: 'goblin', count: 4, delay: 0.75 }, { type: 'kobold', count: 1, delay: 2.0 }] },
+      { name: 'Arrow Storm',         enemies: [{ type: 'goblin', count: 3, delay: 0.8 }, { type: 'kobold', count: 2, delay: 1.2 }] },
+      { name: 'Greenmarch Warband',  enemies: [{ type: 'goblin', count: 10, delay: 0.5 }] },
+      { name: 'Ogre Patrol',         enemies: [{ type: 'ogre', count: 2, delay: 3.0 }] },
+      { name: 'Dark Omens',          enemies: [{ type: 'goblin', count: 5, delay: 0.6 }, { type: 'gobshaman', count: 3, delay: 1.8 }] },
+      { name: 'Heavy Assault',       enemies: [{ type: 'ogre', count: 2, delay: 3.5 }, { type: 'goblin', count: 6, delay: 0.7 }, { type: 'kobold', count: 3, delay: 1.5 }] },
+      { name: 'Swarm of the Wilds',  enemies: [{ type: 'goblin', count: 12, delay: 0.4 }, { type: 'kobold', count: 3, delay: 1.8 }] },
+      { name: 'The Chieftain\'s Wrath', enemies: [{ type: 'ogre', count: 2, delay: 2.8 }, { type: 'gobshaman', count: 3, delay: 1.8 }, { type: 'goblin', count: 5, delay: 0.7 }] },
+      { name: 'GRASHNAK THE GOBLIN KING', enemies: [{ type: 'grashnak', count: 1, delay: 0 }, { type: 'goblin', count: 4, delay: 2.2 }], isBoss: true }
+    ]
+  },
+  {
+    id: 2,
+    name: 'The Whispering Crypts',
+    subtitle: 'Beneath the ruins, the dead walk. Silence them.',
+    bossText: '"Skullking Morvax returns to dust. The crypts sleep again."',
+    waves: [
+      { name: 'Rising Dead',         enemies: [{ type: 'skeleton', count: 3, delay: 0.8 }] },
+      { name: 'Crypt Shadows',       enemies: [{ type: 'skeleton', count: 3, delay: 0.7 }, { type: 'wraith', count: 1, delay: 2.0 }] },
+      { name: 'Bone Tide',           enemies: [{ type: 'skeleton', count: 5, delay: 0.6 }] },
+      { name: 'Soul Drain',          enemies: [{ type: 'wraith', count: 2, delay: 1.6 }, { type: 'skeleton', count: 3, delay: 0.9 }] },
+      { name: 'Necrotic Swarm',      enemies: [{ type: 'skeleton', count: 10, delay: 0.4 }] },
+      { name: 'Grave Stalkers',      enemies: [{ type: 'wraith', count: 3, delay: 1.5 }, { type: 'skeleton', count: 5, delay: 0.7 }] },
+      { name: 'Bone Colossus',       enemies: [{ type: 'ogre', count: 1, delay: 0 }, { type: 'skeleton', count: 6, delay: 0.6 }] },
+      { name: 'Wraithstorm',         enemies: [{ type: 'wraith', count: 6, delay: 1.1 }, { type: 'skeleton', count: 3, delay: 1.0 }] },
+      { name: 'Graveborn Legion',    enemies: [{ type: 'skeleton', count: 9, delay: 0.5 }, { type: 'ogre', count: 1, delay: 3.5 }, { type: 'wraith', count: 2, delay: 2.0 }] },
+      { name: 'SKULLKING MORVAX',    enemies: [{ type: 'skullking', count: 1, delay: 0 }], isBoss: true }
+    ]
+  },
+  {
+    id: 3,
+    name: 'The Fallen Citadel',
+    subtitle: 'Demonic stonework stirs within the ancient keep.',
+    bossText: '"Malachar is broken. The Citadel stands... scarred but free."',
+    waves: [
+      { name: 'Stone Awakens',       enemies: [{ type: 'gargoyle', count: 2, delay: 2.0 }, { type: 'skeleton', count: 4, delay: 0.8 }] },
+      { name: 'Gargoyle Flock',      enemies: [{ type: 'gargoyle', count: 4, delay: 1.8 }] },
+      { name: 'Cursed Archers',      enemies: [{ type: 'kobold', count: 5, delay: 0.8 }, { type: 'wraith', count: 2, delay: 1.5 }] },
+      { name: 'Iron Wings',          enemies: [{ type: 'gargoyle', count: 3, delay: 1.6 }, { type: 'skeleton', count: 4, delay: 0.7 }] },
+      { name: 'Citadel Guard',       enemies: [{ type: 'ogre', count: 2, delay: 3.0 }, { type: 'gargoyle', count: 2, delay: 2.0 }] },
+      { name: 'Shadow Coven',        enemies: [{ type: 'gobshaman', count: 3, delay: 1.8 }, { type: 'wraith', count: 3, delay: 1.4 }] },
+      { name: 'Stormwall',           enemies: [{ type: 'gargoyle', count: 3, delay: 1.5 }, { type: 'ogre', count: 1, delay: 4.0 }, { type: 'skeleton', count: 5, delay: 0.8 }] },
+      { name: 'Bleeding Keep',       enemies: [{ type: 'wraith', count: 4, delay: 1.2 }, { type: 'gargoyle', count: 3, delay: 1.8 }] },
+      { name: 'Final Vanguard',      enemies: [{ type: 'gargoyle', count: 4, delay: 1.5 }, { type: 'ogre', count: 2, delay: 3.0 }, { type: 'gobshaman', count: 2, delay: 2.5 }] },
+      { name: 'LORD MALACHAR',       enemies: [{ type: 'malachar', count: 1, delay: 0 }], isBoss: true }
+    ]
+  },
+  {
+    id: 4,
+    name: 'The Abyssal Gates',
+    subtitle: 'The rift widens. Baelzoth\'s legions spill into the world.',
+    bossText: '"Baelzoth falls. The gates close. The realm breathes again."',
+    waves: [
+      { name: 'Rift Opens',          enemies: [{ type: 'imp', count: 5, delay: 0.6 }] },
+      { name: 'Hellhound Pack',      enemies: [{ type: 'hellhound', count: 4, delay: 1.0 }] },
+      { name: 'Fiends of the Abyss', enemies: [{ type: 'imp', count: 6, delay: 0.5 }, { type: 'hellhound', count: 2, delay: 1.8 }] },
+      { name: 'Brimstone Wave',      enemies: [{ type: 'hellhound', count: 3, delay: 1.2 }, { type: 'gobshaman', count: 3, delay: 1.6 }] },
+      { name: 'Voidcallers',         enemies: [{ type: 'wraith', count: 3, delay: 1.4 }, { type: 'imp', count: 6, delay: 0.5 }] },
+      { name: 'Infernal March',      enemies: [{ type: 'ogre', count: 2, delay: 3.0 }, { type: 'hellhound', count: 4, delay: 1.2 }] },
+      { name: 'Pit Lords',           enemies: [{ type: 'gargoyle', count: 3, delay: 1.8 }, { type: 'imp', count: 6, delay: 0.5 }] },
+      { name: 'Hellfire Storm',      enemies: [{ type: 'hellhound', count: 5, delay: 1.0 }, { type: 'gobshaman', count: 3, delay: 1.6 }] },
+      { name: 'Legion of the Void',  enemies: [{ type: 'imp', count: 8, delay: 0.4 }, { type: 'hellhound', count: 3, delay: 1.5 }, { type: 'ogre', count: 1, delay: 4.0 }] },
+      { name: 'BAELZOTH THE VOIDMAW', enemies: [{ type: 'baelzoth', count: 1, delay: 0 }], isBoss: true }
+    ]
+  }
+];
+
+function currentChapter() { return CHAPTERS[((state.run && state.run.chapter) || 1) - 1]; }
+function currentWaves() { return currentChapter().waves; }
+
+// ============================================================================
+// DATA: CARDS (upgrade pool)
+// ============================================================================
+// kinds: hero, spell, class, item, buff, divine
+// Each card has: id, name, tier, emoji, desc, apply(state)
+const CARDS = [
+  // --- HERO CARDS (dynamically generated based on heroes) ---
+  // (generated by makeHeroCards at runtime)
+
+  // --- SPELL / CLASS UPGRADES ---
+  { id: 'fire_bolt', kind: 'spell', tier: 'commoner', name: 'Fire Bolt', emoji: '🔥',
+    desc: '+10% attack damage for ranged/caster heroes',
+    apply: s => { s.buffs.rangedAtkMult = (s.buffs.rangedAtkMult || 1) + 0.10; } },
+  { id: 'scorching_ray', kind: 'spell', tier: 'adventurer', name: 'Scorching Ray', emoji: '☄️',
+    desc: '+20% attack damage for ranged/caster heroes',
+    apply: s => { s.buffs.rangedAtkMult = (s.buffs.rangedAtkMult || 1) + 0.20; } },
+  { id: 'fireball', kind: 'spell', tier: 'hero', name: 'Fireball', emoji: '💥',
+    desc: '+35% ranged damage; ranged attacks splash (AoE 50)',
+    apply: s => { s.buffs.rangedAtkMult = (s.buffs.rangedAtkMult || 1) + 0.35; s.buffs.rangedAoE = Math.max(s.buffs.rangedAoE || 0, 50); } },
+  { id: 'meteor', kind: 'spell', tier: 'legendary', name: 'Meteor Swarm', emoji: '🌠',
+    desc: '+75% ranged damage; massive AoE on all ranged hits',
+    apply: s => { s.buffs.rangedAtkMult = (s.buffs.rangedAtkMult || 1) + 0.75; s.buffs.rangedAoE = Math.max(s.buffs.rangedAoE || 0, 110); } },
+
+  { id: 'rage1', kind: 'class', tier: 'commoner', name: 'Rage +1', emoji: '😤',
+    desc: '+15% melee damage',
+    apply: s => { s.buffs.meleeAtkMult = (s.buffs.meleeAtkMult || 1) + 0.15; } },
+  { id: 'rage2', kind: 'class', tier: 'adventurer', name: 'Reckless Rage', emoji: '🔥',
+    desc: '+30% melee damage',
+    apply: s => { s.buffs.meleeAtkMult = (s.buffs.meleeAtkMult || 1) + 0.30; } },
+  { id: 'extra_attack', kind: 'class', tier: 'hero', name: 'Extra Attack', emoji: '⚔️',
+    desc: '+25% attack speed (all heroes)',
+    apply: s => { s.buffs.speedMult = (s.buffs.speedMult || 1) * 0.80; } },
+  { id: 'divine_smite', kind: 'class', tier: 'champion', name: 'Divine Smite', emoji: '⚡',
+    desc: '+40% damage to bosses and elites',
+    apply: s => { s.buffs.bossDmgMult = (s.buffs.bossDmgMult || 1) + 0.40; } },
+
+  // --- MAGIC ITEMS ---
+  { id: 'bag_holding', kind: 'item', tier: 'commoner', name: 'Bag of Holding', emoji: '🎒',
+    desc: '+1 Inspiration per wave',
+    apply: s => { s.buffs.inspirationPerWave = (s.buffs.inspirationPerWave || 0) + 1; } },
+  { id: 'boots_speed', kind: 'item', tier: 'adventurer', name: 'Boots of Speed', emoji: '👢',
+    desc: '+15% attack speed; +10% movement',
+    apply: s => { s.buffs.speedMult = (s.buffs.speedMult || 1) * 0.87; } },
+  { id: 'cloak_disp', kind: 'item', tier: 'hero', name: 'Cloak of Displacement', emoji: '🧥',
+    desc: '15% dodge chance for all heroes',
+    apply: s => { s.buffs.dodge = (s.buffs.dodge || 0) + 0.15; } },
+  { id: 'staff_magi', kind: 'item', tier: 'legendary', name: 'Staff of the Magi', emoji: '🪄',
+    desc: '+30% ranged damage; +10% all damage',
+    apply: s => {
+      s.buffs.rangedAtkMult = (s.buffs.rangedAtkMult || 1) + 0.30;
+      s.buffs.meleeAtkMult = (s.buffs.meleeAtkMult || 1) + 0.10;
+      s.buffs.rangedAtkMult += 0.10;
+    } },
+  { id: 'lucky_charm', kind: 'item', tier: 'adventurer', name: 'Lucky Charm', emoji: '🍀',
+    desc: '+1 Luck on all future dice rolls',
+    apply: s => { s.buffs.luck = (s.buffs.luck || 0) + 1; } },
+  { id: 'deck_many', kind: 'item', tier: 'legendary', name: 'Deck of Many Things', emoji: '🃏',
+    desc: '+3 Luck permanently — great fortune (and risk)',
+    apply: s => { s.buffs.luck = (s.buffs.luck || 0) + 3; } },
+
+  // --- PARTY BUFFS ---
+  { id: 'bless', kind: 'buff', tier: 'commoner', name: 'Bless', emoji: '🙏',
+    desc: '+1 damage to all hero attacks (additive)',
+    apply: s => { s.buffs.flatAtk = (s.buffs.flatAtk || 0) + 1; } },
+  { id: 'aid', kind: 'buff', tier: 'commoner', name: 'Aid', emoji: '💚',
+    desc: 'All heroes +15% max HP (healed to full)',
+    apply: s => { s.buffs.hpMult = (s.buffs.hpMult || 1) + 0.15; } },
+  { id: 'haste', kind: 'buff', tier: 'adventurer', name: 'Haste', emoji: '💨',
+    desc: '+20% attack speed',
+    apply: s => { s.buffs.speedMult = (s.buffs.speedMult || 1) * 0.83; } },
+  { id: 'guidance', kind: 'buff', tier: 'hero', name: 'Guidance', emoji: '🌟',
+    desc: '+2 Luck on all future dice rolls',
+    apply: s => { s.buffs.luck = (s.buffs.luck || 0) + 2; } },
+  { id: 'wall_mend', kind: 'buff', tier: 'adventurer', name: 'Wall Mending', emoji: '🧱',
+    desc: 'Restore 150 Wardstone HP',
+    apply: s => { s.wall.hp = Math.min(s.wall.maxHp, s.wall.hp + 150); } },
+  { id: 'wall_fort', kind: 'buff', tier: 'hero', name: 'Stone Shape', emoji: '🏰',
+    desc: '+200 max Wardstone HP (and fully repair)',
+    apply: s => { s.wall.maxHp += 200; s.wall.hp = s.wall.maxHp; } },
+
+  // --- DIVINE INTERVENTIONS (nat 20 territory) ---
+  { id: 'time_stop', kind: 'divine', tier: 'legendary', name: 'Time Stop', emoji: '⏳',
+    desc: 'Freeze enemies for 6s at the next wave',
+    apply: s => { s.buffs.timeStopPending = (s.buffs.timeStopPending || 0) + 1; } },
+  { id: 'miracle', kind: 'divine', tier: 'legendary', name: 'Miracle', emoji: '🕊️',
+    desc: 'Next wave: revive one hero who falls, fully healed',
+    apply: s => { s.buffs.miraclePending = (s.buffs.miraclePending || 0) + 1; } },
+  { id: 'divine_word', kind: 'divine', tier: 'legendary', name: 'Divine Word', emoji: '⚡',
+    desc: 'Next wave: enemies that drop below 30% HP die instantly',
+    apply: s => { s.buffs.divineWordPending = (s.buffs.divineWordPending || 0) + 1; } }
+];
+
+// ============================================================================
+// GAME STATE
+// ============================================================================
+const state = {
+  scene: 'menu',
+  // Persistent (saved)
+  save: {
+    soulShards: 0,
+    runs: 0,
+    roster: {},  // heroId -> { rank, duplicates }
+    chaptersCompleted: 0  // highest completed chapter (0 = none yet)
+  },
+  // Per-run
+  run: null
+};
+
+function newRun(chapterId) {
+  const ch = Math.max(1, Math.min(CHAPTERS.length, chapterId || 1));
+  const squad = pickStartingSquad();
+  const ranks = {};
+  for (const id of squad) ranks[id] = { rank: 1, duplicates: 0 };
+  return {
+    chapter: ch,
+    wave: 1,
+    maxWave: CHAPTERS[ch - 1].waves.length,
+    ranks,   // per-run hero ranks & duplicate progress (discarded at run end)
+    waveState: 'spawning', // spawning | fighting | cleared | dice | cards | intermission
+    wall: { hp: 500, maxHp: 500 },
+    inspiration: 0,
+    units: [],
+    projectiles: [],
+    effects: [],
+    spawnQueue: [],
+    spawnTimer: 0,
+    squad: squad,  // heroIds deployed this run (2 random from unlocked roster)
+    buffs: {
+      luck: 0, flatAtk: 0,
+      meleeAtkMult: 1, rangedAtkMult: 1,
+      hpMult: 1, speedMult: 1,
+      bossDmgMult: 1, rangedAoE: 0,
+      dodge: 0, inspirationPerWave: 0,
+      timeStopPending: 0,
+      miraclePending: 0, miracleCharges: 0,
+      divineWordPending: 0, divineWordActive: 0,
+    },
+    lastRoll: 0,
+    diceModifiersUsed: [],
+    waveStartTime: 0,
+    frozenUntil: 0,   // all enemies frozen
+    cardsThisRun: [],
+    // deferred: soulShards accumulated this run
+    shardsEarned: 0,
+  };
+}
+
+// ============================================================================
+// SAVE / LOAD
+// ============================================================================
+const SAVE_KEY = 'diceDungeons.save.v2';
+function loadSave() {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (raw) {
+      const data = JSON.parse(raw);
+      state.save = Object.assign(state.save, data);
+    }
+  } catch (e) { console.warn('save load failed', e); }
+  // Always-unlocked starters for a playable baseline.
+  for (const id of DEFAULT_UNLOCKS) {
+    if (!state.save.roster[id]) state.save.roster[id] = { unlocked: true };
+  }
+}
+
+function isUnlocked(heroId) {
+  return !!(state.save.roster[heroId] && state.save.roster[heroId].unlocked);
+}
+
+function unlockedHeroIds() {
+  return HERO_IDS.filter(id => isUnlocked(id));
+}
+
+// Pick 2 random heroes from the unlocked roster to start a run with.
+function pickStartingSquad() {
+  const pool = unlockedHeroIds();
+  if (pool.length <= 2) return pool.slice();
+  const shuffled = pool.slice();
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled.slice(0, 2);
+}
+function persistSave() {
+  try { localStorage.setItem(SAVE_KEY, JSON.stringify(state.save)); }
+  catch (e) { console.warn('save failed', e); }
+}
+
+// ============================================================================
+// AUDIO (synthesized via Web Audio API)
+// ============================================================================
+let audioCtx = null;
+function getCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return audioCtx;
+}
+function tone(freq, dur, type = 'sine', vol = 0.15, when = 0) {
+  try {
+    const ctx = getCtx();
+    const t = ctx.currentTime + when;
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.type = type;
+    o.frequency.setValueAtTime(freq, t);
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(vol, t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    o.connect(g).connect(ctx.destination);
+    o.start(t); o.stop(t + dur + 0.05);
+  } catch (e) {}
+}
+function noise(dur, vol = 0.2, when = 0, filter = 800) {
+  try {
+    const ctx = getCtx();
+    const t = ctx.currentTime + when;
+    const bufSize = Math.floor(ctx.sampleRate * dur);
+    const buf = ctx.createBuffer(1, bufSize, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < bufSize; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / bufSize);
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    const f = ctx.createBiquadFilter();
+    f.type = 'lowpass'; f.frequency.value = filter;
+    const g = ctx.createGain();
+    g.gain.value = vol;
+    src.connect(f).connect(g).connect(ctx.destination);
+    src.start(t);
+  } catch (e) {}
+}
+const sfx = {
+  diceClack: () => { for (let i = 0; i < 5; i++) noise(0.06, 0.15, i * 0.08, 2000); },
+  diceLand: () => { noise(0.2, 0.3, 0, 1200); tone(120, 0.15, 'square', 0.1); },
+  nat20: () => {
+    tone(523, 0.15, 'sine', 0.2);
+    tone(659, 0.15, 'sine', 0.2, 0.1);
+    tone(784, 0.3, 'sine', 0.2, 0.2);
+    tone(1046, 0.5, 'sine', 0.25, 0.35);
+  },
+  nat1: () => { tone(110, 0.4, 'sawtooth', 0.25); tone(82, 0.6, 'sawtooth', 0.2, 0.1); },
+  cardPick: () => { tone(880, 0.08, 'triangle', 0.15); tone(1320, 0.1, 'triangle', 0.12, 0.05); },
+  swordHit: () => { noise(0.08, 0.2, 0, 2500); tone(220, 0.05, 'square', 0.1); },
+  bowShot: () => { tone(900, 0.08, 'triangle', 0.1); noise(0.1, 0.1, 0, 3000); },
+  magicCast: () => { tone(440, 0.15, 'sine', 0.12); tone(660, 0.2, 'sine', 0.12, 0.05); tone(880, 0.25, 'sine', 0.12, 0.1); },
+  heal: () => { tone(660, 0.15, 'sine', 0.15); tone(990, 0.2, 'sine', 0.12, 0.1); },
+  enemyDie: () => { tone(200, 0.15, 'sawtooth', 0.15); tone(100, 0.2, 'sawtooth', 0.12, 0.08); },
+  bossHit: () => { noise(0.3, 0.3, 0, 600); tone(80, 0.3, 'sawtooth', 0.15); },
+  victory: () => {
+    [523, 659, 784, 1046].forEach((f, i) => tone(f, 0.3, 'triangle', 0.2, i * 0.15));
+  },
+  defeat: () => {
+    [400, 330, 260, 200].forEach((f, i) => tone(f, 0.4, 'sawtooth', 0.2, i * 0.2));
+  },
+  waveStart: () => { tone(330, 0.15, 'triangle', 0.15); tone(440, 0.2, 'triangle', 0.15, 0.1); },
+  waveClear: () => { tone(523, 0.1, 'sine', 0.15); tone(784, 0.2, 'sine', 0.15, 0.08); }
+};
+
+// ============================================================================
+// UTIL
+// ============================================================================
+const TIER_ORDER = ['commoner', 'adventurer', 'hero', 'champion', 'legendary'];
+const TIER_COLORS = {
+  commoner: '#888', adventurer: '#4ac34a', hero: '#4a8ac3',
+  champion: '#c04ac3', legendary: '#e4c77a'
+};
+const TIER_LABELS = {
+  commoner: 'COMMONER', adventurer: 'ADVENTURER', hero: 'HERO',
+  champion: 'CHAMPION', legendary: 'LEGENDARY'
+};
+
+function rand(a, b) { return a + Math.random() * (b - a); }
+function randInt(a, b) { return Math.floor(rand(a, b + 1)); }
+function choice(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+function dist(a, b) { const dx = a.x - b.x, dy = a.y - b.y; return Math.hypot(dx, dy); }
+function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+
+// ============================================================================
+// CANVAS SETUP
+// ============================================================================
+const canvas = document.getElementById('battlefield');
+const ctx = canvas.getContext('2d');
+let W = 0, H = 0;
+const GROUND_Y_FRAC = 0.82;
+
+function resize() {
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * devicePixelRatio;
+  canvas.height = rect.height * devicePixelRatio;
+  ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+  W = rect.width;
+  H = rect.height;
+}
+window.addEventListener('resize', resize);
+
+// Portrait: wall is at bottom, enemies spawn at top, walk down (+y)
+function wallY() { return H - 60; }
+// Spawn band sits INSIDE the screen near the top so enemies are always visible.
+function spawnY() { return 60; }
+function spawnYMax() { return Math.max(spawnY() + 20, H * 0.18); }
+
+// Role -> row (smaller y = further from wall, closer to enemies = front line)
+const ROLE_ROW = { tank: 0, dps: 1, ranged: 2, support: 2, healer: 3 };
+
+// Per-role base move speed (px/sec). Already includes the 1.5x bump vs prior plan.
+// Tanks hold the line, DPS melee push hardest, ranged hold back, healers stay back.
+const ROLE_MOVE = { tank: 90, dps: 120, ranged: 75, support: 75, healer: 60 };
+
+function getHeroSlot(index, role) {
+  const r = state.run;
+  const row = ROLE_ROW[role] ?? 2;
+  // Count total heroes in this row and find this hero's position among them
+  let myPos = 0, total = 1;
+  if (r) {
+    total = 0;
+    for (let i = 0; i < r.squad.length; i++) {
+      const other = HEROES[r.squad[i]];
+      if (other && (ROLE_ROW[other.role] ?? 2) === row) {
+        if (i === index) myPos = total;
+        total++;
+      }
+    }
+    if (total === 0) total = 1;
+  }
+  // Center heroes: preferred spacing ~18% of width, but shrink automatically
+  // when a row is packed so nobody clips off-screen (no 6-hero cap anymore).
+  const maxSpacing = W * 0.18;
+  const pad = 36;
+  const usable = Math.max(1, W - pad * 2);
+  const needed = total > 1 ? usable / (total - 1) : maxSpacing;
+  const spacing = Math.min(maxSpacing, needed);
+  const x = clamp(W / 2 + (myPos - (total - 1) / 2) * spacing, pad, W - pad);
+  // Hero band sits low (near the wall) so players can see the battlefield above.
+  const topY = H * 0.60;
+  const botY = wallY() - 30;
+  const y = topY + (botY - topY) * (row / 3);
+  return { x, y };
+}
+
+// ============================================================================
+// UNIT CREATION
+// ============================================================================
+let nextUnitId = 1;
+
+function spawnHero(heroId, index) {
+  const h = HEROES[heroId];
+  const r = state.run;
+  const rankData = (r && r.ranks && r.ranks[heroId]) || { rank: 1, duplicates: 0 };
+  const rankMult = 1 + 0.25 * (rankData.rank - 1);
+  const hpMult = state.run.buffs.hpMult || 1;
+  const slot = getHeroSlot(index, h.role);
+  return {
+    id: nextUnitId++,
+    side: 'hero', heroId, name: h.name, emoji: h.emoji, color: h.color,
+    role: h.role, tier: h.tier,
+    x: slot.x, y: slot.y, homeX: slot.x, homeY: slot.y,
+    hp: h.hp * rankMult * hpMult, maxHp: h.hp * rankMult * hpMult,
+    atk: h.atk * rankMult,
+    heal: (h.heal || 0) * rankMult,
+    spd: h.spd, range: h.range,
+    move: ROLE_MOVE[h.role] ?? 80,
+    cd: Math.random() * 0.5, size: 22,
+    dead: false, deadTimer: 0,
+    rank: rankData.rank,
+    regen: h.regen || 0, aoe: h.aoe || 0, speedAura: h.speedAura || 0,
+    shieldUsed: false, flashTimer: 0, attackAnim: 0
+  };
+}
+
+function spawnEnemy(type) {
+  const e = ENEMIES[type];
+  const chapter = state.run.chapter || 1;
+  const chapterScale = 1 + (chapter - 1) * 0.35;
+  const waveScale = 1 + (state.run.wave - 1) * 0.07;
+  const minionScale = waveScale * chapterScale;
+  const hpBoost = e.boss ? 1 : minionScale;
+  const atkBoost = e.boss ? 1 : minionScale;
+  // Greenmarch elites (Chapter 1 only): 1.5x HP & move, 1.25x atk & attack speed
+  const isGreenmarchElite = chapter === 1 && (type === 'ogre' || type === 'gobshaman');
+  const eliteMult = isGreenmarchElite ? 1.5 : 1;
+  const eliteAtkMult = isGreenmarchElite ? 1.25 : 1;
+  // Portrait: enemies spawn INSIDE the top of the screen (always visible),
+  // then walk downward toward the heroes/wall.
+  const margin = 40;
+  const x = e.boss ? W / 2 : rand(margin, W - margin);
+  const y = rand(spawnY(), spawnYMax());
+  return {
+    id: nextUnitId++,
+    side: 'enemy', type, name: e.name, emoji: e.emoji, color: e.color,
+    x, y,
+    hp: e.hp * hpBoost * eliteMult, maxHp: e.hp * hpBoost * eliteMult,
+    atk: e.atk * atkBoost * eliteAtkMult,
+    spd: e.spd / eliteAtkMult, move: e.move * eliteMult, range: e.range,
+    cd: Math.random() * 0.8, size: e.size,
+    dead: false, deadTimer: 0,
+    boss: !!e.boss, summonInterval: e.summonInterval || 0, summonTimer: e.summonInterval || 0,
+    flashTimer: 0, frozen: 0, attackAnim: 0
+  };
+}
+
+// ============================================================================
+// COMBAT UPDATE
+// ============================================================================
+function updateBattle(dt) {
+  const r = state.run;
+  if (!r) return;
+  if (r.waveState !== 'fighting' && r.waveState !== 'spawning' && r.waveState !== 'defeated') return;
+
+  // Spawning
+  r.spawnTimer -= dt;
+  if (r.spawnQueue.length > 0 && r.spawnTimer <= 0) {
+    const next = r.spawnQueue.shift();
+    r.units.push(spawnEnemy(next.type));
+    r.spawnTimer = next.delay;
+  }
+  if (r.waveState === 'spawning' && r.spawnQueue.length === 0) {
+    r.waveState = 'fighting';
+  }
+
+  // Boss summons
+  for (const u of r.units) {
+    if (u.side === 'enemy' && u.boss && u.summonInterval > 0 && !u.dead) {
+      u.summonTimer -= dt;
+      if (u.summonTimer <= 0) {
+        u.summonTimer = u.summonInterval;
+        for (let i = 0; i < 2; i++) {
+          const m = spawnEnemy('goblin');
+          m.x = u.x - 20 + rand(-20, 20);
+          m.y = u.y + rand(-30, 30);
+          m.hp *= 0.6; m.maxHp = m.hp;
+          r.units.push(m);
+        }
+        pushEffect(u.x, u.y - 40, '⚡ SUMMON!', '#e4c77a', 18);
+      }
+    }
+  }
+
+  if (r.frozenUntil > 0) r.frozenUntil -= dt;
+
+  for (const u of r.units) {
+    if (u.dead) { u.deadTimer += dt; continue; }
+    if (u.flashTimer > 0) u.flashTimer -= dt;
+    if (u.attackAnim > 0) u.attackAnim -= dt;
+    if (u.side === 'hero') updateHero(u, dt);
+    else updateEnemy(u, dt);
+  }
+
+  r.units = r.units.filter(u => !(u.dead && u.deadTimer > 0.5));
+
+  for (const p of r.projectiles) {
+    if (p.dead) continue;
+    p.life -= dt;
+    if (p.life <= 0) { p.dead = true; continue; }
+    if (p.homing && p.target && !p.target.dead) {
+      const dx = p.target.x - p.x, dy = p.target.y - p.y;
+      const d = Math.hypot(dx, dy) || 1;
+      p.vx = dx / d * p.speed;
+      p.vy = dy / d * p.speed;
+    }
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+    if (p.target && !p.target.dead) {
+      if (dist(p, p.target) < p.target.size + 6) {
+        resolveHit(p);
+        p.dead = true;
+      }
+    }
+    if (p.kind === 'enemyArrow' && !p.dead) {
+      // hit any hero
+      for (const h of r.units) {
+        if (h.side === 'hero' && !h.dead && dist(p, h) < h.size + 6) {
+          applyDamage(h, p.dmg, null);
+          p.dead = true;
+          break;
+        }
+      }
+    }
+    if (p.x < -50 || p.x > W + 50 || p.y < -50 || p.y > H + 50) p.dead = true;
+  }
+  r.projectiles = r.projectiles.filter(p => !p.dead);
+
+  for (const fx of r.effects) fx.life -= dt;
+  r.effects = r.effects.filter(fx => fx.life > 0);
+
+  // Wave cleared?
+  if ((r.waveState === 'fighting') && r.spawnQueue.length === 0) {
+    const enemiesAlive = r.units.some(u => u.side === 'enemy' && !u.dead);
+    if (!enemiesAlive) {
+      r.waveState = 'cleared';
+      sfx.waveClear();
+      // Unused armed divines expire at wave end
+      r.buffs.miracleCharges = 0;
+      r.buffs.divineWordActive = 0;
+      const shards = r.wave * 2 + (currentWaves()[r.wave - 1].isBoss ? 20 : 0);
+      r.shardsEarned += shards;
+      r.inspiration += r.buffs.inspirationPerWave || 0;
+      updateHUD();
+      if (r.wave >= r.maxWave) {
+        setTimeout(() => endRun(true), 1200);
+      } else {
+        setTimeout(() => startDiceRoll(), 900);
+      }
+    }
+  }
+
+  if (r.wall.hp <= 0 && r.waveState !== 'defeated') {
+    r.wall.hp = 0;
+    r.waveState = 'defeated';
+    setTimeout(() => endRun(false), 600);
+  }
+}
+
+function updateHero(u, dt) {
+  const r = state.run;
+  if (u.regen) u.hp = Math.min(u.maxHp, u.hp + u.regen * dt);
+
+  const speedMult = r.buffs.speedMult || 1;
+  u.cd -= dt / speedMult;
+  const moveSpd = (u.move || 80) * speedMult;
+
+  // Healers prioritize wounded allies
+  if (u.role === 'healer' && u.heal > 0) {
+    let htarget = null, lowest = 0.9;
+    for (const a of r.units) {
+      if (a.side === 'hero' && !a.dead) {
+        const frac = a.hp / a.maxHp;
+        if (frac < lowest) { lowest = frac; htarget = a; }
+      }
+    }
+    if (htarget && u.cd <= 0) {
+      const healAmt = u.heal;
+      htarget.hp = Math.min(htarget.maxHp, htarget.hp + healAmt);
+      pushEffect(htarget.x, htarget.y - 20, '+' + Math.round(healAmt), '#4ac34a');
+      u.attackAnim = 0.2;
+      u.cd = u.spd;
+      r.projectiles.push({
+        kind: 'heal', x: u.x, y: u.y, vx: 0, vy: 0,
+        target: htarget, homing: true, speed: 400, life: 1.5,
+        color: '#4ac34a', dmg: 0, dead: false
+      });
+      sfx.heal();
+      return;
+    }
+    // Healer with no one to heal falls through and can still drift home
+  }
+
+  // Sticky target: heroes commit to their current enemy until it dies, so
+  // wind-up damage on elites isn't wasted by retargeting a closer spawn.
+  if (u.target && u.target.dead) u.target = null;
+  if (!u.target) {
+    let nearest = null, nearestD = Infinity;
+    for (const e of r.units) {
+      if (e.side !== 'enemy' || e.dead) continue;
+      const d = dist(u, e);
+      if (d < nearestD) { nearestD = d; nearest = e; }
+    }
+    u.target = nearest;
+  }
+  const target = u.target;
+  const bestD = target ? dist(u, target) : Infinity;
+
+  if (target) {
+    const attackDist = u.range + target.size;
+    if (bestD > attackDist) {
+      // Pursue the target
+      const dx = target.x - u.x, dy = target.y - u.y;
+      const dd = Math.hypot(dx, dy) || 1;
+      u.x += (dx / dd) * moveSpd * dt;
+      u.y += (dy / dd) * moveSpd * dt;
+      // Bound within the playfield
+      u.x = clamp(u.x, 20, W - 20);
+      u.y = clamp(u.y, 40, wallY() - 16);
+      return;
+    }
+    // In range — attack when off cooldown
+    if (u.cd > 0) return;
+    const isRanged = u.role === 'ranged' || u.role === 'support';
+    let dmg = u.atk + (r.buffs.flatAtk || 0);
+    if (isRanged) dmg *= (r.buffs.rangedAtkMult || 1);
+    else dmg *= (r.buffs.meleeAtkMult || 1);
+    if (target.boss) dmg *= (r.buffs.bossDmgMult || 1);
+
+    u.attackAnim = 0.25;
+    u.cd = u.spd;
+
+    if (isRanged) {
+      r.projectiles.push({
+        kind: u.heroId === 'vaelith' ? 'fire' : 'arrow',
+        x: u.x, y: u.y - 10, target, homing: true,
+        speed: 560, vx: 0, vy: 0, life: 2.5, color: u.color, dmg,
+        aoe: Math.max(u.aoe || 0, r.buffs.rangedAoE || 0),
+        dead: false
+      });
+      if (u.heroId === 'vaelith') sfx.magicCast();
+      else sfx.bowShot();
+    } else {
+      applyDamage(target, dmg, u);
+      sfx.swordHit();
+    }
+    return;
+  }
+
+  // No enemies — drift back to home slot
+  if (u.x !== u.homeX || u.y !== u.homeY) {
+    const dx = u.homeX - u.x, dy = u.homeY - u.y;
+    const d = Math.hypot(dx, dy);
+    if (d > 1) {
+      const step = moveSpd * dt;
+      u.x += (dx / d) * Math.min(step, d);
+      u.y += (dy / d) * Math.min(step, d);
+    }
+  }
+}
+
+function updateEnemy(u, dt) {
+  const r = state.run;
+  if (r.frozenUntil > 0) return;
+  if (u.frozen > 0) { u.frozen -= dt; return; }
+
+  let target = null, bestD = Infinity;
+  for (const h of r.units) {
+    if (h.side !== 'hero' || h.dead) continue;
+    const d = dist(u, h);
+    if (d < bestD) { bestD = d; target = h; }
+  }
+
+  // Portrait: wall is at bottom. Enemies approach by moving DOWN (+y).
+  // wallDist = distance from enemy to wall line (positive while above wall)
+  const wallDist = wallY() - u.y;
+  if (!target || wallDist < 50) {
+    if (wallDist > 30) {
+      u.y += u.move * dt;
+    } else {
+      u.cd -= dt;
+      if (u.cd <= 0) {
+        u.cd = u.spd;
+        r.wall.hp -= u.atk;
+        pushEffect(u.x, wallY() - 10, '-' + Math.round(u.atk), '#c33030');
+        u.attackAnim = 0.3;
+        shakeScreen('sm');
+        noise(0.1, 0.15, 0, 600);
+      }
+    }
+    return;
+  }
+
+  const d = dist(u, target);
+  if (d > u.range + target.size) {
+    const dx = target.x - u.x, dy = target.y - u.y;
+    const dd = Math.hypot(dx, dy) || 1;
+    u.x += (dx / dd) * u.move * dt;
+    u.y += (dy / dd) * u.move * dt;
+  } else {
+    u.cd -= dt;
+    if (u.cd <= 0) {
+      u.cd = u.spd;
+      u.attackAnim = 0.3;
+      const isRanged = u.range > 100;
+      if (isRanged) {
+        const p = {
+          kind: 'enemyArrow', x: u.x, y: u.y + 10,
+          target, homing: false, vx: 0, vy: 420, speed: 420,
+          life: 2.5, color: '#8a6a3a', dmg: u.atk, dead: false
+        };
+        const dx2 = target.x - u.x, dy2 = target.y - u.y;
+        const dd2 = Math.hypot(dx2, dy2) || 1;
+        p.vx = (dx2 / dd2) * p.speed;
+        p.vy = (dy2 / dd2) * p.speed;
+        r.projectiles.push(p);
+      } else {
+        applyDamage(target, u.atk, u);
+      }
+    }
+  }
+}
+
+function resolveHit(p) {
+  if (p.kind === 'heal') return;
+  if (p.aoe && p.aoe > 0) {
+    const r = state.run;
+    for (const e of r.units) {
+      if (e.side !== 'enemy' || e.dead) continue;
+      const d = dist({ x: p.x, y: p.y }, e);
+      if (d <= p.aoe) {
+        const falloff = 1 - (d / p.aoe) * 0.4;
+        applyDamage(e, p.dmg * falloff, null);
+      }
+    }
+    pushEffect(p.x, p.y, '💥', '#e4c77a', 30);
+  } else {
+    if (p.target && !p.target.dead) applyDamage(p.target, p.dmg, null);
+  }
+}
+
+function applyDamage(target, dmg, attacker) {
+  const r = state.run;
+  if (target.dead) return;
+  if (target.side === 'hero' && r.buffs.dodge && Math.random() < r.buffs.dodge) {
+    pushEffect(target.x, target.y - 18, 'MISS', '#b8a070');
+    return;
+  }
+  if (target.side === 'hero' && target.heroId === 'cedric' && !target.shieldUsed) {
+    target.shieldUsed = true;
+    pushEffect(target.x, target.y - 18, 'BLOCK', '#6aa3c8');
+    return;
+  }
+  target.hp -= dmg;
+  target.flashTimer = 0.15;
+  pushEffect(target.x, target.y - 20, '-' + Math.round(dmg), target.side === 'hero' ? '#ff6060' : '#fde4a8');
+  // Divine Word: execute non-boss enemies that drop below 30% HP
+  if (target.side === 'enemy' && !target.boss && r.buffs.divineWordActive > 0
+      && target.hp > 0 && target.hp / target.maxHp < 0.30) {
+    target.hp = 0;
+    pushEffect(target.x, target.y - 30, '⚡ SMITE', '#fff7a8', 18);
+  }
+  if (target.hp <= 0) {
+    // Miracle: one charge cancels a hero death and restores full HP
+    if (target.side === 'hero' && r.buffs.miracleCharges > 0) {
+      r.buffs.miracleCharges--;
+      target.hp = target.maxHp;
+      target.flashTimer = 0.3;
+      pushEffect(target.x, target.y - 30, '🕊️ REVIVED', '#fde4a8', 22);
+      sfx.heal && sfx.heal();
+      return;
+    }
+    target.hp = 0;
+    target.dead = true;
+    target.deadTimer = 0;
+    if (target.side === 'enemy') {
+      sfx.enemyDie();
+      if (target.boss) { shakeScreen('lg'); sfx.bossHit(); }
+    }
+  } else if (target.boss) {
+    sfx.bossHit();
+  }
+}
+
+function pushEffect(x, y, text, color, size = 16) {
+  state.run.effects.push({ x, y, text, color, size, life: 0.9, maxLife: 0.9 });
+}
+
+// ============================================================================
+// RENDER
+// ============================================================================
+// Per-chapter themed background. Paints a smooth gradient + silhouettes +
+// animated atmosphere rather than flat rectangles.
+function drawChapterBackground() {
+  const chapter = (state.run && state.run.chapter) || 1;
+  switch (chapter) {
+    case 2: drawCryptsBg(); break;
+    case 3: drawCitadelBg(); break;
+    case 4: drawAbyssBg(); break;
+    default: drawGreenmarchBg();
+  }
+}
+
+function drawGreenmarchBg() {
+  const t = performance.now() / 1000;
+  // Misty forest: pale sage sky → deep pine → loam
+  const grad = ctx.createLinearGradient(0, 0, 0, H);
+  grad.addColorStop(0, '#4a6a50');
+  grad.addColorStop(0.35, '#2c4a34');
+  grad.addColorStop(0.7, '#3a3018');
+  grad.addColorStop(1, '#1a1208');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, H);
+  // Horizon mist band
+  const mistGrad = ctx.createLinearGradient(0, H * 0.22, 0, H * 0.38);
+  mistGrad.addColorStop(0, 'rgba(200,220,180,0.00)');
+  mistGrad.addColorStop(0.5, 'rgba(200,220,180,0.18)');
+  mistGrad.addColorStop(1, 'rgba(200,220,180,0.00)');
+  ctx.fillStyle = mistGrad;
+  ctx.fillRect(0, H * 0.22, W, H * 0.16);
+  // Rolling hill / far tree canopy as a soft rounded silhouette
+  ctx.fillStyle = 'rgba(8,18,10,0.85)';
+  ctx.beginPath();
+  const baseY = H * 0.34;
+  ctx.moveTo(0, baseY + 40);
+  for (let x = 0; x <= W; x += 16) {
+    const y = baseY - Math.sin(x * 0.035 + 1.3) * 10 - Math.cos(x * 0.015) * 6;
+    ctx.lineTo(x, y);
+  }
+  ctx.lineTo(W, baseY + 40); ctx.closePath(); ctx.fill();
+  // Closer tree line
+  ctx.fillStyle = 'rgba(4,10,6,0.92)';
+  ctx.beginPath();
+  const baseY2 = H * 0.44;
+  ctx.moveTo(0, baseY2 + 40);
+  for (let x = 0; x <= W; x += 12) {
+    const y = baseY2 - Math.sin(x * 0.09 + 0.4) * 8 - Math.cos(x * 0.04 + 2.1) * 5;
+    ctx.lineTo(x, y);
+  }
+  ctx.lineTo(W, baseY2 + 40); ctx.closePath(); ctx.fill();
+  // Drifting leaves
+  ctx.fillStyle = 'rgba(200,160,70,0.55)';
+  for (let i = 0; i < 10; i++) {
+    const x = ((i * 53 + t * 18) % (W + 20)) - 10;
+    const y = H * 0.15 + ((i * 91) % Math.max(1, H * 0.35)) + Math.sin(t + i) * 4;
+    ctx.fillRect(x, y, 2, 2);
+  }
+}
+
+function drawCryptsBg() {
+  const t = performance.now() / 1000;
+  // Violet tomb: dusty purple → deep indigo → black bone
+  const grad = ctx.createLinearGradient(0, 0, 0, H);
+  grad.addColorStop(0, '#3a2050');
+  grad.addColorStop(0.4, '#221030');
+  grad.addColorStop(0.75, '#140818');
+  grad.addColorStop(1, '#080408');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, H);
+  // Pillar silhouettes along the edges
+  ctx.fillStyle = 'rgba(30,16,40,0.75)';
+  const pillarW = Math.max(18, W * 0.06);
+  for (let i = 0; i < 3; i++) {
+    const y = H * (0.18 + i * 0.2);
+    ctx.fillRect(4, y, pillarW, H * 0.2);
+    ctx.fillRect(W - pillarW - 4, y, pillarW, H * 0.2);
+  }
+  // Archway at top (two black pillars + black arch)
+  ctx.fillStyle = 'rgba(8,4,10,0.9)';
+  ctx.fillRect(W * 0.15, 0, 10, H * 0.12);
+  ctx.fillRect(W * 0.85 - 10, 0, 10, H * 0.12);
+  ctx.beginPath();
+  ctx.moveTo(W * 0.15, H * 0.12);
+  ctx.quadraticCurveTo(W / 2, -H * 0.04, W * 0.85, H * 0.12);
+  ctx.lineTo(W * 0.85 - 10, H * 0.12);
+  ctx.quadraticCurveTo(W / 2, H * 0.05, W * 0.15 + 10, H * 0.12);
+  ctx.closePath();
+  ctx.fill();
+  // Floating soul wisps drifting slowly upward
+  for (let i = 0; i < 12; i++) {
+    const baseX = (i * 41) % W;
+    const driftY = (H - ((i * 67 + t * 22) % H));
+    const flicker = 0.35 + 0.25 * Math.sin(t * 2 + i);
+    ctx.fillStyle = 'rgba(180,140,220,' + flicker.toFixed(2) + ')';
+    ctx.beginPath();
+    ctx.arc(baseX + Math.sin(t + i) * 6, driftY, 2.2, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function drawCitadelBg() {
+  const t = performance.now() / 1000;
+  // Slate stone: cold grey sky → charcoal floor
+  const grad = ctx.createLinearGradient(0, 0, 0, H);
+  grad.addColorStop(0, '#55606a');
+  grad.addColorStop(0.4, '#343840');
+  grad.addColorStop(0.75, '#1c1e22');
+  grad.addColorStop(1, '#0e1012');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, H);
+  // Crenellation silhouette along the horizon
+  ctx.fillStyle = 'rgba(14,16,20,0.9)';
+  const merlonY = H * 0.28, merlonH = H * 0.08;
+  for (let x = 0; x < W; x += 22) {
+    const hoff = (x / 22) % 2 === 0 ? merlonH : merlonH * 0.55;
+    ctx.fillRect(x, merlonY - hoff, 18, merlonH + 40);
+  }
+  // Amber torch glows pulsing on the edges
+  const pulse = 0.55 + 0.15 * Math.sin(t * 3);
+  const torches = [
+    { x: 18, y: H * 0.45 },
+    { x: W - 18, y: H * 0.45 },
+    { x: 18, y: H * 0.72 },
+    { x: W - 18, y: H * 0.72 }
+  ];
+  for (const tr of torches) {
+    const rg = ctx.createRadialGradient(tr.x, tr.y, 0, tr.x, tr.y, 120);
+    rg.addColorStop(0, 'rgba(255,170,70,' + (0.6 * pulse).toFixed(2) + ')');
+    rg.addColorStop(0.5, 'rgba(200,90,30,' + (0.28 * pulse).toFixed(2) + ')');
+    rg.addColorStop(1, 'rgba(200,90,30,0)');
+    ctx.fillStyle = rg;
+    ctx.fillRect(tr.x - 120, tr.y - 120, 240, 240);
+    // Flame core
+    ctx.fillStyle = 'rgba(255,220,140,' + pulse.toFixed(2) + ')';
+    ctx.beginPath();
+    ctx.arc(tr.x, tr.y, 3, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function drawAbyssBg() {
+  const t = performance.now() / 1000;
+  // Hellscape: charcoal top, crimson horizon band, pitch at floor
+  const grad = ctx.createLinearGradient(0, 0, 0, H);
+  grad.addColorStop(0, '#0a0308');
+  grad.addColorStop(0.35, '#200408');
+  grad.addColorStop(0.5, '#3e0410');
+  grad.addColorStop(0.7, '#180408');
+  grad.addColorStop(1, '#040204');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, H);
+  // Rift horizon glow
+  const riftY = H * 0.26;
+  const riftGrad = ctx.createLinearGradient(0, riftY - 40, 0, riftY + 40);
+  riftGrad.addColorStop(0, 'rgba(255,40,20,0)');
+  riftGrad.addColorStop(0.5, 'rgba(255,60,30,0.55)');
+  riftGrad.addColorStop(1, 'rgba(255,40,20,0)');
+  ctx.fillStyle = riftGrad;
+  ctx.fillRect(0, riftY - 40, W, 80);
+  // Jagged horizon silhouette (broken spires)
+  ctx.fillStyle = 'rgba(6,2,4,0.95)';
+  ctx.beginPath();
+  ctx.moveTo(0, riftY + 8);
+  let px = 0;
+  while (px < W) {
+    const spike = 8 + ((px * 13) % 22);
+    ctx.lineTo(px, riftY + 8 - spike);
+    px += 14 + ((px * 7) % 8);
+    ctx.lineTo(px, riftY + 8);
+  }
+  ctx.lineTo(W, riftY + 8); ctx.lineTo(W, H); ctx.lineTo(0, H); ctx.closePath();
+  ctx.fill();
+  // Rising embers
+  for (let i = 0; i < 20; i++) {
+    const x = ((i * 37 + Math.sin(t + i) * 8) % W + W) % W;
+    const y = (H - ((i * 53 + t * 40) % H));
+    const alpha = 0.35 + 0.4 * Math.sin(t * 2 + i);
+    ctx.fillStyle = 'rgba(255,' + (100 + (i % 4) * 30) + ',40,' + Math.max(0, alpha).toFixed(2) + ')';
+    ctx.fillRect(x, y, 2, 2);
+  }
+}
+
+function render() {
+  const r = state.run;
+  ctx.clearRect(0, 0, W, H);
+  drawChapterBackground();
+  drawWall();
+  if (!r) return;
+
+  const all = r.units.slice().sort((a, b) => a.y - b.y);
+  for (const u of all) drawUnit(u);
+  for (const p of r.projectiles) drawProjectile(p);
+  for (const fx of r.effects) {
+    const a = fx.life / fx.maxLife;
+    ctx.globalAlpha = a;
+    ctx.font = 'bold ' + fx.size + 'px Georgia';
+    ctx.fillStyle = fx.color;
+    ctx.textAlign = 'center';
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 3;
+    const yOff = (1 - a) * 30;
+    ctx.strokeText(fx.text, fx.x, fx.y - yOff);
+    ctx.fillText(fx.text, fx.x, fx.y - yOff);
+    ctx.globalAlpha = 1;
+  }
+
+  if (r.frozenUntil > 0) {
+    ctx.fillStyle = 'rgba(100,200,255,0.08)';
+    ctx.fillRect(0, 0, W, H);
+  }
+}
+
+function drawWall() {
+  // Horizontal wall along bottom of the canvas
+  const wy = wallY();           // top edge of the wall
+  const wallH = H - wy;         // wall thickness
+  // Stone fill
+  ctx.fillStyle = '#4a4a5a';
+  ctx.fillRect(0, wy, W, wallH);
+  // Crenellations along the top edge
+  ctx.fillStyle = '#3a3a48';
+  const merlonW = 14, gap = 8;
+  for (let x = 2; x < W; x += merlonW + gap) {
+    ctx.fillRect(x, wy - 10, merlonW, 10);
+  }
+  // Stone texture — vertical mortar lines
+  ctx.strokeStyle = '#2a2a38';
+  ctx.lineWidth = 1;
+  for (let x = 0; x < W; x += 22) {
+    ctx.beginPath(); ctx.moveTo(x, wy); ctx.lineTo(x, H); ctx.stroke();
+  }
+  for (let y = wy; y < H; y += 14) {
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+  }
+  // Glowing wardstone rune, centered horizontally within the wall
+  const r = state.run;
+  if (r) {
+    const healthFrac = r.wall.hp / r.wall.maxHp;
+    const glow = Math.sin(Date.now() / 300) * 0.3 + 0.7;
+    ctx.globalAlpha = glow * Math.max(0.1, healthFrac);
+    const gx = W / 2, gy = wy + wallH / 2;
+    ctx.fillStyle = healthFrac > 0.5 ? '#6aa3c8' : '#c36a4a';
+    ctx.beginPath();
+    ctx.arc(gx, gy, 14, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.font = '18px Georgia';
+    ctx.fillStyle = '#fff';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('⚔', gx, gy);
+  }
+}
+
+function drawUnit(u) {
+  if (u.dead) {
+    const alpha = 1 - (u.deadTimer / 0.5);
+    ctx.globalAlpha = Math.max(0, alpha);
+  }
+  ctx.fillStyle = 'rgba(0,0,0,0.35)';
+  ctx.beginPath();
+  ctx.ellipse(u.x, u.y + u.size * 0.8, u.size * 0.8, u.size * 0.3, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  let color = u.color;
+  if (u.flashTimer > 0) color = '#fff';
+  const bob = u.attackAnim > 0 ? Math.sin(u.attackAnim * 30) * 3 : 0;
+  // Portrait: heroes face up (lunge -y), enemies face down (lunge +y)
+  const offsetY = (u.side === 'hero' && u.attackAnim > 0) ? -6 : (u.side === 'enemy' && u.attackAnim > 0) ? 6 : 0;
+
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.arc(u.x + bob, u.y + offsetY, u.size, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = u.side === 'hero' ? '#e4c77a' : '#1a0f08';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  ctx.font = (u.size * 1.2) + 'px serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(u.emoji, u.x + bob, u.y + offsetY);
+
+  if (!u.dead) {
+    const barW = u.size * 2.2;
+    const barH = 4;
+    const bx = u.x - barW / 2;
+    const by = u.y - u.size - 10;
+    ctx.fillStyle = '#1a0a0a';
+    ctx.fillRect(bx, by, barW, barH);
+    const frac = u.hp / u.maxHp;
+    ctx.fillStyle = u.side === 'hero' ? '#4ac34a' : (u.boss ? '#c34a4a' : '#c3a04a');
+    ctx.fillRect(bx, by, barW * frac, barH);
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(bx, by, barW, barH);
+
+    if (u.boss) {
+      ctx.font = 'bold 14px Georgia';
+      ctx.fillStyle = '#e4c77a';
+      ctx.strokeStyle = '#000'; ctx.lineWidth = 3;
+      ctx.textAlign = 'center';
+      ctx.strokeText(u.name, u.x, by - 6);
+      ctx.fillText(u.name, u.x, by - 6);
+    }
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawProjectile(p) {
+  ctx.save();
+  if (p.kind === 'fire') {
+    ctx.fillStyle = '#ff6a20';
+    ctx.shadowColor = '#ffaa40'; ctx.shadowBlur = 16;
+    ctx.beginPath(); ctx.arc(p.x, p.y, 9, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#ffd870';
+    ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI * 2); ctx.fill();
+  } else if (p.kind === 'arrow') {
+    ctx.strokeStyle = '#c8a060'; ctx.lineWidth = 2;
+    const ang = Math.atan2(p.vy, p.vx);
+    ctx.translate(p.x, p.y); ctx.rotate(ang);
+    ctx.beginPath(); ctx.moveTo(-10, 0); ctx.lineTo(10, 0); ctx.stroke();
+    ctx.fillStyle = '#c8a060';
+    ctx.beginPath(); ctx.moveTo(10, 0); ctx.lineTo(6, -3); ctx.lineTo(6, 3); ctx.fill();
+  } else if (p.kind === 'heal') {
+    ctx.fillStyle = '#4ac34a';
+    ctx.shadowColor = '#4ac34a'; ctx.shadowBlur = 12;
+    ctx.beginPath(); ctx.arc(p.x, p.y, 7, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.font = '14px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('✚', p.x, p.y);
+  } else if (p.kind === 'enemyArrow') {
+    ctx.strokeStyle = '#6a4a2a'; ctx.lineWidth = 2;
+    const ang = Math.atan2(p.vy, p.vx);
+    ctx.translate(p.x, p.y); ctx.rotate(ang);
+    ctx.beginPath(); ctx.moveTo(-8, 0); ctx.lineTo(8, 0); ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function shakeScreen(size = 'sm') {
+  const el = document.getElementById('game');
+  el.classList.remove('shake-sm', 'shake-lg');
+  void el.offsetWidth;
+  el.classList.add(size === 'lg' ? 'shake-lg' : 'shake-sm');
+}
+
+// ============================================================================
+// WAVE / RUN FLOW
+// ============================================================================
+// Prepare the battlefield for a wave but DO NOT spawn enemies yet.
+// This is called between waves; the player clicks Start Wave to trigger spawning.
+function prepareWave() {
+  const r = state.run;
+  // Rebuild hero roster fresh each wave from squad (ensures dead heroes respawn)
+  r.units = r.units.filter(u => u.side !== 'enemy');  // drop enemies/corpses
+  const existingIds = new Set(r.units.filter(u => u.side === 'hero').map(u => u.heroId));
+  r.squad.forEach((heroId, i) => {
+    if (!existingIds.has(heroId)) {
+      r.units.push(spawnHero(heroId, i));
+    }
+  });
+  // Fully heal & reset all heroes
+  r.units.filter(u => u.side === 'hero').forEach((h) => {
+    const idx = r.squad.indexOf(h.heroId);
+    const slot = getHeroSlot(idx >= 0 ? idx : 0, h.role);
+    h.homeX = slot.x; h.homeY = slot.y;
+    h.x = slot.x; h.y = slot.y;
+    h.hp = h.maxHp;
+    h.dead = false; h.deadTimer = 0;
+    h.shieldUsed = false;
+    h.cd = Math.random() * 0.5;
+  });
+  r.projectiles = [];
+  r.spawnQueue = [];
+  r.waveState = 'waiting';
+
+  // Show Start Wave button
+  const w = currentWaves()[r.wave - 1];
+  const ch = currentChapter();
+  const label = document.getElementById('start-wave-label');
+  label.innerHTML = 'Ch ' + ch.id + ' — Wave ' + r.wave + ' / ' + r.maxWave + (w.isBoss ? ' — BOSS' : '') + '<span class="sub">' + w.name + '</span>';
+  document.getElementById('start-wave-overlay').classList.add('active');
+  updateHUD();
+}
+
+// Actually begin spawning enemies for the prepared wave.
+function startWave() {
+  const r = state.run;
+  const w = currentWaves()[r.wave - 1];
+
+  document.getElementById('start-wave-overlay').classList.remove('active');
+
+  // Build spawn queue
+  r.spawnQueue = [];
+  for (const grp of w.enemies) {
+    for (let i = 0; i < grp.count; i++) {
+      r.spawnQueue.push({ type: grp.type, delay: grp.delay });
+    }
+  }
+  r.spawnTimer = 0.5;
+  r.waveState = 'spawning';
+
+  // Time stop if pending
+  if (r.buffs.timeStopPending > 0) {
+    r.buffs.timeStopPending--;
+    r.frozenUntil = 6;
+    pushEffect(W / 2, H / 2, '⏳ TIME STOPPED', '#6aa3c8', 24);
+  }
+
+  // Arm Miracle revives for this wave (unused charges expire on wave clear)
+  if (r.buffs.miraclePending > 0) {
+    r.buffs.miracleCharges += r.buffs.miraclePending;
+    r.buffs.miraclePending = 0;
+    pushEffect(W / 2, H / 2 - 30, '🕊️ MIRACLE READY', '#fde4a8', 22);
+  }
+
+  // Arm Divine Word execute-threshold for this wave
+  if (r.buffs.divineWordPending > 0) {
+    r.buffs.divineWordActive = 1;
+    r.buffs.divineWordPending--;
+    pushEffect(W / 2, H / 2 + 30, '⚡ DIVINE WORD', '#fff7a8', 22);
+  }
+
+  sfx.waveStart();
+  announceWave(w);
+  updateHUD();
+}
+
+function announceWave(w) {
+  const el = document.getElementById('wave-announce');
+  el.innerHTML = 'Wave ' + state.run.wave + (w.isBoss ? ' — BOSS' : '') + '<span class="sub">' + w.name + '</span>';
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 2000);
+}
+
+function startRun(chapterId) {
+  state.run = newRun(chapterId);
+  state.run.pendingOpenRoll = true;  // fire the opening dice before wave 1
+  // Park in 'waiting' so the update loop does NOT treat the empty battlefield
+  // as a wave-clear and schedule a second phantom dice roll.
+  state.run.waveState = 'waiting';
+  // Show scene first so canvas gets sized before we compute hero positions
+  showScene('battle');
+  resize();
+  deploySquad();
+  updateHUD();
+  renderSquadTray();
+  // Free opening dice roll before Wave 1. Card pick will NOT advance the wave.
+  setTimeout(() => startDiceRoll(), 400);
+}
+
+function deploySquad() {
+  const r = state.run;
+  r.units = [];
+  r.squad.forEach((heroId, i) => {
+    r.units.push(spawnHero(heroId, i));
+  });
+  // Apply bard luck aura
+  for (const id of r.squad) {
+    const h = HEROES[id];
+    if (h.luckBonus) r.buffs.luck += h.luckBonus;
+    if (h.speedAura) r.buffs.speedMult = (r.buffs.speedMult || 1) * (1 - h.speedAura);
+  }
+}
+
+function endRun(victory) {
+  const r = state.run;
+  const ch = currentChapter();
+  document.getElementById('start-wave-overlay').classList.remove('active');
+  showScene('result');
+  document.getElementById('result-overlay').classList.add(victory ? 'victory' : 'defeat');
+  document.getElementById('result-overlay').classList.remove(victory ? 'defeat' : 'victory');
+  document.getElementById('result-title').textContent = victory ? 'VICTORY!' : 'DEFEAT';
+  document.getElementById('result-text').textContent = victory
+    ? ch.bossText
+    : '"The Wardstone has fallen. The Reach mourns."';
+  // Award shards (partial on defeat)
+  let shards = r.shardsEarned;
+  if (!victory) shards = Math.floor(shards * 0.4);
+  state.save.soulShards += shards;
+  state.save.runs += 1;
+
+  // Unlock next chapter on victory
+  let unlockMsg = '';
+  if (victory) {
+    if ((state.save.chaptersCompleted || 0) < ch.id) {
+      state.save.chaptersCompleted = ch.id;
+    }
+    if (ch.id < CHAPTERS.length) {
+      unlockMsg = '<div style="margin-top:8px; color:#e4c77a;">Chapter ' + ch.id + ' Complete! Ch ' + (ch.id + 1) + ': ' + CHAPTERS[ch.id].name + ' unlocked.</div>';
+    } else {
+      unlockMsg = '<div style="margin-top:8px; color:#e4c77a;">★ ALL CHAPTERS COMPLETE ★</div>';
+    }
+  }
+
+  document.getElementById('result-rewards').innerHTML =
+    '<div>💎 Soul Shards earned: <b>+' + shards + '</b></div>' +
+    '<div style="margin-top:8px;">Heroes in roster: <b>' + Object.keys(state.save.roster).length + '/' + HERO_IDS.length + '</b></div>' +
+    unlockMsg;
+  if (victory) sfx.victory(); else sfx.defeat();
+  persistSave();
+}
+
+// ============================================================================
+// DICE ROLL
+// ============================================================================
+function startDiceRoll() {
+  const overlay = document.getElementById('dice-overlay');
+  const die = document.getElementById('d20');
+  const result = document.getElementById('dice-result');
+  const modEl = document.getElementById('dice-mod');
+
+  state.run.waveState = 'dice';
+  overlay.classList.add('active');
+  die.classList.remove('nat20', 'nat1');
+  die.classList.add('rolling');
+  result.classList.remove('show', 'nat20', 'nat1');
+  result.textContent = '';
+
+  const luck = state.run.buffs.luck || 0;
+  modEl.textContent = luck > 0 ? '+' + luck + ' Luck modifier' : (luck < 0 ? luck + ' Luck modifier' : '');
+
+  // Tumble
+  let elapsed = 0;
+  const tumbleDur = 1800 + Math.random() * 400;
+  const tumbleInterval = setInterval(() => {
+    die.textContent = randInt(1, 20);
+    sfx.diceClack();
+  }, 70);
+  setTimeout(() => {
+    clearInterval(tumbleInterval);
+    die.classList.remove('rolling');
+    const base = randInt(1, 20);
+    const effective = clamp(base + luck, 1, 30);
+    die.textContent = effective > 20 ? '20+' : effective;
+    sfx.diceLand();
+    state.run.lastRoll = effective;
+
+    if (effective >= 20) {
+      die.classList.add('nat20');
+      result.classList.add('show', 'nat20');
+      result.textContent = effective >= 25 ? '✨ DIVINE INTERVENTION ✨' : '✨ DIVINE INSPIRATION ✨';
+      sfx.nat20();
+      shakeScreen('lg');
+    } else if (base === 1) {
+      die.classList.add('nat1');
+      result.classList.add('show', 'nat1');
+      result.textContent = '💀 CRITICAL FAIL 💀';
+      sfx.nat1();
+      shakeScreen('lg');
+    } else {
+      result.classList.add('show');
+      result.textContent = getRollFlavor(effective);
+      shakeScreen('sm');
+    }
+
+    setTimeout(() => {
+      overlay.classList.remove('active');
+      presentCards(effective, base);
+    }, effective >= 20 || base === 1 ? 2400 : 1600);
+  }, tumbleDur);
+}
+
+function getRollFlavor(roll) {
+  if (roll <= 5) return 'Cursed Omen...';
+  if (roll <= 10) return 'Mixed Fate';
+  if (roll <= 14) return 'Fortune Smiles';
+  if (roll <= 17) return 'Heroic Vision';
+  if (roll === 18) return "Champion's Call";
+  if (roll === 19) return 'Legendary Omen';
+  return 'Divine Inspiration';
+}
+
+function getTiersForRoll(roll, base) {
+  // Returns array of tiers (commoner/adventurer/hero/champion/legendary)
+  if (base === 1) return ['commoner']; // forced 1 card
+  if (roll <= 5) return ['commoner', 'commoner', 'commoner'];
+  if (roll <= 10) return ['commoner', 'commoner', 'adventurer'];
+  if (roll <= 14) return ['adventurer', 'adventurer', 'adventurer'];
+  if (roll <= 17) return ['adventurer', 'adventurer', 'hero'];
+  if (roll === 18) return ['hero', 'hero', 'hero'];
+  if (roll === 19) return ['hero', 'hero', 'champion'];
+  if (roll === 20) return ['legendary', 'legendary', 'legendary'];
+  if (roll >= 25) return ['legendary', 'legendary', 'legendary']; // + bonus
+  return ['legendary', 'legendary', 'champion']; // 21-24
+}
+
+// ============================================================================
+// CARDS
+// ============================================================================
+function buildHeroCards() {
+  // Create hero cards dynamically from HEROES, categorized by tier
+  const out = [];
+  for (const id of HERO_IDS) {
+    const h = HEROES[id];
+    out.push({
+      id: 'hero_' + id,
+      kind: 'hero',
+      tier: h.tier,
+      name: h.name,
+      emoji: h.emoji,
+      heroId: id,
+      desc: h.title + '\n\n' + h.skillDesc,
+      apply: s => addHeroToRoster(id)
+    });
+  }
+  return out;
+}
+
+// Drawing a hero card joins them to THIS RUN only. Permanent unlock is
+// shop-only (Soul Shards in main menu). Ranks also live per-run on r.ranks
+// and are wiped at run end — drawing more duplicates powers them up for the
+// rest of this run only.
+function addHeroToRoster(heroId) {
+  const r = state.run;
+  if (!r) return;
+
+  if (!r.ranks[heroId]) {
+    // First time this hero appears in this run — start at rank 1.
+    r.ranks[heroId] = { rank: 1, duplicates: 0 };
+  } else {
+    // Duplicate draw — progress rank-up inside this run.
+    r.ranks[heroId].duplicates += 1;
+    const needed = rankUpCost(r.ranks[heroId].rank);
+    if (r.ranks[heroId].duplicates >= needed) {
+      r.ranks[heroId].rank = Math.min(10, r.ranks[heroId].rank + 1);
+      r.ranks[heroId].duplicates = 0;
+      // Refresh deployed unit's stats
+      const u = r.units.find(x => x.heroId === heroId);
+      if (u) {
+        const rankMult = 1 + 0.25 * (r.ranks[heroId].rank - 1);
+        u.maxHp = HEROES[heroId].hp * rankMult * (r.buffs.hpMult || 1);
+        u.hp = u.maxHp;
+        u.atk = HEROES[heroId].atk * rankMult;
+        u.heal = (HEROES[heroId].heal || 0) * rankMult;
+        u.rank = r.ranks[heroId].rank;
+      }
+    }
+  }
+
+  // No cap — player may stack as many heroes as they draw. Overcrowding a row
+  // is their problem. getHeroSlot auto-tightens spacing.
+  if (!r.squad.includes(heroId)) {
+    r.squad.push(heroId);
+    const idx = r.squad.length - 1;
+    r.units.push(spawnHero(heroId, idx));
+    // Re-home all heroes since row spacing just shifted
+    for (const u of r.units) {
+      if (u.side === 'hero') {
+        const myIdx = r.squad.indexOf(u.heroId);
+        const slot = getHeroSlot(myIdx, u.role);
+        u.homeX = slot.x; u.homeY = slot.y;
+      }
+    }
+  }
+
+  renderSquadTray();
+}
+
+function rankUpCost(fromRank) {
+  const costs = [1, 2, 4, 8, 12, 20, 30, 45, 65];
+  return costs[fromRank - 1] || 99;
+}
+
+// Weight function for card draws. Rank-ups favored; new heroes gated behind
+// a decent roll so bad rolls can never introduce a fresh hero.
+function cardDrawWeight(c, roll) {
+  if (c.kind === 'divine') return 1;
+  if (c.kind === 'hero') {
+    const inSquad = state.run.squad.includes(c.heroId);
+    if (inSquad) return 6;          // rank-up: strongly preferred
+    if (roll < 15) return 0;        // new hero gated out on mediocre rolls
+    // Champion-tier heroes: only recruitable on rolls of 20+
+    if (c.tier === 'champion' && roll < 20) return 0;
+    if (roll < 20) return 2;        // good roll: some new-hero chance
+    return 4;                       // great roll: new heroes at normal rate
+  }
+  return 2;                          // upgrade cards
+}
+
+function presentCards(roll, base) {
+  const r = state.run;
+  r.waveState = 'cards';
+  const tiers = getTiersForRoll(roll, base);
+  const allCards = buildHeroCards().concat(CARDS);
+  const choices = [];
+  const usedIds = new Set();
+  for (const t of tiers) {
+    const pool = allCards.filter(c => c.tier === t && !usedIds.has(c.id));
+    const weighted = [];
+    for (const c of pool) {
+      const weight = cardDrawWeight(c, roll);
+      for (let i = 0; i < weight; i++) weighted.push(c);
+    }
+    // If the weighted pool is empty (e.g. only new heroes at tier, low roll),
+    // fall back to whatever non-hero cards exist at that tier so the player
+    // still gets a pick. No new-hero fallback — low rolls mean no new heroes.
+    let pick;
+    if (weighted.length > 0) {
+      pick = choice(weighted);
+    } else {
+      const fallback = pool.filter(c => c.kind !== 'hero');
+      pick = fallback.length > 0 ? choice(fallback) : null;
+    }
+    if (pick) {
+      choices.push(pick);
+      usedIds.add(pick.id);
+    }
+  }
+  r.cardChoices = choices;
+  r.wasNat1 = (base === 1);
+  renderCardOverlay(choices, base === 1);
+}
+
+function renderCardOverlay(choices, forced) {
+  const row = document.getElementById('cards-row');
+  row.innerHTML = '';
+  document.getElementById('card-title').textContent = forced
+    ? '💀 Critical Fail — forced pick 💀'
+    : 'Choose Your Boon';
+  document.getElementById('card-skip').style.display = forced ? 'none' : 'inline-block';
+
+  for (const c of choices) {
+    const div = document.createElement('div');
+    div.className = 'card tier-' + c.tier;
+    let extra = '';
+    if (c.kind === 'hero') {
+      const runEntry = state.run.ranks[c.heroId];
+      const ownsPerm = isUnlocked(c.heroId);
+      if (!runEntry) {
+        const tag = ownsPerm ? 'JOIN SQUAD — Rank 1' : 'TEMP HERO — this run only';
+        extra = '<div class="card-extra">✨ ' + tag + '</div>';
+      } else {
+        const needed = rankUpCost(runEntry.rank);
+        extra = '<div class="card-extra">Rank ' + runEntry.rank + ' (' + runEntry.duplicates + '/' + needed + ' to rank up)</div>';
+      }
+    }
+    div.innerHTML =
+      '<div class="card-tier">' + TIER_LABELS[c.tier] + '</div>' +
+      '<div class="card-emoji">' + c.emoji + '</div>' +
+      '<div class="card-name">' + c.name + '</div>' +
+      '<div class="card-desc">' + c.desc.replace(/\n/g, '<br>') + '</div>' +
+      extra;
+    div.addEventListener('click', () => selectCard(c));
+    row.appendChild(div);
+  }
+  document.getElementById('card-overlay').classList.add('active');
+}
+
+function selectCard(card) {
+  sfx.cardPick();
+  card.apply(state.run);
+  state.run.cardsThisRun.push(card.id);
+  document.getElementById('card-overlay').classList.remove('active');
+  // Opening roll: free pick, wave stays at 1. Otherwise advance to next wave.
+  if (state.run.pendingOpenRoll) {
+    state.run.pendingOpenRoll = false;
+  } else {
+    state.run.wave += 1;
+  }
+  updateHUD();
+  renderSquadTray();
+  setTimeout(() => prepareWave(), 400);
+}
+
+function skipCards() {
+  document.getElementById('card-overlay').classList.remove('active');
+  if (state.run.pendingOpenRoll) {
+    state.run.pendingOpenRoll = false;
+  } else {
+    state.run.wave += 1;
+  }
+  updateHUD();
+  setTimeout(() => prepareWave(), 400);
+}
+
+// ============================================================================
+// UI / HUD
+// ============================================================================
+function updateHUD() {
+  const r = state.run;
+  if (!r) return;
+  document.getElementById('wave-text').textContent = r.wave + ' / ' + r.maxWave;
+  const fill = document.getElementById('wall-fill');
+  const frac = Math.max(0, r.wall.hp / r.wall.maxHp);
+  fill.style.width = (frac * 100) + '%';
+  document.getElementById('wall-text').textContent = Math.round(r.wall.hp) + ' / ' + r.wall.maxHp;
+  document.getElementById('luck-text').textContent = (r.buffs.luck >= 0 ? '+' : '') + r.buffs.luck;
+  document.getElementById('insp-text').textContent = r.inspiration;
+}
+
+function renderSquadTray() {
+  const tray = document.getElementById('squad-tray');
+  tray.innerHTML = '';
+  const r = state.run;
+  if (!r) return;
+  for (const heroId of r.squad) {
+    const h = HEROES[heroId];
+    const runEntry = (r.ranks && r.ranks[heroId]) || { rank: 1 };
+    const chip = document.createElement('div');
+    chip.className = 'hero-chip tier-' + h.tier;
+    const unit = r.units.find(u => u.heroId === heroId);
+    const hpFrac = unit ? (unit.hp / unit.maxHp) : 1;
+    chip.innerHTML =
+      '<div class="emoji">' + h.emoji + '</div>' +
+      '<div class="name">' + h.name.split(' ')[0] + '</div>' +
+      '<div class="mini-hp"><div class="mini-hp-fill" style="width:' + (hpFrac * 100) + '%"></div></div>' +
+      '<div class="rank">' + runEntry.rank + '</div>';
+    chip.title = h.name + ' — ' + h.title + '\n' + h.skillDesc;
+    tray.appendChild(chip);
+  }
+}
+
+function refreshMenu() {
+  document.getElementById('menu-shards').textContent = state.save.soulShards;
+  document.getElementById('menu-runs').textContent = state.save.runs;
+
+  // Chapter list
+  const chList = document.getElementById('chapter-list');
+  chList.innerHTML = '';
+  const progress = state.save.chaptersCompleted || 0;
+  for (const ch of CHAPTERS) {
+    const unlocked = (ch.id === 1) || (progress >= ch.id - 1);
+    const completed = progress >= ch.id;
+    const btn = document.createElement('button');
+    btn.className = 'btn' + (unlocked ? ' big' : ' ghost');
+    btn.disabled = !unlocked;
+    btn.style.opacity = unlocked ? '1' : '0.55';
+    btn.style.textAlign = 'left';
+    const icon = completed ? '✅' : (unlocked ? '▶' : '🔒');
+    btn.innerHTML =
+      '<div style="font-size:16px;">' + icon + ' Chapter ' + ch.id + ' — ' + ch.name + '</div>' +
+      '<div style="font-size:11px; font-style:italic; color:#b8a070; margin-top:2px;">' + ch.subtitle + '</div>';
+    btn.addEventListener('click', () => {
+      if (!unlocked) return;
+      try { getCtx().resume(); } catch (e) {}
+      startRun(ch.id);
+    });
+    chList.appendChild(btn);
+  }
+
+  // Recruit shop — one row per unowned hero, sorted by tier cost ascending
+  const shop = document.getElementById('shop-list');
+  shop.innerHTML = '';
+  const tierOrder = { commoner: 0, adventurer: 1, hero: 2, champion: 3, legendary: 4 };
+  const lockedIds = HERO_IDS.filter(id => !isUnlocked(id));
+  lockedIds.sort((a, b) => (tierOrder[HEROES[a].tier] - tierOrder[HEROES[b].tier]));
+  if (lockedIds.length === 0) {
+    shop.innerHTML = '<div class="hint" style="text-align:center; padding:8px 0;">Every hero recruited. 🏆</div>';
+  } else {
+    for (const id of lockedIds) {
+      const h = HEROES[id];
+      const cost = RECRUIT_COST[h.tier] || 100;
+      const canAfford = state.save.soulShards >= cost;
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex; align-items:center; justify-content:space-between; gap:8px; padding:6px 8px; background:rgba(40,28,18,0.5); border:1px solid #4a3a20; border-left:3px solid ' + TIER_COLORS[h.tier] + '; border-radius:4px;';
+      row.innerHTML =
+        '<div style="display:flex; flex-direction:column; min-width:0;">' +
+          '<div style="font-size:13px; color:#e4d4a8;"><span>' + h.emoji + '</span> ' + h.name + '</div>' +
+          '<div style="font-size:10px; color:' + TIER_COLORS[h.tier] + '; text-transform:uppercase; letter-spacing:1px;">' + TIER_LABELS[h.tier] + ' · ' + h.role + '</div>' +
+        '</div>';
+      const btn = document.createElement('button');
+      btn.className = 'btn ghost';
+      btn.style.cssText = 'font-size:12px; padding:6px 10px; white-space:nowrap;';
+      btn.disabled = !canAfford;
+      btn.style.opacity = canAfford ? '1' : '0.5';
+      btn.innerHTML = cost + ' 💎';
+      btn.addEventListener('click', () => {
+        if (state.save.soulShards < cost) return;
+        state.save.soulShards -= cost;
+        state.save.roster[id] = { unlocked: true };
+        persistSave();
+        refreshMenu();
+      });
+      row.appendChild(btn);
+      shop.appendChild(row);
+    }
+  }
+
+  // Roster list — owned heroes (always-available pool for starter picks)
+  const list = document.getElementById('roster-list');
+  list.innerHTML = '';
+  const ownedIds = HERO_IDS.filter(id => isUnlocked(id));
+  ownedIds.sort((a, b) => (tierOrder[HEROES[a].tier] - tierOrder[HEROES[b].tier]));
+  if (ownedIds.length === 0) {
+    list.innerHTML = '<div class="hint" style="grid-column:1/-1; text-align:center;">No heroes unlocked yet.</div>';
+  } else {
+    for (const id of ownedIds) {
+      const h = HEROES[id];
+      const row = document.createElement('div');
+      row.className = 'roster-row owned';
+      row.style.borderLeft = '3px solid ' + TIER_COLORS[h.tier];
+      row.innerHTML =
+        '<span>' + h.emoji + ' ' + h.name + '</span>' +
+        '<span style="color:#4ac34a;">✓</span>';
+      list.appendChild(row);
+    }
+  }
+}
+
+// ============================================================================
+// SCENES
+// ============================================================================
+function showScene(name) {
+  document.getElementById('menu').style.display = (name === 'menu') ? 'flex' : 'none';
+  document.getElementById('game').style.display = (name === 'battle' || name === 'result') ? 'flex' : 'none';
+  document.getElementById('result-overlay').classList.toggle('active', name === 'result');
+  if (name === 'menu') refreshMenu();
+  if (name === 'battle') {
+    setTimeout(resize, 0);
+  }
+  state.scene = name;
+}
+
+// ============================================================================
+// MAIN LOOP
+// ============================================================================
+let lastTime = performance.now();
+function loop(t) {
+  const dt = Math.min(0.05, (t - lastTime) / 1000);
+  lastTime = t;
+  if (state.scene === 'battle' && state.run) {
+    if (state.run.waveState !== 'dice' && state.run.waveState !== 'cards' && state.run.waveState !== 'result') {
+      updateBattle(dt);
+    }
+    render();
+    renderSquadTray();
+    updateHUD();
+  }
+  requestAnimationFrame(loop);
+}
+
+// ============================================================================
+// INIT
+// ============================================================================
+function init() {
+  loadSave();
+  resize();
+  refreshMenu();
+
+  document.getElementById('reset-btn').addEventListener('click', () => {
+    if (confirm('Reset all save data? This cannot be undone.')) {
+      localStorage.removeItem(SAVE_KEY);
+      state.save = { soulShards: 0, runs: 0, roster: {}, chaptersCompleted: 0 };
+      loadSave();  // re-applies DEFAULT_UNLOCKS
+      refreshMenu();
+    }
+  });
+  document.getElementById('forfeit-btn').addEventListener('click', () => {
+    if (confirm('Forfeit this run? Partial Soul Shards will be awarded.')) {
+      endRun(false);
+    }
+  });
+  document.getElementById('result-btn').addEventListener('click', () => {
+    state.run = null;
+    document.getElementById('result-overlay').classList.remove('active', 'victory', 'defeat');
+    showScene('menu');
+  });
+  document.getElementById('card-skip').addEventListener('click', skipCards);
+  document.getElementById('start-wave-btn').addEventListener('click', () => {
+    try { getCtx().resume(); } catch (e) {}
+    if (state.run && state.run.waveState === 'waiting') startWave();
+  });
+
+  showScene('menu');
+  requestAnimationFrame(loop);
+}
+
+init();
+
+</script>
+</body>
+</html>
