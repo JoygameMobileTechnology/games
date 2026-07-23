@@ -227,6 +227,24 @@ test('cicek_ozu: bankadayken çiçek ekilince otomatik kullanılır', () => {
   assert.equal(g.bank.cicek_ozu, 0);
   assert.ok(evs.some(e => e.kind === 'variant'), 'ekim sonrası banka özü varyanta dönüşmeli');
 });
+test('move: motions kimlik takibi için kaynak→hedef verir', () => {
+  const b = C.emptyBoard(); b[0][0] = 2; b[0][2] = 2; b[3][1] = 4;
+  const r = C.move(b, 'left');
+  const m00 = r.motions.find(m => m.fromY === 0 && m.fromX === 0);
+  const m02 = r.motions.find(m => m.fromY === 0 && m.fromX === 2);
+  assert.deepEqual([m00.toY, m00.toX, m00.merged, m00.survivor], [0, 0, true, true]);
+  assert.deepEqual([m02.toY, m02.toX, m02.merged, m02.survivor], [0, 0, true, false]);
+  const m31 = r.motions.find(m => m.fromY === 3 && m.fromX === 1);
+  assert.deepEqual([m31.toY, m31.toX, m31.merged, m31.survivor], [3, 0, false, true]);
+});
+test('move down: motions sütun koordinatları doğru', () => {
+  const b = C.emptyBoard(); b[0][2] = 4; b[2][2] = 4;
+  const r = C.move(b, 'down');
+  const src = r.motions.find(m => m.fromY === 0 && m.fromX === 2);
+  const dst = r.motions.find(m => m.fromY === 2 && m.fromX === 2);
+  assert.deepEqual([src.toY, src.toX, src.survivor], [3, 2, false]);
+  assert.deepEqual([dst.toY, dst.toX, dst.survivor], [3, 2, true]);
+});
 test('deserialize: bozuk bahçe içi alanlar temizlenir', () => {
   const bad = JSON.stringify({ garden: { unlocked: 99, plots: 'x', variants: null, animals: 'y', bank: null } });
   const st = C.deserialize(bad);

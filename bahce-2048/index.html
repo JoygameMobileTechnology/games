@@ -17,24 +17,51 @@
            scroll-snap-type:x mandatory; border-radius:0 0 16px 16px; scrollbar-width:none; }
   #garden::-webkit-scrollbar{ display:none; }
   .zone{ position:relative; flex:0 0 100%; height:100%; scroll-snap-align:start; overflow:hidden; }
-  .zone.z-cayir{ background:linear-gradient(#bfe3f7,#a5d06e 55%,#8bc34a); }
-  .zone.z-koru { background:linear-gradient(#a8cbe8,#6d9e4f 50%,#4e7a37); }
-  .zone.z-golet{ background:linear-gradient(#bfe3f7,#8ecfd8 55%,#5aa8b8); }
-  .zone.z-anit { background:linear-gradient(#e8d9f0,#c9b97a 55%,#a08c4a); }
-  .zone.locked{ filter:grayscale(1) brightness(.75); display:flex; align-items:center; justify-content:center;
-                font-size:34px; color:#fff; }
-  .zone-name{ position:absolute; top:6px; left:10px; font-size:11px; font-weight:800; color:#ffffffd9;
-              text-shadow:0 1px 2px #0006; letter-spacing:.5px; }
-  .slot{ position:absolute; transform:translate(-50%,-50%); font-size:22px; line-height:1;
-         filter:drop-shadow(0 1px 1px #0003); }
-  .slot.empty{ width:14px; height:14px; border:2px dashed #ffffff66; border-radius:5px; font-size:0; }
-  .slot.big{ font-size:34px; }
+  .zone.z-cayir{ background:linear-gradient(#aedcf5 0%,#cfe9c3 40%,#9fcf70 58%,#7fb654 100%); }
+  .zone.z-koru { background:linear-gradient(#9cc4e4 0%,#a8cf94 32%,#6da452 52%,#4e7a37 100%); }
+  .zone.z-golet{ background:linear-gradient(#aedcf5 0%,#cde9d4 36%,#8ecfd8 58%,#5aa8b8 100%); }
+  .zone.z-anit { background:linear-gradient(#f6ddb4 0%,#eac89a 38%,#cfae74 58%,#a08c4a 100%); }
+  .zone.locked{ filter:grayscale(.85) brightness(.8); }
+  .lockmsg{ position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;
+            gap:3px; color:#fff; text-shadow:0 1px 3px #0008; font-size:26px; }
+  .lockmsg b{ font-size:14px; } .lockmsg small{ font-size:10px; opacity:.9; }
+
+  /* Sahne dekoru */
+  .sun{ position:absolute; top:10px; right:14px; width:30px; height:30px; border-radius:50%; z-index:1;
+        background:radial-gradient(circle at 35% 35%,#fff6c9,#ffd95e 70%); box-shadow:0 0 22px #ffd95e77; }
+  .cloud{ position:absolute; width:52px; height:15px; border-radius:10px; background:#ffffffcc; z-index:1;
+          box-shadow:13px -6px 0 -2px #ffffffbb; animation:drift 46s ease-in-out infinite alternate; }
+  @keyframes drift{ to{ transform:translateX(52px); } }
+  .hillband{ position:absolute; left:-12%; width:124%; height:46%; border-radius:50%; z-index:1; }
+  .pond{ position:absolute; left:50%; top:52%; width:46%; height:19%; transform:translate(-50%,-50%); z-index:1;
+         border-radius:50%; background:radial-gradient(ellipse at 45% 40%,#d6f0f6,#8fd0e0 60%,#6db8cc);
+         box-shadow:inset 0 3px 8px #00000022; }
+  .bgdeco{ position:absolute; transform:translate(-50%,-50%); z-index:1; opacity:.4; filter:saturate(.7); }
+
+  /* Ekim patikası */
+  .path{ position:absolute; left:4%; right:4%; bottom:8%; height:25%; border-radius:14px; z-index:2;
+         background:linear-gradient(#e6cf9e,#d0b47c); box-shadow:inset 0 3px 6px #00000022, 0 2px 4px #0002; }
+  .z-anit .path{ background:linear-gradient(#ece4d4,#cabf9f); }
+  .pslot{ position:absolute; bottom:22%; transform:translateX(-50%); font-size:clamp(15px,4.4vw,21px); line-height:1;
+          filter:drop-shadow(0 2px 2px #0004); z-index:3; }
+  .pslot.empty{ width:11px; height:11px; border-radius:50%; background:#00000014; border:2px solid #0000000e; bottom:30%; }
+  .bgslot{ position:absolute; transform:translate(-50%,-50%); font-size:clamp(21px,6.4vw,31px); line-height:1;
+           filter:drop-shadow(0 3px 3px #0004); z-index:2; }
+  .bgslot.empty{ width:16px; height:16px; border-radius:50%; background:#ffffff26; border:2px dashed #ffffff4d; }
   .slot.bloom{ animation:bloom .5s ease; }
-  @keyframes bloom{ 0%{ transform:translate(-50%,-50%) scale(0); } 70%{ transform:translate(-50%,-50%) scale(1.35); }
-                    100%{ transform:translate(-50%,-50%) scale(1); } }
-  .animal{ position:absolute; font-size:16px; animation:roam 9s ease-in-out infinite alternate; }
-  @keyframes roam{ from{ transform:translate(0,0); } to{ transform:translate(46px,-16px); } }
-  #bank{ position:absolute; right:6px; top:6px; display:flex; flex-direction:column; gap:2px; z-index:5;
+  @keyframes bloom{ 0%{ scale:0; } 70%{ scale:1.35; } 100%{ scale:1; } }
+  .sway{ transform-origin:50% 100%; animation:sway 3.6s ease-in-out infinite alternate; }
+  @keyframes sway{ from{ rotate:-3deg; } to{ rotate:3deg; } }
+  .animal{ position:absolute; font-size:16px; z-index:2; animation:roam 9s ease-in-out infinite alternate; }
+  @keyframes roam{ from{ transform:translate(0,0); } to{ transform:translate(46px,-14px); } }
+
+  /* Bölge ilerleme başlığı */
+  .zone-head{ position:absolute; top:6px; left:10px; z-index:6; color:#fff; text-shadow:0 1px 3px #0007; }
+  .zone-head .zn{ font-weight:800; font-size:12px; letter-spacing:.3px; }
+  .zone-head .bar{ display:block; width:104px; height:5px; background:#ffffff4d; border-radius:3px; margin-top:3px; }
+  .zone-head .bar i{ display:block; height:100%; background:#ffe082; border-radius:3px; transition:width .4s ease; }
+  .zone-head .nx{ font-size:10px; opacity:.92; display:block; margin-top:2px; }
+  #bank{ position:absolute; right:8px; top:46px; display:flex; flex-direction:column; gap:2px; z-index:5;
          font-size:11px; font-weight:700; color:#fff; text-shadow:0 1px 2px #0008; }
   #zone-dots{ position:absolute; bottom:4px; left:50%; transform:translateX(-50%); display:flex; gap:5px; z-index:5; }
   #zone-dots i{ width:6px; height:6px; border-radius:50%; background:#ffffff77; }
@@ -55,12 +82,16 @@
           border-radius:10px; }
   .cell,.tile{ position:absolute; width:22%; aspect-ratio:1; border-radius:6px; }
   .cell{ background:var(--cell); }
-  .tile{ display:flex; flex-direction:column; overflow:hidden; z-index:2; }
+  .tile{ display:flex; flex-direction:column; overflow:hidden; z-index:2; will-change:left,top;
+         transition:left 130ms cubic-bezier(.25,.8,.3,1), top 130ms cubic-bezier(.25,.8,.3,1); }
   .tile .ico{ flex:1; display:flex; align-items:center; justify-content:center; font-size:clamp(20px,6vw,32px); }
   .tile .num{ width:100%; text-align:center; background:rgba(255,255,255,.82); font-weight:800;
               font-size:clamp(11px,3.4vw,16px); line-height:1.4; color:#33691e; }
-  .tile.pop{ animation:pop .18s ease; }
-  @keyframes pop{ from{ transform:scale(.4); } to{ transform:scale(1); } }
+  /* tek seferlik animasyonlar; sınıf animationend'de kaldırılır (2048-vs deseni) */
+  .tile.spawn{ animation:spawn 180ms 100ms cubic-bezier(.3,1.4,.5,1) backwards; }
+  @keyframes spawn{ from{ scale:0; opacity:0; } }
+  .tile.pop{ animation:pop 180ms ease; }
+  @keyframes pop{ 45%{ scale:1.2; } }
 
   /* Emisyon parçacığı */
   .particle{ position:fixed; z-index:50; font-size:22px; pointer-events:none;
@@ -102,19 +133,29 @@ const SIZE = 4;
 
 function emptyBoard() { return Array.from({ length: SIZE }, () => Array(SIZE).fill(0)); }
 
-// Bir satırı sola kaydırır. merges: [{value, idx}] — idx: birleşmenin sonuç satırındaki konumu
+// Bir satırı sola kaydırır. merges: [{value, idx}] — idx: birleşmenin sonuç satırındaki konumu.
+// motions: her dolu hücrenin kaynak→hedef eşlemesi (UI'nin kimlik takipli kayma animasyonu için);
+// survivor=false olan tile hedefe kayar ve birleşmede yok olur.
 function slideRow(row) {
-  const vals = row.filter(v => v);
-  const out = [], merges = []; let gained = 0;
-  for (let i = 0; i < vals.length; i++) {
-    if (vals[i] === vals[i + 1]) {
-      const nv = vals[i] * 2;
-      out.push(nv); merges.push({ value: nv, idx: out.length - 1 });
-      gained += nv; i++;
-    } else out.push(vals[i]);
+  const vals = [];
+  row.forEach((v, i) => { if (v) vals.push({ v, i }); });
+  const out = [], merges = [], motions = []; let gained = 0;
+  for (let k = 0; k < vals.length; k++) {
+    if (vals[k + 1] && vals[k].v === vals[k + 1].v) {
+      const nv = vals[k].v * 2;
+      out.push(nv);
+      const to = out.length - 1;
+      merges.push({ value: nv, idx: to });
+      motions.push({ from: vals[k].i, to, merged: true, survivor: true });
+      motions.push({ from: vals[k + 1].i, to, merged: true, survivor: false });
+      gained += nv; k++;
+    } else {
+      out.push(vals[k].v);
+      motions.push({ from: vals[k].i, to: out.length - 1, merged: false, survivor: true });
+    }
   }
   while (out.length < SIZE) out.push(0);
-  return { row: out, gained, merges };
+  return { row: out, gained, merges, motions };
 }
 
 function emissionFor(v) {
@@ -144,18 +185,22 @@ function move(board, dir) {
     up:    (i, j) => [j, i],
     down:  (i, j) => [SIZE - 1 - j, i],
   }[dir];
-  let gained = 0, moved = false; const merges = [];
+  let gained = 0, moved = false; const merges = [], motions = [];
   for (let i = 0; i < SIZE; i++) {
     const line = get(i);
     const res = slideRow(line);
     if (res.row.join() !== line.join()) moved = true;
     gained += res.gained;
     for (const m of res.merges) { const [y, x] = toYX(i, m.idx); merges.push({ value: m.value, y, x }); }
+    for (const m of res.motions) {
+      const [fy, fx] = toYX(i, m.from), [ty, tx] = toYX(i, m.to);
+      motions.push({ fromY: fy, fromX: fx, toY: ty, toX: tx, merged: m.merged, survivor: m.survivor });
+    }
     set(i, res.row);
   }
   const emissions = merges.filter(m => m.value >= 64)
     .map(m => ({ type: emissionFor(m.value), y: m.y, x: m.x }));
-  return { board: b, gained, merges, emissions, moved };
+  return { board: b, gained, merges, emissions, motions, moved };
 }
 
 // rnd çağrı sırası sözleşmedir: önce konum, sonra değer (deterministik replay için)
@@ -326,28 +371,69 @@ const iconFor = v => ICONS[v] || '⭐';
 let state = C.deserialize(localStorage.getItem(C.STATE_KEY));
 function save() { localStorage.setItem(C.STATE_KEY, C.serialize(state)); }
 
-// --- Tahta render (re-render + pop; kayma animasyonu v1'de yok, juice emisyonda) ---
+// --- Tahta render: kimlik takipli tile'lar (2048-vs tarzı kayma + pop + gecikmeli spawn) ---
 const POS = i => (2.5 + i * 24.5) + '%';   // 4 hücre + aralıklar
-function renderBoard(popCells) {
+const MOVE_MS = 130;
+let tileEls = new Map();   // "y:x" -> tile elementi (state.board ile senkron)
+let animating = false;
+
+function setTilePos(el, y, x) {
+  el.style.left = POS(x); el.style.top = POS(y);
+  el.dataset.pos = y + ':' + x;
+}
+function setTileValue(el, v) {
+  el.style.background = tileBg(v);
+  el.innerHTML = `<div class="ico">${iconFor(v)}</div><div class="num">${v}</div>`;
+}
+function createTile(v, y, x, isSpawn) {
+  const el = document.createElement('div');
+  el.className = 'tile' + (isSpawn ? ' spawn' : '');
+  setTilePos(el, y, x);
+  setTileValue(el, v);
+  el.addEventListener('animationend', e => el.classList.remove(e.animationName)); // 'spawn' | 'pop'
+  $('#board').appendChild(el);
+  return el;
+}
+function renderBoard() {   // tam yeniden kurulum: açılış ve yeni koşu
   const board = $('#board');
   board.innerHTML = '';
+  tileEls = new Map();
   for (let y = 0; y < C.SIZE; y++) for (let x = 0; x < C.SIZE; x++) {
     const cell = document.createElement('div');
     cell.className = 'cell';
     cell.style.left = POS(x); cell.style.top = POS(y);
     board.appendChild(cell);
     const v = state.board[y][x];
-    if (!v) continue;
-    const t = document.createElement('div');
-    t.className = 'tile' + (popCells && popCells.has(y + ':' + x) ? ' pop' : '');
-    t.dataset.pos = y + ':' + x;
-    t.style.left = POS(x); t.style.top = POS(y);
-    t.style.background = tileBg(v);
-    t.innerHTML = `<div class="ico">${iconFor(v)}</div><div class="num">${v}</div>`;
-    board.appendChild(t);
+    if (v) tileEls.set(y + ':' + x, createTile(v, y, x, false));
   }
+  updateHud();
+}
+function updateHud() {
   $('#score').textContent = state.score;
   $('#best').textContent = state.best;
+}
+// motions'a göre kaydır; MOVE_MS sonra birleşenleri güncelle + spawn'ı göster
+function animateMove(r) {
+  const next = new Map();
+  for (const m of r.motions) {
+    const el = tileEls.get(m.fromY + ':' + m.fromX);
+    if (!el) continue;
+    setTilePos(el, m.toY, m.toX);
+    if (m.survivor) next.set(m.toY + ':' + m.toX, el);
+    else setTimeout(() => el.remove(), MOVE_MS);   // hedefe kayar, birleşme anında yok olur
+  }
+  tileEls = next;
+  setTimeout(() => {
+    for (const mg of r.merges) {
+      const el = tileEls.get(mg.y + ':' + mg.x);
+      if (el) { setTileValue(el, mg.value); el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop'); }
+    }
+    for (let y = 0; y < C.SIZE; y++) for (let x = 0; x < C.SIZE; x++) {
+      const v = state.board[y][x], key = y + ':' + x;
+      if (v && !tileEls.has(key)) tileEls.set(key, createTile(v, y, x, true));
+    }
+    updateHud();
+  }, MOVE_MS);
 }
 function tileBg(v) {
   const tier = Math.min(10, Math.log2(v) - 1);
@@ -364,22 +450,25 @@ function startRun() {
 }
 
 function handleMove(dir) {
-  if (!state.board) return;
+  if (!state.board || animating) return;
   const r = C.move(state.board, dir);
   if (!r.moved) return;
+  animating = true;
   state.board = C.spawn(r.board, Math.random);
   state.score += r.gained;
   state.best = Math.max(state.best, state.score);
-  const pop = new Set(r.merges.map(m => m.y + ':' + m.x));
   const emitted = [];
   for (const em of r.emissions) {
     state.runEmissions++;
     emitted.push({ em, events: C.applyResource(state.garden, em.type, Math.random) });
   }
   touchLastSeen();
-  renderBoard(pop);
-  onEmissions(emitted);
-  if (!C.canMove(state.board)) showGameOver();
+  animateMove(r);
+  setTimeout(() => {
+    animating = false;
+    onEmissions(emitted);            // partikül kaynağı: kayma bittiğinde tile hedef konumunda
+    if (!C.canMove(state.board)) showGameOver();
+  }, MOVE_MS + 20);
 }
 const EMIT_ICON = { tohum_tozu:'✨', cicek_ozu:'💧', meyve:'🍎', nadir_tohum:'🎁', agac_fidani:'🌱', efsanevi:'🏆' };
 
@@ -526,31 +615,97 @@ function slotArt(zone, i) {
   return SLOT_ART[slot.type][plot.stage - 1];
 }
 
+const ZONE_EMOJI = { cayir: '🌼', koru: '🌲', golet: '💧', anit: '🏛️' };
+// Manzara fonundaki büyük öğe konumları (%) — bölge başına, zoneLayout sırasıyla eşleşir
+const BG_SPOTS = [
+  [[22, 52], [52, 44], [80, 52]],                                   // çayır: 3 çalı
+  [[14, 50], [38, 42], [64, 50], [86, 44], [28, 62], [74, 62]],     // koru: 4 çalı + 2 nadir
+  [[14, 46], [86, 46], [26, 64], [74, 64], [50, 30], [50, 67]],     // gölet: 3 çalı + 2 nadir + 1 peyzaj (gölün altında)
+  [[28, 50], [72, 50], [14, 42], [86, 42]],                         // anıt: 2 peyzaj + 2 prestij
+];
+
+// Küçük bitkiler (çiçek; çiçeği olmayan bölgede nadir) patikaya soldan sağa dizilir,
+// geri kalanı manzara fonundaki noktalara yerleşir.
+function zoneLayout(z) {
+  const zone = C.ZONES[z];
+  const pathType = zone.slots.some(s => s.type === 'cicek') ? 'cicek' : 'nadir';
+  const small = [], big = [];
+  zone.slots.forEach((s, i) => (s.type === pathType ? small : big).push(i));
+  const pos = {};
+  small.forEach((idx, k) => { pos[idx] = { path: true, x: (k + 0.5) * (100 / small.length) }; });
+  big.forEach((idx, k) => {
+    const p = BG_SPOTS[z][k % BG_SPOTS[z].length];
+    pos[idx] = { path: false, x: p[0], y: p[1] };
+  });
+  return pos;
+}
+
+function zoneDecor(el, id) {
+  const add = (cls, style) => { const d = document.createElement('div'); d.className = cls; Object.assign(d.style, style); el.appendChild(d); return d; };
+  if (id === 'cayir' || id === 'golet') add('sun');
+  if (id === 'cayir') {
+    add('cloud', { top: '20px', left: '28%' });
+    add('hillband', { bottom: '14%', background: '#00000010' });
+  }
+  if (id === 'koru') for (const [x, y] of [[10, 26], [32, 22], [58, 24], [84, 27]]) {
+    const d = add('bgdeco', { left: x + '%', top: y + '%', fontSize: '26px' }); d.textContent = '🌲';
+  }
+  if (id === 'golet') { const p = document.createElement('div'); p.className = 'pond'; el.appendChild(p); }
+  if (id === 'anit') { const d = add('bgdeco', { left: '50%', top: '24%', fontSize: '34px', opacity: .3 }); d.textContent = '🏛️'; }
+}
+
 function renderGarden(bloomKeys) {
   const garden = $('#garden');
   garden.innerHTML = '';
+  const nextLockedName = state.garden.unlocked < C.ZONES.length ? C.ZONES[state.garden.unlocked].name : null;
   C.ZONES.forEach((zone, z) => {
     const el = document.createElement('div');
     el.className = 'zone z-' + zone.id + (z >= state.garden.unlocked ? ' locked' : '');
     el.dataset.zone = z;
-    if (z >= state.garden.unlocked) { el.textContent = '🔒'; garden.appendChild(el); return; }
-    el.innerHTML = `<span class="zone-name">${zone.name}</span>`;
+    if (z >= state.garden.unlocked) {
+      el.innerHTML = `<div class="lockmsg">🔒<b>${zone.name}</b><small>${C.ZONES[z - 1].name} bölgesini tamamla</small></div>`;
+      garden.appendChild(el); return;
+    }
+    zoneDecor(el, zone.id);
+    // İlerleme başlığı
+    const total = zone.slots.length;
+    const filled = zone.slots.filter((_, i) => state.garden.plots[z + ':' + i]).length;
+    const done = filled === total;
+    const head = document.createElement('div');
+    head.className = 'zone-head';
+    head.innerHTML =
+      `<span class="zn">${ZONE_EMOJI[zone.id]} ${zone.name} · ${filled}/${total}${done ? ' ✓' : ''}</span>` +
+      `<span class="bar"><i style="width:${Math.round(filled / total * 100)}%"></i></span>` +
+      (!done && nextLockedName && z === C.activeZone(state.garden)
+        ? `<span class="nx">Sıradaki: ${nextLockedName} 🔒</span>` : '');
+    el.appendChild(head);
+    // Patika + slotlar
+    const path = document.createElement('div'); path.className = 'path'; el.appendChild(path);
+    const layout = zoneLayout(z);
     zone.slots.forEach((slot, i) => {
       const key = z + ':' + i;
-      const s = document.createElement('div');
       const art = slotArt(z, i);
-      s.className = 'slot' + (art ? '' : ' empty') + (slot.type === 'peyzaj' || slot.type === 'prestij' ? ' big' : '')
-        + (bloomKeys && bloomKeys.has(key) ? ' bloom' : '');
+      const plot = state.garden.plots[key];
+      const blooming = bloomKeys && bloomKeys.has(key);
+      const L = layout[i];
+      const s = document.createElement('div');
       s.dataset.key = key;
-      s.style.left = slot.x + '%'; s.style.top = slot.y + '%';
-      if (art) s.textContent = art;
-      el.appendChild(s);
+      const base = L.path ? 'slot pslot' : 'slot bgslot';
+      s.className = base + (art ? '' : ' empty') + (blooming ? ' bloom' : '')
+        + (art && plot && plot.stage >= 2 && !blooming ? ' sway' : '');
+      if (L.path) { s.style.left = L.x + '%'; path.appendChild(s); }
+      else { s.style.left = L.x + '%'; s.style.top = L.y + '%'; el.appendChild(s); }
+      if (art) {
+        s.textContent = art;
+        if (!blooming) s.style.animationDelay = ((i % 5) * 0.55) + 's';   // salınımlar senkron olmasın
+      }
     });
+    // Hayvanlar manzara katında gezinir
     for (let a = 0; a < state.garden.animals[z]; a++) {
       const an = document.createElement('div');
       an.className = 'animal';
       an.textContent = ANIMALS[a % ANIMALS.length];
-      an.style.left = (15 + a * 25) + '%'; an.style.top = (20 + a * 8) + '%';
+      an.style.left = (16 + a * 26) + '%'; an.style.top = (26 + (a % 2) * 12) + '%';
       an.style.animationDelay = (a * 1.3) + 's';
       el.appendChild(an);
     }
