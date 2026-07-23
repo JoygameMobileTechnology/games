@@ -364,8 +364,8 @@ function handleMove(dir) {
   }
   touchLastSeen();
   renderBoard(pop);
-  onEmissions(emitted);                            // Task 8-9'da doldurulacak
-  if (!C.canMove(state.board)) showGameOver();     // Task 12'de doldurulacak
+  onEmissions(emitted);
+  if (!C.canMove(state.board)) showGameOver();
 }
 const EMIT_ICON = { tohum_tozu:'✨', cicek_ozu:'💧', meyve:'🍎', nadir_tohum:'🎁', agac_fidani:'🌱', efsanevi:'🏆' };
 
