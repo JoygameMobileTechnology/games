@@ -403,14 +403,19 @@ function flyParticle(em, events) {
     p.style.left = (tr.left + tr.width / 2) + 'px';
     p.style.top = (tr.top + tr.height / 2) + 'px';
   }));
-  p.addEventListener('transitionend', () => {
+  let finished = false;
+  const finish = () => {
+    if (finished) return;
+    finished = true;
     p.remove();
     if (plant) {
       const slotEl = document.querySelector(`.slot[data-key="${plant.zone}:${plant.slot}"]`);
       if (slotEl) { slotEl.classList.remove('bloom'); void slotEl.offsetWidth; slotEl.classList.add('bloom'); }
     }
     playChime(em.type);
-  }, { once: true });
+  };
+  p.addEventListener('transitionend', finish, { once: true });
+  setTimeout(finish, 800);
 }
 function playChime(type) {}   // stub — Task 10
 function showGameOver() {}             // placeholder — Task 12
