@@ -289,7 +289,7 @@ function deserialize(json) {
     if (!o || typeof o !== 'object' || Array.isArray(o) || !o.garden) return defaultState();
     const st = Object.assign(defaultState(), o);
     if (st.board && !(Array.isArray(st.board) && st.board.length === SIZE &&
-        st.board.every(r => Array.isArray(r) && r.length === SIZE && r.every(v => typeof v === 'number')))) st.board = null;
+        st.board.every(r => Array.isArray(r) && r.length === SIZE && r.every(v => Number.isInteger(v) && v >= 0)))) st.board = null;
     st.garden = Object.assign(newGarden(), o.garden);
     return st;
   } catch { return defaultState(); }
@@ -367,13 +367,52 @@ function handleMove(dir) {
   onEmissions(emitted);                            // Task 8-9'da doldurulacak
   if (!C.canMove(state.board)) showGameOver();     // Task 12'de doldurulacak
 }
+const EMIT_ICON = { tohum_tozu:'✨', cicek_ozu:'💧', meyve:'🍎', nadir_tohum:'🎁', agac_fidani:'🌱', efsanevi:'🏆' };
+
 function onEmissions(emitted) {
   if (!emitted.length) return;
   const blooms = new Set();
+  let unlockedZone = null;
   for (const { events } of emitted)
-    for (const e of events) if (e.kind === 'plant') blooms.add(e.zone + ':' + e.slot);
+    for (const e of events) {
+      if (e.kind === 'plant') blooms.add(e.zone + ':' + e.slot);
+      if (e.kind === 'unlock') unlockedZone = e.zone;
+    }
   renderGarden(blooms);
+  if (unlockedZone !== null) scrollToZone(unlockedZone);
+  for (const { em, events } of emitted) flyParticle(em, events);
 }
+
+function flyParticle(em, events) {
+  const from = document.querySelector(`.tile[data-pos="${em.y}:${em.x}"]`) || $('#board');
+  const fr = from.getBoundingClientRect();
+  // Hedef: ekilen slot; yoksa (variant/hayvan/banka) bahçe panelinin ilgili köşesi
+  const plant = events.find(e => e.kind === 'plant');
+  let target;
+  if (plant) target = document.querySelector(`.slot[data-key="${plant.zone}:${plant.slot}"]`);
+  if (!target && events.some(e => e.kind === 'bank')) target = $('#bank');
+  if (!target) target = $('#garden-wrap');
+  const tr = target.getBoundingClientRect();
+  const p = document.createElement('div');
+  p.className = 'particle';
+  p.textContent = EMIT_ICON[em.type] || '✨';
+  p.style.left = (fr.left + fr.width / 2) + 'px';
+  p.style.top = (fr.top + fr.height / 2) + 'px';
+  document.body.appendChild(p);
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    p.style.left = (tr.left + tr.width / 2) + 'px';
+    p.style.top = (tr.top + tr.height / 2) + 'px';
+  }));
+  p.addEventListener('transitionend', () => {
+    p.remove();
+    if (plant) {
+      const slotEl = document.querySelector(`.slot[data-key="${plant.zone}:${plant.slot}"]`);
+      if (slotEl) { slotEl.classList.remove('bloom'); void slotEl.offsetWidth; slotEl.classList.add('bloom'); }
+    }
+    playChime(em.type);
+  }, { once: true });
+}
+function playChime(type) {}   // stub — Task 10
 function showGameOver() {}             // placeholder — Task 12
 
 // --- Bahçe render ---
@@ -430,7 +469,7 @@ function renderGarden(bloomKeys) {
   });
   // Banka rozetleri
   $('#bank').innerHTML = Object.entries(state.garden.bank)
-    .filter(([, n]) => n > 0)
+    .filter(([t, n]) => BANK_ICON[t] && n > 0)
     .map(([t, n]) => `<span>${BANK_ICON[t]}×${n}</span>`).join('');
   // Bölge noktaları
   $('#zone-dots').innerHTML = C.ZONES.map((_, z) => `<i${z === C.activeZone(state.garden) ? ' class="on"' : ''}></i>`).join('');
@@ -450,7 +489,7 @@ let touchStart = null;
 const boardWrap = $('#board-wrap');
 boardWrap.addEventListener('pointerdown', e => { if (e.isPrimary) touchStart = [e.clientX, e.clientY]; });
 boardWrap.addEventListener('pointerup', e => {
-  if (!touchStart) return;
+  if (!e.isPrimary || !touchStart) return;
   const dx = e.clientX - touchStart[0], dy = e.clientY - touchStart[1];
   touchStart = null;
   if (Math.max(Math.abs(dx), Math.abs(dy)) < 24) return;
@@ -469,7 +508,7 @@ scrollToZone(C.activeZone(state.garden), false);
 if (new URLSearchParams(location.search).get('debug') === '1') {
   const bar = document.createElement('div');
   bar.id = 'debug';
-  for (const t of ['tohum_tozu', 'cicek_ozu', 'meyve', 'nadir_tohum', 'agac_fidani', 'efsanevi']) {
+  for (const t of Object.keys(BANK_ICON)) {
     const b = document.createElement('button');
     b.textContent = t;
     b.onclick = () => {
