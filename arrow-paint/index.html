@@ -299,7 +299,8 @@ const DPALETTES = [
   { name:'Şeker',     colors:['#c9366e','#ff5d8f','#ff9fb8','#9d4edd','#5fb8ff'] },
   { name:'Gece',      colors:['#22223b','#4a4e69','#9a8c98','#c9ada7','#f2e9e4'] },
 ];
-const DSIZES = [[7,8,5],[7,9,6],[8,9,6],[8,10,7],[8,11,8],[9,12,9]]; // [C,R,ok sayısı]
+// [C, R, ok sayısı, kalın (2 birim) ok sayısı] — basitten zora
+const DSIZES = [[5,6,3,0],[6,7,4,0],[6,8,4,1],[7,8,5,1],[7,9,6,1],[8,10,6,2],[8,11,7,2],[9,12,8,3]];
 
 /* ================= Durum ================= */
 let mode = null;                 // 'resim' | 'desen'
@@ -362,6 +363,68 @@ function rayCells(cells, C, R){
   x += d[0]; y += d[1];
   while (x >= 0 && x < C && y >= 0 && y < R){ out.push([x, y]); x += d[0]; y += d[1]; }
   return out;
+}
+
+/* Kalın (2 hücre genişliğinde) yılan: 2x2 blokların yürüyüşü.
+   Ardışık bloklar 2 hücre paylaşır; yeni hücreler başka oka veya
+   kendi eski gövdesine değemez. */
+function thickWalk(occ, C, R, targetLen){
+  const block = (x, y) => [[x,y],[x+1,y],[x,y+1],[x+1,y+1]];
+  const starts = [];
+  for (let y = 0; y < R - 1; y++)
+    for (let x = 0; x < C - 1; x++)
+      if (block(x, y).every(([cx, cy]) => occ[cy * C + cx] < 0)) starts.push([x, y]);
+  if (!starts.length) return null;
+  let cur = starts[(Math.random() * starts.length) | 0];
+  const anchors = [cur];
+  const own = new Set(block(cur[0], cur[1]).map(([x, y]) => y * C + x));
+  let lastDir = -1;
+  while (anchors.length < targetLen){
+    const [ax, ay] = anchors[anchors.length - 1];
+    const opts = [];
+    for (let d = 0; d < 4; d++){
+      const nx = ax + DIRS[d][0], ny = ay + DIRS[d][1];
+      if (nx < 0 || nx > C - 2 || ny < 0 || ny > R - 2) continue;
+      const fresh = block(nx, ny).filter(([cx, cy]) =>
+        !block(ax, ay).some(([bx, by]) => bx === cx && by === cy));
+      if (!fresh.every(([cx, cy]) => occ[cy * C + cx] < 0 && !own.has(cy * C + cx))) continue;
+      opts.push(d);
+      if (d === lastDir) opts.push(d, d);
+    }
+    if (!opts.length) break;
+    const d = opts[(Math.random() * opts.length) | 0];
+    const nxt = [anchors[anchors.length - 1][0] + DIRS[d][0], anchors[anchors.length - 1][1] + DIRS[d][1]];
+    anchors.push(nxt);
+    for (const [cx, cy] of block(nxt[0], nxt[1])) own.add(cy * C + cx);
+    lastDir = d;
+  }
+  if (anchors.length < 3) return null;
+  return { anchors, cells: [...own].map(i => [i % C, (i / C) | 0]) };
+}
+
+/* Desen tahtası: engel olmadığından soyma testi gerekmez;
+   önce kalın, sonra ince oklar yerleştirilir. */
+function genBoardDesen(C, R, N, TH){
+  for (let attempt = 0; attempt < 400; attempt++){
+    const occ = new Array(C * R).fill(-1);
+    const list = [];
+    let ok = true;
+    for (let s = 0; s < N; s++){
+      const thick = s < TH;
+      let w = null;
+      for (let t = 0; t < 80 && !w; t++){
+        w = thick ? thickWalk(occ, C, R, 3 + ((Math.random() * 3) | 0))
+                  : randomWalk(occ, C, R, 5 + ((Math.random() * 6) | 0));
+      }
+      if (!w){ ok = false; break; }
+      const cells = thick ? w.cells : w;
+      for (const [x, y] of cells) occ[y * C + x] = s;
+      list.push(thick ? { cells: w.cells, anchors: w.anchors, width: 2 }
+                      : { cells: w, width: 1 });
+    }
+    if (ok) return { list };
+  }
+  return null;
 }
 
 function genBoard(C, R, N){
@@ -497,25 +560,26 @@ function renderBoard(){
 
   snakes.forEach((s, i) => {
     const color = mode === 'desen' ? s.color : L.shapes[s.shape].color;
-    const pts = s.cells.map(cellCenter);
+    const wExtra = ((s.width || 1) - 1) * CELL;   // kalın ok: +1 hücre kalınlık
+    const pts = s.pathPts;
     const g = el('g', { class: 'snake', 'data-i': i }, boardSvg);
     if (s.exited) g.style.display = 'none';
     const d = 'M' + pts.map(p => p.join(' ')).join(' L');
-    const under = el('path', { d, fill:'none', stroke: shade(color, .62), 'stroke-width': 4.6,
+    const under = el('path', { d, fill:'none', stroke: shade(color, .62), 'stroke-width': 4.6 + wExtra,
       'stroke-linecap':'round', 'stroke-linejoin':'round' }, g);
-    const main = el('path', { d, fill:'none', stroke: color, 'stroke-width': 3.4,
+    const main = el('path', { d, fill:'none', stroke: color, 'stroke-width': 3.4 + wExtra,
       'stroke-linecap':'round', 'stroke-linejoin':'round' }, g);
     // ok başı
-    const hd = headDir(s.cells);
     const [hx, hy] = pts[pts.length - 1];
     const head = el('polygon', {
       points: '0,-3.4 6,0 0,3.4',
       fill: color, stroke: shade(color, .62), 'stroke-width': 1.1, 'stroke-linejoin':'round',
-      transform: `translate(${hx} ${hy}) rotate(${[270,0,90,180][hd]})`,
+      transform: `translate(${hx} ${hy}) rotate(${[270,0,90,180][s.hd]})` +
+        (s.width === 2 ? ' scale(1.9)' : ''),
     }, g);
     // geniş görünmez dokunma alanı
     const hit = el('path', { d, fill:'none', stroke:'#000', 'stroke-opacity':0,
-      'stroke-width': 10, 'stroke-linecap':'round', 'stroke-linejoin':'round' }, g);
+      'stroke-width': 10 + wExtra, 'stroke-linecap':'round', 'stroke-linejoin':'round' }, g);
     s.els = { g, under, main, head, hit };
     g.addEventListener('pointerdown', ev => { ev.stopPropagation(); tapSnake(i); });
   });
@@ -568,14 +632,45 @@ function violationFlash(shapeIdx, dirVec, done){
 
 /* ================= Ok hareketi ================= */
 function routeFor(s){
-  const pts = s.cells.map(cellCenter);
-  const hd = DIRS[headDir(s.cells)];
-  const ray = rayCells(s.cells, C, R).map(cellCenter);
-  const last = ray.length ? ray[ray.length - 1] : pts[pts.length - 1];
-  const beyond = [ last[0] + hd[0] * CELL * 3.2, last[1] + hd[1] * CELL * 3.2 ];
-  const route = pts.concat(ray, [beyond]);
+  const pts = s.pathPts, hd = DIRS[s.hd];
+  const ex = s.exitPts || [];
+  const last = ex.length ? ex[ex.length - 1] : pts[pts.length - 1];
+  const off = CELL * (3.2 + (s.width || 1));
+  const beyond = [ last[0] + hd[0] * off, last[1] + hd[1] * off ];
+  const route = pts.concat(ex, [beyond]);
   const cum = segLengths(route);
-  return { route, cum, B: (s.cells.length - 1) * CELL, T: cum[cum.length - 1], hd };
+  return { route, cum, B: (pts.length - 1) * CELL, T: cum[cum.length - 1], hd };
+}
+
+/* Baş yönü ve merkez hattı çıkışı: ince ok hücre yolunu, kalın ok
+   2x2 blok çapalarını izler. */
+function prepSnakeGeometry(s){
+  const path = s.width === 2 ? s.anchors : s.cells;
+  s.hd = headDir(path);
+  s.pathPts = s.width === 2
+    ? s.anchors.map(a => [(a[0] + 1) * CELL, (a[1] + 1) * CELL])
+    : s.cells.map(cellCenter);
+  if (s.width === 2){
+    const d = DIRS[s.hd];
+    const block = (x, y) => [[x,y],[x+1,y],[x,y+1],[x+1,y+1]];
+    let [ax, ay] = s.anchors[s.anchors.length - 1];
+    const seen = new Set(s.cells.map(([x, y]) => y * C + x));
+    s.sweepXY = []; s.exitPts = [];
+    while (true){
+      ax += d[0]; ay += d[1];
+      const inb = block(ax, ay).filter(([x, y]) => x >= 0 && x < C && y >= 0 && y < R);
+      if (!inb.length) break;
+      s.exitPts.push([(ax + 1) * CELL, (ay + 1) * CELL]);
+      for (const [x, y] of inb){
+        const idx = y * C + x;
+        if (!seen.has(idx)){ seen.add(idx); s.sweepXY.push([x, y]); }
+      }
+    }
+  } else {
+    s.sweepXY = rayCells(s.cells, C, R);
+    s.exitPts = s.sweepXY.map(cellCenter);
+  }
+  s.trailPts = s.pathPts.concat(s.exitPts);
 }
 
 function animateSnake(s, from, to, dur, ease, onDone){
@@ -599,23 +694,24 @@ function animateSnake(s, from, to, dur, ease, onDone){
     }
     const headD = Math.min(B + shift, T - .01);
     const { p: hp, a } = pointAt(route, cum, headD);
-    s.els.head.setAttribute('transform', `translate(${hp[0]} ${hp[1]}) rotate(${a})`);
+    s.els.head.setAttribute('transform',
+      `translate(${hp[0]} ${hp[1]}) rotate(${a})` + (s.width === 2 ? ' scale(1.9)' : ''));
     if (p < 1) requestAnimationFrame(step);
     else onDone && onDone();
   })(t0);
 }
 
 function resetSnakeVisual(s){ // oku tahtadaki normal hâline döndür
-  const pts = s.cells.map(cellCenter);
+  const pts = s.pathPts;
   const d = 'M' + pts.map(p => p.join(' ')).join(' L');
   for (const k of ['under', 'main', 'hit']){
     s.els[k].setAttribute('d', d);
     s.els[k].removeAttribute('stroke-dasharray');
     s.els[k].removeAttribute('stroke-dashoffset');
   }
-  const hd = headDir(s.cells);
   const [hx, hy] = pts[pts.length - 1];
-  s.els.head.setAttribute('transform', `translate(${hx} ${hy}) rotate(${[270,0,90,180][hd]})`);
+  s.els.head.setAttribute('transform',
+    `translate(${hx} ${hy}) rotate(${[270,0,90,180][s.hd]})` + (s.width === 2 ? ' scale(1.9)' : ''));
 }
 
 function tapSnake(i){
@@ -655,7 +751,8 @@ function tapSnake(i){
     boardSvg.appendChild(s.els.g);   // diğer okların üstünden geçsin
     s._trailLen = (s.trailPts.length - 1) * CELL;
     s._trail = el('path', { d: 'M' + s.trailPts.map(p => p.join(' ')).join(' L'), fill:'none',
-      stroke: s.color, 'stroke-width': 5.6, 'stroke-linecap':'round', 'stroke-linejoin':'round',
+      stroke: s.color, 'stroke-width': 5.6 + (s.width - 1) * CELL,
+      'stroke-linecap':'round', 'stroke-linejoin':'round',
       'stroke-dasharray': `0 ${s._trailLen + 10}` }, paintG);
   }
   sndSlide();
@@ -688,7 +785,8 @@ function onExited(i){
       updateHud();
       toast('Sıra yanlış! Hedefteki katman sırasına bak.');
       const flash = el('path', { d: s._trail.getAttribute('d'), fill:'none', stroke:'#ff5d6c',
-        'stroke-opacity':.7, 'stroke-width': 5.6, 'stroke-linecap':'round', 'stroke-linejoin':'round' }, paintG);
+        'stroke-opacity':.7, 'stroke-width': 5.6 + (s.width - 1) * CELL,
+        'stroke-linecap':'round', 'stroke-linejoin':'round' }, paintG);
       setTimeout(() => {
         flash.remove();
         s._trail.remove(); s._trail = null;
@@ -714,7 +812,7 @@ function onExited(i){
   }
 
   const shapeIdx = s.shape;
-  const dirVec = DIRS[headDir(s.cells)];
+  const dirVec = DIRS[s.hd];
   // bu parçanın ALTINDA kalması gereken bir parça henüz boyanmadıysa hata
   const wrongOver = L.under.find(([a, b]) => b === shapeIdx && !painted.includes(a));
 
@@ -757,8 +855,9 @@ function loadResim(){
   C = L.C; R = L.R;
   const N = L.shapes.length;
   const gb = genBoard(C, R, N);
-  snakes = gb.list.map(cells => ({ cells, shape: -1, exited: false, animating: false }));
+  snakes = gb.list.map(cells => ({ cells, width: 1, shape: -1, exited: false, animating: false }));
   gb.order.forEach((si, k) => { snakes[si].shape = k; });
+  snakes.forEach(prepSnakeGeometry);
   painted = [];
   hearts = 3;
   $('paint-wrap').classList.remove('off', 'desen');
@@ -770,24 +869,33 @@ function loadResim(){
 }
 
 function loadDesen(){
-  const [c, r, n] = DSIZES[Math.min(dlvl, DSIZES.length - 1)];
+  const [c, r, n, th] = DSIZES[Math.min(dlvl, DSIZES.length - 1)];
   C = c; R = r;
   curPal = DPALETTES[dlvl % DPALETTES.length];
-  const gb = genBoard(C, R, n);
-  snakes = gb.list.map(cells => ({ cells, shape: 0, ord: 0, color: '', exited: false, animating: false }));
-  // çözüm sırası = üretim sırası; renkler o sırayla paletten akar
-  gb.order.forEach((si, k) => {
+  let gb = null, thTry = th, nTry = n;
+  while (!gb){ // olağanüstü sıkışıklıkta önce kalınları, sonra ok sayısını azalt
+    gb = genBoardDesen(C, R, nTry, thTry);
+    if (!gb){ if (thTry > 0) thTry--; else nTry--; }
+  }
+  snakes = gb.list.map(o => ({ cells: o.cells, anchors: o.anchors, width: o.width,
+    shape: 0, ord: 0, color: '', exited: false, animating: false }));
+  // çözüm sırası: rastgele — hedef desendeki katmanlaşmayı bu sıra belirler
+  const order = snakes.map((_, i) => i);
+  for (let i = order.length - 1; i > 0; i--){
+    const j = (Math.random() * (i + 1)) | 0;
+    [order[i], order[j]] = [order[j], order[i]];
+  }
+  order.forEach((si, k) => {
     snakes[si].ord = k;
     snakes[si].color = curPal.colors[k % curPal.colors.length];
   });
-  // kapsama: gövde + çıkış yolu; hücrenin sahibi = en son boyayan (en yüksek ord)
+  // kapsama: gövde + çıkış süpürmesi; hücrenin sahibi = en son boyayan
   ownerOf = new Array(C * R).fill(-1);
   cellCovers = Array.from({ length: C * R }, () => []);
   for (const i of snakes.map((_, idx) => idx).sort((a, b) => snakes[a].ord - snakes[b].ord)){
     const s = snakes[i];
-    const coverXY = s.cells.concat(rayCells(s.cells, C, R));
-    s.trailPts = coverXY.map(cellCenter);
-    s.cover = coverXY.map(([x, y]) => y * C + x);
+    prepSnakeGeometry(s);
+    s.cover = s.cells.concat(s.sweepXY).map(([x, y]) => y * C + x);
     for (const cc of s.cover){
       ownerOf[cc] = i;
       if (!cellCovers[cc].includes(i)) cellCovers[cc].push(i);
@@ -814,7 +922,8 @@ function renderDTarget(){
   for (const i of snakes.map((_, idx) => idx).sort((a, b) => snakes[a].ord - snakes[b].ord)){
     const s = snakes[i];
     el('path', { d: 'M' + s.trailPts.map(p => p.join(' ')).join(' L'), fill:'none',
-      stroke: s.color, 'stroke-width': 5.6, 'stroke-linecap':'round', 'stroke-linejoin':'round' }, dt);
+      stroke: s.color, 'stroke-width': 5.6 + (s.width - 1) * CELL,
+      'stroke-linecap':'round', 'stroke-linejoin':'round' }, dt);
   }
 }
 
