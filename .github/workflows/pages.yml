@@ -10,13 +10,16 @@ permissions:
   pages: write
   id-token: write
 
+# Queue runs instead of cancelling: a cancelled mid-deploy run can leave a
+# dangling Pages deployment that blocks every deploy after it.
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - name: Build site (copy games + generate hub)
@@ -28,6 +31,7 @@ jobs:
   deploy:
     needs: build
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
