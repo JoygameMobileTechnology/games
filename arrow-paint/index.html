@@ -5,28 +5,25 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="theme-color" content="#b9dcf7">
+<meta name="theme-color" content="#f4f6fb">
 <title>Arrow Paint</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&display=swap" rel="stylesheet">
 <style>
 :root{
-  --bg1:#bfe3ff;
-  --bg2:#e9d9ff;
-  --ink:#3b3f58;
-  --tile1:#e6ebf5;
-  --tile2:#c7d1e4;
-  --tile-edge:#aab6cf;
-  --arrow:#4a5878;
-  --accent:#ff7bac;
-  --good:#3ecf8e;
+  --bg:#f4f6fb;
+  --ink:#2b3350;
+  --chip:#ffffff;
+  --dot:#d3d8e6;
+  --wood1:#f0dbb6;
+  --wood2:#e6c894;
   --bad:#ff5d6c;
   --font:'Baloo 2', 'Comic Sans MS', system-ui, sans-serif;
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 html,body{height:100%}
 body{
-  background:linear-gradient(160deg,var(--bg1),var(--bg2));
+  background:var(--bg);
   color:var(--ink);
   font-family:var(--font);
   overflow:hidden;
@@ -38,163 +35,125 @@ body{
 #app{
   max-width:520px;height:100dvh;margin:0 auto;
   display:flex;flex-direction:column;position:relative;
-  padding:env(safe-area-inset-top) 12px calc(env(safe-area-inset-bottom) + 8px);
+  padding:env(safe-area-inset-top) 10px calc(env(safe-area-inset-bottom) + 6px);
 }
 
 /* ---------- HUD ---------- */
-header{padding:10px 4px 6px;flex:none}
-.hud{display:flex;align-items:center;justify-content:space-between;gap:8px}
-.hud .chip{
-  background:rgba(255,255,255,.55);
-  border:2px solid rgba(255,255,255,.8);
-  border-radius:14px;padding:3px 12px;
-  font-weight:700;font-size:15px;line-height:1.3;
-  box-shadow:0 2px 6px rgba(59,63,88,.12);
-  white-space:nowrap;
+header{flex:none;display:flex;align-items:center;justify-content:space-between;padding:10px 6px 8px}
+.chip{
+  background:var(--chip);border-radius:14px;padding:4px 14px;
+  font-weight:800;font-size:16px;
+  box-shadow:0 2px 8px rgba(43,51,80,.10);
 }
-#score-chip{font-size:17px;font-weight:800}
-#combo-chip{
-  color:#fff;background:linear-gradient(135deg,#ff7bac,#ff9f5f);
-  border-color:rgba(255,255,255,.9);
-  opacity:0;transform:scale(.7);transition:all .18s;
+#hearts{display:flex;gap:3px;font-size:19px;letter-spacing:1px}
+#hearts .off{filter:grayscale(1);opacity:.35}
+
+/* ---------- Paint area (masa + hedef) ---------- */
+#paint-wrap{
+  flex:0 0 34%;min-height:0;position:relative;
+  border-radius:18px;overflow:hidden;
+  background:
+    repeating-linear-gradient(90deg, rgba(140,95,45,.06) 0 3px, transparent 3px 34px),
+    linear-gradient(160deg,var(--wood1),var(--wood2));
+  box-shadow:inset 0 0 0 3px rgba(255,255,255,.5), 0 4px 14px rgba(43,51,80,.12);
 }
-#combo-chip.on{opacity:1;transform:scale(1)}
-#drops{display:flex;gap:5px;align-items:center}
-.drop{
-  width:18px;height:18px;border-radius:50% 50% 50% 4px;transform:rotate(45deg);
-  background:radial-gradient(circle at 32% 30%,#8fd0ff,#3f9ff2 65%,#2c7cd6);
-  box-shadow:0 2px 4px rgba(44,124,214,.4);
-  transition:all .25s;
+#canvas{position:absolute;inset:0;width:100%;height:100%}
+#canvas.shake{animation:shake .45s}
+@keyframes shake{
+  0%,100%{transform:translateX(0)}
+  20%{transform:translateX(-7px)}40%{transform:translateX(6px)}
+  60%{transform:translateX(-4px)}80%{transform:translateX(3px)}
 }
-.drop.used{background:#c3cad9;box-shadow:none;transform:rotate(45deg) scale(.8);opacity:.5}
-#bar-wrap{
-  margin-top:8px;height:12px;border-radius:8px;
-  background:rgba(255,255,255,.5);border:2px solid rgba(255,255,255,.8);
-  overflow:hidden;
+#target-card{
+  position:absolute;top:8px;right:8px;z-index:5;
+  width:88px;background:#fff;border-radius:12px;padding:6px 6px 3px;
+  box-shadow:0 3px 10px rgba(43,51,80,.22);
+  text-align:center;
 }
-#bar{
-  height:100%;width:0%;border-radius:6px;
-  background:linear-gradient(90deg,#3ecf8e,#7ee8b2);
-  transition:width .35s ease;
+#target-card .lbl{font-size:10.5px;font-weight:800;opacity:.55;letter-spacing:.5px}
+#target{width:100%;aspect-ratio:1;display:block}
+#toast{
+  position:absolute;left:50%;top:12px;transform:translateX(-50%) scale(.8);
+  background:var(--bad);color:#fff;font-weight:800;font-size:14.5px;
+  padding:6px 16px;border-radius:14px;white-space:nowrap;z-index:6;
+  opacity:0;transition:all .25s;box-shadow:0 4px 12px rgba(255,93,108,.45);
 }
+#toast.show{opacity:1;transform:translateX(-50%) scale(1)}
 
 /* ---------- Board ---------- */
-#stage{flex:1;display:flex;align-items:center;justify-content:center;min-height:0;padding:6px 0}
+#board-wrap{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;padding:8px 2px 2px}
 #board{
-  position:relative;border-radius:16px;
-  background:rgba(255,255,255,.4);
-  box-shadow:0 8px 24px rgba(59,63,88,.18), inset 0 0 0 3px rgba(255,255,255,.7);
-  overflow:hidden;
+  max-width:100%;max-height:100%;
+  background:#fff;border-radius:18px;
+  box-shadow:0 6px 20px rgba(43,51,80,.12);
 }
-.cell{
-  position:absolute;border-radius:22%;
-  background:linear-gradient(150deg,var(--tile1),var(--tile2));
-  box-shadow:inset 0 -2px 0 var(--tile-edge);
-  transition:background .15s;
-}
-.cell.painted{box-shadow:inset 0 0 0 1px rgba(0,0,0,.05)}
-.cell.pop{animation:pop .35s ease}
-@keyframes pop{
-  0%{transform:scale(.55);filter:brightness(1.6)}
-  60%{transform:scale(1.12)}
-  100%{transform:scale(1);filter:brightness(1)}
-}
-.cell .sheen{
-  position:absolute;inset:0;border-radius:22%;pointer-events:none;
-  background:linear-gradient(120deg,transparent 30%,rgba(255,255,255,.75) 50%,transparent 70%);
-  animation:sheen .4s ease-out forwards;
-}
-@keyframes sheen{from{opacity:1;transform:translateX(-40%)}to{opacity:0;transform:translateX(40%)}}
-.arrow{
-  position:absolute;inset:12%;z-index:5;
-  transition:filter .15s;
-  will-change:transform;
-}
-.arrow::before{
-  content:'';position:absolute;inset:0;
-  background:var(--arrow);
-  clip-path:polygon(50% 0%, 92% 45%, 68% 45%, 68% 100%, 32% 100%, 32% 45%, 8% 45%);
-  border-radius:2px;
-  filter:drop-shadow(0 2px 2px rgba(59,63,88,.35));
-}
-.arrow.blocker::before{background:var(--bad)}
-.arrow.fly{transition-timing-function:linear}
-@keyframes bump-u{35%{transform:var(--rot) translateY(-22%)}100%{transform:var(--rot)}}
-.float{
-  position:absolute;z-index:20;pointer-events:none;
-  font-weight:800;font-size:16px;color:#fff;
-  text-shadow:0 2px 4px rgba(59,63,88,.5);
-  animation:floatup .7s ease-out forwards;
-}
-@keyframes floatup{from{opacity:1;transform:translateY(0)}to{opacity:0;transform:translateY(-34px)}}
-
-footer{flex:none;text-align:center;font-size:13px;font-weight:600;opacity:.65;padding:4px 0 2px}
+#board .snake{cursor:pointer}
+footer{flex:none;text-align:center;font-size:13px;font-weight:700;opacity:.55;padding:6px 0 2px}
 
 /* ---------- Overlays ---------- */
 .overlay{
   position:absolute;inset:0;z-index:50;
   display:flex;align-items:center;justify-content:center;
-  background:rgba(59,63,88,.35);backdrop-filter:blur(3px);
+  background:rgba(43,51,80,.35);backdrop-filter:blur(3px);
   padding:24px;
 }
 .overlay.hidden{display:none}
-#ov-win{align-items:flex-end;padding-bottom:36px;background:rgba(59,63,88,.12);backdrop-filter:none}
 .card{
   background:#fffdf8;border-radius:22px;padding:26px 22px;
   max-width:340px;width:100%;text-align:center;
-  box-shadow:0 16px 40px rgba(59,63,88,.35);
+  box-shadow:0 16px 40px rgba(43,51,80,.35);
   animation:cardin .3s ease;
 }
 @keyframes cardin{from{transform:translateY(24px) scale(.92);opacity:0}}
-.card h1{font-size:30px;font-weight:800;letter-spacing:.5px}
-.card h2{font-size:24px;font-weight:800}
-.card p{margin:12px 0;font-size:15.5px;line-height:1.45;font-weight:500}
-.card .big{font-size:44px;line-height:1;margin:6px 0}
+.card h1{font-size:30px;font-weight:800}
+.card h2{font-size:25px;font-weight:800}
+.card p{margin:11px 0;font-size:15.5px;line-height:1.45;font-weight:500}
+.card .big{font-size:42px;line-height:1.1;margin:4px 0}
 .btn{
   display:inline-block;border:none;cursor:pointer;
   font-family:var(--font);font-weight:800;font-size:18px;color:#fff;
-  background:linear-gradient(135deg,#ff7bac,#ff9f5f);
+  background:linear-gradient(135deg,#4d9df6,#7c6cf6);
   padding:12px 34px;border-radius:16px;margin-top:10px;
-  box-shadow:0 5px 0 #d95a8b, 0 8px 16px rgba(217,90,139,.35);
+  box-shadow:0 5px 0 #3b6fc4, 0 8px 16px rgba(77,157,246,.35);
   transition:transform .08s, box-shadow .08s;
 }
-.btn:active{transform:translateY(4px);box-shadow:0 1px 0 #d95a8b}
-.btn.alt{background:linear-gradient(135deg,#5fb8ff,#7c8bff);box-shadow:0 5px 0 #4a7fd6, 0 8px 16px rgba(74,127,214,.35)}
-.btn.alt:active{box-shadow:0 1px 0 #4a7fd6}
-
+.btn:active{transform:translateY(4px);box-shadow:0 1px 0 #3b6fc4}
+.mini-demo{display:flex;align-items:center;justify-content:center;gap:8px;margin:6px 0}
 .confetti{
   position:absolute;top:-16px;z-index:60;pointer-events:none;
   width:10px;height:14px;border-radius:3px;
   animation:cfall linear forwards;
 }
-@keyframes cfall{
-  to{transform:translateY(110dvh) rotate(720deg)}
-}
+@keyframes cfall{to{transform:translateY(110dvh) rotate(720deg)}}
 </style>
 </head>
 <body>
 <div id="app">
   <header>
-    <div class="hud">
-      <span class="chip" id="lvl-chip">Bölüm 1</span>
-      <span class="chip" id="combo-chip">x1 Kombo!</span>
-      <span class="chip" id="score-chip">0</span>
-      <span id="drops"></span>
-    </div>
-    <div id="bar-wrap"><div id="bar"></div></div>
+    <span class="chip" id="lvl-chip">Bölüm 1</span>
+    <span id="hearts"></span>
   </header>
 
-  <div id="stage"><div id="board"></div></div>
+  <div id="paint-wrap">
+    <svg id="canvas" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet"></svg>
+    <div id="target-card">
+      <div class="lbl">HEDEF</div>
+      <svg id="target" viewBox="0 0 100 100"></svg>
+    </div>
+    <div id="toast">Katman sırası yanlış!</div>
+  </div>
 
-  <footer>Yolu açık okları serbest bırak — geçtiği yeri boyasın! 🎨</footer>
+  <div id="board-wrap"><svg id="board"></svg></div>
+
+  <footer>Hedefe bak: altta kalan renk önce boyanır! 🎨</footer>
 
   <!-- Intro -->
   <div class="overlay" id="ov-intro">
     <div class="card">
       <h1>🎨 Arrow Paint</h1>
-      <p>Her okun altında gizli bir resmin bir pikseli saklı.</p>
-      <p><b>Önü açık</b> oklara dokun: ok bir boya rulosu gibi kayıp gider ve rengini ortaya çıkarır.</p>
-      <p><b>Önü kapalı</b> oka basarsan bir boya damlası kaybedersin. 💧×3 hakkın var!</p>
+      <p>Her ok bir boya rulosu: tahtadan çıkınca resimdeki <b>kendi renkli parçasını</b> boyar.</p>
+      <p>Okun <b>ucunun baktığı yol</b> boşsa çıkar, doluysa toslar.</p>
+      <p>⚠️ <b>Sıra önemli:</b> Hedef resimde <b>altta kalan</b> parçalar önce boyanmalı. Yanlış üst üste bindirirsen ❤️ kaybedersin!</p>
       <button class="btn" id="btn-start">Başla</button>
     </div>
   </div>
@@ -202,9 +161,9 @@ footer{flex:none;text-align:center;font-size:13px;font-weight:600;opacity:.65;pa
   <!-- Win -->
   <div class="overlay hidden" id="ov-win">
     <div class="card">
-      <div class="big" id="win-emoji">🎉</div>
-      <h2 id="win-title">Kalp!</h2>
-      <p id="win-sub">Resmi tamamladın!</p>
+      <div class="big" id="win-stars">⭐⭐⭐</div>
+      <h2 id="win-title">Harika!</h2>
+      <p id="win-sub">Resmi doğru sırayla boyadın!</p>
       <button class="btn" id="btn-next">Sonraki Bölüm</button>
     </div>
   </div>
@@ -212,10 +171,10 @@ footer{flex:none;text-align:center;font-size:13px;font-weight:600;opacity:.65;pa
   <!-- Fail -->
   <div class="overlay hidden" id="ov-fail">
     <div class="card">
-      <div class="big">💧</div>
-      <h2>Boya bitti!</h2>
-      <p>Önü kapalı oklara dikkat et — sıra önemli!</p>
-      <button class="btn alt" id="btn-retry">Tekrar Dene</button>
+      <div class="big">💔</div>
+      <h2>Kalpler bitti!</h2>
+      <p>Hedef resme dikkat et: önce en alttaki parçayı boya, en üsttekini sona bırak.</p>
+      <button class="btn" id="btn-retry">Tekrar Dene</button>
     </div>
   </div>
 </div>
@@ -223,142 +182,162 @@ footer{flex:none;text-align:center;font-size:13px;font-weight:600;opacity:.65;pa
 <script>
 'use strict';
 
-/* ================= Levels: hidden pixel art ================= */
+/* ================= Seviyeler =================
+   shapes: alttan üste boyama sırasıyla (index = katman).
+   under:  üst üste binen [alt, üst] çiftleri — alt olan önce
+           boyanmazsa hata. C x R: ok tahtası boyutu.       */
 const LEVELS = [
-  { name:'Kalp', emoji:'❤️',
-    pal:{ '.':'#f7edda', R:'#ff4d6d', P:'#ffa1b5' },
-    map:[
-      '........',
-      '.PR..RR.',
-      'RRRRRRRR',
-      'RRRRRRRR',
-      'RRRRRRRR',
-      '.RRRRRR.',
-      '..RRRR..',
-      '...RR...',
-      '........',
-    ]},
-  { name:'Yıldız', emoji:'⭐',
-    pal:{ '.':'#f7edda', Y:'#ffc93c' },
-    map:[
-      '.........',
-      '....Y....',
-      '...YYY...',
-      'YYYYYYYYY',
-      '.YYYYYYY.',
-      '..YYYYY..',
-      '.YYY.YYY.',
-      '.YY...YY.',
-      '.........',
-    ]},
-  { name:'Balık', emoji:'🐠',
-    pal:{ '.':'#f7edda', O:'#ff9f1c', T:'#e76f51', B:'#22223b' },
-    map:[
-      '...........',
-      '...OOOO....',
-      '..OOOOOO.T.',
-      '.OBOOOOOTT.',
-      '.OOOOOOOTTT',
-      '..OOOOOO.T.',
-      '...OOOO....',
-      '...........',
-    ]},
-  { name:'Mantar', emoji:'🍄',
-    pal:{ '.':'#f7edda', R:'#ef476f', W:'#ffffff', B:'#3a2e39' },
-    map:[
-      '..........',
-      '...RRRR...',
-      '..RRRRRR..',
-      '.RWWRRWWR.',
-      'RRWWRRWWRR',
-      'RRRRRRRRRR',
-      '..WWWWWW..',
-      '..WBWWBW..',
-      '..WWWWWW..',
-      '..........',
-    ]},
-  { name:'Kelebek', emoji:'🦋',
-    pal:{ '.':'#f7edda', P:'#9d4edd', M:'#ff70a6', B:'#3a2e39' },
-    map:[
-      '...........',
-      '.PP.....PP.',
-      'PPPP.B.PPPP',
-      'PMPP.B.PPMP',
-      'PPPPPBPPPPP',
-      '.PPPPBPPPP.',
-      '.PMPPBPPMP.',
-      '..PPPBPPP..',
-      '...PP.PP...',
-      '...........',
-    ]},
-  { name:'Roket', emoji:'🚀',
-    pal:{ '.':'#f7edda', R:'#e8505b', C:'#9ee7ff', G:'#8d99ae', F:'#ff9f1c', Y:'#ffe066' },
-    map:[
-      '.........',
-      '....R....',
-      '...RRR...',
-      '..RRRRR..',
-      '..RCCCR..',
-      '..RCCCR..',
-      '..RRRRR..',
-      '..RRRRR..',
-      '.GRRRRRG.',
-      '.G.FFF.G.',
-      '...FYF...',
-      '....F....',
-      '.........',
-    ]},
+  { name:'Kuş', C:6, R:7,
+    shapes:[
+      { color:'#9fc3ea', svg:'<polygon points="8,52 46,30 58,60 24,72"/>' },
+      { color:'#f6a428', svg:'<polygon points="70,38 96,46 72,54"/>' },
+      { color:'#3f7ddb', svg:'<polygon points="30,26 78,40 60,74 26,60"/>' },
+      { color:'#2a58a8', svg:'<polygon points="34,14 58,64 22,52"/>' },
+    ],
+    under:[[0,2],[1,2],[0,3],[2,3]] },
+
+  { name:'Yelkenli', C:7, R:8,
+    shapes:[
+      { color:'#ffd166', svg:'<circle cx="76" cy="58" r="13"/>' },
+      { color:'#35a7e0', svg:'<rect x="2" y="66" width="96" height="30" rx="4"/>' },
+      { color:'#f5f0e6', svg:'<polygon points="50,10 50,70 22,70"/>' },
+      { color:'#f6a428', svg:'<polygon points="56,18 56,70 88,70"/>' },
+      { color:'#b3475a', svg:'<polygon points="16,68 84,68 70,86 30,86"/>' },
+    ],
+    under:[[0,1],[1,4],[2,4],[3,4]] },
+
+  { name:'Balık', C:7, R:8,
+    shapes:[
+      { color:'#1d7a8c', svg:'<polygon points="8,50 32,34 32,66"/>' },
+      { color:'#2fb0c7', svg:'<polygon points="24,50 62,26 88,50 62,74"/>' },
+      { color:'#7fdcec', svg:'<polygon points="44,18 64,34 36,36"/>' },
+      { color:'#123a44', svg:'<circle cx="74" cy="47" r="4.5"/>' },
+      { color:'#bfe9f2', svg:'<g><circle cx="88" cy="20" r="4"/><circle cx="80" cy="10" r="3"/><circle cx="93" cy="9" r="2.5"/></g>' },
+    ],
+    under:[[0,1],[1,2],[1,3]] },
+
+  { name:'Ev', C:7, R:9,
+    shapes:[
+      { color:'#9a5b43', svg:'<rect x="64" y="18" width="10" height="24"/>' },
+      { color:'#f2e3c9', svg:'<rect x="20" y="42" width="60" height="44"/>' },
+      { color:'#d95545', svg:'<polygon points="12,46 50,12 88,46"/>' },
+      { color:'#8a5a38', svg:'<rect x="56" y="60" width="14" height="26" rx="2"/>' },
+      { color:'#8ec7e8', svg:'<rect x="30" y="54" width="16" height="14" rx="2"/>' },
+      { color:'#ffd166', svg:'<circle cx="12" cy="12" r="8"/>' },
+    ],
+    under:[[0,2],[1,2],[1,3],[1,4]] },
+
+  { name:'Roket', C:7, R:9,
+    shapes:[
+      { color:'#f6a428', svg:'<polygon points="42,74 58,74 50,94"/>' },
+      { color:'#e8e3da', svg:'<rect x="38" y="24" width="24" height="54" rx="3"/>' },
+      { color:'#d95545', svg:'<polygon points="40,58 24,84 40,80"/>' },
+      { color:'#d95545', svg:'<polygon points="60,58 76,84 60,80"/>' },
+      { color:'#d95545', svg:'<polygon points="38,26 50,6 62,26"/>' },
+      { color:'#8ec7e8', svg:'<circle cx="50" cy="42" r="7"/>' },
+    ],
+    under:[[0,1],[1,2],[1,3],[1,4],[1,5]] },
 ];
 
-const DIRS = [[0,-1],[1,0],[0,1],[-1,0]];       // yukarı, sağ, aşağı, sol
-const ROT  = [0, 90, 180, 270];
+const DIRS = [[0,-1],[1,0],[0,1],[-1,0]];
+const CELL = 12;                    // svg birimi / hücre
+const NS = 'http://www.w3.org/2000/svg';
 
-/* ================= State ================= */
-let lvl   = +(localStorage.getItem('ap_lvl') || 0);
-let score = 0, combo = 0, lives = 3;
-let cols = 0, rows = 0, cellPx = 0;
-let cells = [];            // {color, alive, dir, el, arrowEl}
-let aliveCount = 0, totalCount = 0;
-let locked = true;         // girişte / overlay açıkken input kilidi
+/* ================= Durum ================= */
+let lvl = +(localStorage.getItem('ap2_lvl') || 0);
+let L = null, C = 0, R = 0;
+let snakes = [];        // {cells:[[x,y]..], shape, exited, els:{}}
+let painted = [];       // boyanmış shape indexleri (boyama sırasıyla)
+let hearts = 3;
+let locked = true;      // overlay / ceza animasyonu sırasında input kilidi
 
 const $ = id => document.getElementById(id);
-const boardEl = $('board');
+const boardSvg = $('board'), canvasSvg = $('canvas'), targetSvg = $('target');
 
-/* ================= Solvable level generation =================
-   Çözüm sırasını ileri simüle ederek üretir: her adımda, kalan oklar
-   arasında kenara giden yolu TAMAMEN boş olan bir (hücre, yön) seçilir,
-   yön atanır ve hücre tahtadan düşürülür. Bu sıra geçerli bir çözümdür,
-   dolayısıyla seviye her zaman çözülebilir. Uzun yollar ağırlıklı seçilir
-   ki oklar tahtayı boydan boya geçsin. */
-function genDirs(C, R){
-  const n = C * R;
-  const present = new Array(n).fill(true);
-  const dirs = new Array(n).fill(0);
-  for (let k = 0; k < n; k++){
-    const cands = [];
-    for (let i = 0; i < n; i++){
-      if (!present[i]) continue;
-      const x = i % C, y = (i / C) | 0;
-      for (let d = 0; d < 4; d++){
-        let cx = x + DIRS[d][0], cy = y + DIRS[d][1], len = 0, ok = true;
-        while (cx >= 0 && cx < C && cy >= 0 && cy < R){
-          if (present[cy * C + cx]){ ok = false; break; }
-          len++; cx += DIRS[d][0]; cy += DIRS[d][1];
-        }
-        if (ok) cands.push([i, d, len + 1]);
-      }
+/* ================= Tahta üretimi =================
+   Yılan-oklar rastgele kendinden-kaçınan yürüyüşlerle yerleştirilir.
+   Sonra "soyma" testi: ucunun ışını boş olan ok sökülür, tekrar tekrar.
+   Hepsi sökülebiliyorsa tahta çözülebilirdir; sökülme sırası, katman
+   sırasıyla eşleştirilir (k. sökülebilen ok = k. katmanı boyar). */
+function randomWalk(occ, C, R, targetLen){
+  const free = [];
+  for (let i = 0; i < C * R; i++) if (occ[i] < 0) free.push(i);
+  if (!free.length) return null;
+  let cur = free[(Math.random() * free.length) | 0];
+  const cells = [[cur % C, (cur / C) | 0]];
+  const used = new Set([cur]);
+  let lastDir = -1;
+  while (cells.length < targetLen){
+    const [x, y] = cells[cells.length - 1];
+    const opts = [];
+    for (let d = 0; d < 4; d++){
+      const nx = x + DIRS[d][0], ny = y + DIRS[d][1];
+      if (nx < 0 || nx >= C || ny < 0 || ny >= R) continue;
+      const idx = ny * C + nx;
+      if (occ[idx] >= 0 || used.has(idx)) continue;
+      opts.push(d);
+      if (d === lastDir) opts.push(d, d);   // düz gitme eğilimi
     }
-    let total = 0;
-    for (const c of cands) total += c[2];
-    let r = Math.random() * total, pick = cands[0];
-    for (const c of cands){ r -= c[2]; if (r <= 0){ pick = c; break; } }
-    dirs[pick[0]] = pick[1];
-    present[pick[0]] = false;
+    if (!opts.length) break;
+    const d = opts[(Math.random() * opts.length) | 0];
+    const nx = x + DIRS[d][0], ny = y + DIRS[d][1];
+    cells.push([nx, ny]);
+    used.add(ny * C + nx);
+    lastDir = d;
   }
-  return dirs;
+  return cells.length >= 4 ? cells : null;
 }
 
-/* ================= Sound (WebAudio) ================= */
+function headDir(cells){
+  const [hx, hy] = cells[cells.length - 1], [px, py] = cells[cells.length - 2];
+  return DIRS.findIndex(d => d[0] === hx - px && d[1] === hy - py);
+}
+function rayCells(cells, C, R){
+  const d = DIRS[headDir(cells)];
+  let [x, y] = cells[cells.length - 1];
+  const out = [];
+  x += d[0]; y += d[1];
+  while (x >= 0 && x < C && y >= 0 && y < R){ out.push([x, y]); x += d[0]; y += d[1]; }
+  return out;
+}
+
+function genBoard(C, R, N){
+  for (let attempt = 0; attempt < 400; attempt++){
+    const occ = new Array(C * R).fill(-1);
+    const list = [];
+    let ok = true;
+    for (let s = 0; s < N; s++){
+      let placed = null;
+      for (let t = 0; t < 80 && !placed; t++){
+        placed = randomWalk(occ, C, R, 6 + ((Math.random() * 6) | 0));
+      }
+      if (!placed){ ok = false; break; }
+      for (const [x, y] of placed) occ[y * C + x] = s;
+      list.push(placed);
+    }
+    if (!ok) continue;
+    // soyma testi
+    const alive = new Set(list.map((_, i) => i));
+    const order = [];
+    while (alive.size){
+      const cands = [];
+      for (const i of alive){
+        const clear = rayCells(list[i], C, R).every(([x, y]) => {
+          const o = occ[y * C + x];
+          return o < 0 || o === i || !alive.has(o);
+        });
+        if (clear) cands.push(i);
+      }
+      if (!cands.length) break;
+      const pick = cands[(Math.random() * cands.length) | 0];
+      order.push(pick); alive.delete(pick);
+    }
+    if (!alive.size) return { list, order };
+  }
+  return null;
+}
+
+/* ================= Ses ================= */
 let AC = null;
 function ac(){ if (!AC) AC = new (window.AudioContext || window.webkitAudioContext)(); return AC; }
 function tone(freq, dur, type, vol, when){
@@ -372,180 +351,284 @@ function tone(freq, dur, type, vol, when){
     o.start(t); o.stop(t + dur + .02);
   }catch(e){}
 }
-const sndPop   = () => tone(420 + Math.min(combo, 12) * 55, .14, 'triangle', .25);
-const sndBlock = () => { tone(130, .2, 'sawtooth', .22); tone(98, .25, 'square', .12); };
+const sndSlide = () => tone(520, .18, 'triangle', .2);
+const sndPaint = () => { tone(620, .16, 'triangle', .22); tone(930, .2, 'sine', .14, .07); };
+const sndThud  = () => { tone(130, .18, 'sawtooth', .2); };
+const sndWrong = () => { tone(220, .25, 'square', .16); tone(165, .3, 'square', .14, .12); };
 const sndWin   = () => [523, 659, 784, 1047].forEach((f, i) => tone(f, .3, 'triangle', .25, i * .13));
 const sndFail  = () => [330, 262, 208].forEach((f, i) => tone(f, .3, 'sine', .25, i * .18));
 
 /* ================= HUD ================= */
-function renderDrops(){
-  $('drops').innerHTML = '';
-  for (let i = 0; i < 3; i++){
-    const d = document.createElement('span');
-    d.className = 'drop' + (i < lives ? '' : ' used');
-    $('drops').appendChild(d);
-  }
-}
 function updateHud(){
-  $('score-chip').textContent = score;
-  $('lvl-chip').textContent = 'Bölüm ' + (lvl + 1);
-  const cc = $('combo-chip');
-  if (combo >= 2){ cc.textContent = 'x' + combo + ' Kombo!'; cc.classList.add('on'); }
-  else cc.classList.remove('on');
-  $('bar').style.width = (totalCount ? (100 * (totalCount - aliveCount) / totalCount) : 0) + '%';
+  $('lvl-chip').textContent = 'Bölüm ' + (lvl + 1) + ' — ' + L.name;
+  $('hearts').innerHTML = [0,1,2].map(i =>
+    `<span class="${i < hearts ? '' : 'off'}">❤️</span>`).join('');
+}
+function toast(msg){
+  const t = $('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t._tm);
+  t._tm = setTimeout(() => t.classList.remove('show'), 1400);
 }
 
-/* ================= Board build & layout ================= */
-function loadLevel(){
-  const L = LEVELS[lvl % LEVELS.length];
-  rows = L.map.length; cols = L.map[0].length;
-  const dirs = genDirs(cols, rows);
-  boardEl.innerHTML = '';
-  cells = [];
-  lives = 3; combo = 0;
-  aliveCount = totalCount = cols * rows;
+/* ================= Yardımcı: renk koyulaştır ================= */
+function shade(hex, f){
+  const n = parseInt(hex.slice(1), 16);
+  const r = Math.round(((n >> 16) & 255) * f), g = Math.round(((n >> 8) & 255) * f), b = Math.round((n & 255) * f);
+  return `rgb(${r},${g},${b})`;
+}
 
-  for (let y = 0; y < rows; y++){
-    for (let x = 0; x < cols; x++){
-      const i = y * cols + x;
-      const cellEl = document.createElement('div');
-      cellEl.className = 'cell';
-      const arrowEl = document.createElement('div');
-      arrowEl.className = 'arrow';
-      cellEl.appendChild(arrowEl);
-      boardEl.appendChild(cellEl);
-      cells.push({ color: L.pal[L.map[y][x]], alive: true, dir: dirs[i], el: cellEl, arrowEl });
-    }
+/* ================= Çizim ================= */
+function cellCenter([x, y]){ return [x * CELL + CELL / 2, y * CELL + CELL / 2]; }
+
+function polyline(points){
+  return points.map(p => p.join(',')).join(' ');
+}
+function segLengths(points){
+  const cum = [0];
+  for (let i = 1; i < points.length; i++){
+    const dx = points[i][0] - points[i-1][0], dy = points[i][1] - points[i-1][1];
+    cum.push(cum[i-1] + Math.hypot(dx, dy));
   }
-  layout();
-  renderDrops();
-  updateHud();
+  return cum;
+}
+function pointAt(points, cum, d){
+  if (d <= 0) return { p: points[0], a: segAngle(points, 0) };
+  const total = cum[cum.length - 1];
+  if (d >= total) return { p: points[points.length - 1], a: segAngle(points, points.length - 2) };
+  let i = 1;
+  while (cum[i] < d) i++;
+  const t = (d - cum[i-1]) / (cum[i] - cum[i-1]);
+  return {
+    p: [ points[i-1][0] + (points[i][0] - points[i-1][0]) * t,
+         points[i-1][1] + (points[i][1] - points[i-1][1]) * t ],
+    a: segAngle(points, i - 1),
+  };
+}
+function segAngle(points, i){
+  i = Math.max(0, Math.min(i, points.length - 2));
+  return Math.atan2(points[i+1][1] - points[i][1], points[i+1][0] - points[i][0]) * 180 / Math.PI;
 }
 
-function layout(){
-  const stage = $('stage');
-  const availW = stage.clientWidth - 8, availH = stage.clientHeight - 8;
-  cellPx = Math.max(18, Math.floor(Math.min(availW / cols, availH / rows)));
-  const pad = 5, gap = Math.max(2, Math.round(cellPx * .07));
-  boardEl.style.width  = (cols * cellPx + pad * 2) + 'px';
-  boardEl.style.height = (rows * cellPx + pad * 2) + 'px';
-  for (let y = 0; y < rows; y++){
-    for (let x = 0; x < cols; x++){
-      const c = cells[y * cols + x];
-      c.el.style.left   = (pad + x * cellPx + gap / 2) + 'px';
-      c.el.style.top    = (pad + y * cellPx + gap / 2) + 'px';
-      c.el.style.width  = (cellPx - gap) + 'px';
-      c.el.style.height = (cellPx - gap) + 'px';
-      if (c.alive) c.arrowEl.style.transform = 'rotate(' + ROT[c.dir] + 'deg)';
-    }
+function el(tag, attrs, parent){
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(e);
+  return e;
+}
+
+function renderBoard(){
+  boardSvg.innerHTML = '';
+  boardSvg.setAttribute('viewBox', `0 0 ${C * CELL} ${R * CELL}`);
+  // noktalar
+  const dots = el('g', {}, boardSvg);
+  for (let y = 0; y < R; y++)
+    for (let x = 0; x < C; x++)
+      el('circle', { cx: x * CELL + CELL/2, cy: y * CELL + CELL/2, r: 1.3, fill: 'var(--dot)' }, dots);
+
+  snakes.forEach((s, i) => {
+    const color = L.shapes[s.shape].color;
+    const pts = s.cells.map(cellCenter);
+    const g = el('g', { class: 'snake', 'data-i': i }, boardSvg);
+    if (s.exited) g.style.display = 'none';
+    const d = 'M' + pts.map(p => p.join(' ')).join(' L');
+    const under = el('path', { d, fill:'none', stroke: shade(color, .62), 'stroke-width': 4.6,
+      'stroke-linecap':'round', 'stroke-linejoin':'round' }, g);
+    const main = el('path', { d, fill:'none', stroke: color, 'stroke-width': 3.4,
+      'stroke-linecap':'round', 'stroke-linejoin':'round' }, g);
+    // ok başı
+    const hd = headDir(s.cells);
+    const [hx, hy] = pts[pts.length - 1];
+    const head = el('polygon', {
+      points: '0,-3.4 6,0 0,3.4',
+      fill: color, stroke: shade(color, .62), 'stroke-width': 1.1, 'stroke-linejoin':'round',
+      transform: `translate(${hx} ${hy}) rotate(${[270,0,90,180][hd]})`,
+    }, g);
+    // geniş görünmez dokunma alanı
+    const hit = el('path', { d, fill:'none', stroke:'#000', 'stroke-opacity':0,
+      'stroke-width': 10, 'stroke-linecap':'round', 'stroke-linejoin':'round' }, g);
+    s.els = { g, under, main, head, hit };
+    g.addEventListener('pointerdown', ev => { ev.stopPropagation(); tapSnake(i); });
+  });
+}
+
+function renderTarget(){
+  targetSvg.innerHTML = L.shapes.map(s =>
+    `<g fill="${s.color}" stroke="${shade(s.color, .8)}" stroke-width="0.8">${s.svg}</g>`).join('');
+}
+
+/* ================= Boyama alanı ================= */
+function clearCanvas(){ canvasSvg.innerHTML = ''; }
+
+function paintShape(shapeIdx, dirVec){
+  const s = L.shapes[shapeIdx];
+  const g = document.createElementNS(NS, 'g');
+  g.innerHTML = `<g fill="${s.color}" stroke="${shade(s.color, .8)}" stroke-width="0.7"
+    style="filter:drop-shadow(0 1px 1.2px rgba(43,51,80,.28))">${s.svg}</g>`;
+  const clipId = 'clip' + shapeIdx + '_' + Date.now();
+  const clip = el('clipPath', { id: clipId }, canvasSvg);
+  const rect = el('rect', { x:-5, y:-5, width:110, height:110 }, clip);
+  g.setAttribute('clip-path', `url(#${clipId})`);
+  canvasSvg.appendChild(g);
+  // rulo gibi açılma: çıkış yönünde büyüyen clip
+  const [dx, dy] = dirVec;
+  const dur = 420, t0 = performance.now();
+  (function roll(now){
+    const p = Math.min(1, (now - t0) / dur);
+    const e = 1 - Math.pow(1 - p, 2.2);
+    if (dx > 0)      rect.setAttribute('width', 110 * e);
+    else if (dx < 0){ rect.setAttribute('x', 105 - 110 * e); rect.setAttribute('width', 110 * e); }
+    else if (dy > 0)  rect.setAttribute('height', 110 * e);
+    else { rect.setAttribute('y', 105 - 110 * e); rect.setAttribute('height', 110 * e); }
+    if (p < 1) requestAnimationFrame(roll);
+  })(t0);
+  return g;
+}
+
+function violationFlash(shapeIdx, dirVec, done){
+  const s = L.shapes[shapeIdx];
+  const g = paintShape(shapeIdx, dirVec);
+  const red = document.createElementNS(NS, 'g');
+  red.innerHTML = `<g fill="#ff5d6c" fill-opacity="0.5" stroke="#ff5d6c"
+    stroke-width="1.4" stroke-dasharray="3 2">${s.svg}</g>`;
+  canvasSvg.appendChild(red);
+  canvasSvg.classList.add('shake');
+  setTimeout(() => canvasSvg.classList.remove('shake'), 500);
+  setTimeout(() => { g.remove(); red.remove(); done(); }, 950);
+}
+
+/* ================= Ok hareketi ================= */
+function routeFor(s){
+  const pts = s.cells.map(cellCenter);
+  const hd = DIRS[headDir(s.cells)];
+  const ray = rayCells(s.cells, C, R).map(cellCenter);
+  const last = ray.length ? ray[ray.length - 1] : pts[pts.length - 1];
+  const beyond = [ last[0] + hd[0] * CELL * 3.2, last[1] + hd[1] * CELL * 3.2 ];
+  const route = pts.concat(ray, [beyond]);
+  const cum = segLengths(route);
+  return { route, cum, B: (s.cells.length - 1) * CELL, T: cum[cum.length - 1], hd };
+}
+
+function animateSnake(s, from, to, dur, ease, onDone){
+  // from/to: kayma mesafesi (0 = yerinde, T = tamamen dışarı)
+  const { route, cum, B, T } = s._route;
+  const d = 'M' + route.map(p => p.join(' ')).join(' L');
+  for (const k of ['under', 'main', 'hit']){
+    s.els[k].setAttribute('d', d);
+    s.els[k].setAttribute('stroke-dasharray', `${B} ${T + B + 10}`);
   }
-}
-window.addEventListener('resize', layout);
-if (window.ResizeObserver) new ResizeObserver(() => cells.length && layout()).observe($('stage'));
-
-/* ================= Gameplay ================= */
-function ray(i){ // hücreden kenara: yol üzerindeki hücre indeksleri (sıralı)
-  const c = cells[i], path = [];
-  let x = (i % cols) + DIRS[c.dir][0], y = ((i / cols) | 0) + DIRS[c.dir][1];
-  while (x >= 0 && x < cols && y >= 0 && y < rows){
-    path.push(y * cols + x);
-    x += DIRS[c.dir][0]; y += DIRS[c.dir][1];
-  }
-  return path;
-}
-
-function paintCell(i, delay){
-  const c = cells[i];
-  setTimeout(() => {
-    if (!c.el.classList.contains('painted')){
-      c.el.classList.add('painted', 'pop');
-      c.el.style.background = c.color;
-    }
-    const s = document.createElement('div');
-    s.className = 'sheen';
-    c.el.appendChild(s);
-    setTimeout(() => s.remove(), 450);
-  }, delay);
+  const t0 = performance.now();
+  (function step(now){
+    let p = Math.min(1, (now - t0) / dur);
+    p = ease(p);
+    const shift = from + (to - from) * p;
+    for (const k of ['under', 'main', 'hit'])
+      s.els[k].setAttribute('stroke-dashoffset', -shift);
+    const headD = Math.min(B + shift, T - .01);
+    const { p: hp, a } = pointAt(route, cum, headD);
+    s.els.head.setAttribute('transform', `translate(${hp[0]} ${hp[1]}) rotate(${a})`);
+    if (p < 1) requestAnimationFrame(step);
+    else onDone && onDone();
+  })(t0);
 }
 
-function onTap(i){
+function tapSnake(i){
   if (locked) return;
-  const c = cells[i];
-  if (!c || !c.alive) return;
-  const path = ray(i);
-  const blockers = path.filter(j => cells[j].alive);
+  const s = snakes[i];
+  if (s.exited || s.animating) return;
 
-  if (blockers.length){ // ---- engelli ----
-    sndBlock();
-    navigator.vibrate && navigator.vibrate(60);
-    combo = 0;
-    lives--;
-    renderDrops(); updateHud();
-    const d = DIRS[c.dir];
-    c.arrowEl.animate([
-      { transform: `rotate(${ROT[c.dir]}deg) translate(0,0)` },
-      { transform: `rotate(${ROT[c.dir]}deg) translateY(-26%)`, offset: .35 },
-      { transform: `rotate(${ROT[c.dir]}deg) translate(0,0)` },
-    ], { duration: 220, easing: 'ease-out' });
-    const b = cells[blockers[0]];
-    b.arrowEl.classList.add('blocker');
-    setTimeout(() => b.arrowEl.classList.remove('blocker'), 450);
-    if (lives <= 0){
-      locked = true;
-      setTimeout(() => { sndFail(); $('ov-fail').classList.remove('hidden'); }, 500);
-    }
+  // engel kontrolü: uçtan kenara düz ışın
+  const blockers = [];
+  for (const [x, y] of rayCells(s.cells, C, R)){
+    const o = snakes.findIndex((t, j) => j !== i && !t.exited && t.cells.some(c => c[0] === x && c[1] === y));
+    if (o >= 0 && !blockers.includes(o)) blockers.push(o);
+  }
+  s._route = routeFor(s);
+
+  if (blockers.length){ // ---- toslama ----
+    sndThud();
+    navigator.vibrate && navigator.vibrate(40);
+    s.animating = true;
+    animateSnake(s, 0, CELL * .45, 110, p => p, () => {
+      animateSnake(s, CELL * .45, 0, 150, p => p, () => { s.animating = false; });
+    });
+    const b = snakes[blockers[0]];
+    const orig = [b.els.main.getAttribute('stroke'), b.els.head.getAttribute('fill')];
+    b.els.main.setAttribute('stroke', '#ff5d6c');
+    b.els.head.setAttribute('fill', '#ff5d6c');
+    setTimeout(() => { b.els.main.setAttribute('stroke', orig[0]); b.els.head.setAttribute('fill', orig[1]); }, 420);
     return;
   }
 
-  // ---- serbest: uç ve boya! ----
-  c.alive = false;
-  aliveCount--;
-  combo++;
-  const gained = 10 * combo;
-  score += gained;
-  sndPop();
+  // ---- kayarak çıkış ----
+  s.exited = true; s.animating = true;
+  sndSlide();
   navigator.vibrate && navigator.vibrate(12);
+  const dur = Math.max(380, s._route.T / (CELL * 15) * 1000);
+  animateSnake(s, 0, s._route.T, dur, p => p * p * .4 + p * .6, () => {
+    s.animating = false;
+    s.els.g.style.display = 'none';
+    onExited(i);
+  });
+}
 
-  const perCell = 42;
-  const flyCells = path.length + 2.5;
-  const dur = Math.max(180, flyCells * perCell);
-  const d = DIRS[c.dir];
-  c.arrowEl.style.transition = `transform ${dur}ms linear, opacity .2s ${dur - 160}ms`;
-  c.arrowEl.style.transform =
-    `translate(${d[0] * flyCells * cellPx}px, ${d[1] * flyCells * cellPx}px) rotate(${ROT[c.dir]}deg)`;
-  c.arrowEl.style.opacity = '0';
-  setTimeout(() => c.arrowEl.remove(), dur + 80);
+function onExited(i){
+  const s = snakes[i];
+  const shapeIdx = s.shape;
+  const dirVec = DIRS[headDir(s.cells)];
+  // bu parçanın ALTINDA kalması gereken bir parça henüz boyanmadıysa hata
+  const wrongOver = L.under.find(([a, b]) => b === shapeIdx && !painted.includes(a));
 
-  paintCell(i, 30);
-  path.forEach((j, k) => paintCell(j, (k + 1) * perCell));
-
-  // skor baloncuğu
-  const f = document.createElement('div');
-  f.className = 'float';
-  f.textContent = '+' + gained;
-  f.style.left = c.el.style.left; f.style.top = c.el.style.top;
-  boardEl.appendChild(f);
-  setTimeout(() => f.remove(), 700);
-
-  updateHud();
-
-  if (aliveCount === 0){
+  if (wrongOver){ // ---- yanlış katman: göster, geri sar ----
     locked = true;
-    setTimeout(win, dur + 900);
+    sndWrong();
+    navigator.vibrate && navigator.vibrate([60, 50, 60]);
+    hearts--;
+    updateHud();
+    toast('Önce bunun altındaki parça boyanmalı!');
+    violationFlash(shapeIdx, dirVec, () => {
+      // ok tahtaya geri döner
+      s.els.g.style.display = '';
+      animateSnake(s, s._route.T, 0, 500, p => 1 - Math.pow(1 - p, 2), () => {
+        s.exited = false;
+        renderBoard();          // dasharray'leri temizle
+        if (hearts <= 0){
+          setTimeout(() => { sndFail(); $('ov-fail').classList.remove('hidden'); }, 350);
+        } else locked = false;
+      });
+    });
+    return;
+  }
+
+  // ---- doğru: boya! ----
+  painted.push(shapeIdx);
+  sndPaint();
+  paintShape(shapeIdx, dirVec);
+  if (painted.length === L.shapes.length){
+    locked = true;
+    setTimeout(win, 800);
   }
 }
 
-boardEl.addEventListener('pointerdown', e => {
-  const r = boardEl.getBoundingClientRect();
-  const x = Math.floor((e.clientX - r.left - 5) / cellPx);
-  const y = Math.floor((e.clientY - r.top  - 5) / cellPx);
-  if (x < 0 || x >= cols || y < 0 || y >= rows) return;
-  onTap(y * cols + x);
-});
+/* ================= Akış ================= */
+function loadLevel(){
+  L = LEVELS[lvl % LEVELS.length];
+  C = L.C; R = L.R;
+  const N = L.shapes.length;
+  const gb = genBoard(C, R, N);
+  snakes = gb.list.map(cells => ({ cells, shape: -1, exited: false, animating: false }));
+  gb.order.forEach((si, k) => { snakes[si].shape = k; });
+  painted = [];
+  hearts = 3;
+  renderBoard();
+  renderTarget();
+  clearCanvas();
+  updateHud();
+}
 
-/* ================= Win / Fail / Flow ================= */
 function confetti(){
-  const colors = ['#ff4d6d','#ffc93c','#3ecf8e','#5fb8ff','#9d4edd','#ff9f1c'];
+  const colors = ['#ff5d6c','#ffd166','#3ecf8e','#4d9df6','#9d4edd','#f6a428'];
   for (let i = 0; i < 60; i++){
     const p = document.createElement('div');
     p.className = 'confetti';
@@ -558,23 +641,22 @@ function confetti(){
   }
 }
 function win(){
-  const L = LEVELS[lvl % LEVELS.length];
   sndWin();
   confetti();
   navigator.vibrate && navigator.vibrate([30, 40, 30]);
-  $('win-emoji').textContent = L.emoji;
-  $('win-title').textContent = L.name + '!';
-  $('win-sub').textContent = 'Skor: ' + score + ' — resmi tamamladın!';
+  $('win-stars').textContent = '⭐'.repeat(Math.max(1, hearts)) + '·'.repeat(0);
+  $('win-title').textContent = L.name + ' tamam!';
+  $('win-sub').textContent = hearts === 3 ? 'Hiç hata yapmadan boyadın!' : 'Resmi tamamladın!';
   $('ov-win').classList.remove('hidden');
 }
 $('btn-start').addEventListener('click', () => {
-  ac(); // ilk dokunuşta ses iznini al
+  ac();
   $('ov-intro').classList.add('hidden');
   locked = false;
 });
 $('btn-next').addEventListener('click', () => {
   lvl++;
-  localStorage.setItem('ap_lvl', lvl);
+  localStorage.setItem('ap2_lvl', lvl);
   $('ov-win').classList.add('hidden');
   loadLevel();
   locked = false;
