@@ -1,0 +1,1405 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#101410">
+<title>Mahjong TCG</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&family=Crimson+Pro:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+:root{
+  --lacquer:#101410;
+  --lacquer-2:#161c15;
+  --panel:#1b241a;
+  --panel-edge:#2c3a29;
+  --ivory:#efe8d6;
+  --ivory-2:#e2d8bf;
+  --ink:#22251f;
+  --gold:#c9a24b;
+  --gem:#9b6fd0;
+  --ticket:#c96b4b;
+  --c-common:#5d7a4c;
+  --c-uncommon:#8b8f93;
+  --c-rare:#8a5fc0;
+  --c-rr:#c9a24b;
+  --c-ir:#4bb0c9;
+  --danger:#b05050;
+  --font-display:'Cinzel', serif;
+  --font-body:'Crimson Pro', Georgia, serif;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{
+  background:var(--lacquer);
+  color:var(--ivory);
+  font-family:var(--font-body);
+  font-size:17px;
+  overflow:hidden;
+  touch-action:manipulation; /* iOS double-tap zoom engelle */
+  -webkit-user-select:none;user-select:none;
+  overscroll-behavior:none; /* elastik kaydırmayı engelle */
+  position:fixed;inset:0; /* iOS Safari adres çubuğu zıplamasına karşı */
+  width:100%;
+}
+#app{
+  max-width:520px;height:100dvh;margin:0 auto;
+  display:flex;flex-direction:column;position:relative;
+  background:
+    radial-gradient(120% 60% at 50% 0%, rgba(93,122,76,.12), transparent 60%),
+    radial-gradient(120% 60% at 50% 100%, rgba(0,0,0,.5), transparent 60%),
+    var(--lacquer);
+  border-left:1px solid #000;border-right:1px solid #000;
+}
+/* iPhone çentik / dynamic island güvenli alanı */
+#topbar{padding-top:calc(10px + env(safe-area-inset-top))}
+/* küçük iPhone'lar (SE/Mini ~375px) */
+@media (max-width:400px){
+  body{font-size:15.5px}
+  #topbar .logo{font-size:13px}
+  .chip{font-size:12.5px;padding:2px 8px 2px 6px}
+  .era-card{padding:14px 12px 12px}
+  .era-card .era-name{font-size:17px}
+  .era-glyph{width:58px;height:58px;right:6px}
+  .binder-grid{gap:8px;padding:6px 12px 14px}
+  .pcard .avatar{width:29px;height:29px;font-size:13px}
+  .pcard{padding:5px 7px;gap:6px}
+  .mini-tile{width:19px;height:26px}
+  .shop-grid{gap:8px}
+  .dialog{padding:18px 14px}
+}
+/* yatay mod uyarısı yerine boardu sıkıştır */
+@media (max-height:600px){
+  .pairs-strip{min-height:24px}
+  .mini-tile{width:17px;height:23px}
+  .match-head{padding:4px 10px 2px}
+  .match-foot{padding:2px 12px 6px}
+}
+/* ---------- top bar ---------- */
+#topbar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:10px 14px 8px;flex:none;
+  border-bottom:1px solid var(--panel-edge);
+  background:linear-gradient(180deg, rgba(0,0,0,.35), transparent);
+}
+#topbar .logo{font-family:var(--font-display);font-weight:900;font-size:15px;letter-spacing:.14em;color:var(--ivory)}
+#topbar .logo span{color:var(--gold)}
+.wallet{display:flex;gap:8px}
+.chip{
+  display:flex;align-items:center;gap:5px;
+  background:rgba(0,0,0,.4);border:1px solid var(--panel-edge);
+  border-radius:20px;padding:3px 10px 3px 7px;font-size:14px;font-weight:600;
+}
+.chip svg{width:14px;height:14px}
+/* ---------- screens ---------- */
+.screen{flex:1;overflow-y:auto;overflow-x:hidden;display:none;padding-bottom:8px}
+.screen.active{display:block}
+.screen::-webkit-scrollbar{width:0}
+h2.title{
+  font-family:var(--font-display);font-weight:700;font-size:14px;letter-spacing:.22em;
+  text-transform:uppercase;color:var(--ivory-2);text-align:center;margin:16px 0 4px;
+}
+.subtitle{text-align:center;color:#9aa38e;font-size:14px;margin-bottom:12px;font-style:italic}
+/* ---------- era select ---------- */
+.era-list{display:flex;flex-direction:column;gap:12px;padding:8px 16px}
+.era-card{
+  position:relative;border-radius:14px;overflow:hidden;cursor:pointer;
+  border:1px solid var(--panel-edge);
+  padding:18px 16px 14px;
+  transition:transform .15s ease, box-shadow .15s ease;
+}
+.era-card:active{transform:scale(.98)}
+.era-card .era-name{font-family:var(--font-display);font-weight:700;font-size:19px;letter-spacing:.08em;margin-bottom:2px}
+.era-card .era-sub{font-size:14px;opacity:.75;font-style:italic}
+.era-card .era-meta{display:flex;gap:10px;margin-top:10px;font-size:12.5px;flex-wrap:wrap}
+.era-card .era-meta b{font-weight:600}
+.era-glyph{position:absolute;right:10px;top:50%;transform:translateY(-50%);width:74px;height:74px;opacity:.5}
+.rarity-dot{display:inline-flex;align-items:center;gap:4px}
+.rarity-dot i{width:8px;height:8px;border-radius:2px;display:inline-block}
+@keyframes pulseDot{0%,100%{opacity:1}50%{opacity:.35}}
+/* ---------- match ---------- */
+#screen-battle{display:none;flex-direction:column;height:100%}
+#screen-battle.active{display:flex}
+.match-head{flex:none;padding:8px 12px 6px}
+.players{display:flex;align-items:stretch;gap:8px}
+.pcard{
+  flex:1;display:flex;align-items:center;gap:8px;
+  background:rgba(0,0,0,.35);border:1px solid var(--panel-edge);border-radius:10px;padding:6px 9px;
+  transition:box-shadow .2s, border-color .2s;
+}
+.pcard.turn{border-color:var(--gold);box-shadow:0 0 12px rgba(201,162,75,.25)}
+.pcard .avatar{
+  width:34px;height:34px;border-radius:50%;flex:none;
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--font-display);font-weight:700;font-size:15px;
+  background:var(--panel);border:1px solid var(--panel-edge);
+}
+.pcard .pname{font-weight:600;font-size:14px;line-height:1.1}
+.pcard .pscore{font-size:12.5px;color:#b6bfa9}
+.vs{align-self:center;font-family:var(--font-display);font-weight:900;font-size:13px;color:var(--gold);letter-spacing:.1em}
+.pairs-strip{
+  display:flex;gap:4px;margin-top:6px;min-height:30px;align-items:center;
+  overflow-x:auto;padding:2px;
+}
+.pairs-strip::-webkit-scrollbar{height:0}
+.mini-tile{
+  width:21px;height:29px;border-radius:3px;background:var(--ivory);flex:none;
+  border:1.5px solid var(--c-common);display:flex;align-items:center;justify-content:center;
+  animation:pop .3s ease;
+}
+.mini-tile svg{width:15px;height:15px}
+@keyframes pop{from{transform:scale(0)}to{transform:scale(1)}}
+.strip-label{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#8b957e;margin-top:8px;display:flex;justify-content:space-between}
+#board-wrap{flex:1;display:flex;align-items:center;justify-content:center;padding:6px 10px;min-height:0}
+#board{position:relative;width:100%;height:100%;max-width:480px}
+.tile{
+  position:absolute;border-radius:6px;cursor:pointer;
+  perspective:400px;
+  transition:filter .4s, opacity .4s;
+}
+.tile.locked{cursor:default;filter:brightness(.45) saturate(.6)}
+.tile.unlock-anim{animation:unlockGlow .8s ease}
+@keyframes unlockGlow{0%{filter:brightness(.45)}50%{filter:brightness(1.3)}100%{filter:brightness(1)}}
+.layer-badge{
+  position:absolute;top:2px;left:8px;z-index:5;font-size:11px;letter-spacing:.12em;
+  text-transform:uppercase;color:#8b957e;
+}
+.exit-btn{
+  position:absolute;top:0;right:8px;z-index:5;
+  background:rgba(0,0,0,.4);border:1px solid var(--panel-edge);color:#b6bfa9;
+  font-family:var(--font-display);font-size:10px;letter-spacing:.12em;text-transform:uppercase;
+  padding:5px 12px;border-radius:16px;cursor:pointer;
+}
+.exit-btn:active{transform:scale(.95)}
+.tile-inner{
+  position:absolute;inset:0;border-radius:6px;
+  transform-style:preserve-3d;transition:transform .35s cubic-bezier(.4,1.4,.6,1);
+}
+.tile.flipped .tile-inner{transform:rotateY(180deg)}
+.tile-face{
+  position:absolute;inset:0;border-radius:6px;backface-visibility:hidden;
+  display:flex;align-items:center;justify-content:center;overflow:hidden;
+}
+.tile-back{
+  background:linear-gradient(160deg, var(--era-back1,#2a3626), var(--era-back2,#172014));
+  border:1px solid rgba(239,232,214,.18);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.06), 0 2px 4px rgba(0,0,0,.5);
+}
+.tile-back::after{
+  content:'';position:absolute;inset:14%;border-radius:50%;
+  border:1px solid rgba(239,232,214,.22);
+}
+.tile-back .backmark{
+  font-family:var(--font-display);font-size:8px;font-weight:700;letter-spacing:.05em;
+  color:rgba(239,232,214,.55);text-align:center;line-height:1.2;padding:2px;
+}
+.tile-front{
+  background:var(--ivory);transform:rotateY(180deg);
+  border:3px solid var(--rar,#5d7a4c);
+  box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.6), inset 0 0 10px color-mix(in srgb, var(--rar) 35%, transparent), 0 2px 6px rgba(0,0,0,.5);
+}
+.tile-front::before{
+  content:'';position:absolute;inset:3px;border-radius:3px;
+  border:1px solid var(--rar);opacity:.5;pointer-events:none;
+}
+.tile-front .rar-tag{
+  position:absolute;bottom:1px;right:3px;font-size:8px;font-weight:700;
+  font-family:var(--font-display);color:var(--rar);letter-spacing:.03em;
+}
+.tile-front svg{width:68%;height:68%}
+.tile.matched{pointer-events:none}
+.tile.matched .tile-inner{animation:claimed .5s ease forwards}
+@keyframes claimed{to{transform:rotateY(180deg) scale(0);opacity:0}}
+.tile.gone{visibility:hidden;pointer-events:none}
+.tile.wrong .tile-front{animation:shake .35s ease}
+@keyframes shake{0%,100%{transform:rotateY(180deg) translateX(0)}25%{transform:rotateY(180deg) translateX(-3px)}75%{transform:rotateY(180deg) translateX(3px)}}
+.match-foot{flex:none;padding:6px 14px 10px;text-align:center}
+.turn-banner{font-family:var(--font-display);font-size:13px;letter-spacing:.18em;text-transform:uppercase;color:var(--gold)}
+.turn-banner.opp{color:#b6bfa9}
+.match-era-label{font-size:12px;color:#8b957e;letter-spacing:.14em;text-transform:uppercase;text-align:center;margin-bottom:4px}
+/* ---------- result / secure overlay ---------- */
+.overlay{
+  position:absolute;inset:0;z-index:40;display:none;
+  background:rgba(8,10,8,.9);backdrop-filter:blur(3px);
+  align-items:center;justify-content:center;padding:20px;
+}
+.overlay.show{display:flex}
+.dialog{
+  width:100%;max-width:420px;max-height:92%;overflow-y:auto;
+  background:var(--panel);border:1px solid var(--panel-edge);border-radius:16px;
+  padding:22px 20px;text-align:center;
+}
+.dialog::-webkit-scrollbar{width:0}
+.dialog h3{font-family:var(--font-display);font-size:22px;font-weight:900;letter-spacing:.1em;margin-bottom:6px}
+.dialog h3.win{color:var(--gold)}
+.dialog h3.lose{color:#b6bfa9}
+.dialog p{color:#b6bfa9;font-size:15px;margin-bottom:12px}
+.reward-row{display:flex;justify-content:center;gap:14px;margin:14px 0}
+.reward{background:rgba(0,0,0,.3);border:1px solid var(--panel-edge);border-radius:10px;padding:10px 16px;font-weight:600}
+.reward svg{width:16px;height:16px;vertical-align:-2px;margin-right:5px}
+.btn{
+  display:inline-block;border:none;cursor:pointer;font-family:var(--font-display);
+  font-weight:700;letter-spacing:.12em;text-transform:uppercase;font-size:13px;
+  padding:12px 26px;border-radius:10px;margin-top:6px;
+  background:linear-gradient(180deg,#d8b35e,#a9843a);color:#1d1607;
+  box-shadow:0 3px 8px rgba(0,0,0,.4);
+  transition:transform .1s;
+}
+.btn:active{transform:scale(.96)}
+.btn.ghost{background:transparent;border:1px solid var(--panel-edge);color:var(--ivory-2)}
+.btn.small{padding:8px 14px;font-size:11px}
+.btn:disabled{opacity:.4;pointer-events:none}
+.secure-list{display:flex;flex-direction:column;gap:8px;margin:12px 0;text-align:left}
+.secure-item{
+  display:flex;align-items:center;gap:10px;background:rgba(0,0,0,.3);
+  border:1px solid var(--panel-edge);border-radius:10px;padding:8px 10px;
+}
+.secure-item .mini-tile{width:30px;height:42px}
+.secure-item .mini-tile svg{width:20px;height:20px}
+.secure-item .info{flex:1}
+.secure-item .info b{font-size:14.5px}
+.secure-item .info small{display:block;color:#9aa38e;font-size:12.5px}
+.secure-item .btn{margin:0}
+.secure-item.done{opacity:.55}
+.secure-item .saved{font-size:12px;color:var(--gold);letter-spacing:.08em;text-transform:uppercase}
+/* ---------- binder ---------- */
+.binder-tabs{display:flex;gap:8px;padding:6px 16px;overflow-x:auto}
+.binder-tabs::-webkit-scrollbar{height:0}
+.btab{
+  flex:none;border:1px solid var(--panel-edge);background:transparent;color:var(--ivory-2);
+  font-family:var(--font-body);font-size:14px;padding:6px 14px;border-radius:20px;cursor:pointer;
+}
+.btab.active{background:var(--panel);border-color:var(--gold);color:var(--gold)}
+.binder-progress{padding:4px 20px 8px;font-size:13.5px;color:#9aa38e;text-align:center}
+.binder-grid{
+  display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:6px 16px 16px;
+}
+.bslot{
+  aspect-ratio:5/7;border-radius:8px;position:relative;
+  display:flex;align-items:center;justify-content:center;flex-direction:column;
+}
+.bslot.owned{background:var(--ivory);border:2.5px solid var(--rar);box-shadow:0 2px 6px rgba(0,0,0,.45)}
+.bslot.owned svg{width:56%;height:56%}
+.bslot.owned .count{
+  position:absolute;bottom:3px;right:5px;font-size:11px;font-weight:700;color:var(--ink);opacity:.6;
+}
+.bslot.missing{background:rgba(0,0,0,.35);border:1.5px dashed var(--panel-edge)}
+.bslot.missing svg{width:46%;height:46%;opacity:.18;filter:grayscale(1) invert(1)}
+.rarity-legend{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;padding:4px 16px 10px;font-size:12px;color:#9aa38e}
+/* ---------- shop ---------- */
+.shop-section{padding:4px 16px 6px}
+.shop-section h4{font-family:var(--font-display);font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:#9aa38e;margin:12px 0 8px}
+.shop-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.shop-item{
+  background:var(--panel);border:1px solid var(--panel-edge);border-radius:12px;
+  padding:14px 12px;text-align:center;cursor:pointer;transition:transform .1s;
+}
+.shop-item:active{transform:scale(.97)}
+.shop-item .icon{font-size:26px;margin-bottom:4px}
+.shop-item b{display:block;font-size:15px}
+.shop-item small{color:#9aa38e;font-size:12.5px;display:block;margin:2px 0 8px}
+.price{
+  display:inline-flex;align-items:center;gap:5px;font-weight:700;font-size:13.5px;
+  background:rgba(0,0,0,.35);border-radius:16px;padding:3px 11px;border:1px solid var(--panel-edge);
+}
+.price svg{width:13px;height:13px}
+/* pack opening — TCG booster */
+.pack-stage{position:relative;height:230px;margin:6px 0 4px;display:flex;align-items:center;justify-content:center}
+.booster{
+  position:relative;width:132px;height:190px;cursor:pointer;
+  border-radius:8px;
+  background:linear-gradient(160deg, var(--pk1,#2a3626), var(--pk2,#141c11));
+  border:1px solid rgba(239,232,214,.25);
+  box-shadow:0 8px 24px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.1);
+  transition:transform .15s;
+  animation:boosterFloat 2.2s ease-in-out infinite;
+}
+@keyframes boosterFloat{0%,100%{transform:translateY(0) rotate(-1deg)}50%{transform:translateY(-6px) rotate(1deg)}}
+.booster:active{transform:scale(.96)}
+.booster .crimp{
+  position:absolute;left:0;right:0;height:16px;
+  background:repeating-linear-gradient(90deg, rgba(255,255,255,.16) 0 3px, transparent 3px 7px);
+  border-bottom:1px solid rgba(239,232,214,.2);
+}
+.booster .crimp.top{top:0;border-radius:8px 8px 0 0}
+.booster .crimp.bot{bottom:0;border-radius:0 0 8px 8px;border-bottom:none;border-top:1px solid rgba(239,232,214,.2)}
+.booster .pk-ring{
+  position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+  width:82px;height:82px;border-radius:50%;
+  border:1.5px solid rgba(239,232,214,.4);
+  display:flex;align-items:center;justify-content:center;text-align:center;
+  font-family:var(--font-display);font-size:12px;font-weight:700;line-height:1.25;
+  color:var(--ivory);letter-spacing:.05em;padding:8px;
+}
+.booster .pk-count{
+  position:absolute;bottom:22px;left:0;right:0;text-align:center;
+  font-size:11px;letter-spacing:.16em;color:rgba(239,232,214,.6);text-transform:uppercase;
+}
+.booster .pk-tap{
+  position:absolute;top:-26px;left:0;right:0;text-align:center;font-size:12px;color:#9aa38e;
+  animation:pulseDot 1.6s infinite;
+}
+.booster.torn{animation:none;pointer-events:none}
+.booster.torn .crimp.top{animation:tearOff .5s ease forwards}
+@keyframes tearOff{
+  0%{transform:translate(0,0) rotate(0)}
+  100%{transform:translate(90px,-70px) rotate(24deg);opacity:0}
+}
+.booster.torn{animation:boosterOpen .55s ease .25s forwards}
+@keyframes boosterOpen{
+  0%{transform:scale(1);opacity:1;filter:brightness(1)}
+  40%{filter:brightness(1.7)}
+  100%{transform:scale(1.35) translateY(14px);opacity:0;filter:brightness(2.2)}
+}
+.card-pile{position:absolute;left:50%;top:50%;width:104px;height:146px;transform:translate(-50%,-50%);cursor:pointer}
+.pcard-t{
+  position:absolute;inset:0;border-radius:8px;perspective:600px;
+  transition:transform .3s;
+}
+.pcard-t .pinner{
+  position:absolute;inset:0;border-radius:8px;transform-style:preserve-3d;
+  transition:transform .45s cubic-bezier(.4,1.3,.6,1);
+  box-shadow:0 5px 16px rgba(0,0,0,.55);
+}
+.pcard-t.revealed .pinner{transform:rotateY(180deg)}
+.pcard-t .pface{
+  position:absolute;inset:0;border-radius:8px;backface-visibility:hidden;
+  display:flex;align-items:center;justify-content:center;
+}
+.pcard-t .pback{
+  background:linear-gradient(160deg, var(--pk1,#2a3626), var(--pk2,#141c11));
+  border:1px solid rgba(239,232,214,.25);
+}
+.pcard-t .pback::after{content:'';position:absolute;inset:12%;border-radius:50%;border:1px solid rgba(239,232,214,.25)}
+.pcard-t .pfront{
+  background:var(--ivory);transform:rotateY(180deg);
+  border:4px solid var(--rar);
+  box-shadow:inset 0 0 0 2px rgba(255,255,255,.6), inset 0 0 14px color-mix(in srgb, var(--rar) 35%, transparent);
+}
+.pcard-t .pfront svg{width:58%;height:58%}
+.pcard-t .pfront .pr-name{
+  position:absolute;bottom:6px;left:0;right:0;text-align:center;
+  font-family:var(--font-display);font-size:11px;font-weight:700;color:var(--rar);
+  text-transform:uppercase;letter-spacing:.08em;
+}
+.pcard-t.slide-out{transform:translate(-140px,-40px) scale(.42) !important;opacity:0;transition:transform .4s ease, opacity .4s}
+.pcard-t.rare-glow .pinner{animation:rareGlow .9s ease}
+@keyframes rareGlow{
+  0%{box-shadow:0 5px 16px rgba(0,0,0,.55)}
+  40%{box-shadow:0 0 34px 10px color-mix(in srgb, var(--rar) 65%, transparent)}
+  100%{box-shadow:0 5px 16px rgba(0,0,0,.55)}
+}
+.burst{
+  position:absolute;left:50%;top:50%;width:4px;height:26px;border-radius:2px;
+  background:var(--rar,#c9a24b);pointer-events:none;
+  animation:chipFly .5s ease-out forwards;
+}
+.chip-p{
+  position:absolute;width:6px;height:6px;background:#9a958a;border-radius:1px;
+  left:50%;top:50%;pointer-events:none;
+  animation:chipFly .55s ease-out forwards;
+}
+@keyframes chipFly{
+  0%{transform:translate(0,0) rotate(0);opacity:1}
+  100%{transform:translate(var(--dx),var(--dy)) rotate(var(--rot));opacity:0}
+}
+.tap-hint{position:absolute;bottom:-4px;left:0;right:0;text-align:center;font-size:12px;color:#9aa38e;animation:pulseDot 1.6s infinite}
+.pack-slots{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;min-height:96px;margin:4px 0 10px}
+.pack-slots .slotbox{position:relative}
+.fly-tile{transition:transform .45s cubic-bezier(.25,1.4,.45,1), opacity .3s}
+.fly-tile.pre{opacity:0}
+.pack-reveal{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin:14px 0}
+.era-pick-list{display:flex;flex-direction:column;gap:8px;margin:10px 0 14px}
+.era-pick{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  border:1px solid var(--panel-edge);border-radius:10px;padding:12px 14px;
+  cursor:pointer;text-align:left;transition:transform .1s;
+}
+.era-pick:active{transform:scale(.97)}
+.era-pick b{font-family:var(--font-display);font-size:14px;display:block}
+.era-pick small{color:#b6bfa9;font-size:12.5px}
+.skip-btn{
+  position:absolute;top:8px;right:8px;z-index:6;
+  background:rgba(0,0,0,.45);border:1px solid var(--panel-edge);color:#b6bfa9;
+  font-family:var(--font-display);font-size:10px;letter-spacing:.1em;text-transform:uppercase;
+  padding:6px 12px;border-radius:16px;cursor:pointer;
+}
+.skip-btn:active{transform:scale(.95)}
+.pack-reveal .mini-tile{width:52px;height:73px;border-width:2.5px}
+.pack-reveal .mini-tile svg{width:32px;height:32px}
+.pack-reveal .rlabel{font-size:10px;letter-spacing:.06em;text-transform:uppercase;text-align:center;margin-top:3px;color:#9aa38e}
+.new-badge{position:absolute;top:-7px;right:-7px;background:var(--gold);color:#1d1607;font-size:9px;font-weight:700;padding:2px 5px;border-radius:8px;letter-spacing:.05em}
+.dup-badge{position:absolute;top:-7px;right:-7px;background:#4b5a44;color:var(--ivory);font-size:9px;font-weight:700;padding:2px 5px;border-radius:8px}
+/* ---------- missions / profile ---------- */
+.plain-list{display:flex;flex-direction:column;gap:8px;padding:8px 16px}
+.plain-item{
+  background:var(--panel);border:1px solid var(--panel-edge);border-radius:10px;
+  padding:12px 14px;display:flex;align-items:center;gap:10px;
+}
+.plain-item .info{flex:1}
+.plain-item small{color:#9aa38e;display:block}
+.stat-big{font-family:var(--font-display);font-size:26px;font-weight:900;color:var(--gold)}
+/* ---------- nav ---------- */
+#nav{
+  flex:none;display:flex;border-top:1px solid var(--panel-edge);
+  background:linear-gradient(0deg, #0a0d09, var(--lacquer-2));
+  padding:6px 4px calc(6px + env(safe-area-inset-bottom));
+}
+#nav button{
+  flex:1;background:none;border:none;color:#7d876f;cursor:pointer;
+  font-family:var(--font-display);font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;
+  display:flex;flex-direction:column;align-items:center;gap:3px;padding:4px 0;
+}
+#nav button svg{width:21px;height:21px;stroke:currentColor}
+#nav button.active{color:var(--gold)}
+#nav button.battle-btn{position:relative;top:-6px}
+#nav button.battle-btn .bcirc{
+  width:46px;height:46px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(180deg,#d8b35e,#a9843a);color:#1d1607;
+  box-shadow:0 3px 10px rgba(0,0,0,.5);
+}
+#nav button.battle-btn .bcirc svg{stroke:#1d1607}
+.toast{
+  position:absolute;left:50%;bottom:90px;transform:translateX(-50%) translateY(20px);
+  background:var(--panel);border:1px solid var(--gold);color:var(--ivory);
+  padding:9px 18px;border-radius:22px;font-size:14px;opacity:0;pointer-events:none;
+  transition:all .3s;z-index:60;white-space:nowrap;
+}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="topbar">
+    <div class="logo">MAHJONG <span>TCG</span></div>
+    <div class="wallet">
+      <div class="chip" id="chip-gold"></div>
+      <div class="chip" id="chip-gem"></div>
+      <div class="chip" id="chip-ticket"></div>
+    </div>
+  </div>
+
+  <!-- ERA SELECT -->
+  <div class="screen active" id="screen-home">
+    <h2 class="title">Diyar Seç</h2>
+    <div class="subtitle">Bir maç 1 ticket. İlk 10 çifti yapan kazanır.</div>
+    <div class="era-list" id="era-list"></div>
+  </div>
+
+  <!-- BATTLE -->
+  <div class="screen" id="screen-battle">
+    <div class="match-head">
+      <div class="match-era-label" id="match-era-label"></div>
+      <div class="players">
+        <div class="pcard" id="pcard-me">
+          <div class="avatar">S</div>
+          <div><div class="pname">Sen</div><div class="pscore" id="score-me"></div></div>
+        </div>
+        <div class="vs">VS</div>
+        <div class="pcard" id="pcard-ai">
+          <div class="avatar">B</div>
+          <div><div class="pname" id="ai-name">Blaze</div><div class="pscore" id="score-ai"></div></div>
+        </div>
+      </div>
+      <div class="strip-label"><span>Senin çiftlerin</span><span id="me-pair-count"></span></div>
+      <div class="pairs-strip" id="strip-me"></div>
+    </div>
+    <div id="board-wrap" style="position:relative">
+      <span class="layer-badge" id="layer-badge"></span>
+      <button class="exit-btn" onclick="exitMatch()">✕ Çık</button>
+      <div id="board"></div>
+    </div>
+    <div class="match-foot">
+      <div class="strip-label"><span>Rakibin çiftleri</span><span id="ai-pair-count"></span></div>
+      <div class="pairs-strip" id="strip-ai"></div>
+      <div class="turn-banner" id="turn-banner">SENİN SIRAN</div>
+    </div>
+  </div>
+
+  <!-- BINDER -->
+  <div class="screen" id="screen-binder">
+    <h2 class="title">Binder</h2>
+    <div class="binder-tabs" id="binder-tabs"></div>
+    <div class="binder-progress" id="binder-progress"></div>
+    <div class="rarity-legend" id="rarity-legend"></div>
+    <div class="binder-grid" id="binder-grid"></div>
+  </div>
+
+  <!-- SHOP -->
+  <div class="screen" id="screen-shop">
+    <h2 class="title">Shop</h2>
+    <div class="shop-section">
+      <h4>Taş Paketleri</h4>
+      <div class="shop-grid" id="shop-packs"></div>
+      <h4>Kaynaklar</h4>
+      <div class="shop-grid">
+        <div class="shop-item" onclick="buyTicket()">
+          <div class="icon">🎟️</div><b>1 Ticket</b><small>Maça giriş</small>
+          <span class="price" id="price-ticket"></span>
+        </div>
+        <div class="shop-item" onclick="buyGold()">
+          <div class="icon">🪙</div><b>500 Gold</b><small>Taş secure etmek için</small>
+          <span class="price" id="price-gold"></span>
+        </div>
+        <div class="shop-item" onclick="freeGems()">
+          <div class="icon">💎</div><b>+100 Gem</b><small>Demo hediyesi (IAP yerine)</small>
+          <span class="price">Ücretsiz</span>
+        </div>
+        <div class="shop-item" onclick="dailyTicket()">
+          <div class="icon">🌅</div><b>Günlük Ticket</b><small>Her oturumda 1 kez</small>
+          <span class="price" id="daily-state">Al</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MISSIONS -->
+  <div class="screen" id="screen-missions">
+    <h2 class="title">Görevler</h2>
+    <div class="plain-list" id="mission-list"></div>
+  </div>
+
+  <!-- PROFILE -->
+  <div class="screen" id="screen-profile">
+    <h2 class="title">Profil</h2>
+    <div class="plain-list" id="profile-list"></div>
+  </div>
+
+  <!-- NAV -->
+  <div id="nav">
+    <button data-nav="shop"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.6"><path d="M4 8h16l-1.5 12h-13L4 8z"/><path d="M8 8V6a4 4 0 0 1 8 0v2"/></svg>Shop</button>
+    <button data-nav="binder"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.6"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M9 3v18M13 8h4M13 12h4"/></svg>Binder</button>
+    <button data-nav="home" class="battle-btn"><span class="bcirc"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.8"><path d="M5 19L19 5M5 5l14 14M5 5h4M5 5v4M19 19h-4M19 19v-4"/></svg></span>Battle</button>
+    <button data-nav="missions"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.6"><path d="M9 11l3 3 8-8"/><path d="M20 12v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9"/></svg>Görev</button>
+    <button data-nav="profile"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.6"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 5-5 8-5s6.5 1 8 5"/></svg>Profil</button>
+  </div>
+
+  <!-- OVERLAYS -->
+  <div class="overlay" id="overlay-exit"><div class="dialog">
+    <h3 class="lose">Maçtan çık?</h3>
+    <p>Ticket iade edilmez ve yaptığın çiftler kaybolur.</p>
+    <button class="btn ghost" onclick="document.getElementById('overlay-exit').classList.remove('show')">Devam Et</button>
+    <button class="btn" style="margin-left:8px" onclick="confirmExit()">Çık</button>
+  </div></div>
+  <div class="overlay" id="overlay-result"><div class="dialog" id="result-dialog"></div></div>
+  <div class="overlay" id="overlay-pack"><div class="dialog" id="pack-dialog"></div></div>
+  <div class="toast" id="toast"></div>
+</div>
+
+<script>
+/* ================= ICONS ================= */
+const ICO = {
+  gold:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="#c9a24b"/><circle cx="12" cy="12" r="6" fill="none" stroke="#8a6a26" stroke-width="1.5"/></svg>',
+  gem:'<svg viewBox="0 0 24 24"><path d="M12 3l7 6-7 12L5 9z" fill="#9b6fd0"/><path d="M5 9h14" stroke="#6e46a0" stroke-width="1.2"/></svg>',
+  ticket:'<svg viewBox="0 0 24 24"><path d="M4 8a2 2 0 0 0 0 8v3h16v-3a2 2 0 0 0 0-8V5H4z" fill="#c96b4b"/><path d="M12 5v14" stroke="#8f452c" stroke-width="1.3" stroke-dasharray="2 2"/></svg>'
+};
+/* ================= GLYPH LIBRARY (ink drawings) ================= */
+const S='stroke="#22251f" stroke-width="1.7" fill="none" stroke-linecap="round" stroke-linejoin="round"';
+const GLYPHS = {
+  tree:`<svg viewBox="0 0 40 40"><g ${S}><path d="M20 34V20"/><path d="M20 20c-6 1-11-3-11-9 4-2 9-1 11 3 2-4 7-5 11-3 0 6-5 10-11 9z" fill="#3f4d35" stroke="none"/><path d="M14 34h12"/></g></svg>`,
+  mountain:`<svg viewBox="0 0 40 40"><g ${S}><path d="M4 32L15 12l6 10 4-6 11 16z"/><path d="M13 16l2 3 2-3"/></g></svg>`,
+  bamboo:`<svg viewBox="0 0 40 40"><g ${S}><path d="M14 34V8M22 34V12M14 16h0M14 24h0M22 20h0M22 28h0"/><path d="M12 16h4M12 24h4M20 20h4M20 28h4M28 34V18M26 24h4"/></g></svg>`,
+  deer:`<svg viewBox="0 0 40 40"><g ${S}><path d="M14 34l2-10 8-2 2 12"/><path d="M24 22l3-8M27 14l-3-4M27 14l4-3M27 14l3 2"/><circle cx="25" cy="19" r="1" fill="#22251f"/></g></svg>`,
+  crane:`<svg viewBox="0 0 40 40"><g ${S}><path d="M8 30c8 2 16 0 20-8l4-8-6 4c-4 2-8 8-18 12z"/><path d="M32 14l3-2M12 30l-2 6"/></g></svg>`,
+  cloud:`<svg viewBox="0 0 40 40"><g ${S}><path d="M10 26c-4 0-5-6-1-7 0-5 7-6 9-2 2-4 9-3 9 2 4 0 4 7 0 7z"/><path d="M12 31h16"/></g></svg>`,
+  moon:`<svg viewBox="0 0 40 40"><g ${S}><path d="M26 6a13 13 0 1 0 8 20A11 11 0 0 1 26 6z" fill="#3f4d35" stroke="none"/><circle cx="12" cy="12" r="1.4" fill="#22251f"/></g></svg>`,
+  wave:`<svg viewBox="0 0 40 40"><g ${S}><path d="M4 26c4-8 10-8 12-2 2-6 8-6 10 0 2-5 7-5 10-1"/><path d="M6 32c6-4 22-4 28 0"/></g></svg>`,
+  stone:`<svg viewBox="0 0 40 40"><g ${S}><ellipse cx="20" cy="28" rx="12" ry="5"/><ellipse cx="20" cy="20" rx="8" ry="4"/><ellipse cx="20" cy="13" rx="5" ry="3"/></g></svg>`,
+  lotus:`<svg viewBox="0 0 40 40"><g ${S}><path d="M20 30c-3-4-3-10 0-14 3 4 3 10 0 14z"/><path d="M20 30c-6 0-10-4-11-9 5-1 9 2 11 6M20 30c6 0 10-4 11-9-5-1-9 2-11 6"/></g></svg>`,
+  koi:`<svg viewBox="0 0 40 40"><g ${S}><path d="M8 20c6-8 18-8 24-2-6 8-18 8-24 2z"/><path d="M32 18l4-4v10l-4-4M14 17c2 2 2 5 0 7"/><circle cx="12" cy="19" r="1" fill="#22251f"/></g></svg>`,
+  torii:`<svg viewBox="0 0 40 40"><g ${S}><path d="M6 12c9-3 19-3 28 0M8 17h24M12 12v22M28 12v22M20 17v6"/></g></svg>`,
+  helmet:`<svg viewBox="0 0 40 40"><g ${S}><path d="M12 26c-1-9 3-14 8-14s9 5 8 14z"/><path d="M10 26h20l-3 6H13z"/><path d="M14 12L8 5M26 12l6-7"/></g></svg>`,
+  katana:`<svg viewBox="0 0 40 40"><g ${S}><path d="M8 32L30 8c2 1 3 2 3 4L12 34z"/><path d="M12 26l4 4M8 34l-2 2"/></g></svg>`,
+  fan:`<svg viewBox="0 0 40 40"><g ${S}><path d="M20 32L8 14c8-6 16-6 24 0z"/><path d="M20 32L14 12M20 32l6-20M20 32V10"/></g></svg>`,
+  flame:`<svg viewBox="0 0 40 40"><g ${S}><path d="M20 6c2 6 8 8 8 16a8 8 0 0 1-16 0c0-5 3-7 4-10 1 2 3 3 4 2 0-3-1-5 0-8z" fill="#3f4d35" stroke="none"/></g></svg>`,
+  volcano:`<svg viewBox="0 0 40 40"><g ${S}><path d="M6 32l8-18h12l8 18z"/><path d="M14 14c2 2 4 2 6 0s4-2 6 0M20 6v4M14 8l2 3M26 8l-2 3"/></g></svg>`,
+  dragon:`<svg viewBox="0 0 40 40"><g ${S}><path d="M8 28c2-8 10-12 18-10 4 1 6 4 5 7-4-2-8-2-10 1-3 4-9 5-13 2z"/><path d="M28 16l3-4M31 18l4-1"/><circle cx="27" cy="20" r="1" fill="#22251f"/></g></svg>`,
+  lantern:`<svg viewBox="0 0 40 40"><g ${S}><ellipse cx="20" cy="20" rx="9" ry="11"/><path d="M16 6h8M16 34h8M20 9v22M13 14h14M13 26h14"/></g></svg>`,
+  pagoda:`<svg viewBox="0 0 40 40"><g ${S}><path d="M8 32h24M10 26h20M8 20c4-3 20-3 24 0l-4-6H12zM12 14c3-2 13-2 16 0l-3-5h-10zM20 5V3"/></g></svg>`,
+  bell:`<svg viewBox="0 0 40 40"><g ${S}><path d="M13 28c0-10 2-16 7-16s7 6 7 16z"/><path d="M10 28h20M20 28v5M17 33h6M20 12V8"/></g></svg>`,
+  gate:`<svg viewBox="0 0 40 40"><g ${S}><rect x="8" y="14" width="24" height="20"/><path d="M8 14l12-8 12 8M20 22v12M14 22h12"/></g></svg>`,
+  sun:`<svg viewBox="0 0 40 40"><g ${S}><circle cx="20" cy="20" r="7" fill="#3f4d35" stroke="none"/><path d="M20 6v4M20 30v4M6 20h4M30 20h4M10 10l3 3M30 10l-3 3M10 30l3-3M30 30l-3-3"/></g></svg>`,
+  plum:`<svg viewBox="0 0 40 40"><g ${S}><circle cx="20" cy="14" r="4"/><circle cx="13" cy="20" r="4"/><circle cx="27" cy="20" r="4"/><circle cx="16" cy="27" r="4"/><circle cx="24" cy="27" r="4"/><circle cx="20" cy="21" r="1.4" fill="#22251f"/></g></svg>`,
+};
+const GLYPH_KEYS = Object.keys(GLYPHS);
+/* ================= RARITIES (malzeme kademeleri) ================= */
+const RAR = {
+  C:{name:'Bambu', tag:'B', color:'var(--c-common)', hex:'#5d7a4c', pts:1, secureGold:50, secureGold2:120},
+  U:{name:'Granit', tag:'G', color:'var(--c-uncommon)', hex:'#8b8f93', pts:2, secureGold:120, secureGold2:260},
+  R:{name:'Ametist', tag:'A', color:'var(--c-rare)', hex:'#8a5fc0', pts:3, secureGold:300, secureGold2:600},
+  RR:{name:'Altın', tag:'AU', color:'var(--c-rr)', hex:'#c9a24b', pts:4, secureGem:15, secureGem2:35},
+  IR:{name:'Göksel', tag:'GK', color:'var(--c-ir)', hex:'#4bb0c9', pts:5, secureGem:30, secureGem2:70},
+};
+/* ================= ERAS ================= */
+function makeEraSet(order){ // order: array of [glyphKey, rarity]
+  return order.map((o,i)=>({id:i, glyph:o[0], rar:o[1]}));
+}
+const ERAS = [
+  {
+    key:'nature', name:'Hate of the Nature', sub:'Kadim orman kin tutar',
+    back1:'#2a3626', back2:'#141c11', accent:'#5d7a4c', aiName:'Willow',
+    set: makeEraSet([
+      ['tree','C'],['bamboo','C'],['cloud','C'],['stone','C'],['wave','C'],['sun','C'],['plum','C'],['lotus','C'],
+      ['mountain','U'],['deer','U'],['crane','U'],['moon','U'],['bell','U'],['gate','U'],
+      ['koi','R'],['lantern','R'],['fan','R'],
+      ['dragon','RR'],['pagoda','RR'],
+      ['torii','IR']
+    ])
+  },
+  {
+    key:'samurai', name:'Age of Samurai', sub:'Ay ışığında çelik konuşur',
+    back1:'#33283d', back2:'#171220', accent:'#8a5fc0', aiName:'Ronin',
+    set: makeEraSet([
+      ['helmet','C'],['fan','C'],['gate','C'],['moon','C'],['stone','C'],['plum','C'],['bell','C'],['cloud','C'],
+      ['katana','U'],['torii','U'],['pagoda','U'],['crane','U'],['lantern','U'],['wave','U'],
+      ['mountain','R'],['koi','R'],['tree','R'],
+      ['dragon','RR'],['sun','RR'],
+      ['volcano','IR']
+    ])
+  },
+  {
+    key:'fire', name:'Realm of Fire', sub:'Dağ öfkeyle uyanır',
+    back1:'#3d2420', back2:'#1c0f0c', accent:'#c96b4b', aiName:'Blaze',
+    set: makeEraSet([
+      ['flame','C'],['volcano','C'],['sun','C'],['stone','C'],['mountain','C'],['cloud','C'],['bell','C'],['gate','C'],
+      ['lantern','U'],['wave','U'],['katana','U'],['helmet','U'],['torii','U'],['plum','U'],
+      ['dragon','R'],['pagoda','R'],['koi','R'],
+      ['crane','RR'],['moon','RR'],
+      ['tree','IR']
+    ])
+  },
+];
+/* ================= STATE ================= */
+const state = {
+  gold:300, gem:60, ticket:5,
+  wins:0, losses:0, matches:0, packs:0,
+  dailyUsed:false,
+  binder:{}, // key: era.key -> {tileId: count}
+  missions:{win1:false, pairs20:0, pack1:false, claimed:{}},
+};
+ERAS.forEach(e=>state.binder[e.key]={});
+// starter tiles
+state.binder.nature[0]=1; state.binder.nature[1]=1;
+
+function fmt(n){return n.toLocaleString('tr-TR')}
+function renderWallet(){
+  document.getElementById('chip-gold').innerHTML = ICO.gold+fmt(state.gold);
+  document.getElementById('chip-gem').innerHTML = ICO.gem+fmt(state.gem);
+  document.getElementById('chip-ticket').innerHTML = ICO.ticket+fmt(state.ticket);
+}
+let toastTimer;
+function toast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove('show'),2200);
+}
+/* ================= NAV ================= */
+const screens=['home','battle','binder','shop','missions','profile'];
+function go(name){
+  screens.forEach(s=>document.getElementById('screen-'+s).classList.toggle('active', s===name));
+  document.querySelectorAll('#nav button').forEach(b=>{
+    b.classList.toggle('active', b.dataset.nav===name || (name==='battle'&&b.dataset.nav==='home'));
+  });
+  if(name==='binder') renderBinder();
+  if(name==='missions') renderMissions();
+  if(name==='profile') renderProfile();
+}
+document.querySelectorAll('#nav button').forEach(b=>b.addEventListener('click',()=>{
+  if(match.active && b.dataset.nav!=='home'){ exitMatch(); return; }
+  go(b.dataset.nav);
+}));
+/* ================= ERA SELECT ================= */
+function rarityCounts(era){
+  const c={C:0,U:0,R:0,RR:0,IR:0};
+  era.set.forEach(t=>c[t.rar]++);
+  return c;
+}
+function renderEraList(){
+  const el=document.getElementById('era-list');
+  el.innerHTML='';
+  ERAS.forEach(era=>{ if(era.players===undefined) era.players=300+Math.floor(Math.random()*301); });
+  // Rastgele maç kartı — en üstte
+  const totalPlayers=ERAS.reduce((s,e)=>s+e.players,0);
+  const rnd=document.createElement('div');
+  rnd.className='era-card';
+  rnd.style.background='linear-gradient(120deg, #2c2a20, #14130d)';
+  rnd.style.borderColor='var(--gold)';
+  rnd.innerHTML=`
+    <div class="era-name" style="color:var(--gold)">Rastgele Maç</div>
+    <div class="era-sub">Kader hangi diyara düşerse</div>
+    <div class="era-meta" style="margin-top:6px">
+      <span class="player-count" data-era="__total" style="color:#8fbf7a">
+        <i style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#8fbf7a;margin-right:4px;animation:pulseDot 2s infinite"></i><b>${totalPlayers}</b> oyuncu çevrimiçi
+      </span>
+    </div>
+    <div class="era-glyph" style="font-size:52px;display:flex;align-items:center;justify-content:center;opacity:.6">🎲</div>`;
+  rnd.onclick=()=>startMatch(ERAS[Math.floor(Math.random()*ERAS.length)]);
+  el.appendChild(rnd);
+  ERAS.forEach(era=>{
+    const c=rarityCounts(era);
+    const d=document.createElement('div');
+    d.className='era-card';
+    d.style.background=`linear-gradient(120deg, ${era.back1}, ${era.back2})`;
+    d.innerHTML=`
+      <div class="era-name">${era.name}</div>
+      <div class="era-sub">${era.sub}</div>
+      <div class="era-meta">
+        <span><b>Set: ${era.set.length}</b></span>
+        ${Object.entries(c).map(([k,v])=>`<span class="rarity-dot"><i style="background:${RAR[k].hex}"></i>${RAR[k].tag}:${v}</span>`).join('')}
+      </div>
+      <div class="era-meta" style="margin-top:6px">
+        <span class="player-count" data-era="${era.key}" style="color:#8fbf7a">
+          <i style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#8fbf7a;margin-right:4px;animation:pulseDot 2s infinite"></i><b>${era.players}</b> oyuncu çevrimiçi
+        </span>
+      </div>
+      <div class="era-glyph">${GLYPHS[era.set[era.set.length-1].glyph].replace('#22251f','rgba(239,232,214,.8)').replaceAll('#22251f','rgba(239,232,214,.8)').replaceAll('#3f4d35','rgba(239,232,214,.35)')}</div>`;
+    d.onclick=()=>startMatch(era);
+    el.appendChild(d);
+  });
+}
+// oyuncu sayıları organik dalgalanma: her 2sn'de küçük değişim, 300-600 bandı
+setInterval(()=>{
+  ERAS.forEach(era=>{
+    if(era.players===undefined) return;
+    // çoğunlukla küçük adımlar, ara sıra biraz daha büyük sıçrama
+    const step = Math.random()<0.15 ? Math.floor(Math.random()*15)-7 : Math.floor(Math.random()*7)-3;
+    era.players=Math.max(300, Math.min(600, era.players+step));
+    const el=document.querySelector(`.player-count[data-era="${era.key}"] b`);
+    if(el) el.textContent=era.players;
+  });
+  const tot=document.querySelector('.player-count[data-era="__total"] b');
+  if(tot) tot.textContent=ERAS.reduce((s,e)=>s+(e.players||0),0);
+},2000);
+/* ================= MATCH ================= */
+const PAIRS_TO_WIN=10;
+const KINDS_IN_BOARD=20; // 20 tür × 2 = 40 taş
+// index 0 = en alt katman, son = en üst (önce üst oynanır)
+const LAYERS=[
+  {cols:5, rows:4},  // 20 taş — alt
+  {cols:4, rows:3},  // 12 taş — orta
+  {cols:4, rows:2},  // 8 taş  — üst
+];
+const match={active:false};
+
+function weightedDraw(era, n){
+  // farklı nadirliklerden n benzersiz taş çek — düşük nadirlik daha olası
+  const w={C:10,U:6,R:3,RR:1.6,IR:1};
+  const pool=[...era.set];
+  const drawn=[];
+  while(drawn.length<n && pool.length){
+    const tot=pool.reduce((s,t)=>s+w[t.rar],0);
+    let r=Math.random()*tot;
+    for(let i=0;i<pool.length;i++){
+      r-=w[pool[i].rar];
+      if(r<=0){ drawn.push(pool.splice(i,1)[0]); break; }
+    }
+  }
+  return drawn;
+}
+function startMatch(era){
+  if(state.ticket<1){ toast('Ticket yok — Shop\'tan al'); go('shop'); return; }
+  state.ticket--; renderWallet();
+  const uniques=weightedDraw(era, KINDS_IN_BOARD); // 20 tür
+  // Türleri katmanlara paylaştır: her çift AYNI katmanda (ilk sürüm kuralı)
+  const shuffled=[...uniques].sort(()=>Math.random()-.5);
+  const tiles=[];
+  let k=0;
+  LAYERS.forEach((L,li)=>{
+    const pairCount=(L.cols*L.rows)/2;
+    const kinds=shuffled.slice(k, k+pairCount); k+=pairCount;
+    // katman içi pozisyonları karıştır
+    const cells=[];
+    for(let r=0;r<L.rows;r++)for(let c=0;c<L.cols;c++)cells.push({r,c});
+    cells.sort(()=>Math.random()-.5);
+    kinds.forEach(t=>{
+      const p1=cells.pop(), p2=cells.pop();
+      tiles.push({...t, layer:li, r:p1.r, c:p1.c});
+      tiles.push({...t, layer:li, r:p2.r, c:p2.c});
+    });
+  });
+  Object.assign(match,{
+    active:true, era, tiles,
+    activeLayer:LAYERS.length-1, // en üst katmandan başla
+    open:[], busy:false, turn:'me',
+    me:{pairs:[], pts:0}, ai:{pairs:[], pts:0},
+    aiMemory:{}, // tileIndex -> glyph
+  });
+  document.getElementById('ai-name').textContent=era.aiName;
+  document.getElementById('match-era-label').textContent=era.name;
+  document.documentElement.style.setProperty('--era-back1',era.back1);
+  document.documentElement.style.setProperty('--era-back2',era.back2);
+  document.getElementById('strip-me').innerHTML='';
+  document.getElementById('strip-ai').innerHTML='';
+  go('battle'); // önce ekranı göster ki board ölçüleri hesaplanabilsin
+  requestAnimationFrame(()=>{ renderBoard(); renderMatchHUD(); });
+}
+function layoutBoard(){
+  const wrap=document.getElementById('board-wrap');
+  const board=document.getElementById('board');
+  const W=board.clientWidth||board.parentElement.clientWidth||340;
+  const H=board.clientHeight||board.parentElement.clientHeight||420;
+  const base=LAYERS[0]; // en geniş katman ölçüyü belirler
+  const gap=5, depth=7; // katmanlar arası derinlik ofseti
+  const tw=Math.max(30, Math.min((W-(base.cols-1)*gap-20)/base.cols, ((H-(base.rows-1)*gap-24)/base.rows)/1.38));
+  const th=tw*1.38;
+  match.tw=tw; match.th=th;
+  match.layerOrigin=LAYERS.map((L,li)=>{
+    const lw=L.cols*tw+(L.cols-1)*gap;
+    const lh=L.rows*th+(L.rows-1)*gap;
+    return {x:(W-lw)/2 - li*depth, y:(H-lh)/2 - li*depth, gap};
+  });
+}
+function renderBoard(){
+  const board=document.getElementById('board');
+  board.innerHTML='';
+  layoutBoard();
+  match.tiles.forEach((t,i)=>{
+    const d=document.createElement('div');
+    d.className='tile'; d.dataset.i=i;
+    d.style.zIndex=t.layer+1;
+    if(t.layer!==match.activeLayer) d.classList.add('locked');
+    d.innerHTML=`<div class="tile-inner">
+      <div class="tile-face tile-back"><div class="backmark">${match.era.name.split(' ').map(w=>w[0]).join('')}</div></div>
+      <div class="tile-face tile-front" style="--rar:${RAR[t.rar].hex}">${GLYPHS[t.glyph]}<span class="rar-tag">${RAR[t.rar].tag}</span></div>
+    </div>`;
+    d.onclick=()=>playerFlip(i);
+    board.appendChild(d);
+  });
+  positionTiles();
+  updateLayerBadge();
+}
+function positionTiles(){
+  match.tiles.forEach((t,i)=>{
+    const el=tileEl(i); if(!el) return;
+    const o=match.layerOrigin[t.layer];
+    el.style.width=match.tw+'px';
+    el.style.height=match.th+'px';
+    el.style.left=(o.x + t.c*(match.tw+o.gap))+'px';
+    el.style.top=(o.y + t.r*(match.th+o.gap))+'px';
+  });
+}
+window.addEventListener('resize',()=>{ if(match.active){layoutBoard();positionTiles();} });
+function updateLayerBadge(){
+  const total=LAYERS.length;
+  document.getElementById('layer-badge').textContent=`Katman ${total-match.activeLayer}/${total}`;
+}
+function exitMatch(){
+  if(!match.active){ go('home'); return; }
+  document.getElementById('overlay-exit').classList.add('show');
+}
+function confirmExit(){
+  document.getElementById('overlay-exit').classList.remove('show');
+  endMatchAbort(); go('home');
+}
+function tileEl(i){return document.querySelector(`.tile[data-i="${i}"]`)}
+function renderMatchHUD(){
+  document.getElementById('score-me').textContent=`${match.me.pairs.length} çift · ${match.me.pts} puan`;
+  document.getElementById('score-ai').textContent=`${match.ai.pairs.length} çift · ${match.ai.pts} puan`;
+  document.getElementById('me-pair-count').textContent=`${match.me.pairs.length}/${PAIRS_TO_WIN}`;
+  document.getElementById('ai-pair-count').textContent=`${match.ai.pairs.length}/${PAIRS_TO_WIN}`;
+  document.getElementById('pcard-me').classList.toggle('turn',match.turn==='me');
+  document.getElementById('pcard-ai').classList.toggle('turn',match.turn==='ai');
+  const tb=document.getElementById('turn-banner');
+  tb.textContent=match.turn==='me'?'SENİN SIRAN':'RAKİBİN SIRASI';
+  tb.classList.toggle('opp',match.turn!=='me');
+}
+function addPairToStrip(who,t){
+  const strip=document.getElementById('strip-'+who);
+  const d=document.createElement('div');
+  d.className='mini-tile';
+  d.style.borderColor=RAR[t.rar].hex;
+  d.innerHTML=GLYPHS[t.glyph];
+  strip.appendChild(d);
+  strip.scrollLeft=strip.scrollWidth;
+}
+function playerFlip(i){
+  if(!match.active||match.busy||match.turn!=='me') return;
+  const t=match.tiles[i], el=tileEl(i);
+  if(t.done||match.open.includes(i)) return;
+  if(t.layer!==match.activeLayer){ toast('Önce üst katmanı temizle'); return; }
+  el.classList.add('flipped');
+  match.aiMemory[i]=t.glyph; // rakip de görür
+  match.open.push(i);
+  if(match.open.length===2) resolveFlips('me');
+}
+function resolveFlips(who){
+  match.busy=true;
+  const [a,b]=match.open;
+  const ta=match.tiles[a], tb=match.tiles[b];
+  const isMatch = ta.glyph===tb.glyph;
+  setTimeout(()=>{
+    if(isMatch){
+      [a,b].forEach(i=>{ match.tiles[i].done=true; tileEl(i).classList.add('matched'); delete match.aiMemory[i]; });
+      setTimeout(()=>[a,b].forEach(i=>tileEl(i).classList.add('gone')),500);
+      match[who].pairs.push(ta);
+      match[who].pts+=RAR[ta.rar].pts;
+      if(who==='me') state.missions.pairs20++;
+      match.open=[];
+      addPairToStrip(who,ta);
+      renderMatchHUD();
+      // aktif katman bitti mi? bir alttakini aç
+      const layerLeft=match.tiles.some(x=>x.layer===match.activeLayer && !x.done);
+      if(!layerLeft && match.activeLayer>0){
+        match.activeLayer--;
+        match.tiles.forEach((x,xi)=>{
+          if(x.layer===match.activeLayer){
+            const el2=tileEl(xi);
+            el2.classList.remove('locked');
+            el2.classList.add('unlock-anim');
+          }
+        });
+        updateLayerBadge();
+        toast('Yeni katman açıldı');
+      }
+      if(checkEnd()) return;
+      match.busy=false;
+      if(who==='ai') setTimeout(aiTurn, 700); // eşleşme = tekrar oyna
+    } else {
+      [a,b].forEach(i=>tileEl(i).classList.add('wrong'));
+      setTimeout(()=>{
+        [a,b].forEach(i=>{tileEl(i).classList.remove('flipped','wrong')});
+        match.open=[];
+        match.turn = who==='me'?'ai':'me';
+        renderMatchHUD();
+        match.busy=false;
+        if(match.turn==='ai') setTimeout(aiTurn, 600);
+      }, 800);
+    }
+  }, 550);
+}
+function aiTurn(){
+  if(!match.active||match.turn!=='ai') return;
+  const alive=match.tiles.map((t,i)=>(!t.done && t.layer===match.activeLayer)?i:null).filter(i=>i!==null);
+  if(!alive.length) return;
+  // bilinen çift var mı? (%40 hatırlar — dengeli zorluk)
+  let pick=null;
+  const known={};
+  for(const [i,g] of Object.entries(match.aiMemory)){
+    if(match.tiles[i].done || match.tiles[i].layer!==match.activeLayer) continue;
+    if(Math.random()<0.25){ delete match.aiMemory[i]; continue; } // unutkanlık
+    if(known[g]!==undefined && Math.random()<0.4){ pick=[+known[g],+i]; break; }
+    known[g]=i;
+  }
+  if(!pick){
+    const first=alive[Math.floor(Math.random()*alive.length)];
+    const g=match.tiles[first].glyph;
+    // ilk taşın eşini biliyor mu?
+    let second=null;
+    for(const [i,gg] of Object.entries(match.aiMemory)){
+      if(+i!==first && gg===g && !match.tiles[i].done && match.tiles[i].layer===match.activeLayer && Math.random()<0.35){ second=+i; break; }
+    }
+    if(second===null){
+      const rest=alive.filter(i=>i!==first);
+      second=rest[Math.floor(Math.random()*rest.length)];
+    }
+    pick=[first,second];
+  }
+  const [a,b]=pick;
+  match.busy=true;
+  tileEl(a).classList.add('flipped'); match.aiMemory[a]=match.tiles[a].glyph;
+  setTimeout(()=>{
+    tileEl(b).classList.add('flipped'); match.aiMemory[b]=match.tiles[b].glyph;
+    match.open=[a,b];
+    resolveFlips('ai');
+  }, 650);
+}
+function checkEnd(){
+  const done = match.me.pairs.length>=PAIRS_TO_WIN || match.ai.pairs.length>=PAIRS_TO_WIN
+    || match.tiles.every(t=>t.done);
+  if(!done) return false;
+  match.active=false;
+  const iWin = match.me.pairs.length>match.ai.pairs.length
+    || (match.me.pairs.length===match.ai.pairs.length && match.me.pts>=match.ai.pts);
+  setTimeout(()=>showResult(iWin), 900);
+  return true;
+}
+function endMatchAbort(){ match.active=false; }
+/* ================= RESULT & SECURE ================= */
+function showResult(iWin){
+  state.matches++;
+  const dlg=document.getElementById('result-dialog');
+  const ov=document.getElementById('overlay-result');
+  let goldR, gemR;
+  if(iWin){
+    state.wins++; state.missions.win1=true;
+    goldR=200+match.me.pts*10; gemR=20+match.me.pts;
+    // kazanan çiftleri binder'a
+    match.me.pairs.forEach(t=>addToBinder(match.era.key,t.id));
+    state.gold+=goldR; state.gem+=gemR; renderWallet();
+    dlg.innerHTML=`
+      <h3 class="win">Zafer</h3>
+      <p>${match.me.pairs.length} çift yaptın — hepsi binder'ına taşındı.</p>
+      <div class="pack-reveal">${match.me.pairs.slice(0,8).map(t=>
+        `<div class="mini-tile" style="border-color:${RAR[t.rar].hex};position:relative">${GLYPHS[t.glyph]}</div>`).join('')}</div>
+      <div class="reward-row">
+        <div class="reward">${ICO.gold}+${goldR}</div>
+        <div class="reward">${ICO.gem}+${gemR}</div>
+      </div>
+      <button class="btn" onclick="closeResult()">Devam</button>`;
+  } else {
+    state.losses++;
+    goldR=80+match.me.pts*5; gemR=5;
+    state.gold+=goldR; state.gem+=gemR; renderWallet();
+    dlg.innerHTML=`
+      <h3 class="lose">Mağlubiyet</h3>
+      <p>Yaptığın çiftleri kaybetmemek için secure edebilirsin:</p>
+      <div class="reward-row">
+        <div class="reward">${ICO.gold}+${goldR}</div>
+        <div class="reward">${ICO.gem}+${gemR}</div>
+      </div>
+      <div class="secure-list" id="secure-list"></div>
+      <button class="btn ghost" onclick="closeResult()">Bitir</button>`;
+    renderSecureList();
+  }
+  ov.classList.add('show');
+}
+function renderSecureList(){
+  const list=document.getElementById('secure-list');
+  if(!list) return;
+  const owned={}; // aynı taştan kaçıncı secure
+  list.innerHTML='';
+  match.me.pairs.forEach((t,idx)=>{
+    const r=RAR[t.rar];
+    const nth=(owned[t.id]||0);
+    owned[t.id]=nth+1;
+    const useGem = r.secureGem!==undefined;
+    const cost = useGem ? (nth===0?r.secureGem:r.secureGem2) : (nth===0?r.secureGold:r.secureGold2);
+    const cur = useGem?'gem':'gold';
+    const row=document.createElement('div');
+    row.className='secure-item';
+    row.innerHTML=`
+      <div class="mini-tile" style="border-color:${r.hex}">${GLYPHS[t.glyph]}</div>
+      <div class="info"><b>${cap(t.glyph)}</b><small>${r.name} · ${r.pts} puan</small></div>
+      <button class="btn small">${useGem?'💎':'🪙'} ${cost}</button>`;
+    row.querySelector('button').onclick=()=>{
+      if(state[cur]<cost){ toast(cur==='gem'?'Yeterli gem yok':'Yeterli gold yok'); return; }
+      state[cur]-=cost; renderWallet();
+      addToBinder(match.era.key,t.id);
+      row.classList.add('done');
+      row.querySelector('button').outerHTML='<span class="saved">Secure ✓</span>';
+      toast('Taş binder\'a taşındı');
+    };
+    list.appendChild(row);
+  });
+  if(!match.me.pairs.length) list.innerHTML='<p style="text-align:center">Bu maçta çift yapamadın.</p>';
+}
+function closeResult(){
+  document.getElementById('overlay-result').classList.remove('show');
+  go('home');
+}
+/* ================= BINDER ================= */
+function addToBinder(eraKey,tileId){
+  const b=state.binder[eraKey];
+  b[tileId]=(b[tileId]||0)+1;
+}
+let binderEra=ERAS[0].key;
+function renderBinder(){
+  const tabs=document.getElementById('binder-tabs');
+  tabs.innerHTML='';
+  ERAS.forEach(e=>{
+    const b=document.createElement('button');
+    b.className='btab'+(e.key===binderEra?' active':'');
+    b.textContent=e.name;
+    b.onclick=()=>{binderEra=e.key;renderBinder();};
+    tabs.appendChild(b);
+  });
+  const era=ERAS.find(e=>e.key===binderEra);
+  const b=state.binder[era.key];
+  const ownedCount=era.set.filter(t=>b[t.id]).length;
+  document.getElementById('binder-progress').textContent=
+    `${ownedCount} / ${era.set.length} görsel toplandı ${ownedCount===era.set.length?'— SET TAMAM! 🏆':''}`;
+  document.getElementById('rarity-legend').innerHTML=
+    Object.entries(RAR).map(([k,r])=>`<span class="rarity-dot"><i style="background:${r.hex}"></i>${r.name}</span>`).join('');
+  const grid=document.getElementById('binder-grid');
+  grid.innerHTML='';
+  const sorted=[...era.set].sort((a,b2)=>RAR[a.rar].pts-RAR[b2.rar].pts);
+  sorted.forEach(t=>{
+    const owned=b[t.id];
+    const d=document.createElement('div');
+    d.className='bslot '+(owned?'owned':'missing');
+    d.style.setProperty('--rar',RAR[t.rar].hex);
+    d.innerHTML=GLYPHS[t.glyph]+(owned>1?`<span class="count">×${owned}</span>`:'');
+    grid.appendChild(d);
+  });
+}
+/* ================= SHOP ================= */
+const PACKS=[
+  {name:'Standart Paket', desc:'5 taş · her kademeden şans', cur:'gold', cost:400, count:5, w:{C:10,U:5,R:2,RR:.8,IR:.4}},
+  {name:'Premium Paket', desc:'5 taş · Ametist+ garantili', cur:'gem', cost:50, count:5, w:{C:4,U:4,R:3,RR:1.5,IR:1}, guaranteeRare:true},
+];
+function renderShop(){
+  const el=document.getElementById('shop-packs');
+  el.innerHTML='';
+  PACKS.forEach((p,i)=>{
+    const d=document.createElement('div');
+    d.className='shop-item';
+    d.innerHTML=`<div class="icon">🀄</div><b>${p.name}</b><small>${p.desc}</small>
+      <span class="price">${p.cur==='gem'?ICO.gem:ICO.gold}${p.cost}</span>`;
+    d.onclick=()=>openPack(i);
+    el.appendChild(d);
+  });
+  document.getElementById('price-ticket').innerHTML=ICO.gem+'20';
+  document.getElementById('price-gold').innerHTML=ICO.gem+'40';
+}
+function openPack(pi){
+  const p=PACKS[pi];
+  // önce hangi seri (diyar) açılacak — seçim akışı
+  const dlg=document.getElementById('pack-dialog');
+  dlg.innerHTML=`
+    <h3 class="win" style="font-size:18px">${p.name}</h3>
+    <p>Hangi serinin paketini açmak istiyorsun?</p>
+    <div class="era-pick-list">
+      ${ERAS.map(e=>{
+        const owned=e.set.filter(t=>state.binder[e.key][t.id]).length;
+        return `<div class="era-pick" style="background:linear-gradient(120deg, ${e.back1}, ${e.back2})" onclick="purchasePack(${pi},'${e.key}')">
+          <div><b>${e.name}</b><small>${owned}/${e.set.length} toplandı</small></div>
+          <span class="price">${p.cur==='gem'?ICO.gem:ICO.gold}${p.cost}</span>
+        </div>`;
+      }).join('')}
+    </div>
+    <button class="btn ghost" onclick="document.getElementById('overlay-pack').classList.remove('show')">Vazgeç</button>`;
+  document.getElementById('overlay-pack').classList.add('show');
+}
+function purchasePack(pi, eraKey){
+  const p=PACKS[pi];
+  const era=ERAS.find(e=>e.key===eraKey);
+  if(state[p.cur]<p.cost){ toast(p.cur==='gem'?'Yeterli gem yok':'Yeterli gold yok'); return; }
+  state[p.cur]-=p.cost; renderWallet();
+  state.packs++; state.missions.pack1=true;
+  const pulls=[];
+  for(let i=0;i<p.count;i++){
+    let pool=era.set;
+    if(p.guaranteeRare && i===p.count-1 && !pulls.some(t=>RAR[t.rar].pts>=3))
+      pool=era.set.filter(t=>RAR[t.rar].pts>=3);
+    const tot=pool.reduce((s,t)=>s+p.w[t.rar],0);
+    let r=Math.random()*tot, chosen=pool[0];
+    for(const t of pool){ r-=p.w[t.rar]; if(r<=0){chosen=t;break;} }
+    pulls.push(chosen);
+  }
+  runPackAnimation(era, pulls);
+}
+function runPackAnimation(era, pulls){
+  const dlg=document.getElementById('pack-dialog');
+  dlg.innerHTML=`
+    <h3 class="win" style="font-size:18px">${era.name}</h3>
+    <p id="pack-hint">&nbsp;</p>
+    <div class="pack-stage" id="pack-stage" style="--pk1:${era.back1};--pk2:${era.back2}">
+      <button class="skip-btn" onclick="fastOpen()">⏩ Hızlı Aç</button>
+      <div class="booster" id="booster" onclick="tearBooster()">
+        <span class="pk-tap">Yırtmak için dokun</span>
+        <div class="crimp top"></div><div class="crimp bot"></div>
+        <div class="pk-ring">${era.name.toUpperCase()}</div>
+        <div class="pk-count">5 Taş</div>
+      </div>
+    </div>
+    <div class="pack-slots" id="pack-slots"></div>
+    <button class="btn" id="pack-done" style="visibility:hidden"
+      onclick="document.getElementById('overlay-pack').classList.remove('show')">Harika</button>`;
+  document.getElementById('overlay-pack').classList.add('show');
+  match._pack={era,pulls,idx:0};
+}
+function fastOpen(){
+  const pk=match._pack;
+  if(!pk || pk.idx>=pk.pulls.length) return;
+  pk.busy=true;
+  const booster=document.getElementById('booster');
+  if(booster) booster.remove();
+  const pile=document.getElementById('card-pile');
+  if(pile) pile.remove();
+  const skip=document.querySelector('.skip-btn');
+  if(skip) skip.remove();
+  // kalan tüm kartları küçük gecikmelerle şeride dök
+  const remaining=pk.pulls.slice(pk.idx);
+  remaining.forEach((t,ri)=>{
+    setTimeout(()=>addToSlots(pk.era,t), ri*90);
+  });
+  pk.idx=pk.pulls.length;
+  setTimeout(()=>{
+    document.getElementById('pack-done').style.visibility='visible';
+    document.getElementById('pack-hint').textContent='Paket tamamlandı';
+    pk.busy=false;
+  }, remaining.length*90+300);
+}
+function tearBooster(){
+  const b=document.getElementById('booster');
+  if(b.classList.contains('torn')) return;
+  b.classList.add('torn');
+  const stage=document.getElementById('pack-stage');
+  // yırtılma molozları
+  for(let p=0;p<10;p++){
+    const c=document.createElement('div');
+    c.className='chip-p';
+    c.style.background='rgba(239,232,214,.7)';
+    const ang=Math.random()*Math.PI-Math.PI/2, dist=50+Math.random()*90;
+    c.style.setProperty('--dx',Math.cos(ang)*dist+'px');
+    c.style.setProperty('--dy',(Math.sin(ang)*dist-40)+'px');
+    c.style.setProperty('--rot',(Math.random()*540-270)+'deg');
+    stage.appendChild(c); setTimeout(()=>c.remove(),600);
+  }
+  setTimeout(()=>{
+    b.remove();
+    buildCardPile();
+  }, 850);
+}
+function buildCardPile(){
+  const stage=document.getElementById('pack-stage');
+  const {era,pulls}=match._pack;
+  const pile=document.createElement('div');
+  pile.className='card-pile'; pile.id='card-pile';
+  // en alttaki kart = son çıkacak; DOM sırası: pulls ters
+  [...pulls].reverse().forEach((t,ri)=>{
+    const i=pulls.length-1-ri; // gerçek sıra
+    const isRare=RAR[t.rar].pts>=3;
+    const c=document.createElement('div');
+    c.className='pcard-t'; c.dataset.i=i;
+    c.style.setProperty('--rar',RAR[t.rar].hex);
+    c.style.transform=`rotate(${(ri-2)*1.6}deg) translateY(${-ri*1.5}px)`;
+    c.innerHTML=`<div class="pinner">
+      <div class="pface pback"></div>
+      <div class="pface pfront">${GLYPHS[t.glyph]}<span class="pr-name">${RAR[t.rar].name}</span></div>
+    </div>`;
+    pile.appendChild(c);
+  });
+  const hint=document.createElement('div');
+  hint.className='tap-hint'; hint.id='pile-hint';
+  hint.textContent='Kartı açmak için dokun';
+  pile.appendChild(hint);
+  pile.onclick=revealNext;
+  stage.appendChild(pile);
+  document.getElementById('pack-hint').textContent='';
+}
+function revealNext(){
+  const pk=match._pack;
+  if(pk.busy || pk.idx>=pk.pulls.length) return;
+  const t=pk.pulls[pk.idx];
+  const card=document.querySelector(`.pcard-t[data-i="${pk.idx}"]`);
+  if(!card) return;
+  pk.busy=true;
+  const isRare=RAR[t.rar].pts>=3;
+  card.classList.add('revealed');
+  if(isRare){
+    card.classList.add('rare-glow');
+    const stage=document.getElementById('pack-stage');
+    for(let p=0;p<10;p++){
+      const s=document.createElement('div');
+      s.className='burst';
+      s.style.setProperty('--rar',RAR[t.rar].hex);
+      const ang=(p/10)*Math.PI*2, dist=70+Math.random()*40;
+      s.style.setProperty('--dx',Math.cos(ang)*dist+'px');
+      s.style.setProperty('--dy',Math.sin(ang)*dist+'px');
+      s.style.setProperty('--rot',ang*57+'deg');
+      stage.appendChild(s); setTimeout(()=>s.remove(),550);
+    }
+  }
+  // görüldükten sonra sonuç şeridine kayar
+  setTimeout(()=>{
+    card.classList.add('slide-out');
+    setTimeout(()=>{
+      card.remove();
+      addToSlots(pk.era, t);
+      pk.idx++; pk.busy=false;
+      if(pk.idx>=pk.pulls.length){
+        const pile=document.getElementById('card-pile');
+        if(pile) pile.remove();
+        const skip=document.querySelector('.skip-btn');
+        if(skip) skip.remove();
+        document.getElementById('pack-done').style.visibility='visible';
+        document.getElementById('pack-hint').textContent='Paket tamamlandı';
+      }
+    }, 380);
+  }, isRare?1050:700);
+}
+function addToSlots(era, t){
+  const slots=document.getElementById('pack-slots');
+  const isNew=!state.binder[era.key][t.id];
+  addToBinder(era.key,t.id);
+  const box=document.createElement('div');
+  box.className='slotbox';
+  box.innerHTML=`<div class="mini-tile fly-tile pre" style="border-color:${RAR[t.rar].hex};position:relative;width:52px;height:73px">
+      ${GLYPHS[t.glyph]}
+      <span class="${isNew?'new-badge':'dup-badge'}">${isNew?'YENİ':'×'+state.binder[era.key][t.id]}</span>
+    </div><div class="rlabel" style="font-size:10px;text-align:center;margin-top:3px;color:#9aa38e;text-transform:uppercase">${RAR[t.rar].name}</div>`;
+  slots.appendChild(box);
+  const tile=box.querySelector('.fly-tile');
+  tile.style.transform='translateY(-30px) scale(.4)';
+  void tile.offsetWidth;
+  tile.classList.remove('pre');
+  tile.style.transform='translate(0,0) scale(1)';
+}
+function buyTicket(){
+  if(state.gem<20){toast('Yeterli gem yok');return;}
+  state.gem-=20; state.ticket++; renderWallet(); toast('+1 Ticket');
+}
+function buyGold(){
+  if(state.gem<40){toast('Yeterli gem yok');return;}
+  state.gem-=40; state.gold+=500; renderWallet(); toast('+500 Gold');
+}
+function freeGems(){ state.gem+=100; renderWallet(); toast('+100 Gem 💎'); }
+function dailyTicket(){
+  if(state.dailyUsed){toast('Bugünlük alındı');return;}
+  state.dailyUsed=true; state.ticket++; renderWallet();
+  document.getElementById('daily-state').textContent='Alındı ✓';
+  toast('Günlük ticket alındı');
+}
+/* ================= MISSIONS ================= */
+const MISSIONS=[
+  {id:'win1', name:'İlk zafer', desc:'1 maç kazan', check:()=>state.missions.win1, rew:{gem:30}},
+  {id:'pairs20', name:'Eş avcısı', desc:'Toplam 20 çift yap', check:()=>state.missions.pairs20>=20, prog:()=>Math.min(state.missions.pairs20,20)+'/20', rew:{gold:400}},
+  {id:'pack1', name:'Koleksiyoncu', desc:'1 paket aç', check:()=>state.missions.pack1, rew:{ticket:2}},
+];
+function renderMissions(){
+  const el=document.getElementById('mission-list');
+  el.innerHTML='';
+  MISSIONS.forEach(m=>{
+    const done=m.check(), claimed=state.missions.claimed[m.id];
+    const rewTxt=Object.entries(m.rew).map(([k,v])=>({gold:'🪙',gem:'💎',ticket:'🎟️'}[k])+v).join(' ');
+    const d=document.createElement('div');
+    d.className='plain-item';
+    d.innerHTML=`<div class="info"><b>${m.name}</b><small>${m.desc}${m.prog?' · '+m.prog():''}</small></div>
+      <span style="font-weight:700">${rewTxt}</span>
+      <button class="btn small" ${(!done||claimed)?'disabled':''}>${claimed?'✓':'Al'}</button>`;
+    d.querySelector('button').onclick=()=>{
+      state.missions.claimed[m.id]=true;
+      Object.entries(m.rew).forEach(([k,v])=>state[k]+=v);
+      renderWallet(); renderMissions(); toast('Ödül alındı');
+    };
+    el.appendChild(d);
+  });
+}
+/* ================= PROFILE ================= */
+function renderProfile(){
+  const el=document.getElementById('profile-list');
+  const totalOwned=ERAS.reduce((s,e)=>s+Object.keys(state.binder[e.key]).length,0);
+  const totalSet=ERAS.reduce((s,e)=>s+e.set.length,0);
+  el.innerHTML=`
+    <div class="plain-item"><div class="info"><small>Maç</small><span class="stat-big">${state.matches}</span></div>
+      <div class="info"><small>Zafer</small><span class="stat-big">${state.wins}</span></div>
+      <div class="info"><small>Mağlubiyet</small><span class="stat-big">${state.losses}</span></div></div>
+    <div class="plain-item"><div class="info"><b>Koleksiyon</b><small>${totalOwned} / ${totalSet} görsel · ${ERAS.length} Diyar</small></div></div>
+    <div class="plain-item"><div class="info"><b>Açılan paket</b><small>${state.packs} paket</small></div></div>
+    <div class="plain-item"><div class="info"><b>Yol haritası</b><small>4 kişilik mod · çiftli turnuva · concept turnuvaları · VIP abonelik (günlük Altın/Göksel taş)</small></div></div>
+    <div class="plain-item" style="border-color:var(--gold)">
+      <div class="info"><b>⚙️ Cheat (test)</b><small>Kaynak ekle — sadece geliştirme için</small>
+        <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+          <button class="btn small" onclick="cheat('gold',1000)">🪙 +1000</button>
+          <button class="btn small" onclick="cheat('gem',100)">💎 +100</button>
+          <button class="btn small" onclick="cheat('ticket',5)">🎟️ +5</button>
+          <button class="btn small ghost" onclick="cheat('all')">Hepsi</button>
+        </div>
+      </div>
+    </div>`;
+}
+function cheat(kind,amt){
+  if(kind==='all'){ state.gold+=1000; state.gem+=100; state.ticket+=5; }
+  else state[kind]+=amt;
+  renderWallet();
+  toast('Cheat uygulandı ✓');
+}
+/* ================= UTIL & INIT ================= */
+function cap(s){return s.charAt(0).toUpperCase()+s.slice(1)}
+renderWallet(); renderEraList(); renderShop();
+</script>
+</body>
+</html>
