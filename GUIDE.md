@@ -5,8 +5,8 @@ Tek dosyalık HTML oyun prototiplerini tuttuğumuz repo. Her oyun kendi klasör�
 ## Kurulum (bir kere)
 
 ```bash
-git clone https://github.com/JoygameMobileTechnology/game-experiments.git
-cd game-experiments
+git clone https://github.com/JoygameMobileTechnology/games.git
+cd games
 ```
 
 ## Yeni oyun ekleme
@@ -44,10 +44,10 @@ git pull --rebase && git push
 
 ## Oynama / paylaşma
 
-- **Ana sayfa (tüm oyunlar):** https://expert-adventure-77kk9m7.pages.github.io/
-- **Senin oyunun:** `https://expert-adventure-77kk9m7.pages.github.io/benim-oyunum/`
+- **Ana sayfa (tüm oyunlar):** https://joygamemobiletechnology.github.io/games/
+- **Senin oyunun:** `https://joygamemobiletechnology.github.io/games/benim-oyunum/`
 
-Site private: yalnızca bu repoya erişimi olan org üyeleri görebilir ve tarayıcıda **GitHub'a girişli olmak şart** (telefonda da). Link açılmıyorsa önce github.com'a giriş yap.
+Site herkese açık — linki doğrudan paylaşabilirsin, giriş gerekmez.
 
 ## Yerelde önizleme
 
