@@ -288,6 +288,8 @@ function deserialize(json) {
     const o = JSON.parse(json);
     if (!o || typeof o !== 'object' || Array.isArray(o) || !o.garden) return defaultState();
     const st = Object.assign(defaultState(), o);
+    if (st.board && !(Array.isArray(st.board) && st.board.length === SIZE &&
+        st.board.every(r => Array.isArray(r) && r.length === SIZE && r.every(v => typeof v === 'number')))) st.board = null;
     st.garden = Object.assign(newGarden(), o.garden);
     return st;
   } catch { return defaultState(); }
@@ -365,8 +367,79 @@ function handleMove(dir) {
   onEmissions(emitted);                            // Task 8-9'da doldurulacak
   if (!C.canMove(state.board)) showGameOver();     // Task 12'de doldurulacak
 }
-function onEmissions(emitted) {}       // placeholder — Task 8/9
+function onEmissions(emitted) {
+  if (!emitted.length) return;
+  const blooms = new Set();
+  for (const { events } of emitted)
+    for (const e of events) if (e.kind === 'plant') blooms.add(e.zone + ':' + e.slot);
+  renderGarden(blooms);
+}
 function showGameOver() {}             // placeholder — Task 12
+
+// --- Bahçe render ---
+const SLOT_ART = {
+  cicek:  ['🌱', '🌿', '🌸'],
+  cali:   ['🌱', '🪴', '🌳'],
+  nadir:  ['🌱', '🌿', '🪷'],
+  peyzaj: ['🌱', '🌲', '🌳'],
+  prestij:['🪨', '🗿', '⛲'],
+};
+const VARIANT_ART = ['🌸', '🌺', '🌼', '🌷', '💐'];
+const ANIMALS = ['🦋', '🐝', '🐞'];
+const BANK_ICON = { tohum_tozu:'✨', cicek_ozu:'💧', meyve:'🍎', nadir_tohum:'🎁', agac_fidani:'🌱', efsanevi:'🏆' };
+
+function slotArt(zone, i) {
+  const key = zone + ':' + i;
+  const slot = C.ZONES[zone].slots[i];
+  const plot = state.garden.plots[key];
+  if (!plot) return null;
+  if (slot.type === 'cicek' && plot.stage === C.MAX_STAGE && state.garden.variants[key])
+    return VARIANT_ART[state.garden.variants[key] % VARIANT_ART.length];
+  return SLOT_ART[slot.type][plot.stage - 1];
+}
+
+function renderGarden(bloomKeys) {
+  const garden = $('#garden');
+  garden.innerHTML = '';
+  C.ZONES.forEach((zone, z) => {
+    const el = document.createElement('div');
+    el.className = 'zone z-' + zone.id + (z >= state.garden.unlocked ? ' locked' : '');
+    el.dataset.zone = z;
+    if (z >= state.garden.unlocked) { el.textContent = '🔒'; garden.appendChild(el); return; }
+    el.innerHTML = `<span class="zone-name">${zone.name}</span>`;
+    zone.slots.forEach((slot, i) => {
+      const key = z + ':' + i;
+      const s = document.createElement('div');
+      const art = slotArt(z, i);
+      s.className = 'slot' + (art ? '' : ' empty') + (slot.type === 'peyzaj' || slot.type === 'prestij' ? ' big' : '')
+        + (bloomKeys && bloomKeys.has(key) ? ' bloom' : '');
+      s.dataset.key = key;
+      s.style.left = slot.x + '%'; s.style.top = slot.y + '%';
+      if (art) s.textContent = art;
+      el.appendChild(s);
+    });
+    for (let a = 0; a < state.garden.animals[z]; a++) {
+      const an = document.createElement('div');
+      an.className = 'animal';
+      an.textContent = ANIMALS[a % ANIMALS.length];
+      an.style.left = (15 + a * 25) + '%'; an.style.top = (20 + a * 8) + '%';
+      an.style.animationDelay = (a * 1.3) + 's';
+      el.appendChild(an);
+    }
+    garden.appendChild(el);
+  });
+  // Banka rozetleri
+  $('#bank').innerHTML = Object.entries(state.garden.bank)
+    .filter(([, n]) => n > 0)
+    .map(([t, n]) => `<span>${BANK_ICON[t]}×${n}</span>`).join('');
+  // Bölge noktaları
+  $('#zone-dots').innerHTML = C.ZONES.map((_, z) => `<i${z === C.activeZone(state.garden) ? ' class="on"' : ''}></i>`).join('');
+}
+
+function scrollToZone(z, smooth = true) {
+  const el = $('#garden').children[z];
+  if (el) el.scrollIntoView({ behavior: smooth ? 'smooth' : 'instant', inline: 'start', block: 'nearest' });
+}
 
 // --- Girdi: ok tuşları + dokunmatik kaydırma ---
 const KEYS = { ArrowLeft:'left', ArrowRight:'right', ArrowUp:'up', ArrowDown:'down' };
@@ -375,7 +448,7 @@ addEventListener('keydown', e => {
 });
 let touchStart = null;
 const boardWrap = $('#board-wrap');
-boardWrap.addEventListener('pointerdown', e => { touchStart = [e.clientX, e.clientY]; });
+boardWrap.addEventListener('pointerdown', e => { if (e.isPrimary) touchStart = [e.clientX, e.clientY]; });
 boardWrap.addEventListener('pointerup', e => {
   if (!touchStart) return;
   const dx = e.clientX - touchStart[0], dy = e.clientY - touchStart[1];
@@ -383,11 +456,35 @@ boardWrap.addEventListener('pointerup', e => {
   if (Math.max(Math.abs(dx), Math.abs(dy)) < 24) return;
   handleMove(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up'));
 });
+boardWrap.addEventListener('pointercancel', () => { touchStart = null; });
 
 $('#new-game').addEventListener('click', startRun);   // yalnız tahta sıfırlanır; bahçe kalıcı
 
 // --- Açılış ---
 if (!state.board) startRun(); else renderBoard();
+renderGarden();
+scrollToZone(C.activeZone(state.garden), false);
+
+// ?debug=1: her kaynak türünü elle enjekte etme butonları
+if (new URLSearchParams(location.search).get('debug') === '1') {
+  const bar = document.createElement('div');
+  bar.id = 'debug';
+  for (const t of ['tohum_tozu', 'cicek_ozu', 'meyve', 'nadir_tohum', 'agac_fidani', 'efsanevi']) {
+    const b = document.createElement('button');
+    b.textContent = t;
+    b.onclick = () => {
+      const events = C.applyResource(state.garden, t, Math.random);
+      save();
+      onEmissions([{ em: { type: t, y: 0, x: 0 }, events }]);
+    };
+    bar.appendChild(b);
+  }
+  const reset = document.createElement('button');
+  reset.textContent = 'SIFIRLA';
+  reset.onclick = () => { localStorage.removeItem(C.STATE_KEY); location.reload(); };
+  bar.appendChild(reset);
+  document.body.appendChild(bar);
+}
 </script>
 </body>
 </html>
