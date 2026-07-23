@@ -1360,7 +1360,7 @@
 
   const MODE_DESC = {
     1: "Canlı savaş: dokunduğun taş anında sol lane'e asker olarak çıkar; askerler önce düşman ordusunu, yol boşsa avatarı döver. 5 dakikada rakibin 500 HP'sini ilk eriten kazanır.",
-    2: "Arena: 45 saniye taş biriktir — her dokunuş orduna asker ekler. Süre sonunda bonus rulet iki boardda da rastgele bir taşın askerini bedava ekler, sonra FIGHT: rakip ordusunu tamamen yok eden kazanır.",
+    2: "Arena: 45 saniye taş biriktir — her dokunuş orduna asker ekler. Süre bitince boş hücreler 2'lerle dolar, bonus rulet iki boardda rastgele bir taşın askerini bedava ekler, sonra FIGHT: rakip ordusunu tamamen yok eden kazanır.",
     3: "Arena kurallarıyla ama asker stoğu iki oyuncu için ORTAK: 2×10 · 4×6 · 8×4 · 16×2 · 32-64-128×1. Kapan alır — rakipten önce davran. Tüm stok biterse savaş beklemeden başlar."
   };
 
@@ -1629,10 +1629,35 @@
     hop();
   }
 
+  /* Anti-abuse: before the roulette, every empty cell fills with a 2 in a
+     quick one-by-one cascade — an emptied board can't guarantee a big bonus. */
+  function fillEmpty(game, cb) {
+    const step = () => {
+      if (state !== 'bonus') { cb(); return; }
+      const m = game.matrix();
+      const empty = [];
+      for (let r = 0; r < SIZE; r++)
+        for (let c = 0; c < SIZE; c++)
+          if (!m[r][c]) empty.push([r, c]);
+      if (!empty.length) { setTimeout(cb, 150); return; }
+      const [r, c] = empty[(Math.random() * empty.length) | 0];
+      game.createTile(2, r, c);
+      setTimeout(step, 60);
+    };
+    step();
+  }
+
   function beginBonusRound() {
     state = 'bonus';
     clearInterval(clockTimer);
     clearTimeout(aiTimer);
+    let filled = 0;
+    const afterFill = () => { if (++filled === 2) startRoulettes(); };
+    fillEmpty(me, afterFill);
+    fillEmpty(ai, afterFill);
+  }
+
+  function startRoulettes() {
     let done = 0;
     const onDone = () => { if (++done === 2) setTimeout(beginFightSplash, 500); };
     rouletteFor(me, 'me', $('meBoard'), onDone);
