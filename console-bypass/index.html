@@ -1,0 +1,1392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Console Bypass</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #0a0a12;
+      --accent: #00f0ff;
+      --accent2: #ff003c;
+      --success: #00ff66;
+      --warning: #ffcc00;
+      --danger: #ff0033;
+      --cell-bg: rgba(0, 240, 255, 0.05);
+      --active-glow: rgba(0, 240, 255, 0.25);
+      --text: #d0f0ff;
+      --text-muted: #4a6a7a;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Share Tech Mono", "Fira Code", "Courier New", monospace;
+      background: var(--bg);
+      color: var(--text);
+      overflow-x: hidden;
+    }
+
+    .app {
+      position: relative;
+      min-height: 100vh;
+      padding: 1.25rem;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .scanlines {
+      pointer-events: none;
+      position: fixed;
+      inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0, 0, 0, 0.12) 2px,
+        rgba(0, 0, 0, 0.12) 4px
+      );
+      z-index: 1000;
+      opacity: 0.35;
+    }
+
+    .crt-flicker {
+      animation: crt 8s ease-in-out infinite;
+    }
+
+    @keyframes crt {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.97; }
+    }
+
+    .bg-grid {
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(0, 240, 255, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 240, 255, 0.03) 1px, transparent 1px);
+      background-size: 24px 24px;
+      pointer-events: none;
+      z-index: -1;
+    }
+
+    h1 {
+      font-size: 1.75rem;
+      letter-spacing: 0.35em;
+      text-transform: uppercase;
+      text-align: center;
+      margin: 0 0 0.5rem;
+      color: var(--accent);
+      text-shadow: 0 0 20px var(--active-glow);
+    }
+
+    .subtitle {
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      letter-spacing: 0.2em;
+      margin-bottom: 2rem;
+    }
+
+    .screen {
+      display: none;
+    }
+
+    .screen.active {
+      display: block;
+    }
+
+    .title-actions {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1.5rem;
+      margin-top: 2rem;
+    }
+
+    .difficulty {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .difficulty button {
+      padding: 0.6rem 1.2rem;
+      font-family: inherit;
+      font-size: 0.8rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      border: 1px solid var(--accent);
+      background: transparent;
+      color: var(--accent);
+      cursor: pointer;
+      transition: background 0.2s, box-shadow 0.2s;
+    }
+
+    .difficulty button.selected {
+      background: var(--active-glow);
+      box-shadow: 0 0 16px rgba(0, 240, 255, 0.4);
+    }
+
+    .btn-primary {
+      padding: 0.85rem 2rem;
+      font-family: inherit;
+      font-size: 0.95rem;
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+      border: none;
+      background: linear-gradient(135deg, var(--accent), #0088aa);
+      color: var(--bg);
+      cursor: pointer;
+      box-shadow: 0 0 24px rgba(0, 240, 255, 0.35);
+    }
+
+    .btn-primary:hover {
+      filter: brightness(1.1);
+    }
+
+    .btn-secondary {
+      padding: 0.65rem 1.25rem;
+      font-family: inherit;
+      font-size: 0.75rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      border: 1px solid var(--text-muted);
+      background: transparent;
+      color: var(--text);
+      cursor: pointer;
+    }
+
+    .timer-row {
+      margin-bottom: 1rem;
+    }
+
+    .timer-label {
+      font-size: 0.65rem;
+      letter-spacing: 0.2em;
+      color: var(--text-muted);
+      margin-bottom: 0.35rem;
+    }
+
+    .timer-bar-wrap {
+      height: 10px;
+      background: rgba(0, 0, 0, 0.5);
+      border: 1px solid var(--text-muted);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .timer-bar {
+      height: 100%;
+      width: 100%;
+      transform-origin: left;
+      transform: scaleX(1);
+      transition: transform 0.1s linear, background 0.3s;
+      background: var(--success);
+    }
+
+    .timer-bar.urgent {
+      animation: pulse-bar 0.5s ease-in-out infinite;
+    }
+
+    @keyframes pulse-bar {
+      50% { filter: brightness(1.3); }
+    }
+
+    .timer-text {
+      text-align: center;
+      font-size: 1.1rem;
+      margin-top: 0.35rem;
+      letter-spacing: 0.2em;
+    }
+
+    .buffer-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      margin-bottom: 1.25rem;
+    }
+
+    .buffer-label {
+      font-size: 0.65rem;
+      letter-spacing: 0.25em;
+      color: var(--text-muted);
+      width: 100%;
+      text-align: center;
+    }
+
+    .buffer-slot {
+      min-width: 3rem;
+      height: 2.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--text-muted);
+      background: rgba(0, 0, 0, 0.4);
+      font-size: 1rem;
+      color: var(--text-muted);
+      transition: border-color 0.2s, box-shadow 0.2s, transform 0.15s;
+    }
+
+    .buffer-slot.next {
+      border-color: var(--accent);
+      box-shadow: 0 0 12px var(--active-glow);
+    }
+
+    .buffer-slot.filled {
+      color: var(--accent);
+      border-color: var(--accent);
+      text-shadow: 0 0 8px var(--accent);
+    }
+
+    .buffer-slot.filled.pop {
+      animation: buf-pop 0.25s ease-out;
+    }
+
+    @keyframes buf-pop {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.12); }
+      100% { transform: scale(1); }
+    }
+
+    .buffer-slot.preview {
+      opacity: 0.45;
+      color: var(--accent);
+    }
+
+    .game-layout {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1.5rem;
+      align-items: flex-start;
+      justify-content: center;
+    }
+
+    .matrix-wrap {
+      border: 1px solid rgba(0, 240, 255, 0.35);
+      padding: 0.75rem;
+      background: rgba(0, 20, 30, 0.5);
+    }
+
+    .matrix-title {
+      font-size: 0.65rem;
+      letter-spacing: 0.2em;
+      color: var(--text-muted);
+      margin-bottom: 0.5rem;
+      text-align: center;
+    }
+
+    .matrix {
+      display: grid;
+      gap: 4px;
+    }
+
+    .cell {
+      width: 2.65rem;
+      height: 2.65rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.85rem;
+      border: 1px solid rgba(0, 240, 255, 0.2);
+      background: var(--cell-bg);
+      cursor: default;
+      user-select: none;
+      transition: background 0.15s, border-color 0.15s, box-shadow 0.15s, opacity 0.15s;
+    }
+
+    .cell.active {
+      border-color: var(--accent);
+      background: var(--active-glow);
+      cursor: pointer;
+    }
+
+    .cell.active:hover {
+      box-shadow: 0 0 14px rgba(0, 240, 255, 0.55);
+      z-index: 1;
+    }
+
+    .cell.selected {
+      opacity: 0.35;
+      text-decoration: line-through;
+      border-color: var(--text-muted);
+      cursor: not-allowed;
+    }
+
+    .cell.locked {
+      opacity: 0.25;
+      cursor: not-allowed;
+    }
+
+    .cell.seq-hover {
+      box-shadow: 0 0 12px rgba(0, 255, 102, 0.45);
+      border-color: var(--success);
+    }
+
+    .sequences {
+      min-width: 260px;
+      border: 1px solid rgba(255, 0, 60, 0.35);
+      padding: 0.75rem 1rem;
+      background: rgba(30, 0, 20, 0.35);
+    }
+
+    .sequences h3 {
+      font-size: 0.65rem;
+      letter-spacing: 0.2em;
+      color: var(--text-muted);
+      margin: 0 0 0.75rem;
+      font-weight: normal;
+    }
+
+    .daemon {
+      margin-bottom: 1rem;
+      padding-bottom: 0.75rem;
+      border-bottom: 1px solid rgba(74, 106, 122, 0.35);
+    }
+
+    .daemon:last-child {
+      border-bottom: none;
+      margin-bottom: 0;
+    }
+
+    .daemon-name {
+      font-size: 0.75rem;
+      color: var(--accent2);
+      margin-bottom: 0.35rem;
+    }
+
+    .daemon-name.done {
+      color: var(--success);
+    }
+
+    .daemon-codes {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+    }
+
+    .code-chip {
+      padding: 0.2rem 0.45rem;
+      border: 1px solid var(--text-muted);
+      font-size: 0.85rem;
+      transition: border-color 0.2s, color 0.2s, background 0.2s;
+    }
+
+    .code-chip.matched {
+      border-color: var(--success);
+      color: var(--success);
+      background: rgba(0, 255, 102, 0.1);
+    }
+
+    .code-chip.failed {
+      opacity: 0.4;
+      border-color: var(--danger);
+    }
+
+    .code-chip.hover-match {
+      border-color: var(--warning);
+      box-shadow: 0 0 8px rgba(255, 204, 0, 0.4);
+    }
+
+    .daemon-points {
+      color: var(--warning);
+      font-size: 0.75rem;
+      margin-left: 0.35rem;
+    }
+
+    .daemon.locked .daemon-name {
+      color: var(--text-muted);
+    }
+
+    .daemon-lock-hint {
+      font-size: 0.6rem;
+      letter-spacing: 0.12em;
+      color: var(--text-muted);
+      margin-top: 0.25rem;
+    }
+
+    .uploaded {
+      font-size: 0.65rem;
+      letter-spacing: 0.15em;
+      color: var(--success);
+      margin-top: 0.35rem;
+    }
+
+    .rewards {
+      margin-top: 1.25rem;
+      padding: 0.75rem 1rem;
+      border: 1px dashed var(--text-muted);
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    .rewards strong {
+      color: var(--accent);
+      letter-spacing: 0.1em;
+    }
+
+    .hint {
+      text-align: center;
+      font-size: 0.7rem;
+      color: var(--warning);
+      letter-spacing: 0.1em;
+      margin-bottom: 0.75rem;
+      min-height: 1.2em;
+    }
+
+    .result-panel {
+      text-align: center;
+      max-width: 480px;
+      margin: 2rem auto;
+    }
+
+    .result-panel h2 {
+      font-size: 1.25rem;
+      letter-spacing: 0.2em;
+      margin-bottom: 1rem;
+    }
+
+    .result-panel.win h2 {
+      color: var(--success);
+    }
+
+    .result-panel.lose h2 {
+      color: var(--danger);
+    }
+
+    .screen-shake {
+      animation: screen-shake 0.45s ease-out;
+    }
+
+    @keyframes screen-shake {
+      0%, 100% { transform: translate(0, 0); }
+      12% { transform: translate(-8px, 3px); }
+      25% { transform: translate(7px, -4px); }
+      38% { transform: translate(-6px, 2px); }
+      50% { transform: translate(5px, -3px); }
+      62% { transform: translate(-4px, 1px); }
+      75% { transform: translate(3px, -2px); }
+    }
+
+    .score-screen {
+      text-align: left;
+      max-width: 420px;
+      margin: 0 auto;
+    }
+
+    .score-total {
+      font-size: 2rem;
+      letter-spacing: 0.15em;
+      color: var(--accent);
+      text-align: center;
+      margin-bottom: 1.25rem;
+      text-shadow: 0 0 20px var(--active-glow);
+    }
+
+    .score-lines {
+      font-size: 0.8rem;
+      line-height: 1.7;
+      color: var(--text-muted);
+      border-top: 1px solid rgba(74, 106, 122, 0.5);
+      padding-top: 0.75rem;
+    }
+
+    .score-lines .row {
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+
+    .score-lines .row span:last-child {
+      color: var(--success);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .score-lines .bonus span:last-child {
+      color: var(--warning);
+    }
+
+    .result-actions {
+      display: flex;
+      gap: 1rem;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-top: 1.5rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="bg-grid"></div>
+  <div class="scanlines"></div>
+
+  <div class="app crt-flicker" id="app">
+    <section class="screen active" id="screen-title">
+      <h1>Console Bypass</h1>
+      <p class="subtitle">Breach protocol simulation</p>
+      <div class="title-actions">
+        <div class="difficulty" id="difficulty-select">
+          <button type="button" data-diff="easy">Easy</button>
+          <button type="button" data-diff="medium" class="selected">Medium</button>
+          <button type="button" data-diff="hard">Hard</button>
+          <button type="button" data-diff="expert">Expert</button>
+          <button type="button" data-diff="extreme">Extreme</button>
+        </div>
+        <button type="button" class="btn-primary" id="btn-start">Start breach</button>
+      </div>
+    </section>
+
+    <section class="screen" id="screen-game">
+      <div class="timer-row">
+        <div class="timer-label">Breach time remaining</div>
+        <div class="timer-bar-wrap">
+          <div class="timer-bar" id="timer-bar"></div>
+        </div>
+        <div class="timer-text" id="timer-text">--:--</div>
+      </div>
+
+      <div class="buffer-row" id="buffer-container"></div>
+
+      <p class="hint" id="game-hint">Click any cell in the top row to begin.</p>
+
+      <div class="game-layout">
+        <div class="matrix-wrap">
+          <div class="matrix-title">Code matrix</div>
+          <div class="matrix" id="matrix"></div>
+        </div>
+        <div class="sequences" id="sequences-panel">
+          <h3>Sequence required to upload</h3>
+          <div id="daemons-list"></div>
+        </div>
+      </div>
+
+      <div class="rewards" id="rewards-panel">
+        <strong>Rewards</strong> — V1: shard · V2: exploit · V3: payload · V4: core breach · V5: system override.
+      </div>
+    </section>
+
+    <section class="screen" id="screen-result">
+      <div class="result-panel" id="result-panel">
+        <h2 id="result-title">Breach complete</h2>
+        <div id="result-score-wrap" class="score-screen"></div>
+        <div class="result-actions">
+          <button type="button" class="btn-secondary" id="btn-try-again">Try again</button>
+          <button type="button" class="btn-primary" id="btn-new-puzzle">New puzzle</button>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+(function () {
+  const FULL_HEX_POOL = ["1C", "55", "7A", "BD", "E9", "FF"];
+
+  const BUFFER_BONUS_PER_SLOT = 40;
+
+  const DIFFICULTY = {
+    easy: {
+      grid: 5,
+      buffer: 4,
+      timer: 60,
+      sequences: 1,
+      hexCount: 4,
+      seqLengths: [2],
+      names: ["DATAMINE_V1"],
+      rewards: ["Shard fragment (low)"],
+      points: [200],
+    },
+    medium: {
+      grid: 6,
+      buffer: 6,
+      timer: 45,
+      sequences: 2,
+      hexCount: 5,
+      seqLengths: [2, 3],
+      names: ["DATAMINE_V1", "DATAMINE_V2"],
+      rewards: ["Shard fragment (low)", "Exploit package (mid)"],
+      points: [200, 350],
+    },
+    hard: {
+      grid: 7,
+      buffer: 8,
+      timer: 30,
+      sequences: 3,
+      hexCount: 6,
+      seqLengths: [3, 3, 4],
+      names: ["DATAMINE_V1", "DATAMINE_V2", "DATAMINE_V3"],
+      rewards: ["Shard fragment (low)", "Exploit package (mid)", "Payload key (high)"],
+      points: [200, 350, 600],
+    },
+    expert: {
+      grid: 8,
+      buffer: 10,
+      timer: 25,
+      sequences: 4,
+      hexCount: 6,
+      seqLengths: [2, 2, 3, 3],
+      names: [
+        "DATAMINE_V1",
+        "DATAMINE_V2",
+        "DATAMINE_V3",
+        "DATAMINE_V4",
+      ],
+      rewards: [
+        "Shard fragment (low)",
+        "Exploit package (mid)",
+        "Payload key (high)",
+        "Core breach bundle (elite)",
+      ],
+      points: [200, 350, 600, 850],
+    },
+    extreme: {
+      grid: 9,
+      buffer: 12,
+      timer: 20,
+      sequences: 5,
+      hexCount: 6,
+      seqLengths: [2, 2, 2, 3, 3],
+      names: [
+        "DATAMINE_V1",
+        "DATAMINE_V2",
+        "DATAMINE_V3",
+        "DATAMINE_V4",
+        "DATAMINE_V5",
+      ],
+      rewards: [
+        "Shard fragment (low)",
+        "Exploit package (mid)",
+        "Payload key (high)",
+        "Core breach bundle (elite)",
+        "System override token (apex)",
+      ],
+      points: [200, 350, 600, 850, 1100],
+    },
+  };
+
+  let state = {
+    difficulty: "medium",
+    grid: [],
+    n: 6,
+    bufferMax: 6,
+    buffer: [],
+    pathCells: [],
+    sequences: [],
+    sequenceStatus: [],
+    moveCount: 0,
+    timerMs: 0,
+    timerId: null,
+    started: false,
+    gameOver: false,
+    hoverR: -1,
+    hoverC: -1,
+    seqHoverHex: null,
+    keyboardIndex: 0,
+  };
+
+  function triggerShake() {
+    const app = el("app");
+    app.classList.remove("screen-shake");
+    void app.offsetWidth;
+    app.classList.add("screen-shake");
+    setTimeout(function () {
+      app.classList.remove("screen-shake");
+    }, 450);
+  }
+
+  function getFirstIncompleteIndex() {
+    for (let i = 0; i < state.sequenceStatus.length; i++) {
+      if (state.sequenceStatus[i] !== "done") return i;
+    }
+    return -1;
+  }
+
+  function canInstallDatamine(idx) {
+    if (idx === 0) return true;
+    return state.sequenceStatus[idx - 1] === "done";
+  }
+
+  function el(id) {
+    return document.getElementById(id);
+  }
+
+  function key(r, c) {
+    return r + "," + c;
+  }
+
+  function generateValidPath(n, len, maxAttempts) {
+    maxAttempts = maxAttempts || 2000;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      const path = [];
+      const used = new Set();
+      let c = Math.floor(Math.random() * n);
+      let r = 0;
+      path.push([r, c]);
+      used.add(key(r, c));
+      let ok = true;
+      for (let move = 1; move < len; move++) {
+        const candidates = [];
+        if (move % 2 === 1) {
+          for (let rr = 0; rr < n; rr++) {
+            if (rr !== r && !used.has(key(rr, c))) candidates.push([rr, c]);
+          }
+        } else {
+          for (let cc = 0; cc < n; cc++) {
+            if (cc !== c && !used.has(key(r, cc))) candidates.push([r, cc]);
+          }
+        }
+        if (candidates.length === 0) {
+          ok = false;
+          break;
+        }
+        const pick = candidates[Math.floor(Math.random() * candidates.length)];
+        r = pick[0];
+        c = pick[1];
+        path.push([r, c]);
+        used.add(key(r, c));
+      }
+      if (ok) return path;
+    }
+    return null;
+  }
+
+  function partitionLengths(total, count, hints) {
+    const lens = [];
+    for (let i = 0; i < count; i++) {
+      lens.push(hints[Math.min(i, hints.length - 1)]);
+    }
+    let sum = lens.reduce((a, b) => a + b, 0);
+    let guard = 0;
+    while (sum > total && guard++ < 200) {
+      let idx = -1;
+      for (let i = lens.length - 1; i >= 0; i--) {
+        if (lens[i] > 2) {
+          idx = i;
+          break;
+        }
+      }
+      if (idx < 0) break;
+      lens[idx]--;
+      sum--;
+    }
+    guard = 0;
+    while (sum < total && guard++ < 200) {
+      lens[lens.length - 1]++;
+      sum++;
+    }
+    if (sum !== total || lens.some((l) => l < 2)) {
+      lens.length = 0;
+      const base = Math.floor(total / count);
+      const rem = total % count;
+      for (let i = 0; i < count; i++) {
+        lens.push(base + (i < rem ? 1 : 0));
+      }
+    }
+    return lens;
+  }
+
+  function buildSequencesFromPath(hexPath, cfg) {
+    const L = hexPath.length;
+    const count = cfg.sequences;
+    const lens = partitionLengths(L, count, cfg.seqLengths);
+    let offset = 0;
+    const out = [];
+    for (let i = 0; i < count; i++) {
+      const len = lens[i];
+      out.push(hexPath.slice(offset, offset + len));
+      offset += len;
+    }
+    return out;
+  }
+
+  function generatePuzzle(diff) {
+    const cfg = DIFFICULTY[diff];
+    const pool = FULL_HEX_POOL.slice(0, cfg.hexCount);
+    const n = cfg.grid;
+    const bufLen = cfg.buffer;
+
+    let path = generateValidPath(n, bufLen);
+    if (!path) path = generateValidPath(n, bufLen, 10000);
+    if (!path) path = generateValidPath(n, bufLen, 50000);
+    if (!path) throw new Error("Could not generate path");
+
+    const hexPath = path.map(() => pool[Math.floor(Math.random() * pool.length)]);
+
+    let sequences = buildSequencesFromPath(hexPath, cfg);
+    if (sequences.length === 0) {
+      sequences = [hexPath.slice(0, Math.min(2, hexPath.length))];
+    }
+
+    const grid = [];
+    for (let r = 0; r < n; r++) {
+      grid[r] = [];
+      for (let c = 0; c < n; c++) {
+        grid[r][c] = pool[Math.floor(Math.random() * pool.length)];
+      }
+    }
+    for (let i = 0; i < path.length; i++) {
+      const [r, c] = path[i];
+      grid[r][c] = hexPath[i];
+    }
+
+    return {
+      grid,
+      path,
+      hexPath,
+      sequences: sequences.map((seq, i) => ({
+        name: cfg.names[i] || "DATAMINE_V" + (i + 1),
+        codes: seq,
+        reward: cfg.rewards[i] || "Data",
+        points: cfg.points[i] != null ? cfg.points[i] : 100 * (i + 1),
+      })),
+    };
+  }
+
+  function findContiguousMatch(buffer, seq) {
+    if (seq.length === 0 || buffer.length < seq.length) return false;
+    for (let start = 0; start <= buffer.length - seq.length; start++) {
+      let match = true;
+      for (let i = 0; i < seq.length; i++) {
+        if (buffer[start + i] !== seq[i]) {
+          match = false;
+          break;
+        }
+      }
+      if (match) return true;
+    }
+    return false;
+  }
+
+  function longestSuffixPrefix(buffer, seq) {
+    let best = 0;
+    const maxK = Math.min(buffer.length, seq.length);
+    for (let k = maxK; k >= 1; k--) {
+      let ok = true;
+      for (let i = 0; i < k; i++) {
+        if (buffer[buffer.length - k + i] !== seq[i]) {
+          ok = false;
+          break;
+        }
+      }
+      if (ok) {
+        best = k;
+        break;
+      }
+    }
+    return best;
+  }
+
+  function sortActiveCells(cells) {
+    return cells.slice().sort(function (a, b) {
+      if (a[0] !== b[0]) return a[0] - b[0];
+      return a[1] - b[1];
+    });
+  }
+
+  function getActiveCells() {
+    const { n, grid, moveCount } = state;
+    const used = new Set(state.pathCells.map((p) => key(p[0], p[1])));
+
+    if (moveCount === 0) {
+      const cells = [];
+      for (let c = 0; c < n; c++) {
+        if (!used.has(key(0, c))) cells.push([0, c]);
+      }
+      return sortActiveCells(cells);
+    }
+    const last = state.pathCells[state.pathCells.length - 1];
+    const [lr, lc] = last;
+    const cells = [];
+    if (moveCount % 2 === 1) {
+      for (let r = 0; r < n; r++) {
+        if (!used.has(key(r, lc))) cells.push([r, lc]);
+      }
+    } else {
+      for (let c = 0; c < n; c++) {
+        if (!used.has(key(lr, c))) cells.push([lr, c]);
+      }
+    }
+    return sortActiveCells(cells);
+  }
+
+  function isActive(r, c) {
+    return getActiveCells().some((x) => x[0] === r && x[1] === c);
+  }
+
+  function updateSequenceStatus() {
+    const buf = state.buffer;
+    const max = state.bufferMax;
+    state.sequences.forEach(function (seq, idx) {
+      if (state.sequenceStatus[idx] === "done") return;
+      if (!canInstallDatamine(idx)) return;
+      if (findContiguousMatch(buf, seq.codes)) {
+        state.sequenceStatus[idx] = "done";
+        return;
+      }
+      if (buf.length >= max) {
+        state.sequenceStatus[idx] = "failed";
+      }
+    });
+  }
+
+  function checkEnd() {
+    const buf = state.buffer;
+    const anyDone = state.sequenceStatus.some((s) => s === "done");
+    if (state.timerMs <= 0) {
+      state.gameOver = true;
+      if (state.timerId) {
+        clearInterval(state.timerId);
+        state.timerId = null;
+      }
+      showResult(anyDone);
+      return true;
+    }
+    if (buf.length >= state.bufferMax) {
+      state.gameOver = true;
+      if (state.timerId) {
+        clearInterval(state.timerId);
+        state.timerId = null;
+      }
+      showResult(anyDone);
+      return true;
+    }
+    return false;
+  }
+
+  function formatTime(ms) {
+    const s = Math.max(0, Math.ceil(ms / 1000));
+    const m = Math.floor(s / 60);
+    const r = s % 60;
+    return String(m).padStart(2, "0") + ":" + String(r).padStart(2, "0");
+  }
+
+  function renderTimer() {
+    const total = DIFFICULTY[state.difficulty].timer * 1000;
+    const pct = state.started ? state.timerMs / total : 1;
+    const bar = el("timer-bar");
+    bar.style.transform = "scaleX(" + pct + ")";
+    if (pct > 0.5) bar.style.background = "var(--success)";
+    else if (pct > 0.2) bar.style.background = "var(--warning)";
+    else bar.style.background = "var(--danger)";
+    if (state.started && state.timerMs <= 10000 && state.timerMs > 0) {
+      bar.classList.add("urgent");
+    } else {
+      bar.classList.remove("urgent");
+    }
+    el("timer-text").textContent = state.started ? formatTime(state.timerMs) : formatTime(total);
+  }
+
+  function renderBuffer() {
+    const wrap = el("buffer-container");
+    wrap.innerHTML = "";
+    const lab = document.createElement("div");
+    lab.className = "buffer-label";
+    lab.textContent = "Buffer";
+    wrap.appendChild(lab);
+    const previewHex =
+      state.hoverR >= 0 && isActive(state.hoverR, state.hoverC)
+        ? state.grid[state.hoverR][state.hoverC]
+        : null;
+    for (let i = 0; i < state.bufferMax; i++) {
+      const slot = document.createElement("div");
+      slot.className = "buffer-slot";
+      if (i < state.buffer.length) {
+        slot.textContent = state.buffer[i];
+        slot.classList.add("filled");
+        if (i === state.buffer.length - 1) slot.classList.add("pop");
+      } else if (i === state.buffer.length && previewHex) {
+        slot.textContent = previewHex;
+        slot.classList.add("preview");
+        slot.classList.add("next");
+      } else {
+        slot.textContent = "__";
+        if (i === state.buffer.length) slot.classList.add("next");
+      }
+      wrap.appendChild(slot);
+    }
+  }
+
+  function renderMatrix() {
+    const root = el("matrix");
+    root.innerHTML = "";
+    root.style.gridTemplateColumns = "repeat(" + state.n + ", 1fr)";
+    const used = new Set(state.pathCells.map((p) => key(p[0], p[1])));
+    const activeList = getActiveCells();
+    const activeSet = new Set(activeList.map((p) => key(p[0], p[1])));
+    if (state.keyboardIndex >= activeList.length) state.keyboardIndex = 0;
+    const hoverVal = state.seqHoverHex;
+
+    for (let r = 0; r < state.n; r++) {
+      for (let c = 0; c < state.n; c++) {
+        const cell = document.createElement("div");
+        cell.className = "cell";
+        cell.textContent = state.grid[r][c];
+        cell.dataset.r = r;
+        cell.dataset.c = c;
+        const k = key(r, c);
+        if (used.has(k)) {
+          cell.classList.add("selected");
+        } else if (activeSet.has(k)) {
+          cell.classList.add("active");
+          const ki = activeList.findIndex(function (p) {
+            return p[0] === r && p[1] === c;
+          });
+          if (ki === state.keyboardIndex) {
+            cell.style.boxShadow = "0 0 16px rgba(255, 204, 0, 0.65)";
+            cell.style.borderColor = "var(--warning)";
+          }
+          if (hoverVal && state.grid[r][c] === hoverVal) {
+            cell.classList.add("seq-hover");
+          }
+        } else {
+          cell.classList.add("locked");
+        }
+        root.appendChild(cell);
+      }
+    }
+  }
+
+  function renderSequences() {
+    const list = el("daemons-list");
+    list.innerHTML = "";
+    state.sequences.forEach(function (seq, idx) {
+      const st = state.sequenceStatus[idx] || "pending";
+      const locked = !canInstallDatamine(idx) && st !== "done";
+      const div = document.createElement("div");
+      div.className = "daemon" + (locked ? " locked" : "");
+      const name = document.createElement("div");
+      name.className = "daemon-name" + (st === "done" ? " done" : "");
+      const pts = seq.points != null ? seq.points : 0;
+      name.appendChild(document.createTextNode((st === "done" ? "✓ " : "▸ ") + seq.name));
+      const ptsSpan = document.createElement("span");
+      ptsSpan.className = "daemon-points";
+      ptsSpan.textContent = " · +" + pts + " pts";
+      name.appendChild(ptsSpan);
+      div.appendChild(name);
+      if (locked) {
+        const lh = document.createElement("div");
+        lh.className = "daemon-lock-hint";
+        lh.textContent =
+          "Requires " + state.sequences[idx - 1].name + " installed first.";
+        div.appendChild(lh);
+      }
+      const codes = document.createElement("div");
+      codes.className = "daemon-codes";
+      const buf = state.buffer;
+      const matchedFull = canInstallDatamine(idx) && findContiguousMatch(buf, seq.codes);
+      const buildActive = canInstallDatamine(idx) && st !== "done";
+      const suffixLen = buildActive
+        ? matchedFull
+          ? seq.codes.length
+          : longestSuffixPrefix(buf, seq.codes)
+        : 0;
+
+      seq.codes.forEach(function (code, ci) {
+        const chip = document.createElement("span");
+        chip.className = "code-chip";
+        chip.textContent = code;
+        chip.dataset.hex = code;
+        if (st === "done" || matchedFull) {
+          chip.classList.add("matched");
+        } else if (st === "failed") {
+          chip.classList.add("failed");
+        } else if (!locked && ci < suffixLen) {
+          chip.classList.add("matched");
+        }
+        if (
+          state.seqHoverHex &&
+          code === state.seqHoverHex &&
+          st !== "done" &&
+          !locked
+        ) {
+          chip.classList.add("hover-match");
+        }
+        codes.appendChild(chip);
+      });
+      div.appendChild(codes);
+      if (st === "done") {
+        const up = document.createElement("div");
+        up.className = "uploaded";
+        up.textContent = "UPLOADED — " + seq.reward + " (+" + pts + " pts)";
+        div.appendChild(up);
+      }
+      list.appendChild(div);
+    });
+  }
+
+  function renderGame() {
+    renderTimer();
+    renderBuffer();
+    renderMatrix();
+    renderSequences();
+    const nSeq = state.sequences.length;
+    let hintOrder =
+      nSeq <= 1
+        ? ""
+        : " Install in order: " +
+          state.sequences.map(function (s) {
+            return s.name.replace("DATAMINE_", "");
+          }).join(" → ") +
+          ".";
+    el("game-hint").textContent = state.gameOver
+      ? ""
+      : state.moveCount === 0
+        ? "Click any cell in the top row to begin." + hintOrder
+        : "Select from highlighted row or column." + hintOrder;
+  }
+
+  function onCellClick(r, c) {
+    if (state.gameOver) return;
+    if (!isActive(r, c)) return;
+
+    if (!state.started) {
+      state.started = true;
+      state.timerMs = DIFFICULTY[state.difficulty].timer * 1000;
+      state.timerId = setInterval(function () {
+        state.timerMs -= 100;
+        renderTimer();
+        if (state.timerMs <= 0) {
+          state.timerMs = 0;
+          clearInterval(state.timerId);
+          state.timerId = null;
+          state.gameOver = true;
+          showResult(state.sequenceStatus.some((s) => s === "done"));
+        }
+      }, 100);
+    }
+
+    const val = state.grid[r][c];
+    const bufBefore = state.buffer.slice();
+    const activeIdx = getFirstIncompleteIndex();
+    let prevSuffix = 0;
+    if (activeIdx >= 0 && canInstallDatamine(activeIdx)) {
+      prevSuffix = longestSuffixPrefix(bufBefore, state.sequences[activeIdx].codes);
+    }
+
+    state.buffer.push(val);
+    state.pathCells.push([r, c]);
+    state.moveCount++;
+    state.keyboardIndex = 0;
+
+    if (activeIdx >= 0 && canInstallDatamine(activeIdx)) {
+      const newSuffix = longestSuffixPrefix(state.buffer, state.sequences[activeIdx].codes);
+      if (prevSuffix > 0 && newSuffix < prevSuffix) {
+        triggerShake();
+      }
+    }
+
+    updateSequenceStatus();
+    renderGame();
+    checkEnd();
+  }
+
+  function showResult(won) {
+    const panel = el("result-panel");
+    panel.classList.remove("win", "lose");
+    panel.classList.add(won ? "win" : "lose");
+    el("result-title").textContent = won ? "Breach successful" : "Breach failed";
+
+    let dataminePts = 0;
+    const completed = state.sequences.filter(function (_, i) {
+      return state.sequenceStatus[i] === "done";
+    });
+    completed.forEach(function (s) {
+      dataminePts += s.points != null ? s.points : 0;
+    });
+
+    const slotsLeft = state.bufferMax - state.buffer.length;
+    const bufferBonus =
+      won && slotsLeft > 0 ? slotsLeft * BUFFER_BONUS_PER_SLOT : 0;
+    const total = dataminePts + bufferBonus;
+
+    const wrap = el("result-score-wrap");
+    wrap.innerHTML = "";
+    const totalEl = document.createElement("div");
+    totalEl.className = "score-total";
+    totalEl.textContent = "SCORE " + total;
+    wrap.appendChild(totalEl);
+
+    const lines = document.createElement("div");
+    lines.className = "score-lines";
+
+    if (completed.length) {
+      completed.forEach(function (s) {
+        const row = document.createElement("div");
+        row.className = "row";
+        row.innerHTML =
+          "<span>" +
+          s.name +
+          "</span><span>+" +
+          (s.points != null ? s.points : 0) +
+          "</span>";
+        lines.appendChild(row);
+      });
+    } else {
+      const row = document.createElement("div");
+      row.className = "row";
+      row.innerHTML = "<span>No datamines installed</span><span>0</span>";
+      lines.appendChild(row);
+    }
+
+    const bonusRow = document.createElement("div");
+    bonusRow.className = "row bonus";
+    if (!won) {
+      bonusRow.innerHTML =
+        "<span>Buffer efficiency (no bonus on breach failure)</span><span>0</span>";
+    } else if (slotsLeft === 0) {
+      bonusRow.innerHTML =
+        "<span>Buffer efficiency (buffer full)</span><span>0</span>";
+    } else {
+      bonusRow.innerHTML =
+        "<span>Buffer efficiency (" +
+        slotsLeft +
+        " unused slot" +
+        (slotsLeft === 1 ? "" : "s") +
+        ")</span><span>+" +
+        bufferBonus +
+        "</span>";
+    }
+    lines.appendChild(bonusRow);
+
+    wrap.appendChild(lines);
+
+    el("screen-game").classList.remove("active");
+    el("screen-result").classList.add("active");
+  }
+
+  function attachMatrixHandlers() {
+    el("matrix").addEventListener("click", function (e) {
+      const cell = e.target.closest(".cell");
+      if (!cell || !cell.classList.contains("active")) return;
+      const r = +cell.dataset.r;
+      const c = +cell.dataset.c;
+      onCellClick(r, c);
+    });
+    el("matrix").addEventListener("mousemove", function (e) {
+      const cell = e.target.closest(".cell");
+      if (cell && cell.classList.contains("active")) {
+        state.hoverR = +cell.dataset.r;
+        state.hoverC = +cell.dataset.c;
+      } else {
+        state.hoverR = -1;
+        state.hoverC = -1;
+      }
+      renderBuffer();
+    });
+    el("matrix").addEventListener("mouseleave", function () {
+      state.hoverR = -1;
+      state.hoverC = -1;
+      renderBuffer();
+    });
+  }
+
+  function attachSequenceHover() {
+    el("daemons-list").addEventListener("mousemove", function (e) {
+      const chip = e.target.closest(".code-chip");
+      if (chip && chip.dataset.hex) {
+        state.seqHoverHex = chip.dataset.hex;
+        renderMatrix();
+        renderSequences();
+      }
+    });
+    el("daemons-list").addEventListener("mouseleave", function () {
+      state.seqHoverHex = null;
+      renderMatrix();
+      renderSequences();
+    });
+  }
+
+  function startGame(diff) {
+    state.difficulty = diff;
+    const data = generatePuzzle(diff);
+    state.grid = data.grid;
+    state.n = DIFFICULTY[diff].grid;
+    state.bufferMax = DIFFICULTY[diff].buffer;
+    state.buffer = [];
+    state.pathCells = [];
+    state.sequences = data.sequences;
+    state.sequenceStatus = state.sequences.map(() => "pending");
+    state.moveCount = 0;
+    state.timerMs = DIFFICULTY[diff].timer * 1000;
+    state.started = false;
+    state.gameOver = false;
+    state.hoverR = -1;
+    state.hoverC = -1;
+    state.seqHoverHex = null;
+    state.keyboardIndex = 0;
+    if (state.timerId) {
+      clearInterval(state.timerId);
+      state.timerId = null;
+    }
+
+    el("screen-title").classList.remove("active");
+    el("screen-result").classList.remove("active");
+    el("screen-game").classList.add("active");
+
+    renderGame();
+  }
+
+  document.getElementById("difficulty-select").addEventListener("click", function (e) {
+    const btn = e.target.closest("button[data-diff]");
+    if (!btn) return;
+    document.querySelectorAll("#difficulty-select button").forEach((b) => b.classList.remove("selected"));
+    btn.classList.add("selected");
+    state.difficulty = btn.dataset.diff;
+  });
+
+  el("btn-start").addEventListener("click", function () {
+    startGame(state.difficulty);
+  });
+
+  el("btn-try-again").addEventListener("click", function () {
+    startGame(state.difficulty);
+  });
+
+  el("btn-new-puzzle").addEventListener("click", function () {
+    el("screen-result").classList.remove("active");
+    el("screen-title").classList.add("active");
+  });
+
+  attachMatrixHandlers();
+  attachSequenceHover();
+
+  document.addEventListener("keydown", function (e) {
+    if (!el("screen-game").classList.contains("active") || state.gameOver) return;
+    const active = getActiveCells();
+    if (active.length === 0) return;
+    if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+      e.preventDefault();
+      state.keyboardIndex = (state.keyboardIndex + 1) % active.length;
+      renderMatrix();
+    } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+      e.preventDefault();
+      state.keyboardIndex = (state.keyboardIndex - 1 + active.length) % active.length;
+      renderMatrix();
+    } else if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      const p = active[state.keyboardIndex];
+      if (p) onCellClick(p[0], p[1]);
+    } else if (e.key === "Escape") {
+      el("screen-game").classList.remove("active");
+      el("screen-title").classList.add("active");
+      if (state.timerId) {
+        clearInterval(state.timerId);
+        state.timerId = null;
+      }
+    }
+  });
+
+  renderTimer();
+})();
+  </script>
+</body>
+</html>
