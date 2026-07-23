@@ -588,7 +588,8 @@ function checkIdle() {
     showOverlay('🌙 Sen yokken...', `Bahçen kendi kendine büyüdü: ${r.grown} bitki olgunlaştı.`, 'Bahçeme dön');
   }
 }
-function touchLastSeen() { state.lastSeen = Date.now(); save(); }
+let wiping = false;
+function touchLastSeen() { if (wiping) return; state.lastSeen = Date.now(); save(); }
 addEventListener('pagehide', touchLastSeen);
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) { touchLastSeen(); }
@@ -649,7 +650,7 @@ if (new URLSearchParams(location.search).get('debug') === '1') {
   }
   const reset = document.createElement('button');
   reset.textContent = 'SIFIRLA';
-  reset.onclick = () => { localStorage.removeItem(C.STATE_KEY); location.reload(); };
+  reset.onclick = () => { wiping = true; localStorage.removeItem(C.STATE_KEY); location.reload(); };
   bar.appendChild(reset);
   document.body.appendChild(bar);
 }
