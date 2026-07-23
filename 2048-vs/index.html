@@ -254,10 +254,24 @@
   @keyframes cast { 40% { transform: rotate(-14deg); } }
   @keyframes orbpulse { 40% { transform: scale(1.5); } }
   @keyframes slam { 35% { transform: translateY(3.5px); } }
-  .unit.dying {
-    transition: opacity .18s, scale .18s;
-    opacity: 0;
-    scale: .4;
+  .splat {
+    position: absolute;
+    z-index: 1;
+    pointer-events: none;
+    translate: -50% -50%;
+    background:
+      radial-gradient(circle at 30% 40%, rgba(178, 34, 52, .85) 0 28%, transparent 30%),
+      radial-gradient(circle at 65% 30%, rgba(178, 34, 52, .75) 0 18%, transparent 20%),
+      radial-gradient(circle at 55% 65%, rgba(150, 24, 40, .8) 0 32%, transparent 34%),
+      radial-gradient(circle at 20% 75%, rgba(178, 34, 52, .6) 0 12%, transparent 14%),
+      radial-gradient(circle at 82% 62%, rgba(150, 24, 40, .55) 0 10%, transparent 12%);
+    animation: splatfade 2s ease-out forwards;
+  }
+  @keyframes splatfade {
+    0% { scale: .3; opacity: 0; }
+    12% { scale: 1; opacity: 1; }
+    55% { opacity: .85; }
+    100% { opacity: 0; }
   }
   .proj {
     position: absolute;
@@ -589,6 +603,23 @@
   }
   .m2f .hpbar, .m2f .hpnum { display: none; }
   .m2f .lane .mark { display: none; }
+  .bonus-hl {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: var(--cs);
+    height: var(--cs);
+    border-radius: 7px;
+    border: 3px solid var(--gold);
+    box-shadow: 0 0 14px rgba(247, 190, 42, .7), inset 0 0 10px rgba(247, 190, 42, .4);
+    z-index: 6;
+    pointer-events: none;
+    transform: translate(
+      calc(var(--gap) + var(--c) * (var(--cs) + var(--gap))),
+      calc(var(--gap) + var(--r) * (var(--cs) + var(--gap)))
+    );
+  }
+  .bonus-hl.lock { animation: pop .3s ease; }
   .fight-splash {
     position: absolute;
     inset: 0;
@@ -623,7 +654,7 @@
   @media (prefers-reduced-motion: reduce) {
     .tile { transition: none; }
     .spawn, .pop, .consume, .deny, .timer.urgent, .avatar.hit, .dmgf,
-    .unit.born, .unit.hurt .g { animation: none; }
+    .unit.born, .unit.hurt .g, .splat, .bonus-hl.lock { animation: none; }
     .unit.atk .wpn, .unit.atk .orb { animation: none; }
     .overlay { transition: none; }
   }
@@ -700,7 +731,7 @@
   const SIZE = 4;
   const MOVE_MS = 130;
   const MATCH_MS = 300000;
-  const BUILD_MS = 30000;
+  const BUILD_MS = 45000;
   const BATTLE_MS = 45000;
   const MAX_HP = 500;
   const DEPLOY_COOLDOWN = 250;
@@ -709,9 +740,9 @@
   const SPAWN_COLS = [20, 50, 80]; // percent of lane width, cycled left→right
 
   const UNITS = {
-    2:   { name: 'Çaylak',    hp: 4,  dmg: 1,  per: 1.25, speed: 45, range: 16, size: 15, px: 22 },
-    4:   { name: 'Asker',     hp: 10, dmg: 3,  per: 1.0,  speed: 45, range: 16, size: 17, px: 25 },
-    8:   { name: 'Okçu',      hp: 8,  dmg: 4,  per: 1.1,  speed: 45, range: 90, size: 17, px: 25, ranged: true, proj: 'arrow' },
+    2:   { name: 'Çaylak',    hp: 3,  dmg: 1,  per: 1.25, speed: 45, range: 16, size: 15, px: 22 },
+    4:   { name: 'Asker',     hp: 9,  dmg: 2,  per: 1.0,  speed: 45, range: 16, size: 17, px: 25 },
+    8:   { name: 'Okçu',      hp: 7,  dmg: 3,  per: 1.3,  speed: 45, range: 75, size: 17, px: 25, ranged: true, proj: 'arrow' },
     16:  { name: 'Şövalye',   hp: 32, dmg: 6,  per: 1.25, speed: 30, range: 16, size: 19, px: 28 },
     32:  { name: 'Büyücü',    hp: 16, dmg: 8,  per: 1.7,  speed: 30, range: 75, size: 19, px: 29, ranged: true, splash: 26, proj: 'magic' },
     64:  { name: 'Berserker', hp: 28, dmg: 14, per: 0.85, speed: 68, range: 16, size: 19, px: 28 },
@@ -1144,10 +1175,23 @@
     units.push(u);
   }
 
+  function bloodSplat(x, y, size) {
+    const s = document.createElement('div');
+    s.className = 'splat';
+    const d = Math.round(size * 1.5);
+    s.style.width = d + 'px';
+    s.style.height = d + 'px';
+    s.style.left = x + 'px';
+    s.style.top = y + 'px';
+    s.style.rotate = ((Math.random() * 360) | 0) + 'deg';
+    laneEl.appendChild(s);
+    setTimeout(() => s.remove(), 2100);
+  }
+
   function killUnit(u) {
     u.dead = true;
-    u.el.classList.add('dying');
-    setTimeout(() => u.el.remove(), 200);
+    bloodSplat(u.x, u.y, u.spec.size);
+    u.el.remove();
   }
 
   function hurtUnit(u, dmg) {
@@ -1298,7 +1342,7 @@
       game.deleteTile(tile);
       if (mode === 1) {
         if (state === 'running') spawnUnit(side, value);
-      } else if (state === 'build' || state === 'fightsplash') {
+      } else if (state === 'build' || state === 'bonus' || state === 'fightsplash') {
         bankUnit(side, value);
       }
     }, DEPLOY_CAST_MS);
@@ -1316,7 +1360,7 @@
 
   const MODE_DESC = {
     1: "Canlı savaş: dokunduğun taş anında sol lane'e asker olarak çıkar; askerler önce düşman ordusunu, yol boşsa avatarı döver. 5 dakikada rakibin 500 HP'sini ilk eriten kazanır.",
-    2: "Arena: 30 saniye taş biriktir — her dokunuş orduna asker ekler (ortadaki tabloda sayılır). Süre bitince FIGHT: ordular arenada çarpışır; rakip ordusunu tamamen yok eden kazanır, 45 sn dolarsa kalan ordu gücü sayılır.",
+    2: "Arena: 45 saniye taş biriktir — her dokunuş orduna asker ekler. Süre sonunda bonus rulet iki boardda da rastgele bir taşın askerini bedava ekler, sonra FIGHT: rakip ordusunu tamamen yok eden kazanır.",
     3: "Arena kurallarıyla ama asker stoğu iki oyuncu için ORTAK: 2×10 · 4×6 · 8×4 · 16×2 · 32-64-128×1. Kapan alır — rakipten önce davran. Tüm stok biterse savaş beklemeden başlar."
   };
 
@@ -1539,9 +1583,60 @@
       if (mode === 3) initPool();
       setPoolVisible(mode === 3);
       state = 'build';
-      startClock(BUILD_MS, beginFightSplash);
+      startClock(BUILD_MS, beginBonusRound);
     }
     aiTick();
+  }
+
+  /* Bonus roulette: a gold highlight hops across deployable tiles on both
+     boards, slows down and lands on a random one — that unit joins for free. */
+  function rouletteFor(game, side, boardRoot, cb) {
+    const elig = [...game.tiles.values()].filter(t =>
+      !t.firing && UNITS[t.value] && (mode !== 3 || pool[t.value] > 0));
+    if (!elig.length) { cb(); return; }
+    const winner = elig[(Math.random() * elig.length) | 0];
+
+    const hl = document.createElement('div');
+    hl.className = 'bonus-hl';
+    boardRoot.appendChild(hl);
+
+    const steps = [];
+    let interval = 90, total = 0;
+    while (total < 2600) { steps.push(interval); total += interval; interval *= 1.13; }
+
+    let i = 0;
+    const hop = () => {
+      if (state !== 'bonus') { hl.remove(); cb(); return; }
+      const isLast = i >= steps.length - 1;
+      const t = isLast ? winner : elig[(Math.random() * elig.length) | 0];
+      hl.style.setProperty('--r', t.r);
+      hl.style.setProperty('--c', t.c);
+      if (isLast) {
+        hl.classList.add('lock');
+        setTimeout(() => {
+          hl.remove();
+          // pool may have been drained by the other roulette meanwhile
+          if (mode === 3 && !(pool[winner.value] > 0)) { cb(); return; }
+          if (mode === 3) claimPool(winner.value);
+          bankUnit(side, winner.value);
+          winner.el.classList.add('pop');
+          cb();
+        }, 450);
+        return;
+      }
+      setTimeout(hop, steps[i++]);
+    };
+    hop();
+  }
+
+  function beginBonusRound() {
+    state = 'bonus';
+    clearInterval(clockTimer);
+    clearTimeout(aiTimer);
+    let done = 0;
+    const onDone = () => { if (++done === 2) setTimeout(beginFightSplash, 500); };
+    rouletteFor(me, 'me', $('meBoard'), onDone);
+    rouletteFor(ai, 'ai', $('aiBoard'), onDone);
   }
 
   function beginFightSplash() {
