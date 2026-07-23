@@ -98,7 +98,79 @@
 <div id="overlay"><div class="box"><h2 id="ov-title"></h2><p id="ov-text"></p><button id="ov-btn">Devam</button></div></div>
 <script>
 /* CORE-START */
-const CORE = {};
+const SIZE = 4;
+
+function emptyBoard() { return Array.from({ length: SIZE }, () => Array(SIZE).fill(0)); }
+
+// Bir satırı sola kaydırır. merges: [{value, idx}] — idx: birleşmenin sonuç satırındaki konumu
+function slideRow(row) {
+  const vals = row.filter(v => v);
+  const out = [], merges = []; let gained = 0;
+  for (let i = 0; i < vals.length; i++) {
+    if (vals[i] === vals[i + 1]) {
+      const nv = vals[i] * 2;
+      out.push(nv); merges.push({ value: nv, idx: out.length - 1 });
+      gained += nv; i++;
+    } else out.push(vals[i]);
+  }
+  while (out.length < SIZE) out.push(0);
+  return { row: out, gained, merges };
+}
+
+// dir: 'left' | 'right' | 'up' | 'down'
+function move(board, dir) {
+  const b = board.map(r => r.slice());
+  const get = {
+    left:  i => b[i].slice(),
+    right: i => b[i].slice().reverse(),
+    up:    i => b.map(r => r[i]),
+    down:  i => b.map(r => r[i]).reverse(),
+  }[dir];
+  const set = {
+    left:  (i, row) => { b[i] = row; },
+    right: (i, row) => { b[i] = row.slice().reverse(); },
+    up:    (i, row) => { row.forEach((v, j) => b[j][i] = v); },
+    down:  (i, row) => { row.slice().reverse().forEach((v, j) => b[j][i] = v); },
+  }[dir];
+  const toYX = {
+    left:  (i, j) => [i, j],
+    right: (i, j) => [i, SIZE - 1 - j],
+    up:    (i, j) => [j, i],
+    down:  (i, j) => [SIZE - 1 - j, i],
+  }[dir];
+  let gained = 0, moved = false; const merges = [];
+  for (let i = 0; i < SIZE; i++) {
+    const line = get(i);
+    const res = slideRow(line);
+    if (res.row.join() !== line.join()) moved = true;
+    gained += res.gained;
+    for (const m of res.merges) { const [y, x] = toYX(i, m.idx); merges.push({ value: m.value, y, x }); }
+    set(i, res.row);
+  }
+  return { board: b, gained, merges, moved };
+}
+
+function spawn(board, rnd) {
+  const empties = [];
+  board.forEach((r, y) => r.forEach((v, x) => { if (!v) empties.push([y, x]); }));
+  if (!empties.length) return board;
+  const [y, x] = empties[Math.floor(rnd() * empties.length)];
+  const b = board.map(r => r.slice());
+  b[y][x] = rnd() < 0.9 ? 2 : 4;
+  return b;
+}
+
+function canMove(board) {
+  for (let y = 0; y < SIZE; y++) for (let x = 0; x < SIZE; x++) {
+    const v = board[y][x];
+    if (!v) return true;
+    if (x + 1 < SIZE && board[y][x + 1] === v) return true;
+    if (y + 1 < SIZE && board[y + 1][x] === v) return true;
+  }
+  return false;
+}
+
+const CORE = { SIZE, emptyBoard, slideRow, move, spawn, canMove };
 /* CORE-END */
 window.CORE = CORE;
 </script>
