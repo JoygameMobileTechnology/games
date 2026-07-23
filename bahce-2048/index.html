@@ -362,7 +362,7 @@ function handleMove(dir) {
     state.runEmissions++;
     emitted.push({ em, events: C.applyResource(state.garden, em.type, Math.random) });
   }
-  save();
+  touchLastSeen();
   renderBoard(pop);
   onEmissions(emitted);                            // Task 8-9'da doldurulacak
   if (!C.canMove(state.board)) showGameOver();     // Task 12'de doldurulacak
@@ -420,7 +420,11 @@ function flyParticle(em, events) {
 // --- Ses ---
 let _ctx = null;
 function audioCtx() {
-  if (!_ctx) { _ctx = new (window.AudioContext || window.webkitAudioContext)(); startAmbient(); }
+  if (!_ctx) {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return null;
+    _ctx = new AC(); startAmbient();
+  }
   if (_ctx.state === 'suspended') _ctx.resume();
   return _ctx;
 }
@@ -429,7 +433,9 @@ const SCALE = [523.25, 587.33, 659.25, 783.99, 880, 1046.5];   // C majör penta
 
 function playChime(type) {
   if (state.muted) return;
-  const ctx = audioCtx(), t = ctx.currentTime;
+  const ctx = audioCtx();
+  if (!ctx) return;
+  const t = ctx.currentTime;
   const tier = TIER[type] ?? 0;
   const notes = tier >= 5 ? [SCALE[2], SCALE[3], SCALE[5]] : [SCALE[tier]];  // efsanevi: mini fanfar
   notes.forEach((f, i) => {
@@ -542,6 +548,29 @@ function scrollToZone(z, smooth = true) {
   if (el) el.scrollIntoView({ behavior: smooth ? 'smooth' : 'instant', inline: 'start', block: 'nearest' });
 }
 
+// --- Overlay ---
+function showOverlay(title, text, btnLabel, onClose) {
+  $('#ov-title').textContent = title;
+  $('#ov-text').textContent = text;
+  $('#ov-btn').textContent = btnLabel;
+  $('#overlay').classList.add('show');
+  $('#ov-btn').onclick = () => { $('#overlay').classList.remove('show'); if (onClose) onClose(); };
+}
+
+// --- Idle ---
+function checkIdle() {
+  if (!state.lastSeen) return;
+  const r = C.idleGrowth(state.garden, Date.now() - state.lastSeen);
+  if (r.grown > 0) {
+    save();
+    renderGarden();
+    showOverlay('🌙 Sen yokken...', `Bahçen kendi kendine büyüdü: ${r.grown} bitki olgunlaştı.`, 'Bahçeme dön');
+  }
+}
+function touchLastSeen() { state.lastSeen = Date.now(); save(); }
+addEventListener('pagehide', touchLastSeen);
+document.addEventListener('visibilitychange', () => { if (document.hidden) touchLastSeen(); });
+
 // --- Girdi: ok tuşları + dokunmatik kaydırma ---
 const KEYS = { ArrowLeft:'left', ArrowRight:'right', ArrowUp:'up', ArrowDown:'down' };
 addEventListener('keydown', e => {
@@ -576,6 +605,8 @@ addEventListener('keydown', () => audioCtx(), { once: true });
 if (!state.board) startRun(); else renderBoard();
 renderGarden();
 scrollToZone(C.activeZone(state.garden), false);
+checkIdle();
+touchLastSeen();
 
 // ?debug=1: her kaynak türünü elle enjekte etme butonları
 if (new URLSearchParams(location.search).get('debug') === '1') {
