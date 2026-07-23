@@ -566,6 +566,14 @@
   .mcnt.me .tc { fill: var(--gold); }
   .mcnt.zero { opacity: .35; }
   .mcnt.bump { animation: pop .18s ease; }
+  .mcol .pool {
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--muted);
+    line-height: 1;
+    white-space: nowrap;
+  }
+  .vchip.depleted { opacity: .35; filter: grayscale(.6); }
   .m2f {
     flex: 1;
     min-width: 0;
@@ -657,8 +665,9 @@
       <div class="panel" id="startPanel">
         <p class="panel-title">2048 <span class="vs">VS</span></p>
         <div class="seg" id="modeSeg" role="group" aria-label="Mod">
-          <button data-m="1">Mod 1 · Canlı</button>
-          <button data-m="2">Mod 2 · Arena</button>
+          <button data-m="1">1 · Canlı</button>
+          <button data-m="2">2 · Arena</button>
+          <button data-m="3">3 · Havuz</button>
         </div>
         <p class="panel-sub" id="modeDesc"></p>
         <div class="roster" id="roster"></div>
@@ -1282,6 +1291,7 @@
   /* ---------- Deploy (tile → unit or bank) ---------- */
 
   function deploy(game, tile, side) {
+    if (mode === 3) claimPool(tile.value); // claimed at tap time so the race is fair
     game.beginFire(tile);
     const value = tile.value;
     setTimeout(() => {
@@ -1300,14 +1310,49 @@
   let diffKey = storage.get('vs2048diff') || 'mid';
   if (!DIFFS[diffKey]) diffKey = 'mid';
   let mode = +(storage.get('vs2048mode') || 1);
-  if (mode !== 2) mode = 1;
+  if (mode !== 2 && mode !== 3) mode = 1;
   let clockTimer = null, aiTimer = null, endAt = 0;
   let lastDeploy = 0;
 
   const MODE_DESC = {
     1: "Canlı savaş: dokunduğun taş anında sol lane'e asker olarak çıkar; askerler önce düşman ordusunu, yol boşsa avatarı döver. 5 dakikada rakibin 500 HP'sini ilk eriten kazanır.",
-    2: "Arena: 30 saniye taş biriktir — her dokunuş orduna asker ekler (ortadaki tabloda sayılır). Süre bitince FIGHT: ordular arenada çarpışır; rakip ordusunu tamamen yok eden kazanır, 45 sn dolarsa kalan ordu gücü sayılır."
+    2: "Arena: 30 saniye taş biriktir — her dokunuş orduna asker ekler (ortadaki tabloda sayılır). Süre bitince FIGHT: ordular arenada çarpışır; rakip ordusunu tamamen yok eden kazanır, 45 sn dolarsa kalan ordu gücü sayılır.",
+    3: "Arena kurallarıyla ama asker stoğu iki oyuncu için ORTAK: 2×10 · 4×6 · 8×4 · 16×2 · 32-64-128×1. Kapan alır — rakipten önce davran. Tüm stok biterse savaş beklemeden başlar."
   };
+
+  const POOL_LIMITS = { 2: 10, 4: 6, 8: 4, 16: 2, 32: 1, 64: 1, 128: 1 };
+  const pool = {};
+  const poolEls = {};
+
+  function renderPool(v) {
+    const p = poolEls[v];
+    p.label.textContent = pool[v] > 0 ? 'kalan ' + pool[v] : 'bitti';
+    p.chip.classList.toggle('depleted', pool[v] <= 0);
+  }
+
+  function initPool() {
+    for (const v of Object.keys(POOL_LIMITS)) {
+      pool[v] = POOL_LIMITS[v];
+      renderPool(v);
+    }
+  }
+
+  function setPoolVisible(on) {
+    for (const v of Object.keys(poolEls)) {
+      poolEls[v].label.hidden = !on;
+      if (!on) poolEls[v].chip.classList.remove('depleted');
+    }
+  }
+
+  function poolRemainingTotal() {
+    return Object.values(pool).reduce((s, n) => s + n, 0);
+  }
+
+  function claimPool(v) {
+    pool[v]--;
+    renderPool(v);
+    if (state === 'build' && poolRemainingTotal() === 0) beginFightSplash();
+  }
 
   const overlay = $('overlay');
   const startPanel = $('startPanel');
@@ -1398,8 +1443,10 @@
       col.innerHTML = `
         <div class="mcnt ai zero"><span class="ic">${SPRITES[v]}</span><b>0</b></div>
         <div class="vchip t${v}">${v}</div>
+        <span class="pool" hidden></span>
         <div class="mcnt me zero"><span class="ic">${SPRITES[v]}</span><b>0</b></div>`;
       strip.appendChild(col);
+      poolEls[v] = { label: col.querySelector('.pool'), chip: col.querySelector('.vchip') };
       for (const side of ['ai', 'me']) {
         const cell = col.querySelector('.mcnt.' + side);
         cell.addEventListener('animationend', () => cell.classList.remove('bump'));
@@ -1489,6 +1536,8 @@
       lastTick = performance.now();
       requestAnimationFrame(battleLoop);
     } else {
+      if (mode === 3) initPool();
+      setPoolVisible(mode === 3);
       state = 'build';
       startClock(BUILD_MS, beginFightSplash);
     }
@@ -1497,6 +1546,7 @@
 
   function beginFightSplash() {
     state = 'fightsplash';
+    clearInterval(clockTimer);
     clearTimeout(aiTimer);
     const sp = document.createElement('div');
     sp.className = 'fight-splash';
@@ -1535,8 +1585,8 @@
     if (ai.busy) return;
     const live = ai.liveTiles();
     if (!live.length) return;
-    const eligible = live.filter(t => UNITS[t.value]);
-    const capOk = mode === 2 || unitCount('ai') < MAX_UNITS_PER_SIDE;
+    const eligible = live.filter(t => UNITS[t.value] && (mode !== 3 || pool[t.value] > 0));
+    const capOk = mode !== 1 || unitCount('ai') < MAX_UNITS_PER_SIDE;
     const canDeploy = live.length > 1 && eligible.length > 0 && capOk;
     const biggest = eligible.reduce((a, b) => (b.value > a.value ? b : a), eligible[0]);
     const smallest = eligible.reduce((a, b) => (b.value < a.value ? b : a), eligible[0]);
@@ -1544,6 +1594,14 @@
     if (ai.locked) {
       if (canDeploy) aiDeploy(smallest);
       return;
+    }
+    if (mode === 3 && canDeploy) {
+      // scarcity race: grab high-value or nearly-exhausted stock before the player
+      const scarce = eligible
+        .filter(t => t.value >= 16 || pool[t.value] <= 2)
+        .sort((a, b) => (pool[a.value] - pool[b.value]) || (b.value - a.value))[0];
+      const p = diffKey === 'hard' ? 0.6 : diffKey === 'mid' ? 0.35 : 0.15;
+      if (scarce && Math.random() < p) { aiDeploy(scarce); return; }
     }
     const g = ai.gridValues();
     if (diffKey === 'easy') {
@@ -1616,7 +1674,8 @@
     const tile = me.tileByEl(el);
     if (!tile || tile.firing) return;
     const capFull = mode === 1 && unitCount('me') >= MAX_UNITS_PER_SIDE;
-    if (!UNITS[tile.value] || me.liveTiles().length <= 1 || capFull) {
+    const poolOut = mode === 3 && !(pool[tile.value] > 0);
+    if (!UNITS[tile.value] || poolOut || me.liveTiles().length <= 1 || capFull) {
       denyTile(tile);
       return;
     }
