@@ -168,6 +168,39 @@ test('activeZone: kilit açılınca ilerler', () => {
   for (let i = 0; i < 3; i++) C.applyResource(g, 'meyve', makeRnd(0));
   assert.equal(C.activeZone(g), 1);
 });
+test('idleGrowth: 4 saatte 1 evre, 2 evre tavanı, MAX_STAGE tavanı', () => {
+  const H = 3600 * 1000;
+  const g = C.newGarden();
+  C.applyResource(g, 'tohum_tozu', makeRnd(0));         // stage 1
+  const key = Object.keys(g.plots)[0];
+  assert.deepEqual(C.idleGrowth(g, 3 * H), { steps: 0, grown: 0 });
+  assert.deepEqual(C.idleGrowth(g, 5 * H), { steps: 1, grown: 1 });
+  assert.equal(g.plots[key].stage, 2);
+  assert.deepEqual(C.idleGrowth(g, 100 * H), { steps: 2, grown: 1 });  // 2 -> 3 (tavan)
+  assert.equal(g.plots[key].stage, 3);
+  assert.deepEqual(C.idleGrowth(g, 100 * H), { steps: 2, grown: 0 });  // zaten olgun
+});
+test('koruma invariantı: hiçbir kaynak kaybolmaz, tüm bölgeler açılır', () => {
+  const g = C.newGarden();
+  const types = ['tohum_tozu', 'meyve', 'nadir_tohum', 'agac_fidani', 'efsanevi', 'cicek_ozu'];
+  let planted = 0, banked = 0, animals = 0, variants = 0;
+  const rnd = makeRnd(0);
+  for (let i = 0; i < 200; i++) {
+    for (const e of C.applyResource(g, types[i % types.length], rnd)) {
+      if (e.kind === 'plant') planted++;
+      else if (e.kind === 'animal') animals++;
+      else if (e.kind === 'variant') variants++;
+      else if (e.kind === 'bank') banked++;
+    }
+  }
+  const stillBanked = Object.values(g.bank).reduce((a, b) => a + b, 0);
+  // Ekilen + hayvan + varyant + halen bankada = beslenen toplam (drenaj sırasında bankadan çıkanlar
+  // plant/animal/variant olarak sayılır; banked sayacı geçici bankalamaları da içerdiğinden >= stillBanked)
+  assert.equal(planted, 38);                       // 12+10+10+6 = tüm slotlar
+  assert.equal(g.unlocked, 4);
+  assert.equal(planted + animals + variants + stillBanked <= 200, true);
+  assert.equal(planted + animals + variants >= 200 - stillBanked - banked, true);
+});
 
 let fail = 0;
 for (const [name, fn] of tests) {

@@ -207,7 +207,7 @@ const ZONES = [
 const SLOT_FOR = { tohum_tozu: 'cicek', meyve: 'cali', nadir_tohum: 'nadir', agac_fidani: 'peyzaj', efsanevi: 'prestij' };
 const MAX_ANIMALS = 3, MAX_STAGE = 3;
 
-function newGarden() { return { unlocked: 1, plots: {}, variants: {}, animals: [0, 0, 0, 0], bank: {} }; }
+function newGarden() { return { unlocked: 1, plots: {}, variants: {}, animals: ZONES.map(() => 0), bank: {} }; }
 
 function zoneComplete(g, z) { return ZONES[z].slots.every((_, i) => g.plots[z + ':' + i]); }
 
@@ -264,8 +264,22 @@ function drainBank(g, rnd) {
   return events;
 }
 
+const IDLE_STEP_MS = 4 * 3600 * 1000;
+
+function idleGrowth(g, elapsedMs) {
+  const steps = Math.min(2, Math.floor(elapsedMs / IDLE_STEP_MS));
+  let grown = 0;
+  if (steps > 0) for (const k in g.plots) {
+    const p = g.plots[k];
+    const ns = Math.min(MAX_STAGE, p.stage + steps);
+    if (ns > p.stage) { p.stage = ns; grown++; }
+  }
+  return { steps, grown };
+}
+
 const CORE = { SIZE, emptyBoard, slideRow, move, spawn, canMove, emissionFor,
-               ZONES, SLOT_FOR, MAX_ANIMALS, MAX_STAGE, newGarden, zoneComplete, activeZone, applyResource };
+               ZONES, SLOT_FOR, MAX_ANIMALS, MAX_STAGE, newGarden, zoneComplete, activeZone, applyResource,
+               idleGrowth, IDLE_STEP_MS };
 /* CORE-END */
 window.CORE = CORE;
 </script>
