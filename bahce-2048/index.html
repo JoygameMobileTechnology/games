@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Bahçe 2048</title>
+<style>
+  :root{ --bg:#faf8ef; --panel:#bbada0; --cell:#cdc1b4; --text:#776e65; }
+  *{ box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+  html,body{ height:100%; }
+  body{ background:var(--bg); font-family:system-ui,-apple-system,sans-serif; color:var(--text);
+        display:flex; flex-direction:column; align-items:center; overflow:hidden; touch-action:none; }
+  #app{ width:min(100vw,480px); height:100%; display:flex; flex-direction:column; }
+
+  /* Bahçe paneli */
+  #garden{ position:relative; height:100%; display:flex; overflow-x:auto;
+           scroll-snap-type:x mandatory; border-radius:0 0 16px 16px; scrollbar-width:none; }
+  #garden::-webkit-scrollbar{ display:none; }
+  .zone{ position:relative; flex:0 0 100%; height:100%; scroll-snap-align:start; overflow:hidden; }
+  .zone.z-cayir{ background:linear-gradient(#bfe3f7,#a5d06e 55%,#8bc34a); }
+  .zone.z-koru { background:linear-gradient(#a8cbe8,#6d9e4f 50%,#4e7a37); }
+  .zone.z-golet{ background:linear-gradient(#bfe3f7,#8ecfd8 55%,#5aa8b8); }
+  .zone.z-anit { background:linear-gradient(#e8d9f0,#c9b97a 55%,#a08c4a); }
+  .zone.locked{ filter:grayscale(1) brightness(.75); display:flex; align-items:center; justify-content:center;
+                font-size:34px; color:#fff; }
+  .zone-name{ position:absolute; top:6px; left:10px; font-size:11px; font-weight:800; color:#ffffffd9;
+              text-shadow:0 1px 2px #0006; letter-spacing:.5px; }
+  .slot{ position:absolute; transform:translate(-50%,-50%); font-size:22px; line-height:1;
+         filter:drop-shadow(0 1px 1px #0003); }
+  .slot.empty{ width:14px; height:14px; border:2px dashed #ffffff66; border-radius:5px; font-size:0; }
+  .slot.big{ font-size:34px; }
+  .slot.bloom{ animation:bloom .5s ease; }
+  @keyframes bloom{ 0%{ transform:translate(-50%,-50%) scale(0); } 70%{ transform:translate(-50%,-50%) scale(1.35); }
+                    100%{ transform:translate(-50%,-50%) scale(1); } }
+  .animal{ position:absolute; font-size:16px; animation:roam 9s ease-in-out infinite alternate; }
+  @keyframes roam{ from{ transform:translate(0,0); } to{ transform:translate(46px,-16px); } }
+  #bank{ position:absolute; right:6px; top:6px; display:flex; flex-direction:column; gap:2px; z-index:5;
+         font-size:11px; font-weight:700; color:#fff; text-shadow:0 1px 2px #0008; }
+  #zone-dots{ position:absolute; bottom:4px; left:50%; transform:translateX(-50%); display:flex; gap:5px; z-index:5; }
+  #zone-dots i{ width:6px; height:6px; border-radius:50%; background:#ffffff77; }
+  #zone-dots i.on{ background:#fff; }
+  #garden-wrap{ position:relative; height:34%; min-height:180px; }
+
+  /* HUD */
+  #hud{ display:flex; align-items:center; gap:8px; padding:8px 12px; }
+  #hud h1{ font-size:16px; margin-right:auto; }
+  .score{ background:var(--panel); color:#fff; border-radius:6px; padding:3px 8px; font-size:11px; text-align:center; }
+  .score b{ display:block; font-size:14px; }
+  #hud button{ border:0; border-radius:6px; background:#8f7a66; color:#fff; font-weight:700;
+               padding:6px 10px; font-size:12px; cursor:pointer; }
+
+  /* Tahta */
+  #board-wrap{ flex:1; display:flex; align-items:flex-start; justify-content:center; padding-top:4px; }
+  #board{ position:relative; width:min(92vw,420px,56vh); aspect-ratio:1; background:var(--panel);
+          border-radius:10px; }
+  .cell,.tile{ position:absolute; width:22%; aspect-ratio:1; border-radius:6px; }
+  .cell{ background:var(--cell); }
+  .tile{ display:flex; flex-direction:column; overflow:hidden; z-index:2; }
+  .tile .ico{ flex:1; display:flex; align-items:center; justify-content:center; font-size:clamp(20px,6vw,32px); }
+  .tile .num{ width:100%; text-align:center; background:rgba(255,255,255,.82); font-weight:800;
+              font-size:clamp(11px,3.4vw,16px); line-height:1.4; color:#33691e; }
+  .tile.pop{ animation:pop .18s ease; }
+  @keyframes pop{ from{ transform:scale(.4); } to{ transform:scale(1); } }
+
+  /* Emisyon parçacığı */
+  .particle{ position:fixed; z-index:50; font-size:22px; pointer-events:none;
+             filter:drop-shadow(0 0 6px #fff59d); transition:left .7s cubic-bezier(.3,-.2,.4,1), top .7s cubic-bezier(.2,.6,.4,1); }
+
+  /* Overlay (idle özeti + oyun sonu) */
+  #overlay{ position:fixed; inset:0; background:#0007; display:none; align-items:center; justify-content:center; z-index:100; }
+  #overlay.show{ display:flex; }
+  #overlay .box{ background:var(--bg); border-radius:14px; padding:22px; max-width:320px; text-align:center; }
+  #overlay .box h2{ font-size:18px; margin-bottom:10px; }
+  #overlay .box p{ font-size:14px; margin-bottom:14px; }
+  #overlay .box button{ border:0; border-radius:8px; background:#8f7a66; color:#fff; font-weight:700;
+                        padding:10px 18px; font-size:14px; cursor:pointer; }
+
+  #debug{ position:fixed; bottom:4px; left:4px; z-index:60; display:flex; gap:4px; flex-wrap:wrap; }
+  #debug button{ font-size:10px; padding:3px 5px; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="garden-wrap">
+    <div id="garden"></div>
+    <div id="bank"></div>
+    <div id="zone-dots"></div>
+  </div>
+  <div id="hud">
+    <h1>Bahçe 2048</h1>
+    <div class="score">SKOR<b id="score">0</b></div>
+    <div class="score">REKOR<b id="best">0</b></div>
+    <button id="new-game">Yeni</button>
+    <button id="mute">🔊</button>
+  </div>
+  <div id="board-wrap"><div id="board"></div></div>
+</div>
+<div id="overlay"><div class="box"><h2 id="ov-title"></h2><p id="ov-text"></p><button id="ov-btn">Devam</button></div></div>
+<script>
+/* CORE-START */
+const CORE = {};
+/* CORE-END */
+window.CORE = CORE;
+</script>
+<script>
+// UI katmanı — sonraki görevlerde doldurulacak
+</script>
+</body>
+</html>
