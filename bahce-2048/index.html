@@ -179,7 +179,93 @@ function canMove(board) {
   return false;
 }
 
-const CORE = { SIZE, emptyBoard, slideRow, move, spawn, canMove, emissionFor };
+// --- Bahçe ---
+const sl = (type, x, y) => ({ type, x, y });   // x,y: bölge paneli içinde % konum
+const ZONES = [
+  { id: 'cayir', name: 'Çayır', slots: [
+    sl('cicek',10,72), sl('cicek',22,80), sl('cicek',34,70), sl('cicek',46,82), sl('cicek',58,72),
+    sl('cicek',70,80), sl('cicek',82,70), sl('cicek',16,58), sl('cicek',64,58),
+    sl('cali',30,52), sl('cali',78,54), sl('cali',48,60),
+  ]},
+  { id: 'koru', name: 'Koru', slots: [
+    sl('cali',15,70), sl('cali',35,60), sl('cali',55,72), sl('cali',75,62),
+    sl('cicek',25,82), sl('cicek',45,80), sl('cicek',65,84), sl('cicek',85,78),
+    sl('nadir',50,50), sl('nadir',20,50),
+  ]},
+  { id: 'golet', name: 'Gölet', slots: [
+    sl('cicek',12,78), sl('cicek',30,84), sl('cicek',70,84), sl('cicek',88,78),
+    sl('cali',18,60), sl('cali',82,62), sl('cali',50,88),
+    sl('nadir',35,55), sl('nadir',65,55),
+    sl('peyzaj',50,42),
+  ]},
+  { id: 'anit', name: 'Anıt Bahçesi', slots: [
+    sl('nadir',25,75), sl('nadir',75,75),
+    sl('peyzaj',15,55), sl('peyzaj',85,55),
+    sl('prestij',50,62), sl('prestij',50,35),
+  ]},
+];
+const SLOT_FOR = { tohum_tozu: 'cicek', meyve: 'cali', nadir_tohum: 'nadir', agac_fidani: 'peyzaj', efsanevi: 'prestij' };
+const MAX_ANIMALS = 3, MAX_STAGE = 3;
+
+function newGarden() { return { unlocked: 1, plots: {}, variants: {}, animals: [0, 0, 0, 0], bank: {} }; }
+
+function zoneComplete(g, z) { return ZONES[z].slots.every((_, i) => g.plots[z + ':' + i]); }
+
+function activeZone(g) {
+  for (let z = 0; z < g.unlocked; z++) if (!zoneComplete(g, z)) return z;
+  return g.unlocked - 1;
+}
+
+// g'yi mutasyona uğratır; olay listesi döndürür:
+// {kind:'plant',zone,slot,type} | {kind:'variant',key} | {kind:'animal',zone} | {kind:'bank',type} | {kind:'unlock',zone}
+function applyResource(g, type, rnd) {
+  const events = [];
+  if (type === 'cicek_ozu') {
+    const filled = [];
+    for (let z = 0; z < g.unlocked; z++)
+      ZONES[z].slots.forEach((s, i) => { if (s.type === 'cicek' && g.plots[z + ':' + i]) filled.push(z + ':' + i); });
+    if (!filled.length) { g.bank[type] = (g.bank[type] || 0) + 1; return [{ kind: 'bank', type }]; }
+    const key = filled[Math.floor(rnd() * filled.length)];
+    g.variants[key] = (g.variants[key] || 0) + 1;
+    return [{ kind: 'variant', key }];
+  }
+  const want = SLOT_FOR[type];
+  const z = activeZone(g);
+  const idx = ZONES[z].slots.findIndex((s, i) => s.type === want && !g.plots[z + ':' + i]);
+  if (idx >= 0) {
+    g.plots[z + ':' + idx] = { stage: 1 };
+    events.push({ kind: 'plant', zone: z, slot: idx, type });
+    if (zoneComplete(g, z) && g.unlocked < ZONES.length) {
+      g.unlocked++;
+      events.push({ kind: 'unlock', zone: g.unlocked - 1 });
+      events.push(...drainBank(g, rnd));
+    }
+    return events;
+  }
+  if (type === 'meyve' && g.animals[z] < MAX_ANIMALS) {
+    g.animals[z]++;
+    return [{ kind: 'animal', zone: z }];
+  }
+  g.bank[type] = (g.bank[type] || 0) + 1;
+  return [{ kind: 'bank', type }];
+}
+
+// Kilit açıldığında bankadakileri yeni bölgeye ekmeyi dener
+function drainBank(g, rnd) {
+  const events = [];
+  for (const type of Object.keys(g.bank)) {
+    while (g.bank[type] > 0) {
+      g.bank[type]--;
+      const evs = applyResource(g, type, rnd);
+      if (evs.some(e => e.kind === 'bank')) break;  // yeniden bankalandı (sayaç applyResource'ta geri arttı)
+      events.push(...evs);
+    }
+  }
+  return events;
+}
+
+const CORE = { SIZE, emptyBoard, slideRow, move, spawn, canMove, emissionFor,
+               ZONES, SLOT_FOR, MAX_ANIMALS, MAX_STAGE, newGarden, zoneComplete, activeZone, applyResource };
 /* CORE-END */
 window.CORE = CORE;
 </script>

@@ -110,6 +110,65 @@ test('move: aynı hamlede çoklu emisyon', () => {
   assert.deepEqual(r.emissions.map(e => e.type).sort(), ['cicek_ozu', 'tohum_tozu']);
 });
 
+test('ZONES: spec slot sayıları (12/10/10/6)', () => {
+  assert.deepEqual(C.ZONES.map(z => z.slots.length), [12, 10, 10, 6]);
+});
+test('tohum_tozu: aktif bölgede çiçek slotu doldurur', () => {
+  const g = C.newGarden();
+  const evs = C.applyResource(g, 'tohum_tozu', makeRnd(0));
+  assert.equal(evs[0].kind, 'plant');
+  assert.equal(evs[0].zone, 0);
+  assert.equal(C.ZONES[0].slots[evs[0].slot].type, 'cicek');
+  assert.deepEqual(g.plots['0:' + evs[0].slot], { stage: 1 });
+});
+test('cicek_ozu: dolu çiçek yoksa bankaya', () => {
+  const g = C.newGarden();
+  const evs = C.applyResource(g, 'cicek_ozu', makeRnd(0));
+  assert.deepEqual(evs, [{ kind: 'bank', type: 'cicek_ozu' }]);
+  assert.equal(g.bank.cicek_ozu, 1);
+});
+test('cicek_ozu: dolu çiçeği zenginleştirir', () => {
+  const g = C.newGarden();
+  C.applyResource(g, 'tohum_tozu', makeRnd(0));
+  const evs = C.applyResource(g, 'cicek_ozu', makeRnd(0));
+  assert.equal(evs[0].kind, 'variant');
+  assert.equal(g.variants[evs[0].key], 1);
+});
+test('meyve: cali slotu doldurur; slotlar dolunca hayvan; 3 hayvandan sonra banka', () => {
+  const g = C.newGarden();
+  const caliCount = C.ZONES[0].slots.filter(s => s.type === 'cali').length;
+  for (let i = 0; i < caliCount; i++) {
+    assert.equal(C.applyResource(g, 'meyve', makeRnd(0))[0].kind, 'plant');
+  }
+  for (let i = 0; i < 3; i++) {
+    assert.equal(C.applyResource(g, 'meyve', makeRnd(0))[0].kind, 'animal');
+  }
+  assert.equal(C.applyResource(g, 'meyve', makeRnd(0))[0].kind, 'bank');
+  assert.equal(g.animals[0], 3);
+});
+test('nadir_tohum: çayırda slot yok -> banka; çayır dolunca koruya otomatik ekilir', () => {
+  const g = C.newGarden();
+  assert.equal(C.applyResource(g, 'nadir_tohum', makeRnd(0))[0].kind, 'bank');
+  // Çayırı tamamen doldur (9 cicek + 3 cali)
+  let all = [];
+  for (let i = 0; i < 9; i++) all.push(...C.applyResource(g, 'tohum_tozu', makeRnd(0)));
+  for (let i = 0; i < 3; i++) all.push(...C.applyResource(g, 'meyve', makeRnd(0)));
+  assert.ok(all.some(e => e.kind === 'unlock' && e.zone === 1), 'koru kilidi açılmalı');
+  assert.equal(g.unlocked, 2);
+  // Bankadaki nadir_tohum koruya (zone 1) drenajla ekilmiş olmalı
+  assert.equal(g.bank.nadir_tohum || 0, 0);
+  const planted = all.find(e => e.kind === 'plant' && e.zone === 1);
+  assert.ok(planted, 'bankadan koruya ekim olmalı');
+  assert.equal(C.ZONES[1].slots[planted.slot].type, 'nadir');
+});
+test('activeZone: kilit açılınca ilerler', () => {
+  const g = C.newGarden();
+  assert.equal(C.activeZone(g), 0);
+  for (let i = 0; i < 9; i++) C.applyResource(g, 'tohum_tozu', makeRnd(0));
+  for (let i = 0; i < 3; i++) C.applyResource(g, 'meyve', makeRnd(0));
+  assert.equal(C.activeZone(g), 1);
+});
+
 let fail = 0;
 for (const [name, fn] of tests) {
   try { fn(); console.log('PASS', name); }
