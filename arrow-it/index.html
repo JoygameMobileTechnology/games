@@ -1,0 +1,2866 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#f5ecd2">
+<title>Arrow It</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; }
+  body {
+    font-family: "Marker Felt", "Bradley Hand", "Segoe Script", "Comic Sans MS",
+                 -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    background: #f5ecd2;
+    color: #6b4423;
+    overflow: hidden;
+    height: 100vh;
+    height: 100dvh;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; padding: 0; }
+
+  #app {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    max-width: 480px;
+    margin: 0 auto;
+    overflow: hidden;
+  }
+
+  .screen {
+    position: absolute;
+    inset: 0;
+    display: none;
+    flex-direction: column;
+    padding: env(safe-area-inset-top) 16px env(safe-area-inset-bottom);
+  }
+  .screen[data-active] { display: flex; }
+
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 56px;
+    flex-shrink: 0;
+    border-bottom: 1px solid #e3d7b0;
+  }
+  .topbar h1 {
+    font-size: 18px;
+    font-weight: 600;
+    margin: 0;
+    text-align: center;
+    flex: 1;
+    color: #c46a30;
+    line-height: 1.1;
+  }
+  .topbar h1 small {
+    display: block;
+    font-size: 12px;
+    color: #8a4ab0;
+    font-weight: 600;
+    margin-top: 1px;
+  }
+  .iconBtn {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    color: #6b4423;
+  }
+  .iconBtn:active { background: #ebdcb0; }
+
+  /* ── Title ── */
+  .screen[data-screen="title"] { justify-content: center; align-items: center; gap: 18px; padding-bottom: 80px; }
+  .title__logo {
+    font-size: 60px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    margin: 0 0 4px;
+    color: #c46a30;
+    text-align: center;
+  }
+  .title__sub { color: #8a5e3a; margin: 0 0 28px; font-size: 15px; text-align: center; max-width: 280px; line-height: 1.5; }
+  .title__btns { display: flex; flex-direction: column; gap: 12px; width: 100%; max-width: 280px; }
+  .bigBtn {
+    padding: 16px 24px;
+    background: #f0e3bb;
+    border: 2px solid #d6c28a;
+    border-radius: 14px;
+    font-size: 16px;
+    font-weight: 600;
+    color: #6b4423;
+    transition: transform 80ms, background 120ms;
+  }
+  .bigBtn--primary {
+    background: #c46a30;
+    border-color: #a85420;
+    color: #fff;
+  }
+  .bigBtn:active { transform: scale(0.97); }
+  .bigBtn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+  /* ── Level select ── */
+  .levelList { overflow-y: auto; padding: 8px 0 24px; flex: 1; }
+  .levelList h2 {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #a18653;
+    margin: 14px 4px 8px;
+  }
+  .levelGrid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+  .levelCard {
+    position: relative;
+    aspect-ratio: 1.1;
+    background: #f0e3bb;
+    border: 2px solid #d6c28a;
+    border-radius: 14px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 10px;
+    transition: transform 80ms, background 120ms;
+  }
+  .levelCard:active { transform: scale(0.97); background: #e8d8a8; }
+  .levelCard__num { font-size: 26px; font-weight: 700; color: #c46a30; line-height: 1; }
+  .levelCard__name { font-size: 13px; color: #6b4423; margin-top: 4px; line-height: 1.2; text-align: center; }
+  .levelCard__pill {
+    margin-top: 6px;
+    padding: 2px 9px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #fff;
+  }
+  .pill--easy { background: #5fa860; }
+  .pill--medium { background: #d4a020; }
+  .pill--hard { background: #8a4ab0; }
+  .pill--expert { background: #b02a37; }
+  .pill--custom { background: #c46a30; }
+  .levelCard__del {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    color: #6b4423;
+    line-height: 1;
+  }
+  .empty {
+    color: #a18653;
+    font-size: 13px;
+    padding: 16px 8px;
+    text-align: center;
+    line-height: 1.5;
+  }
+
+  /* ── Game ── */
+  .screen[data-screen="game"] { justify-content: flex-start; }
+  .gameMain {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 12px 0;
+    overflow: hidden;
+  }
+  .board-wrap {
+    width: min(92vw, calc((100vh - 100px) * var(--cols) / var(--rows)), 440px);
+    aspect-ratio: var(--cols) / var(--rows);
+  }
+  svg.board { display: block; width: 100%; height: 100%; }
+
+  /* SVG arrow styles. --arrow-stroke is set per-board so finer grids get a slightly thicker
+     stroke relative to cell size, keeping trails readable without a full zoom-in. */
+  g.arrow .trail {
+    stroke: #6b4423;
+    stroke-width: var(--arrow-stroke, 0.13);
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    fill: none;
+  }
+  g.arrow .head { fill: #6b4423; }
+  g.arrow .hit {
+    stroke: rgba(0,0,0,0.001);
+    stroke-width: var(--arrow-hit, 0.7);
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    fill: none;
+    pointer-events: stroke;
+    cursor: pointer;
+  }
+  g.arrow.shake { animation: shake 0.4s; }
+  g.arrow.flash .trail, g.arrow.flash .head { stroke: #d43030; fill: #d43030; }
+  @keyframes shake {
+    0%,100% { transform: translate(0,0); }
+    20% { transform: translate(-4px, 0); }
+    40% { transform: translate(4px, 0); }
+    60% { transform: translate(-2px, 0); }
+    80% { transform: translate(2px, 0); }
+  }
+  circle.dot { fill: #cdb997; opacity: 0; transition: opacity 250ms; }
+  circle.dot.revealed { opacity: 1; }
+  .silhouetteHint circle { fill: #cdb997; opacity: 0.2; }
+
+  /* ── Intermission ── */
+  .screen[data-screen="intermission"] {
+    background: linear-gradient(180deg, #e89860 0%, #c46a30 70%);
+    color: #fff;
+    justify-content: center;
+    align-items: center;
+    padding: 24px;
+    overflow: hidden;
+  }
+  .interHeading {
+    font-size: 48px;
+    font-weight: 800;
+    margin: 0 0 24px;
+    text-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    text-align: center;
+    z-index: 1;
+  }
+  .interCard {
+    width: min(75vw, 280px);
+    aspect-ratio: 1;
+    background: #f5ecd2;
+    border-radius: 22px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+    padding: 14px;
+    z-index: 1;
+  }
+  .interCard svg { display: block; width: 100%; height: 100%; }
+  .interSubtitle {
+    margin: 24px 0 16px;
+    font-size: 16px;
+    font-weight: 600;
+    color: #fff;
+    opacity: 0.92;
+    z-index: 1;
+  }
+  .interBtns { display: flex; flex-direction: column; gap: 10px; width: min(80vw, 280px); z-index: 1; }
+  .interBtn {
+    padding: 14px;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 700;
+    color: #fff;
+    border: none;
+    transition: transform 80ms, opacity 120ms;
+  }
+  .interBtn--primary { background: #a85420; }
+  .interBtn--secondary { background: rgba(255,255,255,0.25); }
+  .interBtn:active { transform: scale(0.97); }
+  .confetti-container {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    overflow: hidden;
+  }
+  .confetti {
+    position: absolute;
+    top: -24px;
+    width: 8px;
+    height: 12px;
+    border-radius: 1px;
+    transform: translateY(0) rotate(0);
+    animation: confetti-fall var(--dur, 3s) ease-in var(--delay, 0s) infinite;
+  }
+  @keyframes confetti-fall {
+    0% { transform: translateY(0) rotate(0); opacity: 1; }
+    100% { transform: translateY(110vh) rotate(720deg); opacity: 0.2; }
+  }
+
+  /* ── Import ── */
+  .importBody { flex: 1; overflow-y: auto; padding: 8px 0 24px; display: flex; flex-direction: column; gap: 14px; }
+  .importDrop {
+    border: 2px dashed #d6c28a;
+    border-radius: 14px;
+    padding: 22px 16px;
+    text-align: center;
+    color: #a18653;
+    background: #f0e3bb;
+    position: relative;
+    overflow: hidden;
+  }
+  .importDrop input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+  .importDrop p { margin: 4px 0; font-size: 14px; }
+  .importDrop p:first-child { font-size: 15px; color: #6b4423; font-weight: 600; }
+  .importPreview {
+    display: none;
+    width: 100%;
+    border-radius: 12px;
+    max-height: 160px;
+    object-fit: contain;
+    background: #f0e3bb;
+  }
+  .sliderRow { display: flex; flex-direction: column; gap: 6px; }
+  .sliderRow label { font-size: 12px; color: #8a5e3a; display: flex; justify-content: space-between; }
+  .sliderRow input[type="range"] { width: 100%; accent-color: #c46a30; }
+
+  .diffRow { display: flex; flex-direction: column; gap: 6px; }
+  .diffRow > label { font-size: 12px; color: #8a5e3a; }
+  .diffBtns { display: flex; gap: 6px; }
+  .optHint { margin: 2px 0 0; font-size: 11px; line-height: 1.4; color: #a18653; }
+  .diffBtn {
+    flex: 1;
+    padding: 10px 8px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 600;
+    background: #f0e3bb;
+    border: 2px solid #d6c28a;
+    color: #6b4423;
+    transition: transform 80ms, background 120ms;
+  }
+  .diffBtn:active { transform: scale(0.97); }
+  .diffBtn--active { background: #c46a30; color: #fff; border-color: #a85420; }
+  .miniBoardWrap { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .miniBoard {
+    width: min(70vw, 220px);
+    aspect-ratio: var(--cols, 14) / var(--rows, 20);
+    background: #f0e3bb;
+    border-radius: 10px;
+    border: 2px solid #d6c28a;
+    overflow: hidden;
+  }
+  .miniBoard svg { display: block; width: 100%; height: 100%; }
+  .importStatus { font-size: 13px; color: #8a5e3a; min-height: 18px; text-align: center; }
+  .importBtns { display: flex; gap: 10px; padding-top: 4px; }
+  .importBtns .bigBtn { flex: 1; padding: 14px; font-size: 14px; }
+
+  /* ── Toast ── */
+  .toast {
+    position: fixed;
+    left: 50%;
+    bottom: 80px;
+    transform: translate(-50%, 20px);
+    padding: 9px 20px;
+    background: #6b4423;
+    border-radius: 999px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #f5ecd2;
+    opacity: 0;
+    pointer-events: none;
+    transition: transform 200ms, opacity 200ms;
+    z-index: 100;
+  }
+  .toast--show { opacity: 1; transform: translate(-50%, 0); }
+  .toast--warn { background: #b04030; color: #fff; }
+  .toast--win { background: #5fa860; color: #fff; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- Title -->
+  <section class="screen" data-screen="title">
+    <h1 class="title__logo">Arrow It</h1>
+    <p class="title__sub">Tap arrows to fire them off the board. Plan the order — every arrow needs a clear path.</p>
+    <div class="title__btns">
+      <button class="bigBtn bigBtn--primary" id="btnPlay">Play</button>
+      <button class="bigBtn" id="btnImport">Import image →</button>
+    </div>
+  </section>
+
+  <!-- Level select -->
+  <section class="screen" data-screen="levelSelect">
+    <div class="topbar">
+      <button class="iconBtn" id="btnBackFromLevels" aria-label="Back">←</button>
+      <h1>Levels</h1>
+      <div style="width:44px"></div>
+    </div>
+    <div class="levelList">
+      <h2>Built-in</h2>
+      <div class="levelGrid" id="builtinLevels"></div>
+      <h2>Your levels</h2>
+      <div id="customLevelsList"></div>
+    </div>
+  </section>
+
+  <!-- Game -->
+  <section class="screen" data-screen="game">
+    <div class="topbar">
+      <button class="iconBtn" id="btnBackFromGame" aria-label="Back">←</button>
+      <h1 id="gameLevelName">Level<small id="gameLevelDiff"></small></h1>
+      <div style="width:44px"></div>
+    </div>
+    <div class="gameMain">
+      <div class="board-wrap" id="boardWrap">
+        <svg class="board" id="board" preserveAspectRatio="xMidYMid meet"></svg>
+      </div>
+    </div>
+  </section>
+
+  <!-- Intermission -->
+  <section class="screen" data-screen="intermission">
+    <div class="confetti-container" id="confettiContainer"></div>
+    <h1 class="interHeading" id="interHeading">Splendid!</h1>
+    <div class="interCard">
+      <svg id="interSnapshot" preserveAspectRatio="xMidYMid meet"></svg>
+    </div>
+    <p class="interSubtitle" id="interSubtitle">Level completed!</p>
+    <div class="interBtns">
+      <button class="interBtn interBtn--primary" id="btnNextLevel">Next Level</button>
+      <button class="interBtn interBtn--secondary" id="btnHomeFromInter">Home</button>
+    </div>
+  </section>
+
+  <!-- Import -->
+  <section class="screen" data-screen="import">
+    <div class="topbar">
+      <button class="iconBtn" id="btnCancelImport" aria-label="Back">←</button>
+      <h1>Import image</h1>
+      <div style="width:44px"></div>
+    </div>
+    <div class="importBody">
+      <label class="importDrop">
+        <p>Pick any image</p>
+        <p>A playable version is generated automatically.</p>
+        <input type="file" id="importFile" accept="image/*">
+      </label>
+      <img class="importPreview" id="importPreviewImg" alt="">
+      <div class="diffRow">
+        <label>Style</label>
+        <div class="diffBtns" id="modeBtns">
+          <button class="diffBtn diffBtn--active" data-mode="auto">Auto</button>
+          <button class="diffBtn" data-mode="solid">Filled</button>
+          <button class="diffBtn" data-mode="outline">Outline</button>
+        </div>
+        <p class="optHint">Auto balances the main shape with important image details.</p>
+      </div>
+      <div class="diffRow importAdvanced" hidden>
+        <label>Subject bias</label>
+        <div class="diffBtns" id="polarityBtns">
+          <button class="diffBtn" data-polarity="dark">Dark parts</button>
+          <button class="diffBtn" data-polarity="bright">Bright parts</button>
+          <button class="diffBtn diffBtn--active" data-polarity="auto">Auto</button>
+        </div>
+        <p class="optHint">Auto picks based on your image. Pick Dark for silhouettes against a bright sky; Bright for glowing or colorful subjects on a dark background.</p>
+      </div>
+      <div class="sliderRow">
+        <label>Detail <span id="threshVal">0.50</span></label>
+        <input type="range" id="threshSlider" min="0.05" max="0.95" step="0.01" value="0.5">
+        <p class="optHint">Slide right for more photo detail, left for a cleaner puzzle.</p>
+      </div>
+      <div class="diffRow">
+        <label>Difficulty</label>
+        <div class="diffBtns" id="diffBtns">
+          <button class="diffBtn" data-diff="Easy">Easy</button>
+          <button class="diffBtn diffBtn--active" data-diff="Medium">Medium</button>
+          <button class="diffBtn" data-diff="Hard">Hard</button>
+          <button class="diffBtn" data-diff="Expert">Expert</button>
+        </div>
+        <p class="optHint">Harder settings force longer arrow chains and a stricter firing order. Expert plays out as one long forced sequence.</p>
+      </div>
+      <div class="miniBoardWrap">
+        <div class="miniBoard" id="miniBoard"><svg id="miniSvg" preserveAspectRatio="xMidYMid meet"></svg></div>
+      </div>
+      <p class="importStatus" id="importStatus"></p>
+      <div class="importBtns">
+        <button class="bigBtn" id="btnTryAgain">Try again</button>
+        <button class="bigBtn bigBtn--primary" id="btnSave" disabled>Save &amp; play</button>
+      </div>
+    </div>
+  </section>
+
+  <div id="toast" class="toast"></div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  // ── Constants ──────────────────────────────
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+  const LEVEL_COLS = 14;
+  const LEVEL_ROWS = 20;
+  // Imports use a grid sized to the image dimensions (see `gridSizeForImage`). The cap is the
+  // ABSOLUTE maximum supported anywhere in the game.
+  const IMPORT_GRID_MIN = 24;
+  const IMPORT_GRID_MAX = 200;     // performance ceiling for in-browser construction
+  const ABSOLUTE_GRID_CAP = 500;   // hard cap (not currently reachable from imports)
+  const IMPORT_TARGET_CELL_PIXELS = 11;  // ~11 source pixels per grid cell for good detail
+  const IMPORT_ALPHA_CUTOFF = 12;
+  const IMPORT_MAX_FILLED_CELLS = 9000;
+  const IMPORT_MIN_FILLED_CELLS = 28;
+  // Bump whenever the level-generation rules change. Caches generated under a different version
+  // are discarded on load so every level reflects the current ruleset. Custom levels with a stored
+  // silhouette are regenerated; any saved before silhouettes were stored are dropped.
+  const RULESET_VERSION = 5;
+
+  // Difficulty knobs.
+  //   pathWeight    — multiplier on firing-path length when scoring candidate directions; larger
+  //                   = stronger preference for cross-board firing paths (more dependencies).
+  //   trailMin/Max  — clamp on trail length (cells per arrow). Hard wants longer trails for
+  //                   visual maze-iness.
+  //   targetBranch  — target average number of fireable arrows at each greedy step. Lower means
+  //                   a more forced firing order (= harder). Generation regenerates until the
+  //                   produced level lands within `branchTol` of this target.
+  //   sort          — construction-order strategy. "exit" places hardest-to-exit first (current),
+  //                   "depth" places innermost (deepest from boundary) first → outer arrows fire
+  //                   first → layered peel.
+  //   exitStop      — probability that a random-walk trail stops early once its head reaches a
+  //                   position with an immediate exit. High = heads sit at easy exits (easy);
+  //                   low = heads get buried deep in the silhouette (hard, forced chains).
+  //   interlock     — probability that a new trail starts on a currently-free arrow's firing
+  //                   path during interlocked construction (sort: 'depth'). Higher = tighter
+  //                   forced ordering.
+  //   lenScale      — multiplier on the size-adaptive trail length for large silhouettes.
+  //                   Longer trails = fewer arrows = fewer chances for free arrows to
+  //                   accumulate on big imports, keeping hard tiers forced at any scale.
+  const DIFFICULTY_PARAMS = {
+    Easy:   { pathWeight: 1.2, trailMin: 3, trailMax: 6,  targetBranch: 3,    branchTol: 1.5, exitStop: 0.6,  interlock: 0,    lenScale: 1,   sort: 'exit'  },
+    Medium: { pathWeight: 3.0, trailMin: 4, trailMax: 9,  targetBranch: 2,    branchTol: 1.0, exitStop: 0.3,  interlock: 0.75, lenScale: 1,   sort: 'depth' },
+    Hard:   { pathWeight: 5.5, trailMin: 5, trailMax: 12, targetBranch: 1.45, branchTol: 0.7, exitStop: 0.12, interlock: 0.9,  lenScale: 1.3, sort: 'depth' },
+    Expert: { pathWeight: 8.0, trailMin: 6, trailMax: 15, targetBranch: 1.15, branchTol: 0.5, exitStop: 0.05, interlock: 0.97, lenScale: 1.6, sort: 'depth' },
+    Custom: { pathWeight: 3.0, trailMin: 4, trailMax: 9,  targetBranch: 2,    branchTol: 1.0, exitStop: 0.3,  interlock: 0.75, lenScale: 1,   sort: 'depth' }
+  };
+  function diffParams(d) { return DIFFICULTY_PARAMS[d] || DIFFICULTY_PARAMS.Medium; }
+  const DIRS = ['up', 'down', 'left', 'right'];
+  const DIR_VEC = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
+  const REV_DIR = { up: 'down', down: 'up', left: 'right', right: 'left' };
+  const FLIGHT_MS = 350;
+  const PHRASES = ['Splendid!', 'Bravo!', 'Nicely done!', 'Magnificent!', 'Cleared!'];
+
+  // ── State ──────────────────────────────────
+  let currentScreen = 'title';
+  let currentLevel = null;       // { id, name, difficulty, cols, rows, arrows: [...] }
+  let runtimeArrows = [];        // copies with state for in-game mutation
+  let clearedCells = new Set();  // 'c,r' strings
+  let allLevels = [];            // built-in + custom in display order
+  let customLevels = [];
+  let lastCompleted = null;      // { level, builtinIndex }
+  let importImageData = null;
+  let importPreview = null;
+  let importDebounce = null;
+  // View transform on the board (pinch-zoom + pan)
+  const view = { scale: 1, tx: 0, ty: 0 };
+  let gesture = null;
+  let viewG = null;          // <g class="board-view"> wrapping dots + arrows
+  let suppressNextClick = false;
+
+  // ── Built-in level definitions ─────────────
+  const BUILTIN_DEFS = [
+    {
+      // Teaches the mechanic through a forced 3-chain: the vertical arrow is blocked by the
+      // horizontal bar, which is blocked by the short vertical — only one arrow is ever
+      // fireable, and tapping a blocked one flashes its blocker as a hint.
+      id: 'b1', name: 'First step', difficulty: 'Easy', kind: 'manual',
+      arrows: [
+        { cells: [[6,12],[6,11],[6,10],[6,9]], headIdx: 3, dir: 'up' },
+        { cells: [[3,8],[4,8],[5,8],[6,8]], headIdx: 3, dir: 'right' },
+        { cells: [[8,10],[8,9],[8,8]], headIdx: 2, dir: 'up' }
+      ]
+    },
+    {
+      // Six arrows in a single forced dependency chain that winds around the board.
+      id: 'b2', name: 'Chain reaction', difficulty: 'Easy', kind: 'manual',
+      arrows: [
+        { cells: [[3,11],[3,10],[3,9]], headIdx: 2, dir: 'up' },
+        { cells: [[1,8],[2,8],[3,8]], headIdx: 2, dir: 'right' },
+        { cells: [[7,5],[7,6],[7,7],[7,8]], headIdx: 3, dir: 'down' },
+        { cells: [[10,12],[9,12],[8,12],[7,12]], headIdx: 3, dir: 'left' },
+        { cells: [[5,15],[5,14],[5,13],[5,12]], headIdx: 3, dir: 'up' },
+        { cells: [[8,4],[7,4],[6,4],[5,4]], headIdx: 3, dir: 'left' }
+      ]
+    },
+    {
+      id: 'b3', name: 'Plus', difficulty: 'Medium', kind: 'silhouette', sil: 'plus'
+    },
+    {
+      id: 'b4', name: 'Heart', difficulty: 'Hard', kind: 'silhouette', sil: 'heart'
+    },
+    {
+      id: 'b5', name: 'Anchor', difficulty: 'Expert', kind: 'silhouette', sil: 'anchor'
+    }
+  ];
+
+  const SILHOUETTES = {
+    plus: [
+      '..............',
+      '..............',
+      '..............',
+      '.....####.....',
+      '.....####.....',
+      '.....####.....',
+      '.....####.....',
+      '.....####.....',
+      '.############.',
+      '.############.',
+      '.############.',
+      '.############.',
+      '.....####.....',
+      '.....####.....',
+      '.....####.....',
+      '.....####.....',
+      '.....####.....',
+      '..............',
+      '..............',
+      '..............'
+    ],
+    heart: [
+      '..............',
+      '..............',
+      '..###....###..',
+      '.#####..#####.',
+      '.############.',
+      '.############.',
+      '.############.',
+      '.############.',
+      '.############.',
+      '..##########..',
+      '..##########..',
+      '...########...',
+      '....######....',
+      '.....####.....',
+      '......##......',
+      '..............',
+      '..............',
+      '..............',
+      '..............',
+      '..............'
+    ],
+    anchor: [
+      '..............',
+      '..............',
+      '......##......',
+      '.....####.....',
+      '.....####.....',
+      '......##......',
+      '......##......',
+      '......##......',
+      '......##......',
+      '......##......',
+      '.##...##...##.',
+      '###...##...###',
+      '###...##...###',
+      '##############',
+      '.############.',
+      '..##########..',
+      '....######....',
+      '......##......',
+      '..............',
+      '..............'
+    ]
+  };
+
+  // ── Utilities ──────────────────────────────
+  function shuffle(arr) {
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  }
+  const cellKey = (c, r) => c + ',' + r;
+  const escapeHtml = s => String(s).replace(/[&<>"']/g, c =>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+  function parseSilhouette(rows) {
+    const cells = [];
+    for (let r = 0; r < rows.length; r++) {
+      for (let c = 0; c < rows[r].length; c++) {
+        if (rows[r][c] === '#') cells.push([c, r]);
+      }
+    }
+    return cells;
+  }
+
+  // ── Solver (greedy simulation) ─────────────
+  function firingPath(arrow, cols, rows) {
+    const [hc, hr] = arrow.cells[arrow.headIdx];
+    const [dc, dr] = DIR_VEC[arrow.dir];
+    const path = [];
+    let c = hc + dc, r = hr + dr;
+    while (c >= 0 && c < cols && r >= 0 && r < rows) {
+      path.push([c, r]);
+      c += dc; r += dr;
+    }
+    return path;
+  }
+
+  function isSolvable(arrows, cols, rows) {
+    const occ = new Map();
+    for (const a of arrows) {
+      for (const [c, r] of a.cells) occ.set(cellKey(c, r), a.id);
+    }
+    const remaining = new Set(arrows.map(a => a.id));
+    const byId = new Map(arrows.map(a => [a.id, a]));
+
+    while (remaining.size) {
+      let firedId = null;
+      for (const id of remaining) {
+        const a = byId.get(id);
+        const path = firingPath(a, cols, rows);
+        let blocked = false;
+        for (const [c, r] of path) {
+          const owner = occ.get(cellKey(c, r));
+          if (owner != null && owner !== id) { blocked = true; break; }
+        }
+        if (!blocked) { firedId = id; break; }
+      }
+      if (firedId == null) return false;
+      const a = byId.get(firedId);
+      for (const [c, r] of a.cells) occ.delete(cellKey(c, r));
+      remaining.delete(firedId);
+    }
+    return true;
+  }
+
+  // ── Trail generator (random walk over filled cells) ─
+  // Maintains two invariants:
+  //   • Every trail has at least 2 cells (head + at least 1 trail cell behind it). If a walk
+  //     ends up with a single orphan cell, it's extended by one neighbor outside the silhouette
+  //     (or into an unclaimed silhouette cell). If no neighbor is available, the orphan is dropped.
+  //   • No two trails share a cell. `claimed` tracks every cell already in some trail.
+  function generateTrails(filledCells, cols, rows, difficulty, minLen, maxLen) {
+    // Adapt trail length to silhouette size AND difficulty. Harder levels get longer trails
+    // (more visual maze, more potential for cross-board blocking).
+    const N = filledCells.length;
+    const dp = diffParams(difficulty);
+    if (minLen == null) minLen = Math.max(dp.trailMin, Math.floor(N / 80));
+    if (maxLen == null) maxLen = Math.max(dp.trailMax, Math.floor(N / 35));
+    const silhouette = new Set(filledCells.map(([c, r]) => cellKey(c, r)));
+    const claimed = new Set();
+    const trails = [];
+
+    while (silhouette.size > 0) {
+      const arr = Array.from(silhouette);
+      const startKey = arr[Math.floor(Math.random() * arr.length)];
+      const [sc, sr] = startKey.split(',').map(Number);
+
+      const trail = [[sc, sr]];
+      silhouette.delete(startKey);
+      claimed.add(startKey);
+      let cx = sc, cy = sr;
+      let lastDir = null;
+      const targetLen = minLen + Math.floor(Math.random() * (maxLen - minLen + 1));
+
+      for (let step = 1; step < targetLen; step++) {
+        const opts = [];
+        for (const dir of DIRS) {
+          if (lastDir && dir === REV_DIR[lastDir]) continue;
+          const [dc, dr] = DIR_VEC[dir];
+          const nc = cx + dc, nr = cy + dr;
+          const key = cellKey(nc, nr);
+          if (silhouette.has(key)) opts.push({ dir, nc, nr, key });
+        }
+        if (opts.length === 0) break;
+        let pick;
+        if (lastDir && Math.random() < 0.55) {
+          pick = opts.find(o => o.dir === lastDir) || opts[Math.floor(Math.random() * opts.length)];
+        } else {
+          pick = opts[Math.floor(Math.random() * opts.length)];
+        }
+        cx = pick.nc; cy = pick.nr; lastDir = pick.dir;
+        trail.push([cx, cy]);
+        silhouette.delete(pick.key);
+        claimed.add(pick.key);
+
+        // Maybe stop early if we've reached a "fireable" position: a cell on the silhouette
+        // boundary whose firing direction along `lastDir` exits the silhouette/board
+        // immediately. High exitStop boosts construction success on dense silhouettes but
+        // leaves heads at easy exits, so harder difficulties keep it low and bury the heads.
+        if (step >= minLen) {
+          const [ldc, ldr] = DIR_VEC[lastDir];
+          const ahead = cellKey(cx + ldc, cy + ldr);
+          const aheadOff = (cx + ldc < 0 || cx + ldc >= cols || cy + ldr < 0 || cy + ldr >= rows);
+          if ((aheadOff || !silhouette.has(ahead)) && Math.random() < dp.exitStop) break;
+        }
+      }
+
+      // Rule: every arrow needs at least 1 trail cell behind the head.
+      if (trail.length < 2) {
+        let extended = false;
+        const dirsTry = shuffle([...DIRS]);
+        for (const dir of dirsTry) {
+          const [dc, dr] = DIR_VEC[dir];
+          const nc = cx + dc, nr = cy + dr;
+          if (nc < 0 || nc >= cols || nr < 0 || nr >= rows) continue;
+          const k = cellKey(nc, nr);
+          if (claimed.has(k)) continue;
+          trail.push([nc, nr]);
+          cx = nc; cy = nr; lastDir = dir;
+          if (silhouette.has(k)) silhouette.delete(k);
+          claimed.add(k);
+          extended = true;
+          break;
+        }
+        if (!extended) continue;  // truly isolated orphan; drop
+      }
+
+      trails.push({
+        cells: trail,
+        headIdx: trail.length - 1,
+        tentativeDir: lastDir
+      });
+    }
+    return trails;
+  }
+
+  // Direction of the last segment of a trail (head cell - prev cell).
+  function trailLastSegDir(t) {
+    const cells = t.cells;
+    const i = t.headIdx;
+    if (i === 0) return null;
+    const [c0, r0] = cells[i - 1];
+    const [c1, r1] = cells[i];
+    if (c1 > c0) return 'right';
+    if (c1 < c0) return 'left';
+    if (r1 > r0) return 'down';
+    if (r1 < r0) return 'up';
+    return null;
+  }
+
+  // Distance from a trail's head to the first non-silhouette cell along its best legal direction.
+  // Lower = easier to fire (fewer silhouette cells to clear). Used to order construction so the
+  // easiest-to-fire trails go LAST in construction (= FIRST in firing order). When such an arrow
+  // fires, the rest of the board is full but its path goes immediately off-silhouette anyway.
+  function easiestExitDist(trail, silhouetteSet, cols, rows) {
+    const [hc, hr] = trail.cells[trail.headIdx];
+    const lastSeg = trailLastSegDir(trail);
+    let best = Infinity;
+    for (const dir of DIRS) {
+      if (lastSeg && dir === REV_DIR[lastSeg]) continue;
+      // If a direction requires a bend cell, check that the bend cell is at least on-board —
+      // otherwise this direction is unusable regardless of path-clear-ness.
+      let firingHc = hc, firingHr = hr;
+      if (lastSeg && dir !== lastSeg) {
+        const [bdc, bdr] = DIR_VEC[dir];
+        const bc = hc + bdc, br = hr + bdr;
+        if (bc < 0 || bc >= cols || br < 0 || br >= rows) continue;
+        firingHc = bc; firingHr = br;
+      }
+      const [dc, dr] = DIR_VEC[dir];
+      let dist = 0;
+      let cx = firingHc + dc, cy = firingHr + dr;
+      while (cx >= 0 && cx < cols && cy >= 0 && cy < rows && silhouetteSet.has(cellKey(cx, cy))) {
+        dist++;
+        cx += dc; cy += dr;
+      }
+      if (dist < best) best = dist;
+    }
+    return best === Infinity ? 9999 : best;
+  }
+
+  // ── Constructive direction assignment ──────
+  // Rules baked in:
+  //   1. Firing direction can never be opposite the trail's last segment (no shooting backward).
+  //   2. If firing direction differs from the last-segment direction, append a single "bend"
+  //      cell in the firing direction so the visual turn is one grid cell, not a sharp 180°.
+  //      The bend cell must be on-board, not overlap placed arrows, and not overlap the trail
+  //      itself.
+  //   3. The firing path must not cross THIS arrow's own cells (no self-block).
+  //
+  // Construction order (which controls firing order via reverse) is parameterized by difficulty:
+  //   "exit"  — hardest-to-exit first (Easy: gives independent, easily-fired arrows).
+  //   "depth" — deepest-from-boundary first (Medium/Hard: outer arrows fire first → layered peel).
+  //
+  // Direction selection: instead of picking the FIRST valid direction, score every valid direction
+  // by `pathLength * pathWeight - bendPenalty` and pick the best. Higher pathWeight (Hard > Medium
+  // > Easy=0) shifts construction toward long, cross-silhouette firing lines that create more
+  // dependencies between arrows.
+  function assignDirections(trails, cols, rows, silhouetteSet, difficulty, attempts = 60) {
+    const dp = diffParams(difficulty);
+    const useDepthSort = dp.sort === 'depth' && silhouetteSet;
+    const depthMap = useDepthSort ? computeDepthMap(silhouetteSet, cols, rows) : null;
+
+    for (let attempt = 0; attempt < attempts; attempt++) {
+      const order = trails.map(t => ({
+        cells: t.cells.map(p => p.slice()),
+        headIdx: t.headIdx,
+        tentativeDir: t.tentativeDir
+      }));
+
+      if (attempt < attempts * 0.7) {
+        if (useDepthSort) {
+          // Sort by silhouette-depth DESCENDING — deepest interior trails go FIRST in construction
+          // (fire LAST), boundary trails go LAST (fire FIRST). Layered outer-to-inner peel.
+          order.sort((a, b) => {
+            const [ac, ar] = a.cells[a.headIdx];
+            const [bc, br] = b.cells[b.headIdx];
+            return (depthMap.get(cellKey(bc, br)) || 0) - (depthMap.get(cellKey(ac, ar)) || 0);
+          });
+        } else if (silhouetteSet) {
+          // Easy: easiest-to-exit fires first (current behavior).
+          order.sort((a, b) =>
+            easiestExitDist(b, silhouetteSet, cols, rows) -
+            easiestExitDist(a, silhouetteSet, cols, rows));
+        }
+      } else {
+        if (attempt % 2) shuffle(order);
+      }
+
+      const claimed = new Set();
+      for (const t of order) for (const [c, r] of t.cells) claimed.add(cellKey(c, r));
+
+      const placedOcc = new Map();
+      const placed = [];
+
+      // Map of cellKey → order-index for every trail not yet placed. Construction order is
+      // reverse firing order, so a firing path that crosses an unplaced trail's cells is
+      // guaranteed blocked until that (earlier-firing) arrow clears. Preferring such paths is
+      // what creates forced ordering — without it, every boundary arrow is free at once.
+      const unplacedOwner = new Map();
+      order.forEach((t, idx) => {
+        for (const [c, r] of t.cells) unplacedOwner.set(cellKey(c, r), idx);
+      });
+
+      for (const t of order) {
+        for (const [c, r] of t.cells) unplacedOwner.delete(cellKey(c, r));
+        const lastSeg = trailLastSegDir(t);
+        let dirs = [...DIRS];
+        if (lastSeg) dirs = dirs.filter(d => d !== REV_DIR[lastSeg]);
+
+        const [hc, hr] = t.cells[t.headIdx];
+        const ownCells = new Set(t.cells.map(([c, r]) => cellKey(c, r)));
+
+        // Score every valid direction; pick the highest-scoring.
+        let bestScore = -Infinity;
+        let chosen = null;
+        let chosenBend = null;
+
+        for (const dir of dirs) {
+          const needsBend = lastSeg && dir !== lastSeg;
+          let bend = null;
+          let firingHead = [hc, hr];
+
+          if (needsBend) {
+            const [dc, dr] = DIR_VEC[dir];
+            const bc = hc + dc, br = hr + dr;
+            if (bc < 0 || bc >= cols || br < 0 || br >= rows) continue;
+            const bk = cellKey(bc, br);
+            if (claimed.has(bk)) continue;
+            bend = [bc, br];
+            firingHead = [bc, br];
+          }
+
+          // Walk firing path: reject if blocked by a placed arrow or own cells, and collect
+          // the distinct unplaced trails the path crosses — each is a guaranteed blocker
+          // until it fires.
+          const cellsForSelf = bend ? new Set([...ownCells, cellKey(bend[0], bend[1])]) : ownCells;
+          const [dc, dr] = DIR_VEC[dir];
+          let cx = firingHead[0] + dc, cy = firingHead[1] + dr;
+          const futureOwners = new Set();
+          let blocked = false;
+          while (cx >= 0 && cx < cols && cy >= 0 && cy < rows) {
+            const key = cellKey(cx, cy);
+            if (placedOcc.has(key) || cellsForSelf.has(key)) { blocked = true; break; }
+            const owner = unplacedOwner.get(key);
+            if (owner !== undefined) futureOwners.add(owner);
+            cx += dc; cy += dr;
+          }
+          if (blocked) continue;
+
+          // Score: dependency-rich firing paths preferred — a big bonus for having at least
+          // one guaranteed blocker plus a per-blocker reward, both scaled by difficulty
+          // (Expert > Hard > Medium > Easy). Easy keeps the weight low so plenty of arrows
+          // stay free; Expert makes nearly every arrow start blocked → forced chains.
+          const distinctFuture = futureOwners.size;
+          const bendPenalty = needsBend ? 0.5 : 0;
+          const score = (distinctFuture > 0 ? dp.pathWeight * 2 : 0)
+            + distinctFuture * dp.pathWeight
+            - bendPenalty
+            + (dir === lastSeg ? 0.1 : 0)               // tiny tiebreak toward straight continuation
+            + (dir === t.tentativeDir ? 0.05 : 0)
+            + Math.random() * 0.01;                      // randomize ties
+
+          if (score > bestScore) {
+            bestScore = score;
+            chosen = dir;
+            chosenBend = bend;
+          }
+        }
+
+        if (chosen == null) continue;  // skip unplaceable trail (silhouette gap)
+
+        if (chosenBend) claimed.add(cellKey(chosenBend[0], chosenBend[1]));
+        const newCells = chosenBend
+          ? [...t.cells.map(p => p.slice()), chosenBend]
+          : t.cells.map(p => p.slice());
+        placed.push({ cells: newCells, headIdx: newCells.length - 1, dir: chosen });
+        for (const [c, r] of newCells) placedOcc.set(cellKey(c, r), true);
+      }
+
+      if (placed.length >= Math.max(1, trails.length * 0.6)) {
+        placed.reverse();
+        return placed.map((p, i) => ({ id: i, ...p }));
+      }
+    }
+    return null;
+  }
+
+  // ── Interlocked construction (Medium/Hard/Expert) ──
+  // Co-generates trails AND directions one arrow at a time, in reverse firing order. At each
+  // step it computes which already-placed arrows are currently free (clear firing path), then
+  // starts the next trail ON one of those arrows' path cells — so the new, earlier-firing
+  // arrow re-blocks a free one. That keeps the number of simultaneously fireable arrows small
+  // for the whole solve, which is what makes the firing order feel forced. The two-phase
+  // generator (generateTrails → assignDirections) can't do this because all trail geometry is
+  // frozen before any firing path exists.
+  //
+  // Same construction rules as assignDirections: no firing backward along the last segment,
+  // a single bend cell when turning, no self-crossing paths, path clear of placed arrows
+  // (placed = fires later, so a crossing would deadlock the reverse order).
+  function constructInterlocked(filledCells, cols, rows, difficulty) {
+    const dp = diffParams(difficulty);
+    const N = filledCells.length;
+    const lenScale = dp.lenScale || 1;
+    const minLen = Math.max(dp.trailMin, Math.floor(N / 80 * lenScale));
+    const maxLen = Math.max(dp.trailMax, Math.floor(N / 35 * lenScale));
+    const silhouette = new Set(filledCells.map(([c, r]) => cellKey(c, r)));
+    const originalSil = new Set(silhouette);
+    const claimed = new Set();
+    const placed = [];
+    const placedOcc = new Set();
+
+    function isFreeNow(a) {
+      for (const [c, r] of firingPath(a, cols, rows)) {
+        if (placedOcc.has(cellKey(c, r))) return false;
+      }
+      return true;
+    }
+
+    let stall = 0;
+    while (silhouette.size > 0 && stall < 40) {
+      // Unclaimed silhouette cells sitting on currently-free arrows' firing paths. Starting
+      // the next walk there is what re-blocks a free arrow. The most urgent free arrow is the
+      // one with the fewest such cells left — once they're all claimed by trails that don't
+      // block it, it can never be blocked again, so it gets first claim on the new walk.
+      const pooled = [];
+      let urgentCells = null;
+      for (const a of placed) {
+        if (!isFreeNow(a)) continue;
+        const onPath = [];
+        for (const [c, r] of firingPath(a, cols, rows)) {
+          const k = cellKey(c, r);
+          if (silhouette.has(k)) onPath.push(k);
+        }
+        if (!onPath.length) continue;
+        pooled.push(...onPath);
+        if (!urgentCells || onPath.length < urgentCells.length) urgentCells = onPath;
+      }
+
+      let startKey;
+      if (urgentCells && Math.random() < dp.interlock) {
+        startKey = urgentCells[Math.floor(Math.random() * urgentCells.length)];
+      } else if (pooled.length && Math.random() < dp.interlock) {
+        startKey = pooled[Math.floor(Math.random() * pooled.length)];
+      } else {
+        const arr = Array.from(silhouette);
+        startKey = arr[Math.floor(Math.random() * arr.length)];
+      }
+      const targetSet = new Set(pooled);
+
+      // Random walk (same mechanics as generateTrails), mildly preferring further target
+      // cells so one trail can re-block several free arrows.
+      const [sc, sr] = startKey.split(',').map(Number);
+      const trail = [[sc, sr]];
+      silhouette.delete(startKey);
+      claimed.add(startKey);
+      let cx = sc, cy = sr;
+      let lastDir = null;
+      const targetLen = minLen + Math.floor(Math.random() * (maxLen - minLen + 1));
+      for (let step = 1; step < targetLen; step++) {
+        const opts = [];
+        for (const dir of DIRS) {
+          if (lastDir && dir === REV_DIR[lastDir]) continue;
+          const [dc, dr] = DIR_VEC[dir];
+          const key = cellKey(cx + dc, cy + dr);
+          if (silhouette.has(key)) opts.push({ dir, nc: cx + dc, nr: cy + dr, key });
+        }
+        if (opts.length === 0) break;
+        let pick = null;
+        const targetOpts = opts.filter(o => targetSet.has(o.key));
+        if (targetOpts.length && Math.random() < 0.75) {
+          pick = targetOpts[Math.floor(Math.random() * targetOpts.length)];
+        } else if (lastDir && Math.random() < 0.55) {
+          pick = opts.find(o => o.dir === lastDir) || null;
+        }
+        if (!pick) pick = opts[Math.floor(Math.random() * opts.length)];
+        cx = pick.nc; cy = pick.nr; lastDir = pick.dir;
+        trail.push([cx, cy]);
+        silhouette.delete(pick.key);
+        claimed.add(pick.key);
+        if (step >= minLen) {
+          const [ldc, ldr] = DIR_VEC[lastDir];
+          const ahead = cellKey(cx + ldc, cy + ldr);
+          const aheadOff = (cx + ldc < 0 || cx + ldc >= cols || cy + ldr < 0 || cy + ldr >= rows);
+          if ((aheadOff || !silhouette.has(ahead)) && Math.random() < dp.exitStop) break;
+        }
+      }
+
+      function revert() {
+        for (const [c, r] of trail) {
+          const k = cellKey(c, r);
+          claimed.delete(k);
+          // Only true silhouette cells go back in the pool — an orphan-extension cell from
+          // outside the shape must not become walkable silhouette.
+          if (originalSil.has(k)) silhouette.add(k);
+        }
+        stall++;
+      }
+
+      // Extend single-cell orphans exactly like generateTrails; drop if truly isolated.
+      if (trail.length < 2) {
+        let extended = false;
+        for (const dir of shuffle([...DIRS])) {
+          const [dc, dr] = DIR_VEC[dir];
+          const nc = cx + dc, nr = cy + dr;
+          if (nc < 0 || nc >= cols || nr < 0 || nr >= rows) continue;
+          const k = cellKey(nc, nr);
+          if (claimed.has(k)) continue;
+          trail.push([nc, nr]);
+          cx = nc; cy = nr; lastDir = dir;
+          silhouette.delete(k);
+          claimed.add(k);
+          extended = true;
+          break;
+        }
+        if (!extended) {
+          // Permanently drop the orphan cell (keep it claimed) so we don't loop on it.
+          stall++;
+          continue;
+        }
+      }
+
+      // Direction choice for the new trail: valid per the construction rules, preferring
+      // paths that cross many UNCLAIMED silhouette cells — those are claimed by later walks,
+      // which is what blocks THIS arrow at game start.
+      const t = { cells: trail, headIdx: trail.length - 1 };
+      const lastSeg = trailLastSegDir(t);
+      const [hc, hr] = trail[trail.length - 1];
+      const ownCells = new Set(trail.map(([c, r]) => cellKey(c, r)));
+      let bestScore = -Infinity, chosen = null, chosenBend = null;
+      for (const dir of DIRS) {
+        if (lastSeg && dir === REV_DIR[lastSeg]) continue;
+        const needsBend = lastSeg && dir !== lastSeg;
+        let bend = null;
+        let fh = hc, fr = hr;
+        if (needsBend) {
+          const [bdc, bdr] = DIR_VEC[dir];
+          const bc = hc + bdc, br = hr + bdr;
+          if (bc < 0 || bc >= cols || br < 0 || br >= rows) continue;
+          if (claimed.has(cellKey(bc, br))) continue;
+          bend = [bc, br];
+          fh = bc; fr = br;
+        }
+        const selfCells = bend ? new Set([...ownCells, cellKey(bend[0], bend[1])]) : ownCells;
+        const [dc, dr] = DIR_VEC[dir];
+        let px = fh + dc, py = fr + dr;
+        let unclaimedOnPath = 0, blocked = false;
+        while (px >= 0 && px < cols && py >= 0 && py < rows) {
+          const key = cellKey(px, py);
+          if (placedOcc.has(key) || selfCells.has(key)) { blocked = true; break; }
+          if (silhouette.has(key)) unclaimedOnPath++;
+          px += dc; py += dr;
+        }
+        if (blocked) continue;
+        const score = (unclaimedOnPath > 0 ? dp.pathWeight * 2 : 0)
+          + unclaimedOnPath * dp.pathWeight
+          - (needsBend ? 0.5 : 0)
+          + (dir === lastSeg ? 0.1 : 0)
+          + Math.random() * 0.01;
+        if (score > bestScore) { bestScore = score; chosen = dir; chosenBend = bend; }
+      }
+      if (chosen == null) { revert(); continue; }
+
+      stall = 0;
+      if (chosenBend) {
+        const bk = cellKey(chosenBend[0], chosenBend[1]);
+        claimed.add(bk);
+        // A bend can land on a still-unwalked silhouette cell; remove it from the pool or a
+        // later trail could claim the same cell and draw over this arrow.
+        silhouette.delete(bk);
+      }
+      const cells = chosenBend ? [...trail, chosenBend] : trail;
+      const arrow = { cells, headIdx: cells.length - 1, dir: chosen };
+      placed.push(arrow);
+      for (const [c, r] of cells) placedOcc.add(cellKey(c, r));
+    }
+
+    if (placed.length === 0) return null;
+    placed.reverse();
+    return placed.map((p, i) => ({ id: i, ...p }));
+  }
+
+  // BFS from silhouette-boundary cells inward; returns Map<cellKey, distance>.
+  // Distance 0 = on the silhouette boundary; higher = deeper interior. Used to know which cells
+  // are easy to fire (low depth) vs hard (high depth).
+  function computeDepthMap(silhouetteSet, cols, rows) {
+    const dist = new Map();
+    const queue = [];
+    for (const key of silhouetteSet) {
+      const [c, r] = key.split(',').map(Number);
+      for (const dir of DIRS) {
+        const [dc, dr] = DIR_VEC[dir];
+        const nc = c + dc, nr = r + dr;
+        if (nc < 0 || nc >= cols || nr < 0 || nr >= rows ||
+            !silhouetteSet.has(cellKey(nc, nr))) {
+          dist.set(key, 0);
+          queue.push([c, r]);
+          break;
+        }
+      }
+    }
+    let head = 0;
+    while (head < queue.length) {
+      const [c, r] = queue[head++];
+      const d = dist.get(cellKey(c, r));
+      for (const dir of DIRS) {
+        const [dc, dr] = DIR_VEC[dir];
+        const nc = c + dc, nr = r + dr;
+        const k = cellKey(nc, nr);
+        if (silhouetteSet.has(k) && !dist.has(k)) {
+          dist.set(k, d + 1);
+          queue.push([nc, nr]);
+        }
+      }
+    }
+    return dist;
+  }
+
+  // Average number of fireable arrows at each greedy-firing step.
+  //   Easy puzzles → many fireable per step (≥ 4). Player has lots of choices.
+  //   Hard puzzles → few fireable per step (1–2). Solution feels forced/peeling.
+  // Returns -1 if not solvable (which shouldn't happen given construction guarantees).
+  function avgBranchiness(arrows, cols, rows) {
+    const occ = new Map();
+    for (const a of arrows) for (const [c, r] of a.cells) occ.set(cellKey(c, r), a.id);
+    const remaining = new Set(arrows.map(a => a.id));
+    const byId = new Map(arrows.map(a => [a.id, a]));
+    let totalBranches = 0, steps = 0;
+
+    while (remaining.size) {
+      let firedId = null;
+      let count = 0;
+      for (const id of remaining) {
+        const a = byId.get(id);
+        const path = firingPath(a, cols, rows);
+        let blocked = false;
+        for (const [c, r] of path) {
+          const owner = occ.get(cellKey(c, r));
+          if (owner != null && owner !== id) { blocked = true; break; }
+        }
+        if (!blocked) {
+          count++;
+          if (firedId == null) firedId = id;
+        }
+      }
+      if (firedId == null) return -1;
+      totalBranches += count;
+      steps++;
+      const a = byId.get(firedId);
+      for (const [c, r] of a.cells) occ.delete(cellKey(c, r));
+      remaining.delete(firedId);
+    }
+    return steps ? totalBranches / steps : 0;
+  }
+
+  // ── Level generation from filled-cell set ──
+  // Strategy:
+  //   1. Try N attempts at FULL silhouette size (generate trails → direct → measure
+  //      branchiness). Score each candidate by branch-delta with a per-arrow bonus, so a
+  //      level with many arrows is preferred over a tiny one even if its branchiness is
+  //      slightly worse.
+  //   2. Return the first candidate that lands within the target branch tolerance, or the
+  //      best-scoring candidate if none did.
+  //   3. Only fall back to iterative silhouette shrinking if NO candidate could be built
+  //      at full size at all (i.e., construction itself kept failing).
+  function buildLevelFromCells(filledCells, defaults) {
+    if (filledCells.length === 0) return null;
+    const dp = diffParams(defaults.difficulty);
+    const target = dp.targetBranch;
+    const tol = dp.branchTol;
+
+    let bestLevel = null;
+    let bestScore = Infinity;
+    // Score = |branch − target| − coverage_cells × 0.02  (lower = better; high-coverage wins
+    // ties). Weighting cells (not arrow count) so a level with fewer-but-longer arrows still
+    // wins on visual fidelity, while keeping the coverage bonus small enough that difficulty
+    // (branch delta) stays the primary criterion.
+    function recordCandidate(directed) {
+      if (!directed || !isSolvable(directed, defaults.cols, defaults.rows)) return false;
+      const branch = avgBranchiness(directed, defaults.cols, defaults.rows);
+      if (branch < 0) return false;
+      const delta = Math.abs(branch - target);
+      const totalCells = directed.reduce((s, a) => s + a.cells.length, 0);
+      // Low-coverage candidates get branchiness cheaply (fewer arrows = fewer choices), so
+      // anything under half the silhouette takes a flat penalty on top of the coverage term.
+      const lowCoverage = totalCells < filledCells.length * 0.5 ? 1.5 : 0;
+      const score = delta - totalCells * 0.02 + lowCoverage;
+      if (score < bestScore) {
+        bestScore = score;
+        bestLevel = { ...defaults, arrows: directed };
+      }
+      return delta <= tol;
+    }
+
+    // Interlocked construction for the forced-ordering tiers; two-phase for Easy.
+    function buildCandidate(cells, silhouetteSet) {
+      if (dp.sort === 'depth') {
+        return constructInterlocked(cells, defaults.cols, defaults.rows, defaults.difficulty);
+      }
+      const trails = generateTrails(cells, defaults.cols, defaults.rows, defaults.difficulty);
+      return assignDirections(trails, defaults.cols, defaults.rows, silhouetteSet, defaults.difficulty);
+    }
+
+    const fullSilhouette = new Set(filledCells.map(([c, r]) => cellKey(c, r)));
+    const baseAttempts = filledCells.length > 200 ? 14 : 30;
+    const diffMult = defaults.difficulty === 'Expert' ? 2
+      : defaults.difficulty === 'Hard' ? 1.6 : 1;
+    const fullAttempts = Math.round(baseAttempts * diffMult);
+    const minCoverage = Math.floor(filledCells.length * 0.6);
+    for (let attempt = 0; attempt < fullAttempts; attempt++) {
+      const directed = buildCandidate(filledCells, fullSilhouette);
+      const hit = recordCandidate(directed);
+      if (hit && bestLevel) {
+        const cells = bestLevel.arrows.reduce((s, a) => s + a.cells.length, 0);
+        if (cells >= minCoverage) return bestLevel;
+      }
+    }
+
+    // If we have any candidate from full-size attempts, use it.
+    if (bestLevel) return bestLevel;
+
+    // Otherwise (full-size construction was unable to produce ANY valid level), fall back to
+    // iterative silhouette shrinking.
+    let cells = filledCells.map(p => p.slice());
+    const minKeep = Math.max(1, Math.floor(cells.length / 25));
+    while (cells.length >= minKeep) {
+      const silhouetteSet = new Set(cells.map(([c, r]) => cellKey(c, r)));
+      for (let attempt = 0; attempt < 8; attempt++) {
+        const directed = buildCandidate(cells, silhouetteSet);
+        if (recordCandidate(directed)) return bestLevel;
+      }
+      const depth = computeDepthMap(silhouetteSet, defaults.cols, defaults.rows);
+      cells.sort((a, b) =>
+        (depth.get(cellKey(b[0], b[1])) || 0) - (depth.get(cellKey(a[0], a[1])) || 0));
+      const dropN = Math.max(1, Math.floor(cells.length * 0.06));
+      cells.splice(0, dropN);
+    }
+    return bestLevel;
+  }
+
+  // ── Built-in cache ─────────────────────────
+  function loadBuiltinCache() {
+    try { return JSON.parse(localStorage.getItem('arrows.builtinCache') || '{}'); }
+    catch { return {}; }
+  }
+  function saveBuiltinCache(cache) {
+    try { localStorage.setItem('arrows.builtinCache', JSON.stringify(cache)); }
+    catch (e) { console.warn('Could not cache built-ins:', e); }
+  }
+
+  function buildLevelFromDef(def) {
+    if (def.kind === 'manual') {
+      const arrows = def.arrows.map((a, i) => ({
+        id: i, cells: a.cells.map(p => p.slice()), headIdx: a.headIdx, dir: a.dir
+      }));
+      return {
+        id: def.id, name: def.name, difficulty: def.difficulty,
+        cols: LEVEL_COLS, rows: LEVEL_ROWS, arrows
+      };
+    }
+    // silhouette
+    const filled = parseSilhouette(SILHOUETTES[def.sil]);
+    const defaults = {
+      id: def.id, name: def.name, difficulty: def.difficulty,
+      cols: LEVEL_COLS, rows: LEVEL_ROWS
+    };
+    // Two independent builds, keeping the one closer to the difficulty's branchiness target —
+    // insurance against a single unlucky roll being cached forever.
+    const a = buildLevelFromCells(filled, defaults);
+    const b = buildLevelFromCells(filled, defaults);
+    if (a) a.silhouette = filled;
+    if (b) b.silhouette = filled;
+    if (!a || !b) return a || b;
+    const target = diffParams(def.difficulty).targetBranch;
+    const scoreOf = lvl => {
+      const cells = lvl.arrows.reduce((s, x) => s + x.cells.length, 0);
+      return Math.abs(avgBranchiness(lvl.arrows, lvl.cols, lvl.rows) - target) - cells * 0.02;
+    };
+    return scoreOf(a) <= scoreOf(b) ? a : b;
+  }
+
+  // ── Custom level persistence ───────────────
+  function loadCustomLevels() {
+    try {
+      const raw = localStorage.getItem('arrows.customLevels');
+      customLevels = raw ? JSON.parse(raw) : [];
+      if (!Array.isArray(customLevels)) customLevels = [];
+    } catch { customLevels = []; }
+  }
+  function saveCustomLevels() {
+    try { localStorage.setItem('arrows.customLevels', JSON.stringify(customLevels)); }
+    catch (e) { console.warn('Could not persist custom levels:', e); }
+  }
+
+  // ── Screens ────────────────────────────────
+  function showScreen(name) {
+    currentScreen = name;
+    document.querySelectorAll('.screen').forEach(s => {
+      if (s.dataset.screen === name) s.setAttribute('data-active', '');
+      else s.removeAttribute('data-active');
+    });
+    if (name === 'levelSelect') renderLevelSelect();
+    if (name === 'game') renderGame();
+  }
+
+  function renderLevelSelect() {
+    const builtinList = document.getElementById('builtinLevels');
+    builtinList.innerHTML = '';
+    BUILTIN_DEFS.forEach((def, i) => {
+      const lvl = allLevels[i];
+      builtinList.appendChild(makeLevelCard(lvl, i + 1, def.difficulty.toLowerCase(), false));
+    });
+
+    const customWrap = document.getElementById('customLevelsList');
+    customWrap.innerHTML = '';
+    if (customLevels.length === 0) {
+      customWrap.innerHTML = '<p class="empty">No imported levels yet. Use Import image on the title screen.</p>';
+    } else {
+      const grid = document.createElement('div');
+      grid.className = 'levelGrid';
+      customLevels.forEach(lvl => grid.appendChild(makeLevelCard(lvl, '★', 'custom', true)));
+      customWrap.appendChild(grid);
+    }
+  }
+
+  function makeLevelCard(level, label, pillKind, deletable) {
+    const card = document.createElement('button');
+    card.className = 'levelCard';
+
+    const num = document.createElement('div');
+    num.className = 'levelCard__num';
+    num.textContent = label;
+    card.appendChild(num);
+
+    const name = document.createElement('div');
+    name.className = 'levelCard__name';
+    name.textContent = level.name;
+    card.appendChild(name);
+
+    const pill = document.createElement('span');
+    pill.className = 'levelCard__pill pill--' + pillKind;
+    pill.textContent = level.difficulty;
+    card.appendChild(pill);
+
+    card.addEventListener('click', () => startLevel(level));
+
+    if (deletable) {
+      const del = document.createElement('span');
+      del.className = 'levelCard__del';
+      del.textContent = '×';
+      del.addEventListener('click', e => {
+        e.stopPropagation();
+        if (!confirm('Delete "' + level.name + '"?')) return;
+        customLevels = customLevels.filter(l => l.id !== level.id);
+        saveCustomLevels();
+        renderLevelSelect();
+      });
+      card.appendChild(del);
+    }
+    return card;
+  }
+
+  // ── Game rendering ─────────────────────────
+  function startLevel(level) {
+    currentLevel = level;
+    showScreen('game');
+  }
+
+  function renderGame() {
+    document.getElementById('gameLevelName').firstChild.textContent = currentLevel.name;
+    document.getElementById('gameLevelDiff').textContent = currentLevel.difficulty || '';
+
+    const wrap = document.getElementById('boardWrap');
+    wrap.style.setProperty('--cols', currentLevel.cols);
+    wrap.style.setProperty('--rows', currentLevel.rows);
+    // Scale stroke widths with grid density so trails stay readable on finer grids.
+    const stroke = Math.max(0.08, 1.8 / currentLevel.cols).toFixed(3);
+    const hit = Math.max(0.5, 9 / currentLevel.cols).toFixed(3);
+    wrap.style.setProperty('--arrow-stroke', stroke);
+    wrap.style.setProperty('--arrow-hit', hit);
+
+    runtimeArrows = currentLevel.arrows.map(a => ({
+      id: a.id,
+      cells: a.cells.map(p => p.slice()),
+      headIdx: a.headIdx,
+      dir: a.dir,
+      state: 'idle',
+      el: null
+    }));
+    clearedCells = new Set();
+
+    const svg = document.getElementById('board');
+    svg.setAttribute('viewBox', `0 0 ${currentLevel.cols} ${currentLevel.rows}`);
+    svg.innerHTML = '';
+
+    // Wrapper that receives the pinch-zoom / pan transform.
+    viewG = document.createElementNS(SVG_NS, 'g');
+    viewG.setAttribute('class', 'board-view');
+    svg.appendChild(viewG);
+
+    // For larger grids, start zoomed in so cells are readable; player pans/pinches to explore.
+    view.scale = initialScaleForLevel(currentLevel.cols, currentLevel.rows);
+    view.tx = 0; view.ty = 0;
+    centerViewOnContent(view, currentLevel);
+    applyView();
+
+    if (Array.isArray(currentLevel.silhouette)) {
+      const hintG = document.createElementNS(SVG_NS, 'g');
+      hintG.setAttribute('class', 'silhouetteHint');
+      const r = Math.max(0.05, 0.45 / currentLevel.cols);
+      for (const [c, row] of currentLevel.silhouette) {
+        const dot = document.createElementNS(SVG_NS, 'circle');
+        dot.setAttribute('cx', c + 0.5);
+        dot.setAttribute('cy', row + 0.5);
+        dot.setAttribute('r', r);
+        hintG.appendChild(dot);
+      }
+      viewG.appendChild(hintG);
+    }
+
+    // Dots layer
+    const dotsG = document.createElementNS(SVG_NS, 'g');
+    dotsG.setAttribute('class', 'dots');
+    for (let r = 0; r < currentLevel.rows; r++) {
+      for (let c = 0; c < currentLevel.cols; c++) {
+        const dot = document.createElementNS(SVG_NS, 'circle');
+        dot.setAttribute('cx', c + 0.5);
+        dot.setAttribute('cy', r + 0.5);
+        dot.setAttribute('r', 0.06);
+        dot.setAttribute('class', 'dot');
+        dot.dataset.cell = cellKey(c, r);
+        dotsG.appendChild(dot);
+      }
+    }
+    viewG.appendChild(dotsG);
+
+    // Arrows layer
+    const arrowsG = document.createElementNS(SVG_NS, 'g');
+    arrowsG.setAttribute('class', 'arrows');
+    for (const a of runtimeArrows) {
+      arrowsG.appendChild(makeArrowG(a));
+    }
+    viewG.appendChild(arrowsG);
+
+    setupBoardGestures(svg);
+  }
+
+  // Clamp a view's translation so the board can't be dragged off-screen — the grid edges always
+  // stop at the viewport edges (no infinite cream area).
+  function clampView(v, cols, rows) {
+    const minTx = Math.min(0, cols * (1 - v.scale));
+    const minTy = Math.min(0, rows * (1 - v.scale));
+    v.tx = Math.max(minTx, Math.min(0, v.tx));
+    v.ty = Math.max(minTy, Math.min(0, v.ty));
+  }
+
+  function applyView() {
+    if (!viewG || !currentLevel) return;
+    clampView(view, currentLevel.cols, currentLevel.rows);
+    viewG.setAttribute('transform', `translate(${view.tx} ${view.ty}) scale(${view.scale})`);
+  }
+
+  // Pick an initial scale so large grids open zoomed-in to a comfortable cell size; small grids
+  // still show in full at scale 1.
+  function initialScaleForLevel(cols, rows) {
+    const COMFY_COLS = 50;  // grids up to this many cols start at scale 1; larger zoom in
+    return Math.max(1, cols / COMFY_COLS);
+  }
+
+  // Centre a zoomed-in view on the level's drawn content (silhouette or arrow cells) instead
+  // of the grid's top-left corner, which is often empty on large imports. clampView afterwards
+  // keeps the result on the board.
+  function centerViewOnContent(v, level) {
+    if (v.scale <= 1) return;
+    const src = Array.isArray(level.silhouette) && level.silhouette.length
+      ? level.silhouette
+      : level.arrows.flatMap(a => a.cells);
+    if (!src.length) return;
+    let sc = 0, sr = 0;
+    for (const [c, r] of src) { sc += c; sr += r; }
+    const cx = sc / src.length + 0.5, cy = sr / src.length + 0.5;
+    v.tx = level.cols / 2 - cx * v.scale;
+    v.ty = level.rows / 2 - cy * v.scale;
+  }
+
+  // Attach pan + pinch + wheel gestures to an SVG, driving its viewG transform via the supplied
+  // `state` object: { view: {tx, ty, scale}, viewG, cols, rows, minScale, maxScale, onTap }.
+  // onTap (if provided) fires when a touch ends without panning — main board uses it to fire
+  // arrows; mini-preview leaves it null.
+  function attachBoardGestures(svg, state) {
+    let g = null;  // local gesture state
+
+    function pxToUser() {
+      const rect = svg.getBoundingClientRect();
+      return state.cols / rect.width;
+    }
+    function clientToUser(clientX, clientY) {
+      const rect = svg.getBoundingClientRect();
+      const s = pxToUser();
+      return { x: (clientX - rect.left) * s, y: (clientY - rect.top) * s };
+    }
+    function apply() {
+      clampView(state.view, state.cols, state.rows);
+      state.viewG.setAttribute('transform',
+        `translate(${state.view.tx} ${state.view.ty}) scale(${state.view.scale})`);
+    }
+
+    svg.ontouchstart = (e) => {
+      if (e.touches.length === 1) {
+        g = { type: 'maybe-pan',
+          startX: e.touches[0].clientX, startY: e.touches[0].clientY,
+          baseTx: state.view.tx, baseTy: state.view.ty, moved: 0 };
+      } else if (e.touches.length === 2) {
+        const t1 = e.touches[0], t2 = e.touches[1];
+        const dx = t2.clientX - t1.clientX, dy = t2.clientY - t1.clientY;
+        const startDist = Math.sqrt(dx*dx + dy*dy) || 1;
+        const mid = clientToUser((t1.clientX + t2.clientX) / 2, (t1.clientY + t2.clientY) / 2);
+        g = { type: 'pinch', startDist, midUx: mid.x, midUy: mid.y,
+          baseScale: state.view.scale, baseTx: state.view.tx, baseTy: state.view.ty };
+      }
+    };
+
+    svg.ontouchmove = (e) => {
+      if (!g) return;
+      if (g.type === 'pinch' && e.touches.length === 2) {
+        e.preventDefault();
+        const t1 = e.touches[0], t2 = e.touches[1];
+        const dx = t2.clientX - t1.clientX, dy = t2.clientY - t1.clientY;
+        const newDist = Math.sqrt(dx*dx + dy*dy) || 1;
+        const factor = newDist / g.startDist;
+        const newScale = Math.max(state.minScale, Math.min(state.maxScale, g.baseScale * factor));
+        state.view.scale = newScale;
+        state.view.tx = g.midUx - (g.midUx - g.baseTx) * (newScale / g.baseScale);
+        state.view.ty = g.midUy - (g.midUy - g.baseTy) * (newScale / g.baseScale);
+        apply();
+      } else if ((g.type === 'maybe-pan' || g.type === 'pan') && e.touches.length === 1) {
+        const t = e.touches[0];
+        const ddx = t.clientX - g.startX, ddy = t.clientY - g.startY;
+        g.moved = Math.max(g.moved, Math.abs(ddx) + Math.abs(ddy));
+        // Always allow pan after small drag — works at any zoom level, including scale 1 for
+        // grids larger than the viewport.
+        if (g.moved > 10) {
+          g.type = 'pan';
+          e.preventDefault();
+          const s = pxToUser();
+          state.view.tx = g.baseTx + ddx * s;
+          state.view.ty = g.baseTy + ddy * s;
+          apply();
+        }
+      }
+    };
+
+    svg.ontouchend = (e) => {
+      if (g && (g.type === 'pan' || g.type === 'pinch')) {
+        suppressNextClick = true;
+        setTimeout(() => { suppressNextClick = false; }, 60);
+      }
+      if (e.touches.length === 0) g = null;
+    };
+    svg.ontouchcancel = svg.ontouchend;
+
+    svg.onwheel = (e) => {
+      e.preventDefault();
+      const u = clientToUser(e.clientX, e.clientY);
+      const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
+      const newScale = Math.max(state.minScale, Math.min(state.maxScale, state.view.scale * factor));
+      state.view.tx = u.x - (u.x - state.view.tx) * (newScale / state.view.scale);
+      state.view.ty = u.y - (u.y - state.view.ty) * (newScale / state.view.scale);
+      state.view.scale = newScale;
+      apply();
+    };
+
+    // Desktop mouse-drag pan (so the same pan gesture works with a mouse, not just touch).
+    svg.onmousedown = (e) => {
+      if (e.button !== 0) return;
+      g = { type: 'maybe-pan', startX: e.clientX, startY: e.clientY,
+        baseTx: state.view.tx, baseTy: state.view.ty, moved: 0 };
+    };
+    const onWindowMouseMove = (e) => {
+      if (!g || g.type === 'pinch') return;
+      const ddx = e.clientX - g.startX, ddy = e.clientY - g.startY;
+      g.moved = Math.max(g.moved, Math.abs(ddx) + Math.abs(ddy));
+      if (g.moved > 6) {
+        g.type = 'pan';
+        const s = pxToUser();
+        state.view.tx = g.baseTx + ddx * s;
+        state.view.ty = g.baseTy + ddy * s;
+        apply();
+      }
+    };
+    const onWindowMouseUp = () => {
+      if (g && g.type === 'pan') {
+        suppressNextClick = true;
+        setTimeout(() => { suppressNextClick = false; }, 60);
+      }
+      g = null;
+    };
+    window.addEventListener('mousemove', onWindowMouseMove);
+    window.addEventListener('mouseup', onWindowMouseUp);
+  }
+
+  function setupBoardGestures(svg) {
+    attachBoardGestures(svg, {
+      view, get viewG() { return viewG; },
+      get cols() { return currentLevel.cols; },
+      get rows() { return currentLevel.rows; },
+      minScale: 0.5,
+      maxScale: 8
+    });
+  }
+
+  function makeArrowG(arrow) {
+    const g = document.createElementNS(SVG_NS, 'g');
+    g.setAttribute('class', 'arrow');
+    g.dataset.id = arrow.id;
+    arrow.el = g;
+
+    const points = arrow.cells.map(([c, r]) => `${c + 0.5},${r + 0.5}`).join(' ');
+
+    const trail = document.createElementNS(SVG_NS, 'polyline');
+    trail.setAttribute('class', 'trail');
+    trail.setAttribute('points', points);
+    g.appendChild(trail);
+
+    const [hc, hr] = arrow.cells[arrow.headIdx];
+    const head = document.createElementNS(SVG_NS, 'polygon');
+    head.setAttribute('class', 'head');
+    head.setAttribute('points', arrowHeadPoints(hc + 0.5, hr + 0.5, arrow.dir));
+    g.appendChild(head);
+
+    const hit = document.createElementNS(SVG_NS, 'polyline');
+    hit.setAttribute('class', 'hit');
+    hit.setAttribute('points', points);
+    g.appendChild(hit);
+
+    g.addEventListener('click', () => fireArrow(arrow.id));
+    return g;
+  }
+
+  function arrowHeadPoints(cx, cy, dir) {
+    const tip = 0.4, back = 0.05, halfWidth = 0.22;
+    const [dc, dr] = DIR_VEC[dir];
+    const tipX = cx + dc * tip;
+    const tipY = cy + dr * tip;
+    const baseX = cx - dc * back;
+    const baseY = cy - dr * back;
+    const pdc = -dr, pdr = dc;
+    return [
+      `${tipX},${tipY}`,
+      `${baseX + pdc * halfWidth},${baseY + pdr * halfWidth}`,
+      `${baseX - pdc * halfWidth},${baseY - pdr * halfWidth}`
+    ].join(' ');
+  }
+
+  // ── Firing ─────────────────────────────────
+  function fireArrow(id) {
+    if (suppressNextClick) return;
+    const arrow = runtimeArrows.find(a => a.id === id);
+    if (!arrow || arrow.state !== 'idle') return;
+
+    const path = firingPath(arrow, currentLevel.cols, currentLevel.rows);
+    const occByOthers = new Map();
+    for (const a of runtimeArrows) {
+      if (a.id === id || a.state !== 'idle') continue;
+      for (const [c, r] of a.cells) occByOthers.set(cellKey(c, r), a);
+    }
+    let blocker = null;
+    for (const [c, r] of path) {
+      const b = occByOthers.get(cellKey(c, r));
+      if (b) { blocker = b; break; }
+    }
+
+    if (blocker) {
+      arrow.el.classList.add('shake');
+      blocker.el.classList.add('flash');
+      showToast('Blocked', 'warn');
+      setTimeout(() => {
+        if (arrow.el) arrow.el.classList.remove('shake');
+        if (blocker.el) blocker.el.classList.remove('flash');
+      }, 420);
+      return;
+    }
+
+    arrow.state = 'flying';
+
+    // Ravel-out animation: head leads, body follows along the original trail, each cell
+    // tracing the head's exit path. Implemented as a moving fixed-length window along an
+    // extended path = (polyline cell centers) + (extension in firing direction).
+    const cellPoints = arrow.cells.map(([c, r]) => [c + 0.5, r + 0.5]);
+    const headXY = cellPoints[arrow.headIdx];
+    const [dc, dr] = DIR_VEC[arrow.dir];
+    let headExit;
+    if (arrow.dir === 'up') headExit = headXY[1] + 0.5;
+    else if (arrow.dir === 'down') headExit = currentLevel.rows - headXY[1] + 0.5;
+    else if (arrow.dir === 'left') headExit = headXY[0] + 0.5;
+    else headExit = currentLevel.cols - headXY[0] + 0.5;
+
+    const polylineLen = arrow.cells.length - 1;
+    // Path = polyline + extension of length headExit (so the path ends exactly at the off-board edge).
+    // Tail travels (polylineLen + headExit) along this path; head travels only headExit. They meet
+    // at the path's end at t=1, so the snake shrinks linearly to zero — the ravel-out effect.
+    const exitPoint = [headXY[0] + dc * headExit, headXY[1] + dr * headExit];
+    const fullPath = cellPoints.concat([exitPoint]);
+    const segLens = [];
+    for (let i = 0; i < fullPath.length - 1; i++) {
+      segLens.push(Math.hypot(fullPath[i + 1][0] - fullPath[i][0], fullPath[i + 1][1] - fullPath[i][1]));
+    }
+
+    function pointAt(d) {
+      let acc = 0;
+      for (let i = 0; i < segLens.length; i++) {
+        if (acc + segLens[i] >= d) {
+          const f = (d - acc) / segLens[i];
+          return [
+            fullPath[i][0] + (fullPath[i + 1][0] - fullPath[i][0]) * f,
+            fullPath[i][1] + (fullPath[i + 1][1] - fullPath[i][1]) * f
+          ];
+        }
+        acc += segLens[i];
+      }
+      return fullPath[fullPath.length - 1];
+    }
+    function pointsBetween(dStart, dEnd) {
+      const out = [pointAt(dStart)];
+      let acc = 0;
+      for (let i = 0; i < fullPath.length; i++) {
+        if (i > 0) acc += segLens[i - 1];
+        if (acc > dStart + 1e-6 && acc < dEnd - 1e-6) out.push(fullPath[i]);
+      }
+      out.push(pointAt(dEnd));
+      return out;
+    }
+
+    const trailEl = arrow.el.querySelector('.trail');
+    const headEl = arrow.el.querySelector('.head');
+    const hitEl = arrow.el.querySelector('.hit');
+
+    const totalPathLen = polylineLen + headExit;
+    const start = performance.now();
+    const stepMs = 16;
+    const tick = () => {
+      const t = Math.min(1, (performance.now() - start) / FLIGHT_MS);
+      const tailPos = t * totalPathLen;
+      const headPos = polylineLen + t * headExit;
+
+      const visible = pointsBetween(tailPos, headPos);
+      const ptsStr = visible.map(p => p[0].toFixed(3) + ',' + p[1].toFixed(3)).join(' ');
+      trailEl.setAttribute('points', ptsStr);
+      hitEl.setAttribute('points', ptsStr);
+
+      const headPt = pointAt(headPos);
+      headEl.setAttribute('points', arrowHeadPoints(headPt[0], headPt[1], arrow.dir));
+
+      if (t < 1) {
+        setTimeout(tick, stepMs);
+      } else {
+        if (arrow.el && arrow.el.parentNode) arrow.el.parentNode.removeChild(arrow.el);
+        arrow.el = null;
+        arrow.state = 'gone';
+        for (const [c, r] of arrow.cells) {
+          const dot = document.querySelector(`.dot[data-cell="${cellKey(c, r)}"]`);
+          if (dot) dot.classList.add('revealed');
+          clearedCells.add(cellKey(c, r));
+        }
+        if (runtimeArrows.every(a => a.state === 'gone')) {
+          setTimeout(() => showIntermission(), 500);
+        }
+      }
+    };
+    tick();
+  }
+
+  function showToast(msg, kind) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = 'toast toast--show' + (kind ? ' toast--' + kind : '');
+    clearTimeout(showToast._t);
+    showToast._t = setTimeout(() => { t.className = 'toast'; }, 1200);
+  }
+
+  // ── Intermission ───────────────────────────
+  function showIntermission() {
+    lastCompleted = currentLevel;
+    document.getElementById('interHeading').textContent = PHRASES[Math.floor(Math.random() * PHRASES.length)];
+    document.getElementById('interSubtitle').textContent = lastCompleted.name + ' completed!';
+    renderSnapshot(document.getElementById('interSnapshot'), lastCompleted);
+    spawnConfetti();
+
+    const idx = BUILTIN_DEFS.findIndex(d => d.id === lastCompleted.id);
+    const nextBtn = document.getElementById('btnNextLevel');
+    if (idx >= 0 && idx < BUILTIN_DEFS.length - 1) {
+      nextBtn.textContent = 'Next Level';
+      nextBtn.disabled = false;
+      nextBtn._next = allLevels[idx + 1];
+    } else {
+      nextBtn.textContent = 'Back to levels';
+      nextBtn.disabled = false;
+      nextBtn._next = null;
+    }
+
+    showScreen('intermission');
+  }
+
+  function renderSnapshot(svg, level, opts) {
+    svg.setAttribute('viewBox', `0 0 ${level.cols} ${level.rows}`);
+    svg.style.setProperty('--arrow-stroke', Math.max(0.12, 2 / level.cols).toFixed(3));
+    svg.style.setProperty('--arrow-hit', Math.max(0.5, 9 / level.cols).toFixed(3));
+    svg.innerHTML = '';
+
+    // Wrap content in a viewG so the snapshot SVG can be panned/zoomed independently — used by
+    // the import preview for large imports.
+    const wrap = document.createElementNS(SVG_NS, 'g');
+    wrap.setAttribute('class', 'snapshot-view');
+    svg.appendChild(wrap);
+
+    if (opts && opts.silhouette && Array.isArray(opts.silhouette)) {
+      const silG = document.createElementNS(SVG_NS, 'g');
+      silG.setAttribute('class', 'silhouette-underlay');
+      const r = Math.max(0.08, 0.6 / level.cols);
+      for (const [c, row] of opts.silhouette) {
+        const dot = document.createElementNS(SVG_NS, 'circle');
+        dot.setAttribute('cx', c + 0.5);
+        dot.setAttribute('cy', row + 0.5);
+        dot.setAttribute('r', r);
+        dot.setAttribute('fill', '#cdb997');
+        silG.appendChild(dot);
+      }
+      wrap.appendChild(silG);
+    }
+
+    const arrowsG = document.createElementNS(SVG_NS, 'g');
+    for (const a of level.arrows) {
+      const g = document.createElementNS(SVG_NS, 'g');
+      g.setAttribute('class', 'arrow');
+      const points = a.cells.map(([c, r]) => `${c + 0.5},${r + 0.5}`).join(' ');
+      const trail = document.createElementNS(SVG_NS, 'polyline');
+      trail.setAttribute('class', 'trail');
+      trail.setAttribute('points', points);
+      g.appendChild(trail);
+      const [hc, hr] = a.cells[a.headIdx];
+      const head = document.createElementNS(SVG_NS, 'polygon');
+      head.setAttribute('class', 'head');
+      head.setAttribute('points', arrowHeadPoints(hc + 0.5, hr + 0.5, a.dir));
+      g.appendChild(head);
+      arrowsG.appendChild(g);
+    }
+    wrap.appendChild(arrowsG);
+    return wrap;
+  }
+
+  function spawnConfetti() {
+    const container = document.getElementById('confettiContainer');
+    container.innerHTML = '';
+    const colors = ['#ffd54a', '#ff7a52', '#9adef5', '#a78bfa', '#80e08a', '#ff80b0'];
+    for (let i = 0; i < 28; i++) {
+      const c = document.createElement('span');
+      c.className = 'confetti';
+      c.style.left = (Math.random() * 100) + '%';
+      c.style.background = colors[i % colors.length];
+      c.style.setProperty('--delay', (Math.random() * 1.5) + 's');
+      c.style.setProperty('--dur', (2.4 + Math.random() * 1.8) + 's');
+      container.appendChild(c);
+    }
+  }
+
+  // ── Image import ───────────────────────────
+  function loadImageToCanvas(file) {
+    return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        const maxDim = 2200;  // larger source = finer detail in larger grids
+        const scale = Math.min(maxDim / img.width, maxDim / img.height, 1);
+        const w = Math.max(1, Math.round(img.width * scale));
+        const h = Math.max(1, Math.round(img.height * scale));
+        const c = document.createElement('canvas');
+        c.width = w; c.height = h;
+        const ctx = c.getContext('2d');
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(img, 0, 0, w, h);
+        URL.revokeObjectURL(url);
+        resolve({ dataUrl: c.toDataURL(), imageData: ctx.getImageData(0, 0, w, h) });
+      };
+      img.onerror = e => { URL.revokeObjectURL(url); reject(e); };
+      img.src = url;
+    });
+  }
+
+  function isOpaquePixel(data, i) {
+    return data[i + 3] == null || data[i + 3] > IMPORT_ALPHA_CUTOFF;
+  }
+
+  function imageHasTransparency(imageData) {
+    const { data } = imageData;
+    for (let i = 3; i < data.length; i += 4) {
+      if (data[i] < 250) return true;
+    }
+    return false;
+  }
+
+  // Perceptual colour space: sRGB → CIELAB (D65). Euclidean distance in Lab tracks human
+  // colour perception far better than RGB distance, which is what makes background/subject
+  // separation reliable across photo types.
+  function srgbToLab(r, g, b) {
+    const lin = u => { u /= 255; return u > 0.04045 ? Math.pow((u + 0.055) / 1.055, 2.4) : u / 12.92; };
+    const rl = lin(r), gl = lin(g), bl = lin(b);
+    const x = (0.4124 * rl + 0.3576 * gl + 0.1805 * bl) / 0.95047;
+    const y =  0.2126 * rl + 0.7152 * gl + 0.0722 * bl;
+    const z = (0.0193 * rl + 0.1192 * gl + 0.9505 * bl) / 1.08883;
+    const f = t => t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116;
+    const fx = f(x), fy = f(y), fz = f(z);
+    return [116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz)];
+  }
+
+  // Border-vs-centre luminance comparison. The border ring is almost always background, so a
+  // bright ring around a darker centre means the subject is dark (and vice versa).
+  function detectPolarity(imageData) {
+    const { data, width, height } = imageData;
+    const bw = Math.max(1, Math.round(Math.min(width, height) * 0.08));
+    const stride = Math.max(1, Math.floor(Math.sqrt(width * height / 60000)));
+    let bSum = 0, bN = 0, cSum = 0, cN = 0;
+    for (let y = 0; y < height; y += stride) {
+      for (let x = 0; x < width; x += stride) {
+        const i = (y * width + x) * 4;
+        if (!isOpaquePixel(data, i)) continue;
+        const lum = 0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2];
+        if (x < bw || y < bw || x >= width - bw || y >= height - bw) { bSum += lum; bN++; }
+        else { cSum += lum; cN++; }
+      }
+    }
+    if (!bN || !cN) return 'dark';
+    return cSum / cN < bSum / bN ? 'dark' : 'bright';
+  }
+
+  function sobelEdgeMap(imageData) {
+    const { data, width: w, height: h } = imageData;
+    const gray = new Float32Array(w * h);
+    for (let i = 0, p = 0; i < data.length; i += 4, p++) {
+      const a = data[i + 3] == null ? 1 : data[i + 3] / 255;
+      const lum = (data[i] + data[i+1] + data[i+2]) / 3 / 255;
+      gray[p] = a <= IMPORT_ALPHA_CUTOFF / 255 ? 0 : a * (0.25 + lum * 0.75);
+    }
+    const mag = new Float32Array(w * h);
+    let maxMag = 0;
+    for (let y = 1; y < h - 1; y++) {
+      for (let x = 1; x < w - 1; x++) {
+        const tl = gray[(y-1)*w + (x-1)], tc = gray[(y-1)*w + x], tr = gray[(y-1)*w + (x+1)];
+        const ml = gray[y*w + (x-1)],     mr = gray[y*w + (x+1)];
+        const bl = gray[(y+1)*w + (x-1)], bc = gray[(y+1)*w + x], br = gray[(y+1)*w + (x+1)];
+        const gx = -tl - 2*ml - bl + tr + 2*mr + br;
+        const gy = -tl - 2*tc - tr + bl + 2*bc + br;
+        const m = Math.sqrt(gx*gx + gy*gy);
+        mag[y*w + x] = m;
+        if (m > maxMag) maxMag = m;
+      }
+    }
+    return { mag, maxMag };
+  }
+
+  function gridSizeForImage(imageData) {
+    const aspect = Math.max(0.01, imageData.width / Math.max(1, imageData.height));
+    let contentCols, contentRows;
+    if (aspect >= 1) {
+      contentCols = Math.round(imageData.width / IMPORT_TARGET_CELL_PIXELS);
+      contentCols = Math.max(IMPORT_GRID_MIN, Math.min(IMPORT_GRID_MAX, contentCols));
+      contentRows = Math.max(1, Math.round(contentCols / aspect));
+    } else {
+      contentRows = Math.round(imageData.height / IMPORT_TARGET_CELL_PIXELS);
+      contentRows = Math.max(IMPORT_GRID_MIN, Math.min(IMPORT_GRID_MAX, contentRows));
+      contentCols = Math.max(1, Math.round(contentRows * aspect));
+    }
+    contentCols = Math.min(ABSOLUTE_GRID_CAP, Math.max(1, contentCols));
+    contentRows = Math.min(ABSOLUTE_GRID_CAP, Math.max(1, contentRows));
+    const cols = Math.max(IMPORT_GRID_MIN, contentCols);
+    const rows = Math.max(IMPORT_GRID_MIN, contentRows);
+    return {
+      cols, rows,
+      contentCols, contentRows,
+      offsetC: Math.floor((cols - contentCols) / 2),
+      offsetR: Math.floor((rows - contentRows) / 2)
+    };
+  }
+
+  // One pass over the source pixels accumulating per-content-cell statistics: average colour
+  // (opaque pixels only), alpha coverage, and Sobel edge density. Everything downstream works
+  // on this small grid instead of raw pixels, so regeneration stays fast at any image size.
+  function buildCellStats(imageData, layout, sobel) {
+    const { data, width, height } = imageData;
+    const cw = layout.contentCols, ch = layout.contentRows;
+    const n = cw * ch;
+    const sumR = new Float64Array(n), sumG = new Float64Array(n), sumB = new Float64Array(n);
+    const opaque = new Uint32Array(n), totals = new Uint32Array(n);
+    const edgeSum = new Float64Array(n), edgeHigh = new Uint32Array(n);
+    const highCut = sobel.maxMag * 0.24;
+    for (let y = 0; y < height; y++) {
+      const cy = Math.min(ch - 1, (y * ch / height) | 0);
+      for (let x = 0; x < width; x++) {
+        const cell = cy * cw + Math.min(cw - 1, (x * cw / width) | 0);
+        const i = (y * width + x) * 4;
+        totals[cell]++;
+        const m = sobel.mag[y * width + x];
+        edgeSum[cell] += m;
+        if (m > highCut) edgeHigh[cell]++;
+        if (isOpaquePixel(data, i)) {
+          opaque[cell]++;
+          sumR[cell] += data[i]; sumG[cell] += data[i + 1]; sumB[cell] += data[i + 2];
+        }
+      }
+    }
+    const lab = new Float32Array(n * 3);
+    const lum = new Float32Array(n);
+    const alphaFrac = new Float32Array(n);
+    const edgeScore = new Float32Array(n);
+    const maxMag = sobel.maxMag || 1;
+    for (let c = 0; c < n; c++) {
+      const o = opaque[c];
+      alphaFrac[c] = totals[c] ? o / totals[c] : 0;
+      const r = o ? sumR[c] / o : 0, g = o ? sumG[c] / o : 0, b = o ? sumB[c] / o : 0;
+      const L = srgbToLab(r, g, b);
+      lab[c * 3] = L[0]; lab[c * 3 + 1] = L[1]; lab[c * 3 + 2] = L[2];
+      lum[c] = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+      const meanE = totals[c] ? edgeSum[c] / totals[c] / maxMag : 0;
+      const highE = totals[c] ? edgeHigh[c] / totals[c] : 0;
+      edgeScore[c] = Math.min(1, highE * 1.7 + meanE * 2.2);
+    }
+    return { cw, ch, lab, lum, alphaFrac, edgeScore };
+  }
+
+  // Model the background as up to two CIELAB colour clusters fitted (2-means) to the border
+  // ring of cells. Two clusters handle split backgrounds — sky above / ground below, vignettes,
+  // gradients. A cell's "subjectness" is its distance from the nearest background cluster.
+  // Returns { centers: [[L,a,b], ...], lum } or null when the border is transparent or tiny.
+  function estimateBackgroundLab(stats) {
+    const { cw, ch, lab, lum, alphaFrac } = stats;
+    const ring = [];
+    for (let y = 0; y < ch; y++) {
+      for (let x = 0; x < cw; x++) {
+        if (y >= 2 && y < ch - 2 && x >= 2 && x < cw - 2) continue;
+        const c = y * cw + x;
+        if (alphaFrac[c] >= 0.6) ring.push(c);
+      }
+    }
+    if (ring.length < 6) return null;
+    const L = c => [lab[c * 3], lab[c * 3 + 1], lab[c * 3 + 2]];
+    const d2 = (a, b) => {
+      const x = a[0] - b[0], y = a[1] - b[1], z = a[2] - b[2];
+      return x * x + y * y + z * z;
+    };
+    // Seed A with the first ring cell, B with the ring cell farthest from A.
+    let ca = L(ring[0]);
+    let cb = ca, far = -1;
+    for (const c of ring) { const d = d2(L(c), ca); if (d > far) { far = d; cb = L(c); } }
+    let groupA = [], groupB = [];
+    for (let iter = 0; iter < 6; iter++) {
+      groupA = []; groupB = [];
+      for (const c of ring) (d2(L(c), ca) <= d2(L(c), cb) ? groupA : groupB).push(c);
+      const mean = g => {
+        if (!g.length) return null;
+        const m = [0, 0, 0];
+        for (const c of g) { m[0] += lab[c * 3]; m[1] += lab[c * 3 + 1]; m[2] += lab[c * 3 + 2]; }
+        return [m[0] / g.length, m[1] / g.length, m[2] / g.length];
+      };
+      ca = mean(groupA) || ca;
+      cb = mean(groupB) || cb;
+    }
+    // Keep only clusters that hold a meaningful share of the border; a lone outlier cluster
+    // (e.g. the subject clipping one corner) shouldn't count as background.
+    const centers = [];
+    if (groupA.length / ring.length >= 0.18) centers.push(ca);
+    if (groupB.length / ring.length >= 0.18) centers.push(cb);
+    if (centers.length === 0) centers.push(ca);
+    let lumSum = 0;
+    for (const c of ring) lumSum += lum[c];
+    return { centers, lum: lumSum / ring.length };
+  }
+
+  function dilateMask(mask, cols, rows) {
+    const out = new Uint8Array(cols * rows);
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        let v = 0;
+        for (let dr = -1; dr <= 1 && !v; dr++) {
+          for (let dc = -1; dc <= 1 && !v; dc++) {
+            const nc = c + dc, nr = r + dr;
+            if (nc < 0 || nc >= cols || nr < 0 || nr >= rows) continue;
+            if (mask[nr * cols + nc]) v = 1;
+          }
+        }
+        out[r * cols + c] = v;
+      }
+    }
+    return out;
+  }
+
+  function erodeMask(mask, cols, rows) {
+    const out = new Uint8Array(cols * rows);
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        let all = 1;
+        for (let dr = -1; dr <= 1 && all; dr++) {
+          for (let dc = -1; dc <= 1 && all; dc++) {
+            const nc = c + dc, nr = r + dr;
+            if (nc < 0 || nc >= cols || nr < 0 || nr >= rows || !mask[nr * cols + nc]) all = 0;
+          }
+        }
+        out[r * cols + c] = all;
+      }
+    }
+    return out;
+  }
+
+  // Morphological close (dilate → erode), unioned with the original so no true cell is lost.
+  // Bridges 1-cell gaps and smooths ragged silhouette boundaries.
+  function closeMask(mask, cols, rows) {
+    const closed = erodeMask(dilateMask(mask, cols, rows), cols, rows);
+    for (let i = 0; i < closed.length; i++) if (mask[i]) closed[i] = 1;
+    return closed;
+  }
+
+  // Drop 4-connected components smaller than minSize — despeckles the silhouette so stray
+  // texture noise doesn't turn into scattered confetti arrows.
+  function removeSmallComponents(mask, cols, rows, minSize) {
+    const out = new Uint8Array(cols * rows);
+    const seen = new Uint8Array(cols * rows);
+    const stack = [];
+    for (let start = 0; start < mask.length; start++) {
+      if (!mask[start] || seen[start]) continue;
+      const comp = [];
+      seen[start] = 1;
+      stack.length = 0;
+      stack.push(start);
+      while (stack.length) {
+        const i = stack.pop();
+        comp.push(i);
+        const c = i % cols, r = (i / cols) | 0;
+        if (c > 0 && mask[i - 1] && !seen[i - 1]) { seen[i - 1] = 1; stack.push(i - 1); }
+        if (c < cols - 1 && mask[i + 1] && !seen[i + 1]) { seen[i + 1] = 1; stack.push(i + 1); }
+        if (r > 0 && mask[i - cols] && !seen[i - cols]) { seen[i - cols] = 1; stack.push(i - cols); }
+        if (r < rows - 1 && mask[i + cols] && !seen[i + cols]) { seen[i + cols] = 1; stack.push(i + cols); }
+      }
+      if (comp.length >= minSize) for (const i of comp) out[i] = 1;
+    }
+    return out;
+  }
+
+  // Fill enclosed empty pockets of up to maxHole cells. Empty regions are flood-filled; any
+  // region that never touches the grid border is a hole inside the silhouette.
+  function fillSmallHoles(mask, cols, rows, maxHole) {
+    const out = Uint8Array.from(mask);
+    const seen = new Uint8Array(cols * rows);
+    const stack = [];
+    for (let start = 0; start < mask.length; start++) {
+      if (mask[start] || seen[start]) continue;
+      const comp = [];
+      let touchesBorder = false;
+      seen[start] = 1;
+      stack.length = 0;
+      stack.push(start);
+      while (stack.length) {
+        const i = stack.pop();
+        comp.push(i);
+        const c = i % cols, r = (i / cols) | 0;
+        if (c === 0 || c === cols - 1 || r === 0 || r === rows - 1) touchesBorder = true;
+        if (c > 0 && !mask[i - 1] && !seen[i - 1]) { seen[i - 1] = 1; stack.push(i - 1); }
+        if (c < cols - 1 && !mask[i + 1] && !seen[i + 1]) { seen[i + 1] = 1; stack.push(i + 1); }
+        if (r > 0 && !mask[i - cols] && !seen[i - cols]) { seen[i - cols] = 1; stack.push(i - cols); }
+        if (r < rows - 1 && !mask[i + cols] && !seen[i + cols]) { seen[i + cols] = 1; stack.push(i + cols); }
+      }
+      if (!touchesBorder && comp.length <= maxHole) for (const i of comp) out[i] = 1;
+    }
+    return out;
+  }
+
+  function maskToFilled(mask, cols, rows) {
+    const filled = [];
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        if (mask[r * cols + c]) filled.push([c, r]);
+      }
+    }
+    return filled;
+  }
+
+  function simplifyFilledCells(filled, cols, rows, maxCells) {
+    if (filled.length <= maxCells) return filled;
+    const set = new Set(filled.map(([c, r]) => cellKey(c, r)));
+    const boundary = [];
+    const interior = [];
+    for (const [c, r] of filled) {
+      let isBoundary = false;
+      for (const dir of DIRS) {
+        const [dc, dr] = DIR_VEC[dir];
+        const nc = c + dc, nr = r + dr;
+        if (nc < 0 || nc >= cols || nr < 0 || nr >= rows || !set.has(cellKey(nc, nr))) {
+          isBoundary = true;
+          break;
+        }
+      }
+      (isBoundary ? boundary : interior).push([c, r]);
+    }
+    const out = [];
+    function takeEvenly(arr, limit) {
+      if (limit <= 0 || arr.length === 0) return;
+      if (arr.length <= limit) {
+        for (const cell of arr) out.push(cell);
+        return;
+      }
+      const step = arr.length / limit;
+      for (let i = 0; i < limit; i++) out.push(arr[Math.floor(i * step)]);
+    }
+    const boundaryBudget = Math.min(maxCells, Math.max(Math.floor(maxCells * 0.45), boundary.length));
+    takeEvenly(boundary, boundaryBudget);
+    takeEvenly(interior, maxCells - out.length);
+    return out.sort((a, b) => a[1] - b[1] || a[0] - b[0]);
+  }
+
+  function fallbackSilhouette(layout) {
+    const filled = [];
+    const c0 = layout.offsetC, r0 = layout.offsetR;
+    const c1 = c0 + layout.contentCols - 1;
+    const r1 = r0 + layout.contentRows - 1;
+    for (let r = r0; r <= r1; r++) {
+      for (let c = c0; c <= c1; c++) {
+        const edge = c === c0 || c === c1 || r === r0 || r === r1;
+        const sample = ((c - c0) % 4 === 0) && ((r - r0) % 4 === 0);
+        if (edge || sample) filled.push([c, r]);
+      }
+    }
+    return simplifyFilledCells(filled, layout.cols, layout.rows, IMPORT_MAX_FILLED_CELLS);
+  }
+
+  function normalizeMaskToFilled(mask, layout) {
+    let m = mask;
+    let filled = maskToFilled(m, layout.cols, layout.rows);
+    let grow = 0;
+    while (filled.length > 0 && filled.length < IMPORT_MIN_FILLED_CELLS && grow < 3) {
+      m = dilateMask(m, layout.cols, layout.rows);
+      filled = maskToFilled(m, layout.cols, layout.rows);
+      grow++;
+    }
+    if (filled.length === 0) return fallbackSilhouette(layout);
+    return simplifyFilledCells(filled, layout.cols, layout.rows, IMPORT_MAX_FILLED_CELLS);
+  }
+
+  // ── Silhouette extraction ──────────────────
+  // Turns an arbitrary image into a set of grid cells that reads as the image's subject:
+  //   1. Per-cell stats   — buildCellStats folds the pixels into the content grid.
+  //   2. Background model — 2-means CIELAB clustering over the border ring; distance from
+  //                         the nearest cluster is a cell's region "subjectness".
+  //   3. Scoring          — blend of region subjectness and edge density (mode-dependent),
+  //                         a mild centre prior, and the polarity bias. Images with real
+  //                         transparency use alpha coverage as the authoritative shape.
+  //   4. Percentile cut   — the Detail slider maps to a target fill fraction and the score
+  //                         cutoff is chosen by rank, so the silhouette always lands at a
+  //                         playable density regardless of the image's contrast.
+  //   5. Cleanup          — morphological close, small-component removal and hole filling
+  //                         keep the shape readable at grid resolution.
+  function silhouetteFromImage(imageData, detail, polarity, mode, sobelCache, layout) {
+    layout = layout || gridSizeForImage(imageData);
+    const sobel = sobelCache || sobelEdgeMap(imageData);
+    const stats = buildCellStats(imageData, layout, sobel);
+    const { cw, ch, lab, lum, alphaFrac, edgeScore } = stats;
+    const n = cw * ch;
+    const transparent = imageHasTransparency(imageData);
+    const bg = transparent ? null : estimateBackgroundLab(stats);
+
+    const score = new Float32Array(n);
+    const cx0 = (cw - 1) / 2, cy0 = (ch - 1) / 2;
+    const maxD = Math.hypot(cx0, cy0) || 1;
+    for (let y = 0; y < ch; y++) {
+      for (let x = 0; x < cw; x++) {
+        const c = y * cw + x;
+        let region;
+        if (transparent) {
+          region = alphaFrac[c];
+        } else if (bg) {
+          let d = Infinity;
+          for (const ctr of bg.centers) {
+            const dl = lab[c * 3] - ctr[0], da = lab[c * 3 + 1] - ctr[1], db = lab[c * 3 + 2] - ctr[2];
+            const e = Math.sqrt(dl * dl + da * da + db * db);
+            if (e < d) d = e;
+          }
+          region = Math.min(1, d / 55);   // ΔE ≈ 55 ⇒ unmistakably not background
+          if (polarity === 'dark' && lum[c] >= bg.lum - 0.02) region *= 0.3;
+          if (polarity === 'bright' && lum[c] <= bg.lum + 0.02) region *= 0.3;
+        } else {
+          region = edgeScore[c];          // degenerate: no usable border ring
+        }
+        let s;
+        if (mode === 'outline') s = edgeScore[c];
+        else if (mode === 'solid') s = region * 0.85 + edgeScore[c] * 0.15;
+        else s = region * 0.6 + edgeScore[c] * 0.4;
+        if (!transparent) {
+          // Mild centre prior: photo subjects are usually framed centrally; corners get a
+          // gentle handicap rather than a hard vignette.
+          const dx = x - cx0, dy = y - cy0;
+          const rad = Math.hypot(dx, dy) / maxD;
+          s *= 1 - 0.3 * rad * rad;
+        } else if (alphaFrac[c] < 0.22) {
+          s = 0;
+        }
+        score[c] = s;
+      }
+    }
+
+    // Rank-based cutoff: Detail chooses how much of the content area gets filled, and the
+    // absolute floor stops near-empty images from filling with noise.
+    const fillFrac = 0.10 + detail * 0.55;
+    const want = Math.max(IMPORT_MIN_FILLED_CELLS,
+      Math.min(Math.round(n * fillFrac), IMPORT_MAX_FILLED_CELLS));
+    const sorted = Float32Array.from(score).sort();
+    const cutoff = Math.max(sorted[Math.max(0, n - want)], 0.045);
+
+    const mask = new Uint8Array(layout.cols * layout.rows);
+    let filledCount = 0;
+    for (let y = 0; y < ch; y++) {
+      for (let x = 0; x < cw; x++) {
+        if (score[y * cw + x] >= cutoff) {
+          mask[(layout.offsetR + y) * layout.cols + (layout.offsetC + x)] = 1;
+          filledCount++;
+        }
+      }
+    }
+
+    let m = mask;
+    if (mode !== 'outline') m = closeMask(m, layout.cols, layout.rows);
+    m = removeSmallComponents(m, layout.cols, layout.rows,
+      Math.max(3, Math.round(filledCount * 0.004)));
+    const maxHole = mode === 'solid' ? Math.max(8, Math.round(filledCount * 0.02))
+      : mode === 'outline' ? 0 : 4;
+    if (maxHole > 0) m = fillSmallHoles(m, layout.cols, layout.rows, maxHole);
+    return normalizeMaskToFilled(m, layout);
+  }
+
+  function generateImportedLevel(imageData, detail, polarity, mode, sobelCache, difficulty) {
+    const layout = gridSizeForImage(imageData);
+    const { cols, rows } = layout;
+    const filled = silhouetteFromImage(imageData, detail, polarity, mode, sobelCache, layout);
+    if (filled.length === 0) return null;
+    const dateStr = new Date().toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    const lvl = buildLevelFromCells(filled, {
+      id: 'cust-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
+      name: 'Imported · ' + dateStr,
+      difficulty: difficulty || 'Medium',
+      cols, rows
+    });
+    if (!lvl) return null;
+    if (!isSolvable(lvl.arrows, cols, rows)) {
+      console.warn('Generated level failed solvability re-check, dropping');
+      return null;
+    }
+    lvl.silhouette = filled;
+    lvl.captureMode = mode;
+    lvl.capturePolarity = polarity;
+    return lvl;
+  }
+
+  let importWorkerUrl = null;
+  function buildImportWorkerScript() {
+    const fnList = [
+      shuffle, diffParams, firingPath, isSolvable, generateTrails, trailLastSegDir,
+      easiestExitDist, assignDirections, constructInterlocked, computeDepthMap,
+      avgBranchiness, buildLevelFromCells,
+      isOpaquePixel, imageHasTransparency, srgbToLab, sobelEdgeMap, gridSizeForImage,
+      buildCellStats, estimateBackgroundLab, dilateMask, erodeMask, closeMask,
+      removeSmallComponents, fillSmallHoles, maskToFilled, simplifyFilledCells,
+      fallbackSilhouette, normalizeMaskToFilled, silhouetteFromImage, generateImportedLevel
+    ];
+    return `
+      const IMPORT_GRID_MIN = ${IMPORT_GRID_MIN};
+      const IMPORT_GRID_MAX = ${IMPORT_GRID_MAX};
+      const ABSOLUTE_GRID_CAP = ${ABSOLUTE_GRID_CAP};
+      const IMPORT_TARGET_CELL_PIXELS = ${IMPORT_TARGET_CELL_PIXELS};
+      const IMPORT_ALPHA_CUTOFF = ${IMPORT_ALPHA_CUTOFF};
+      const IMPORT_MAX_FILLED_CELLS = ${IMPORT_MAX_FILLED_CELLS};
+      const IMPORT_MIN_FILLED_CELLS = ${IMPORT_MIN_FILLED_CELLS};
+      const DIFFICULTY_PARAMS = ${JSON.stringify(DIFFICULTY_PARAMS)};
+      const DIRS = ${JSON.stringify(DIRS)};
+      const DIR_VEC = ${JSON.stringify(DIR_VEC)};
+      const REV_DIR = ${JSON.stringify(REV_DIR)};
+      const cellKey = ${cellKey.toString()};
+      ${fnList.map(fn => fn.toString()).join('\n')}
+      self.onmessage = function (event) {
+        const p = event.data;
+        try {
+          const level = generateImportedLevel(
+            p.imageData, p.detail, p.polarity, p.mode, null, p.difficulty
+          );
+          self.postMessage({ id: p.id, level });
+        } catch (err) {
+          self.postMessage({ id: p.id, error: err && err.message ? err.message : String(err) });
+        }
+      };
+    `;
+  }
+
+  function createImportWorker() {
+    if (!window.Worker || !window.Blob || !window.URL) return null;
+    try {
+      if (!importWorkerUrl) {
+        importWorkerUrl = URL.createObjectURL(new Blob([buildImportWorkerScript()], {
+          type: 'text/javascript'
+        }));
+      }
+      return new Worker(importWorkerUrl);
+    } catch (err) {
+      console.warn('Worker generation unavailable, falling back to main thread:', err);
+      return null;
+    }
+  }
+
+  function setupImport() {
+    const fileInput = document.getElementById('importFile');
+    const slider = document.getElementById('threshSlider');
+    const sliderVal = document.getElementById('threshVal');
+    const previewImg = document.getElementById('importPreviewImg');
+    const status = document.getElementById('importStatus');
+    const saveBtn = document.getElementById('btnSave');
+    const tryAgain = document.getElementById('btnTryAgain');
+    const miniSvg = document.getElementById('miniSvg');
+    const miniBoard = document.getElementById('miniBoard');
+    const diffBtns = document.getElementById('diffBtns');
+    const modeBtns = document.getElementById('modeBtns');
+    const polarityBtns = document.getElementById('polarityBtns');
+    let importDifficulty = 'Medium';
+    let importMode = 'auto';         // 'auto', 'solid', or 'outline'
+    let importPolarity = 'auto';     // 'dark', 'bright', or 'auto'
+    let detectedPolarity = 'dark';   // last result of detectPolarity (for 'auto')
+    let sobelCache = null;           // { mag, maxMag } cached per loaded image
+    let importWorker = null;
+    let generationId = 0;
+    const miniView = { tx: 0, ty: 0, scale: 1 };
+    let miniGesturesAttached = false;
+
+    function effectivePolarity() {
+      return importPolarity === 'auto' ? detectedPolarity : importPolarity;
+    }
+
+    function stopImportWorker() {
+      if (importWorker) {
+        importWorker.terminate();
+        importWorker = null;
+      }
+    }
+
+    function renderImportResult(lvl) {
+      importPreview = lvl;
+      if (!lvl) {
+        miniSvg.innerHTML = '';
+        status.textContent = 'Could not build a playable puzzle from that image.';
+        saveBtn.disabled = true;
+        return;
+      }
+      miniBoard.style.setProperty('--cols', lvl.cols);
+      miniBoard.style.setProperty('--rows', lvl.rows);
+      const miniViewG = renderSnapshot(miniSvg, lvl, { silhouette: lvl.silhouette });
+      miniView.scale = initialScaleForLevel(lvl.cols, lvl.rows);
+      miniView.tx = 0; miniView.ty = 0;
+      centerViewOnContent(miniView, lvl);
+      clampView(miniView, lvl.cols, lvl.rows);
+      miniViewG.setAttribute('transform',
+        `translate(${miniView.tx} ${miniView.ty}) scale(${miniView.scale})`);
+      if (!miniGesturesAttached) {
+        attachBoardGestures(miniSvg, {
+          view: miniView,
+          get viewG() { return miniSvg.querySelector('.snapshot-view'); },
+          get cols() { return importPreview ? importPreview.cols : 36; },
+          get rows() { return importPreview ? importPreview.rows : 50; },
+          minScale: 0.5,
+          maxScale: 8
+        });
+        miniGesturesAttached = true;
+      }
+      const silhouetteSet = new Set((lvl.silhouette || []).map(([c, r]) => cellKey(c, r)));
+      const covered = lvl.arrows.reduce((s, a) =>
+        s + a.cells.filter(([c, r]) => silhouetteSet.has(cellKey(c, r))).length, 0);
+      const coverPct = lvl.silhouette && lvl.silhouette.length
+        ? Math.min(100, Math.round(100 * covered / lvl.silhouette.length))
+        : null;
+      const arrowsTxt = lvl.arrows.length + ' arrow' + (lvl.arrows.length === 1 ? '' : 's');
+      status.textContent = 'Playable: ' + arrowsTxt + ' - ' + importDifficulty +
+        (coverPct != null ? ' - ' + coverPct + '% image coverage' : '');
+      saveBtn.disabled = false;
+    }
+
+    function regenerate() {
+      if (!importImageData) return;
+      const id = ++generationId;
+      status.textContent = importPreview ? 'Refining details...' : 'Creating playable version...';
+      if (!importPreview) saveBtn.disabled = true;
+
+      stopImportWorker();
+      importWorker = createImportWorker();
+      if (importWorker) {
+        importWorker.onmessage = (event) => {
+          if (event.data.id !== generationId) return;
+          stopImportWorker();
+          if (event.data.error) {
+            console.error(event.data.error);
+            renderImportResult(null);
+            return;
+          }
+          renderImportResult(event.data.level);
+        };
+        importWorker.onerror = (err) => {
+          if (id !== generationId) return;
+          console.error(err);
+          stopImportWorker();
+          renderImportResult(null);
+        };
+        importWorker.postMessage({
+          id,
+          imageData: importImageData,
+          detail: parseFloat(slider.value),
+          polarity: effectivePolarity(),
+          mode: importMode,
+          difficulty: importDifficulty
+        });
+        return;
+      }
+
+      setTimeout(() => {
+        if (id !== generationId) return;
+        const lvl = generateImportedLevel(
+          importImageData,
+          parseFloat(slider.value),
+          effectivePolarity(),
+          importMode,
+          sobelCache,
+          importDifficulty
+        );
+        if (id === generationId) renderImportResult(lvl);
+      }, 0);
+    }
+
+    function setActive(group, attr, value) {
+      group.querySelectorAll('.diffBtn').forEach(b => {
+        b.classList.toggle('diffBtn--active', b.dataset[attr] === value);
+      });
+    }
+
+    diffBtns.addEventListener('click', (e) => {
+      const btn = e.target.closest('.diffBtn');
+      if (!btn) return;
+      setActive(diffBtns, 'diff', btn.dataset.diff);
+      importDifficulty = btn.dataset.diff;
+      if (importImageData) regenerate();
+    });
+    modeBtns.addEventListener('click', (e) => {
+      const btn = e.target.closest('.diffBtn');
+      if (!btn) return;
+      setActive(modeBtns, 'mode', btn.dataset.mode);
+      importMode = btn.dataset.mode;
+      if (importImageData) regenerate();
+    });
+    polarityBtns.addEventListener('click', (e) => {
+      const btn = e.target.closest('.diffBtn');
+      if (!btn) return;
+      setActive(polarityBtns, 'polarity', btn.dataset.polarity);
+      importPolarity = btn.dataset.polarity;
+      if (importImageData) regenerate();
+    });
+
+    fileInput.addEventListener('change', async (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      try {
+        status.textContent = 'Loading…';
+        saveBtn.disabled = true;
+        const { dataUrl, imageData } = await loadImageToCanvas(file);
+        importImageData = imageData;
+        previewImg.src = dataUrl;
+        previewImg.style.display = 'block';
+        sobelCache = null;
+        // Auto-detect polarity by comparing the border ring to the image centre.
+        detectedPolarity = detectPolarity(imageData);
+        // Detail maps to a target fill fraction now, so a fixed midpoint is a good start
+        // for every image — no per-image threshold seeding needed.
+        slider.value = '0.5';
+        sliderVal.textContent = '0.50';
+        regenerate();
+      } catch (err) {
+        console.error(err);
+        status.textContent = 'Could not load that image.';
+      }
+    });
+
+    slider.addEventListener('input', () => {
+      sliderVal.textContent = parseFloat(slider.value).toFixed(2);
+      clearTimeout(importDebounce);
+      importDebounce = setTimeout(regenerate, 220);
+    });
+
+    saveBtn.addEventListener('click', () => {
+      if (!importPreview) return;
+      customLevels.push(importPreview);
+      saveCustomLevels();
+      currentLevel = importPreview;
+      resetImportUI();
+      showScreen('game');
+    });
+
+    tryAgain.addEventListener('click', () => regenerate());
+
+    function resetImportUI() {
+      importImageData = null;
+      importPreview = null;
+      generationId++;
+      stopImportWorker();
+      sobelCache = null;
+      detectedPolarity = 'dark';
+      fileInput.value = '';
+      previewImg.style.display = 'none';
+      previewImg.removeAttribute('src');
+      miniSvg.innerHTML = '';
+      status.textContent = '';
+      saveBtn.disabled = true;
+      slider.value = '0.5';
+      sliderVal.textContent = '0.50';
+      importDifficulty = 'Medium';
+      importMode = 'auto';
+      importPolarity = 'auto';
+      miniView.tx = 0; miniView.ty = 0; miniView.scale = 1;
+      setActive(diffBtns, 'diff', 'Medium');
+      setActive(modeBtns, 'mode', 'auto');
+      setActive(polarityBtns, 'polarity', 'auto');
+    }
+
+    document.getElementById('btnCancelImport').addEventListener('click', () => {
+      resetImportUI();
+      showScreen('title');
+    });
+  }
+
+  // ── Init ───────────────────────────────────
+  function buildAllLevels() {
+    const cache = loadBuiltinCache();
+    let cacheChanged = false;
+
+    allLevels = BUILTIN_DEFS.map(def => {
+      if (def.kind === 'manual') return buildLevelFromDef(def);
+      // silhouette: use cache if present
+      if (cache[def.id]) return cache[def.id];
+      const lvl = buildLevelFromDef(def);
+      if (lvl) { cache[def.id] = lvl; cacheChanged = true; }
+      return lvl;
+    });
+
+    if (cacheChanged) saveBuiltinCache(cache);
+
+    // Sanity-check
+    allLevels.forEach(lvl => {
+      if (!lvl) { console.warn('Failed to build level'); return; }
+      if (!isSolvable(lvl.arrows, lvl.cols, lvl.rows)) {
+        console.warn('Built-in level not solvable:', lvl.name);
+      }
+    });
+  }
+
+  function migrateForRulesetVersion() {
+    let stored = 0;
+    try { stored = parseInt(localStorage.getItem('arrows.rulesetVersion') || '0', 10); } catch {}
+    if (stored === RULESET_VERSION) return { migrated: false, regenerated: 0, dropped: 0 };
+
+    let regenerated = 0, dropped = 0;
+
+    // Built-in cache: just clear; buildAllLevels will rebuild fresh.
+    try { localStorage.removeItem('arrows.builtinCache'); } catch {}
+
+    // Custom levels: if we have the silhouette, regenerate; otherwise drop the level.
+    let raw = [];
+    try { raw = JSON.parse(localStorage.getItem('arrows.customLevels') || '[]') || []; } catch {}
+    const fresh = [];
+    for (const lvl of raw) {
+      if (Array.isArray(lvl.silhouette) && lvl.silhouette.length > 0) {
+        const rebuilt = buildLevelFromCells(lvl.silhouette, {
+          id: lvl.id, name: lvl.name, difficulty: lvl.difficulty || 'Custom',
+          cols: lvl.cols, rows: lvl.rows
+        });
+        if (rebuilt) {
+          rebuilt.silhouette = lvl.silhouette;
+          fresh.push(rebuilt);
+          regenerated++;
+        } else {
+          dropped++;
+        }
+      } else {
+        dropped++;
+      }
+    }
+    try {
+      localStorage.setItem('arrows.customLevels', JSON.stringify(fresh));
+      localStorage.setItem('arrows.rulesetVersion', String(RULESET_VERSION));
+    } catch {}
+    return { migrated: true, regenerated, dropped };
+  }
+
+  function init() {
+    const migration = migrateForRulesetVersion();
+    loadCustomLevels();
+    buildAllLevels();
+
+    document.getElementById('btnPlay').addEventListener('click', () => showScreen('levelSelect'));
+    document.getElementById('btnImport').addEventListener('click', () => showScreen('import'));
+    document.getElementById('btnBackFromLevels').addEventListener('click', () => showScreen('title'));
+    document.getElementById('btnBackFromGame').addEventListener('click', () => showScreen('levelSelect'));
+    document.getElementById('btnHomeFromInter').addEventListener('click', () => showScreen('levelSelect'));
+    document.getElementById('btnNextLevel').addEventListener('click', () => {
+      const next = document.getElementById('btnNextLevel')._next;
+      if (next) startLevel(next);
+      else showScreen('levelSelect');
+    });
+
+    setupImport();
+    showScreen('title');
+
+    // Console-only testing hook; the game itself never reads this.
+    window.__arrowDebug = {
+      get levels() { return allLevels; },
+      isSolvable, avgBranchiness, buildLevelFromCells,
+      silhouetteFromImage, generateImportedLevel, gridSizeForImage, DIFFICULTY_PARAMS
+    };
+
+    if (migration.migrated && (migration.regenerated || migration.dropped)) {
+      const msg = migration.dropped
+        ? `Levels updated · ${migration.regenerated} regenerated, ${migration.dropped} dropped`
+        : `Levels updated · ${migration.regenerated} regenerated`;
+      setTimeout(() => showToast(msg, 'win'), 600);
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();
+</script>
+</body>
+</html>
