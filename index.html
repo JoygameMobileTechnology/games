@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Game Experiments</title>
+<style>
+  :root {
+    --bg: #EDF0F6;
+    --chip: #FFFFFF;
+    --ink: #1D2740;
+    --muted: #65718C;
+    --gold: #EFAD12;
+    --gold-ink: #3A2B00;
+    --shadow: 0 1px 3px rgba(29, 39, 64, .12);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0F1522;
+      --chip: #1B2536;
+      --ink: #EDF2FA;
+      --muted: #8B99B5;
+      --gold: #F7BE2A;
+      --gold-ink: #3A2B00;
+      --shadow: 0 1px 3px rgba(0, 0, 0, .35);
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Avenir Next", "Segoe UI Variable Display", system-ui, -apple-system, "Segoe UI", sans-serif;
+    display: flex;
+    justify-content: center;
+  }
+  .wrap {
+    width: min(92vw, 560px);
+    padding: clamp(28px, 8vh, 72px) 0 48px;
+  }
+  h1 {
+    margin: 0;
+    font-size: clamp(30px, 7vw, 40px);
+    font-weight: 900;
+    letter-spacing: -.02em;
+  }
+  h1 span { color: var(--gold); }
+  .sub {
+    color: var(--muted);
+    font-size: 14.5px;
+    margin: 8px 0 28px;
+    line-height: 1.5;
+  }
+  .games { display: flex; flex-direction: column; gap: 10px; }
+  .card {
+    display: block;
+    background: var(--chip);
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+    padding: 16px 18px;
+    text-decoration: none;
+    color: var(--ink);
+    transition: transform .12s ease;
+  }
+  .card:hover { transform: translateY(-2px); }
+  .card b { font-size: 17px; font-weight: 800; }
+  .card p {
+    margin: 5px 0 0;
+    color: var(--muted);
+    font-size: 13.5px;
+    line-height: 1.5;
+  }
+  .tagline {
+    display: inline-block;
+    margin-left: 8px;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--gold-ink);
+    background: var(--gold);
+    border-radius: 999px;
+    padding: 2px 9px;
+    vertical-align: 2px;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Game <span>Experiments</span></h1>
+  <p class="sub">Tek dosyalık HTML oyun prototipleri. Her klasör bağımsız bir deneme.</p>
+  <div class="games">
+    <a class="card" href="2048-vs/">
+      <b>2048 VS</b><span class="tagline">prototip</span>
+      <p>2048 boardu asker üretir: canlı lane savaşı (Mod 1) veya 30 saniye biriktirip arena düellosu (Mod 2). AI rakip, 3 zorluk.</p>
+    </a>
+  </div>
+</div>
+</body>
+</html>

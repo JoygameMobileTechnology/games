@@ -1,0 +1,1714 @@
+<title>2048 VS</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>
+  :root {
+    --bg: #EDF0F6;
+    --well: #D7DDE9;
+    --cellbg: #C6CEDE;
+    --chip: #FFFFFF;
+    --ink: #1D2740;
+    --muted: #65718C;
+    --gold: #EFAD12;
+    --gold-ink: #3A2B00;
+    --danger: #D64545;
+    --hp-ok: #3FA97C;
+    --hp-warn: #E8A21C;
+    --shadow: 0 1px 3px rgba(29, 39, 64, .12);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0F1522;
+      --well: #1A2434;
+      --cellbg: #27324A;
+      --chip: #1B2536;
+      --ink: #EDF2FA;
+      --muted: #8B99B5;
+      --gold: #F7BE2A;
+      --gold-ink: #3A2B00;
+      --danger: #F0605C;
+      --hp-ok: #46BD8A;
+      --hp-warn: #F0B027;
+      --shadow: 0 1px 3px rgba(0, 0, 0, .35);
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #EDF0F6;
+    --well: #D7DDE9;
+    --cellbg: #C6CEDE;
+    --chip: #FFFFFF;
+    --ink: #1D2740;
+    --muted: #65718C;
+    --gold: #EFAD12;
+    --gold-ink: #3A2B00;
+    --danger: #D64545;
+    --hp-ok: #3FA97C;
+    --hp-warn: #E8A21C;
+    --shadow: 0 1px 3px rgba(29, 39, 64, .12);
+  }
+  :root[data-theme="dark"] {
+    --bg: #0F1522;
+    --well: #1A2434;
+    --cellbg: #27324A;
+    --chip: #1B2536;
+    --ink: #EDF2FA;
+    --muted: #8B99B5;
+    --gold: #F7BE2A;
+    --gold-ink: #3A2B00;
+    --danger: #F0605C;
+    --hp-ok: #46BD8A;
+    --hp-warn: #F0B027;
+    --shadow: 0 1px 3px rgba(0, 0, 0, .35);
+  }
+
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    min-height: 100dvh;
+    display: flex;
+    justify-content: center;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Avenir Next", "Segoe UI Variable Display", system-ui, -apple-system, "Segoe UI", sans-serif;
+    touch-action: manipulation;
+    overscroll-behavior: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .wrap {
+    --gamew: min(96vw, 620px);
+    width: var(--gamew);
+    padding: clamp(6px, 1.2vh, 14px) 0 10px;
+    display: flex;
+    flex-direction: column;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  .game {
+    position: relative;
+    display: flex;
+    gap: 10px;
+    height: clamp(420px, 90svh, 780px);
+  }
+
+  /* ---------- Lane column (left 1/4) ---------- */
+  .lane-col {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .avbox {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 0;
+  }
+  .avatar {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: var(--chip);
+    box-shadow: var(--shadow);
+    display: grid;
+    place-items: center;
+    font-size: 21px;
+    border: 2px solid transparent;
+  }
+  .avbox.me .avatar { border-color: var(--gold); }
+  .avatar.hit { animation: shake .3s; }
+  @keyframes shake {
+    20% { transform: translateX(-3px); box-shadow: 0 0 16px var(--danger); }
+    60% { transform: translateX(3px); box-shadow: 0 0 16px var(--danger); }
+  }
+  .hpbar {
+    width: 92%;
+    height: 8px;
+    border-radius: 999px;
+    background: var(--cellbg);
+    overflow: hidden;
+  }
+  .hpfill {
+    height: 100%;
+    width: 100%;
+    border-radius: 999px;
+    background: var(--hp-ok);
+    transition: width .25s ease, background-color .25s;
+  }
+  .hpfill.warn { background: var(--hp-warn); }
+  .hpfill.low { background: var(--danger); }
+  .hpnum {
+    font-size: 13px;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+  }
+  .dmgf {
+    position: absolute;
+    translate: -50% 0;
+    top: 4px;
+    color: var(--danger);
+    font-weight: 800;
+    font-size: 14px;
+    pointer-events: none;
+    z-index: 5;
+    animation: rise .7s ease-out forwards;
+  }
+  @keyframes rise {
+    to { transform: translateY(-20px); opacity: 0; }
+  }
+
+  .lane {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    background: var(--well);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .lane .mark {
+    position: absolute;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    translate: -50% 0;
+    background: color-mix(in srgb, var(--muted) 40%, transparent);
+  }
+
+  .unit {
+    position: absolute;
+    left: 0;
+    top: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    pointer-events: none;
+    will-change: transform;
+    z-index: 2;
+  }
+  /* one-shot spawn pop; the class is removed on animationend so later class
+     changes on the root can't restart it (position-flick bug) */
+  .unit.born { animation: spawn .18s cubic-bezier(.3, 1.4, .5, 1) backwards; }
+  .unit .g {
+    line-height: 1;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .35));
+  }
+  .g svg, .ic svg { display: block; width: 100%; height: 100%; }
+  .unit.me .tc { fill: var(--gold); }
+  .unit.ai .tc { fill: var(--danger); }
+  .roster .tc { fill: var(--gold); }
+  .roster {
+    display: flex;
+    gap: 6px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  .ri {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+    width: 48px;
+    font-size: 9.5px;
+    color: var(--muted);
+  }
+  .ri .ic { width: 30px; height: 30px; }
+  .ri b {
+    font-size: 11px;
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+  }
+  .unit .uhp {
+    width: 16px;
+    height: 3px;
+    border-radius: 2px;
+    background: rgba(0, 0, 0, .3);
+    margin-top: 1px;
+    overflow: hidden;
+  }
+  .unit .uhp i { display: block; height: 100%; width: 100%; }
+  .unit.me .uhp i { background: var(--gold); }
+  .unit.ai .uhp i { background: var(--danger); }
+  .unit.hurt .g { animation: hurtf .15s; }
+  @keyframes hurtf {
+    50% { filter: brightness(2.1); }
+  }
+  .wpn, .orb { transform-box: fill-box; transform-origin: 50% 85%; }
+  .k8 .wpn, .k16 .wpn, .k128 .wpn, .orb { transform-origin: 50% 50%; }
+  .unit.atk.k2 .wpn { animation: swing .32s ease; }
+  .unit.atk.k4 .wpn { animation: swing .3s ease; }
+  .unit.atk.k64 .wpn { animation: swingbig .3s ease-in; }
+  .unit.atk.k8 .wpn { animation: bowkick .25s ease; }
+  .unit.atk.k16 .wpn { animation: bash .3s ease; }
+  .unit.atk.k32 .wpn { animation: cast .35s ease; }
+  .unit.atk.k32 .orb { animation: orbpulse .35s ease; }
+  .unit.atk.k128 .wpn { animation: slam .35s ease; }
+  @keyframes swing { 40% { transform: rotate(-55deg); } }
+  @keyframes swingbig { 35% { transform: rotate(-80deg); } }
+  @keyframes bowkick { 30% { transform: translateX(2px) scaleX(.94); } }
+  @keyframes bash { 35% { transform: translateX(-3.5px); } }
+  @keyframes cast { 40% { transform: rotate(-14deg); } }
+  @keyframes orbpulse { 40% { transform: scale(1.5); } }
+  @keyframes slam { 35% { transform: translateY(3.5px); } }
+  .unit.dying {
+    transition: opacity .18s, scale .18s;
+    opacity: 0;
+    scale: .4;
+  }
+  .proj {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: #DCE8FF;
+    box-shadow: 0 0 5px rgba(120, 150, 255, .9);
+    z-index: 3;
+    pointer-events: none;
+  }
+  .proj.magic {
+    width: 7px;
+    height: 7px;
+    background: #E9C8FF;
+    box-shadow: 0 0 7px rgba(169, 69, 196, .95);
+  }
+  .proj.arrow {
+    width: 12px;
+    height: 2.5px;
+    border-radius: 2px;
+    background: linear-gradient(90deg, #8B6844 62%, #D7DDE9 62%);
+    box-shadow: none;
+  }
+
+  /* ---------- Boards column (right 3/4) ---------- */
+  .boards-col {
+    flex: 3;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    gap: 4px;
+  }
+  .bname {
+    font-size: 11px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    font-weight: 700;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .hud { line-height: 1; }
+  .timer {
+    font-size: clamp(22px, 4svh, 30px);
+    font-weight: 900;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: .02em;
+  }
+  .timer.urgent {
+    color: var(--danger);
+    animation: pulse 1s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    50% { opacity: .45; }
+  }
+
+  .board {
+    position: relative;
+    flex-shrink: 0; /* tiles position by --bsize; a flex-squished board desyncs them */
+    background: var(--well);
+    border-radius: 12px;
+    touch-action: none;
+    -webkit-touch-callout: none;
+    --gap: clamp(5px, 1.2vw, 8px);
+    width: var(--bsize);
+    height: var(--bsize);
+    --cs: calc((var(--bsize) - var(--gap) * 5) / 4);
+  }
+  .board.opp { --bsize: min(calc(var(--gamew) * .48), 24svh); }
+  .board.me { --bsize: min(calc(var(--gamew) * .68), 38svh); }
+  .grid {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    grid-template-rows: repeat(4, 1fr);
+    gap: var(--gap);
+    padding: var(--gap);
+  }
+  .cellbg { background: var(--cellbg); border-radius: 7px; }
+
+  .tile {
+    position: absolute;
+    top: 0; left: 0;
+    width: var(--cs);
+    height: var(--cs);
+    border-radius: 7px;
+    display: grid;
+    place-items: center;
+    color: #fff;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    font-size: calc(var(--cs) * .42);
+    z-index: 1;
+    transform: translate(
+      calc(var(--gap) + var(--c) * (var(--cs) + var(--gap))),
+      calc(var(--gap) + var(--r) * (var(--cs) + var(--gap)))
+    );
+    transition: transform 130ms cubic-bezier(.25, .8, .3, 1), filter .15s, scale .15s;
+  }
+  .tile[data-len="3"] { font-size: calc(var(--cs) * .36); }
+  .tile[data-len="4"] { font-size: calc(var(--cs) * .30); }
+  .tile[data-len="5"], .tile[data-len="6"] { font-size: calc(var(--cs) * .24); }
+  .board.me .tile { cursor: pointer; }
+  @media (hover: hover) {
+    .board.me .tile:not(.firing):hover { filter: brightness(1.12); }
+  }
+  .tile.firing {
+    filter: brightness(.72) saturate(.85);
+    scale: .94;
+    cursor: default;
+  }
+
+  .t2    { background: #3B4A66; }
+  .t4    { background: #40598A; }
+  .t8    { background: #3D77C2; }
+  .t16   { background: #5B63D3; }
+  .t32   { background: #7A4FD6; }
+  .t64   { background: #A945C4; }
+  .t128  { background: #CC4383; box-shadow: 0 0 16px rgba(204, 67, 131, .35); }
+  .t256  { background: #E25545; box-shadow: 0 0 18px rgba(226, 85, 69, .40); }
+  .t512  { background: #EE7A28; box-shadow: 0 0 20px rgba(238, 122, 40, .45); }
+  .t1024 { background: #F49A18; box-shadow: 0 0 24px rgba(244, 154, 24, .50); text-shadow: 0 1px 2px rgba(0,0,0,.25); }
+  .t2048 { background: #F7B816; color: #3A2B00; box-shadow: 0 0 30px rgba(247, 184, 22, .60); }
+  .tsuper { background: #FFE082; color: #4A3800; box-shadow: 0 0 34px rgba(255, 224, 130, .65); }
+
+  .spawn { animation: spawn 180ms 100ms cubic-bezier(.3, 1.4, .5, 1) backwards; }
+  @keyframes spawn {
+    from { scale: 0; opacity: 0; }
+  }
+  .pop { animation: pop 180ms ease; }
+  @keyframes pop {
+    0% { scale: 1; }
+    45% { scale: 1.2; }
+    100% { scale: 1; }
+  }
+  .consume { animation: consume 180ms ease forwards; }
+  @keyframes consume {
+    to { scale: .2; opacity: 0; }
+  }
+  .deny { animation: deny .22s ease; }
+  @keyframes deny {
+    25% { rotate: -4deg; }
+    75% { rotate: 4deg; }
+  }
+
+  .lock {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    z-index: 5;
+    pointer-events: none;
+  }
+  .lock span {
+    background: var(--chip);
+    color: var(--muted);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    padding: 5px 10px;
+    border-radius: 999px;
+    box-shadow: var(--shadow);
+  }
+
+  /* ---------- Overlay ---------- */
+  .overlay {
+    position: absolute;
+    inset: -6px;
+    display: grid;
+    place-items: center;
+    background: color-mix(in srgb, var(--bg) 74%, transparent);
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+    border-radius: 14px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .25s;
+    z-index: 70;
+  }
+  .overlay.show { opacity: 1; pointer-events: auto; }
+  .panel {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    gap: 13px;
+    align-items: center;
+    padding: 16px;
+    max-width: 340px;
+  }
+  .panel-title { font-size: 26px; font-weight: 900; margin: 0; text-wrap: balance; }
+  .panel-title .vs { color: var(--gold); }
+  .panel-sub { color: var(--muted); font-size: 13.5px; margin: 0; line-height: 1.5; text-wrap: balance; }
+  .tally {
+    color: var(--muted);
+    font-size: 12.5px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  .count {
+    font-size: 80px;
+    font-weight: 900;
+    margin: 0;
+    font-variant-numeric: tabular-nums;
+  }
+  .ov-actions { display: flex; gap: 8px; }
+
+  .btn {
+    border: 0;
+    cursor: pointer;
+    border-radius: 10px;
+    padding: 10px 16px;
+    font: 600 14px inherit;
+    font-family: inherit;
+    background: var(--chip);
+    color: var(--ink);
+    box-shadow: var(--shadow);
+  }
+  .btn.primary {
+    background: var(--gold);
+    color: var(--gold-ink);
+    font-weight: 800;
+  }
+  .btn.big { padding: 12px 34px; font-size: 16px; }
+  .btn:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+  .seg {
+    display: flex;
+    background: var(--chip);
+    border-radius: 10px;
+    padding: 4px;
+    gap: 4px;
+    box-shadow: var(--shadow);
+  }
+  .seg button {
+    border: 0;
+    background: transparent;
+    padding: 8px 16px;
+    border-radius: 7px;
+    font: 600 14px inherit;
+    font-family: inherit;
+    color: var(--muted);
+    cursor: pointer;
+  }
+  .seg button.on {
+    background: var(--gold);
+    color: var(--gold-ink);
+    font-weight: 800;
+  }
+  .seg button:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+  /* ---------- Mode 2: build + arena ---------- */
+  .m2b {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    gap: 3px;
+  }
+  .m2b .board.opp { --bsize: min(calc(var(--gamew) * .5), 24svh); }
+  .m2b .board.me { --bsize: min(calc(var(--gamew) * .6), 28svh); }
+  .m2timer { text-align: center; line-height: 1; }
+  .m2meter {
+    display: flex;
+    gap: 4px;
+    justify-content: center;
+    width: 100%;
+  }
+  .mcol {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    flex: 1;
+    max-width: 52px;
+  }
+  .vchip {
+    width: 100%;
+    max-width: 40px;
+    aspect-ratio: 1;
+    border-radius: 7px;
+    display: grid;
+    place-items: center;
+    color: #fff;
+    font-weight: 800;
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+  }
+  .mcnt {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 12px;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+  }
+  .mcnt .ic { width: 18px; height: 18px; }
+  .mcnt.ai .tc { fill: var(--danger); }
+  .mcnt.me .tc { fill: var(--gold); }
+  .mcnt.zero { opacity: .35; }
+  .mcnt.bump { animation: pop .18s ease; }
+  .m2f {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+  .m2fhud { text-align: center; line-height: 1; }
+  .m2f .lane {
+    width: min(calc(var(--gamew) * .6), 320px);
+    flex: 1;
+  }
+  .m2f .hpbar, .m2f .hpnum { display: none; }
+  .m2f .lane .mark { display: none; }
+  .fight-splash {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    z-index: 65;
+    pointer-events: none;
+  }
+  .fight-splash span {
+    font-size: clamp(40px, 10vw, 72px);
+    font-weight: 900;
+    color: var(--gold);
+    letter-spacing: .06em;
+    text-shadow: 0 2px 18px rgba(247, 190, 42, .5);
+    animation: fsplash .9s cubic-bezier(.3, 1.4, .5, 1) forwards;
+  }
+  @keyframes fsplash {
+    0% { scale: .2; opacity: 0; }
+    25% { scale: 1.1; opacity: 1; }
+    75% { scale: 1; opacity: 1; }
+    100% { scale: 1.15; opacity: 0; }
+  }
+
+  .hint {
+    margin: 6px 0 0;
+    text-align: center;
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1.5;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .tile { transition: none; }
+    .spawn, .pop, .consume, .deny, .timer.urgent, .avatar.hit, .dmgf,
+    .unit.born, .unit.hurt .g { animation: none; }
+    .unit.atk .wpn, .unit.atk .orb { animation: none; }
+    .overlay { transition: none; }
+  }
+</style>
+
+<div class="wrap">
+  <div class="game" id="game">
+    <div class="lane-col" id="m1Left">
+      <div class="avbox opp" id="aiCol">
+        <div class="avatar" id="aiAvatar">🤖</div>
+        <div class="hpbar"><div class="hpfill" id="aiHpFill"></div></div>
+        <div class="hpnum" id="aiHpNum">500</div>
+      </div>
+      <div class="lane" id="lane"></div>
+      <div class="avbox me" id="meCol">
+        <div class="avatar" id="meAvatar">😎</div>
+        <div class="hpbar"><div class="hpfill" id="meHpFill"></div></div>
+        <div class="hpnum" id="meHpNum">500</div>
+      </div>
+    </div>
+
+    <div class="boards-col" id="m1Right">
+      <div class="bname">Rakip · <span id="diffLabel"></span></div>
+      <div class="board opp" id="aiBoard"></div>
+      <div class="hud" id="hud"><span class="timer" id="timer">5:00</span></div>
+      <div class="board me" id="meBoard"></div>
+      <div class="bname" id="bnameBottom">Sen</div>
+    </div>
+
+    <div class="m2b" id="m2Build" hidden>
+      <div class="m2timer" id="m2TimerSlot"></div>
+      <div class="m2meter" id="m2Meter"></div>
+    </div>
+    <div class="m2f" id="m2Fight" hidden>
+      <div class="m2fhud" id="m2fHud"></div>
+    </div>
+
+    <div class="overlay show" id="overlay">
+      <div class="panel" id="startPanel">
+        <p class="panel-title">2048 <span class="vs">VS</span></p>
+        <div class="seg" id="modeSeg" role="group" aria-label="Mod">
+          <button data-m="1">Mod 1 · Canlı</button>
+          <button data-m="2">Mod 2 · Arena</button>
+        </div>
+        <p class="panel-sub" id="modeDesc"></p>
+        <div class="roster" id="roster"></div>
+        <p class="panel-sub">256+ taşlar şimdilik pasif; son taşın harcanamaz.</p>
+        <div class="seg" id="diffSeg" role="group" aria-label="Zorluk">
+          <button data-d="easy">Kolay</button>
+          <button data-d="mid">Orta</button>
+          <button data-d="hard">Zor</button>
+        </div>
+        <button class="btn primary big" id="startBtn">Başla</button>
+        <div class="tally" id="tallyStart"></div>
+      </div>
+      <p class="count" id="countPanel" hidden>3</p>
+      <div class="panel" id="endPanel" hidden>
+        <p class="panel-title" id="endTitle"></p>
+        <p class="panel-sub" id="endSub"></p>
+        <div class="ov-actions">
+          <button class="btn" id="chgBtn">Zorluk Değiştir</button>
+          <button class="btn primary" id="againBtn">Tekrar Oyna</button>
+        </div>
+        <div class="tally" id="tallyEnd"></div>
+      </div>
+    </div>
+  </div>
+
+  <p class="hint">Kaydır: hamle · Taşa dokun: asker çıkar</p>
+</div>
+
+<script>
+  const SIZE = 4;
+  const MOVE_MS = 130;
+  const MATCH_MS = 300000;
+  const BUILD_MS = 30000;
+  const BATTLE_MS = 45000;
+  const MAX_HP = 500;
+  const DEPLOY_COOLDOWN = 250;
+  const DEPLOY_CAST_MS = 350;
+  const MAX_UNITS_PER_SIDE = 12;
+  const SPAWN_COLS = [20, 50, 80]; // percent of lane width, cycled left→right
+
+  const UNITS = {
+    2:   { name: 'Çaylak',    hp: 4,  dmg: 1,  per: 1.25, speed: 45, range: 16, size: 15, px: 22 },
+    4:   { name: 'Asker',     hp: 10, dmg: 3,  per: 1.0,  speed: 45, range: 16, size: 17, px: 25 },
+    8:   { name: 'Okçu',      hp: 8,  dmg: 4,  per: 1.1,  speed: 45, range: 90, size: 17, px: 25, ranged: true, proj: 'arrow' },
+    16:  { name: 'Şövalye',   hp: 32, dmg: 6,  per: 1.25, speed: 30, range: 16, size: 19, px: 28 },
+    32:  { name: 'Büyücü',    hp: 16, dmg: 8,  per: 1.7,  speed: 30, range: 75, size: 19, px: 29, ranged: true, splash: 26, proj: 'magic' },
+    64:  { name: 'Berserker', hp: 28, dmg: 14, per: 0.85, speed: 68, range: 16, size: 19, px: 28 },
+    128: { name: 'Dev',       hp: 90, dmg: 18, per: 2.0,  speed: 22, range: 18, size: 25, px: 40 }
+  };
+
+  /* 2D character sprites — flat vector, 32×32. Elements with class="tc"
+     take the team color (gold = player, red = AI) via CSS. */
+  const SPRITES = {
+    2: `<svg viewBox="0 0 32 32">
+      <g class="wpn"><rect x="21.5" y="9" width="3" height="13" rx="1.5" fill="#8B6844" transform="rotate(18 23 15)"/></g>
+      <circle cx="15" cy="9" r="5.2" fill="#E8B88A"/>
+      <rect x="9.8" y="5.4" width="10.4" height="2.6" rx="1.3" class="tc"/>
+      <rect x="9.5" y="14.5" width="11" height="10.5" rx="3" fill="#7A8699"/>
+      <rect x="12" y="25" width="2.6" height="5.5" rx="1" fill="#5A4634"/>
+      <rect x="15.6" y="25" width="2.6" height="5.5" rx="1" fill="#5A4634"/>
+    </svg>`,
+    4: `<svg viewBox="0 0 32 32">
+      <g class="wpn"><rect x="23" y="6" width="2.6" height="14" rx="1" fill="#D7DDE9"/>
+      <rect x="20.8" y="19" width="7" height="2.4" rx="1" fill="#8B6844"/></g>
+      <circle cx="14.5" cy="9.5" r="5" fill="#E8B88A"/>
+      <path d="M9.5 9 a5 5 0 0 1 10 0 z" fill="#9AA7BE"/>
+      <rect x="13" y="2" width="3" height="3.6" rx="1.4" class="tc"/>
+      <rect x="9.3" y="14.8" width="10.4" height="10" rx="3" fill="#9AA7BE"/>
+      <rect x="9.3" y="17.6" width="10.4" height="2" class="tc"/>
+      <rect x="11.5" y="25" width="2.6" height="5.5" rx="1" fill="#39445C"/>
+      <rect x="15.2" y="25" width="2.6" height="5.5" rx="1" fill="#39445C"/>
+    </svg>`,
+    8: `<svg viewBox="0 0 32 32">
+      <g class="wpn"><path d="M24 5 a11 11 0 0 1 0 22" fill="none" stroke="#8B6844" stroke-width="2.2" stroke-linecap="round"/>
+      <line x1="24" y1="5" x2="24" y2="27" stroke="#D7DDE9" stroke-width="1"/></g>
+      <circle cx="14" cy="10" r="4.8" fill="#E8B88A"/>
+      <path d="M8.6 10 L14 2.2 L19.4 10 z" class="tc"/>
+      <path d="M9 15 h10 l-1.2 10 h-7.6 z" fill="#4C7A5E"/>
+      <rect x="11.2" y="25" width="2.6" height="5.5" rx="1" fill="#39445C"/>
+      <rect x="14.9" y="25" width="2.6" height="5.5" rx="1" fill="#39445C"/>
+    </svg>`,
+    16: `<svg viewBox="0 0 32 32">
+      <circle cx="16" cy="8.5" r="5" fill="#9AA7BE"/>
+      <rect x="11.8" y="7.2" width="8.4" height="2" rx="1" fill="#39445C"/>
+      <rect x="12.5" y="1.6" width="7" height="2.4" rx="1.2" class="tc"/>
+      <rect x="10" y="13.8" width="12" height="11" rx="3" fill="#7A8699"/>
+      <rect x="12.2" y="25" width="2.8" height="5.5" rx="1" fill="#39445C"/>
+      <rect x="17" y="25" width="2.8" height="5.5" rx="1" fill="#39445C"/>
+      <g class="wpn"><path d="M5.5 13 h9 v9 q0 4 -4.5 5.5 q-4.5 -1.5 -4.5 -5.5 z" fill="#D7DDE9"/>
+      <rect x="9.1" y="14.6" width="1.8" height="7.2" rx=".9" class="tc"/>
+      <rect x="6.9" y="16.8" width="6.2" height="1.8" rx=".9" class="tc"/></g>
+    </svg>`,
+    32: `<svg viewBox="0 0 32 32">
+      <g class="wpn"><rect x="23.4" y="6" width="2.4" height="20" rx="1.2" fill="#8B6844"/>
+      <g class="orb"><circle cx="24.6" cy="5.4" r="4.4" fill="#F7BE2A" opacity=".3"/>
+      <circle cx="24.6" cy="5.4" r="2.8" fill="#F7BE2A"/></g></g>
+      <circle cx="14" cy="11" r="4.6" fill="#E8B88A"/>
+      <path d="M7.5 11.5 L14 1.5 L20.5 11.5 z" class="tc"/>
+      <path d="M11.8 13.5 h4.4 v3.2 q-2.2 2.2 -4.4 0 z" fill="#E8EDF5"/>
+      <path d="M9 16 h10 l1.6 9.5 h-13.2 z" fill="#5B63D3"/>
+    </svg>`,
+    64: `<svg viewBox="0 0 32 32">
+      <g class="wpn"><rect x="22.6" y="5" width="2.6" height="18" rx="1.3" fill="#8B6844" transform="rotate(14 24 14)"/>
+      <path d="M20 4.5 q6 1.5 6 7 l-4 0 q0 -4 -2 -7 z" fill="#B9C4D6"/></g>
+      <circle cx="14" cy="9.5" r="5" fill="#E8B88A"/>
+      <path d="M8.6 7 q-2.4 -4 1 -5.6 q1 2.6 2.4 3.4 z" fill="#D9CDBB"/>
+      <path d="M19.4 7 q2.4 -4 -1 -5.6 q-1 2.6 -2.4 3.4 z" fill="#D9CDBB"/>
+      <rect x="10.4" y="6.6" width="7.2" height="1.8" rx=".9" class="tc"/>
+      <rect x="9.3" y="14.5" width="9.4" height="10.3" rx="3" fill="#C98B5F"/>
+      <rect x="9.3" y="20.6" width="9.4" height="2" class="tc"/>
+      <rect x="11.4" y="25" width="2.7" height="5.5" rx="1" fill="#5A4634"/>
+      <rect x="15" y="25" width="2.7" height="5.5" rx="1" fill="#5A4634"/>
+    </svg>`,
+    128: `<svg viewBox="0 0 32 32">
+      <rect x="6" y="10" width="20" height="16" rx="6" fill="#7C87A2"/>
+      <rect x="10.5" y="3.5" width="11" height="8" rx="3.5" fill="#8D97B0"/>
+      <rect x="12.6" y="6.4" width="2.4" height="1.8" rx=".9" fill="#2A3348"/>
+      <rect x="17" y="6.4" width="2.4" height="1.8" rx=".9" fill="#2A3348"/>
+      <g class="wpn"><circle cx="5.4" cy="18" r="4.2" fill="#8D97B0"/>
+      <circle cx="26.6" cy="18" r="4.2" fill="#8D97B0"/></g>
+      <path d="M12 14 l3 3 m5 1 l-2.6 2.6" stroke="#5A6579" stroke-width="1.4" fill="none" stroke-linecap="round"/>
+      <rect x="9" y="24.4" width="14" height="2.2" rx="1.1" class="tc"/>
+      <rect x="10.5" y="26.6" width="4.4" height="4.6" rx="1.4" fill="#5A6579"/>
+      <rect x="17.1" y="26.6" width="4.4" height="4.6" rx="1.4" fill="#5A6579"/>
+    </svg>`
+  };
+
+  const $ = id => document.getElementById(id);
+  const laneEl = $('lane');
+  const storage = {
+    get(key) { try { return localStorage.getItem(key); } catch { return null; } },
+    set(key, val) { try { localStorage.setItem(key, val); } catch { /* sandboxed */ } }
+  };
+  const inb = (r, c) => r >= 0 && r < SIZE && c >= 0 && c < SIZE;
+
+  /* ---------- Board ---------- */
+
+  class Game {
+    constructor(rootEl) {
+      rootEl.innerHTML = '';
+      const grid = document.createElement('div');
+      grid.className = 'grid';
+      grid.setAttribute('aria-hidden', 'true');
+      for (let i = 0; i < SIZE * SIZE; i++) {
+        const cell = document.createElement('div');
+        cell.className = 'cellbg';
+        grid.appendChild(cell);
+      }
+      this.tilesEl = document.createElement('div');
+      this.lockEl = document.createElement('div');
+      this.lockEl.className = 'lock';
+      this.lockEl.innerHTML = '<span>Hamle yok — taş harca</span>';
+      this.lockEl.hidden = true;
+      rootEl.append(grid, this.tilesEl, this.lockEl);
+
+      this.tiles = new Map();
+      this.nextId = 1;
+      this.busy = false;
+      this.locked = false;
+    }
+
+    reset() {
+      for (const t of this.tiles.values()) t.el.remove();
+      this.tiles.clear();
+      this.busy = false;
+      this.locked = false;
+      this.lockEl.hidden = true;
+      this.spawnRandom();
+      this.spawnRandom();
+    }
+
+    matrix() {
+      const m = Array.from({ length: SIZE }, () => Array(SIZE).fill(null));
+      for (const t of this.tiles.values()) m[t.r][t.c] = t;
+      return m;
+    }
+
+    gridValues() {
+      // Firing (pinned) tiles occupy their cell but can't move or merge — mark -1 as opaque blocker.
+      const g = Array.from({ length: SIZE }, () => Array(SIZE).fill(0));
+      for (const t of this.tiles.values()) g[t.r][t.c] = t.firing ? -1 : t.value;
+      return g;
+    }
+
+    liveTiles() {
+      return [...this.tiles.values()].filter(t => !t.firing);
+    }
+
+    setPos(el, r, c) {
+      el.style.setProperty('--r', r);
+      el.style.setProperty('--c', c);
+    }
+
+    tileClass(v) { return v <= 2048 ? 't' + v : 'tsuper'; }
+
+    applyValue(t) {
+      t.el.className = t.el.className.replace(/\bt(\d+|super)\b/, this.tileClass(t.value));
+      t.el.dataset.len = Math.min(String(t.value).length, 6);
+      t.el.textContent = t.value;
+    }
+
+    createTile(value, r, c) {
+      const el = document.createElement('div');
+      el.className = 'tile ' + this.tileClass(value) + ' spawn';
+      el.dataset.len = Math.min(String(value).length, 6);
+      el.textContent = value;
+      this.setPos(el, r, c);
+      el.addEventListener('animationend', e => {
+        if (e.animationName === 'consume') return;
+        el.classList.remove(e.animationName === 'pop' ? 'pop' : e.animationName === 'deny' ? 'deny' : 'spawn');
+      });
+      this.tilesEl.appendChild(el);
+      const t = { id: this.nextId++, value, r, c, el, firing: false };
+      this.tiles.set(t.id, t);
+      return t;
+    }
+
+    tileByEl(el) {
+      for (const t of this.tiles.values()) if (t.el === el) return t;
+      return null;
+    }
+
+    spawnRandom() {
+      const m = this.matrix();
+      const empty = [];
+      for (let r = 0; r < SIZE; r++)
+        for (let c = 0; c < SIZE; c++)
+          if (!m[r][c]) empty.push([r, c]);
+      if (!empty.length) return;
+      const [r, c] = empty[(Math.random() * empty.length) | 0];
+      this.createTile(Math.random() < 0.9 ? 2 : 4, r, c);
+    }
+
+    movesAvailable() {
+      const m = this.matrix();
+      for (let r = 0; r < SIZE; r++) {
+        for (let c = 0; c < SIZE; c++) {
+          const t = m[r][c];
+          if (!t) return true;
+          if (t.firing) continue;
+          const right = inb(r, c + 1) ? m[r][c + 1] : null;
+          if (right && !right.firing && right.value === t.value) return true;
+          const down = inb(r + 1, c) ? m[r + 1][c] : null;
+          if (down && !down.firing && down.value === t.value) return true;
+        }
+      }
+      return false;
+    }
+
+    updateLock() {
+      this.locked = !this.movesAvailable();
+      this.lockEl.hidden = !this.locked;
+    }
+
+    beginFire(tile) {
+      tile.firing = true;
+      tile.el.classList.add('firing');
+      this.updateLock();
+    }
+
+    deleteTile(tile) {
+      this.tiles.delete(tile.id);
+      tile.el.classList.add('consume');
+      setTimeout(() => tile.el.remove(), 200);
+      this.updateLock();
+    }
+
+    move(dr, dc) {
+      if (this.busy || this.locked) return;
+      const m = this.matrix();
+      const rows = dr === 1 ? [3, 2, 1, 0] : [0, 1, 2, 3];
+      const cols = dc === 1 ? [3, 2, 1, 0] : [0, 1, 2, 3];
+      const merges = [];
+      const mergedIds = new Set();
+      let moved = false;
+
+      for (const r of rows) {
+        for (const c of cols) {
+          const t = m[r][c];
+          if (!t || t.firing) continue;
+          let nr = r, nc = c;
+          let tr = r + dr, tc = c + dc;
+          while (inb(tr, tc) && !m[tr][tc]) { nr = tr; nc = tc; tr += dr; tc += dc; }
+          const target = inb(tr, tc) ? m[tr][tc] : null;
+          if (target && !target.firing && target.value === t.value && !mergedIds.has(target.id)) {
+            m[r][c] = null;
+            mergedIds.add(target.id);
+            t.r = target.r; t.c = target.c;
+            this.setPos(t.el, t.r, t.c);
+            merges.push({ src: t, dst: target });
+            moved = true;
+          } else if (nr !== r || nc !== c) {
+            m[r][c] = null;
+            m[nr][nc] = t;
+            t.r = nr; t.c = nc;
+            this.setPos(t.el, nr, nc);
+            moved = true;
+          }
+        }
+      }
+
+      if (!moved) return;
+      this.busy = true;
+
+      setTimeout(() => {
+        for (const { src, dst } of merges) {
+          this.tiles.delete(src.id);
+          src.el.remove();
+          dst.value *= 2;
+          this.applyValue(dst);
+          dst.el.classList.add('pop');
+        }
+        this.spawnRandom();
+        this.busy = false;
+        this.updateLock();
+      }, MOVE_MS);
+    }
+  }
+
+  /* ---------- Pure-grid simulation for the AI board ---------- */
+  /* Cell values: 0 = empty, -1 = pinned blocker (firing tile), >0 = tile. */
+
+  const DIRS = { up: [-1, 0], down: [1, 0], left: [0, -1], right: [0, 1] };
+
+  function simMove(g, [dr, dc]) {
+    const s = g.map(row => row.slice());
+    const rows = dr === 1 ? [3, 2, 1, 0] : [0, 1, 2, 3];
+    const cols = dc === 1 ? [3, 2, 1, 0] : [0, 1, 2, 3];
+    const merged = Array.from({ length: SIZE }, () => Array(SIZE).fill(false));
+    let moved = false, gained = 0;
+    for (const r of rows) {
+      for (const c of cols) {
+        const v = s[r][c];
+        if (v <= 0) continue;
+        let nr = r, nc = c, tr = r + dr, tc = c + dc;
+        while (inb(tr, tc) && !s[tr][tc]) { nr = tr; nc = tc; tr += dr; tc += dc; }
+        if (inb(tr, tc) && s[tr][tc] === v && !merged[tr][tc]) {
+          s[r][c] = 0;
+          s[tr][tc] = v * 2;
+          merged[tr][tc] = true;
+          gained += v * 2;
+          moved = true;
+        } else if (nr !== r || nc !== c) {
+          s[r][c] = 0;
+          s[nr][nc] = v;
+          moved = true;
+        }
+      }
+    }
+    return { s, gained, moved };
+  }
+
+  function validMoves(g) {
+    return Object.values(DIRS)
+      .map(d => ({ d, ...simMove(g, d) }))
+      .filter(m => m.moved);
+  }
+
+  function pickRandom(g) {
+    const ms = validMoves(g);
+    return ms.length ? ms[(Math.random() * ms.length) | 0].d : null;
+  }
+
+  function pickOrdered(g) {
+    for (const key of ['down', 'left', 'right', 'up']) {
+      if (simMove(g, DIRS[key]).moved) return DIRS[key];
+    }
+    return null;
+  }
+
+  function pickGreedy(g) {
+    const ms = validMoves(g);
+    if (!ms.length) return null;
+    let bestScore = -Infinity, best = null;
+    for (const m of ms) {
+      let empties = 0, max = 0;
+      for (let r = 0; r < SIZE; r++)
+        for (let c = 0; c < SIZE; c++) {
+          if (!m.s[r][c]) empties++;
+          if (m.s[r][c] > max) max = m.s[r][c];
+        }
+      const corner = m.s[3][0] === max ? max / 2 : 0;
+      const score = m.gained + empties * 10 + corner + Math.random() * 4;
+      if (score > bestScore) { bestScore = score; best = m.d; }
+    }
+    return best;
+  }
+
+  const DIFFS = {
+    easy: { label: 'Kolay', tempo: 950 },
+    mid:  { label: 'Orta',  tempo: 700 },
+    hard: { label: 'Zor',   tempo: 480 }
+  };
+
+  /* ---------- HP / avatars ---------- */
+
+  const hp = { me: MAX_HP, ai: MAX_HP };
+
+  function renderHP(side) {
+    const fill = $(side === 'me' ? 'meHpFill' : 'aiHpFill');
+    const num = $(side === 'me' ? 'meHpNum' : 'aiHpNum');
+    const v = hp[side];
+    const pct = v / MAX_HP;
+    fill.style.width = (pct * 100) + '%';
+    fill.classList.toggle('warn', pct <= .5 && pct > .25);
+    fill.classList.toggle('low', pct <= .25);
+    num.textContent = v;
+  }
+
+  function hitFx(side, n) {
+    const avatar = $(side === 'me' ? 'meAvatar' : 'aiAvatar');
+    avatar.classList.remove('hit');
+    void avatar.offsetWidth;
+    avatar.classList.add('hit');
+    const col = $(side === 'me' ? 'meCol' : 'aiCol');
+    const f = document.createElement('span');
+    f.className = 'dmgf';
+    f.textContent = '-' + n;
+    f.style.left = `calc(50% + ${Math.round(Math.random() * 40 - 20)}px)`;
+    col.appendChild(f);
+    f.addEventListener('animationend', () => f.remove());
+  }
+
+  const inCombat = () => state === 'running' || state === 'fight';
+
+  function applyDamage(side, n) {
+    if (!inCombat()) return;
+    hp[side] = Math.max(0, hp[side] - n);
+    renderHP(side);
+    hitFx(side, n);
+    if (hp[side] === 0) finish('ko');
+  }
+
+  /* ---------- Lane battle simulation ---------- */
+
+  let units = [];
+  const spawnIx = { me: 0, ai: 0 };
+
+  function unitCount(side) {
+    return units.filter(u => u.side === side && !u.dead).length;
+  }
+
+  function spawnUnit(side, value, fx, fy) {
+    const spec = UNITS[value];
+    const laneW = laneEl.clientWidth, laneH = laneEl.clientHeight;
+    let x, y;
+    if (fx != null) {
+      x = fx; y = fy;
+    } else {
+      x = laneW * SPAWN_COLS[spawnIx[side]] / 100;
+      spawnIx[side] = (spawnIx[side] + 1) % SPAWN_COLS.length;
+      y = side === 'me' ? laneH - 16 : 16;
+    }
+
+    const el = document.createElement('div');
+    el.className = 'unit born ' + side + ' k' + value;
+    el.innerHTML = `<span class="g" style="width:${spec.px}px;height:${spec.px}px">${SPRITES[value]}</span><div class="uhp"><i></i></div>`;
+    el.addEventListener('animationend', e => {
+      if (e.animationName === 'spawn') el.classList.remove('born');
+      else if (e.animationName === 'hurtf') el.classList.remove('hurt');
+    });
+    laneEl.appendChild(el);
+
+    const u = {
+      side, spec,
+      hp: spec.hp,
+      x, y,
+      cd: 0.4,
+      dead: false,
+      el,
+      hpEl: el.querySelector('.uhp i')
+    };
+    el.style.transform = `translate(${x}px, ${y}px) translate(-50%, -50%)`;
+    units.push(u);
+  }
+
+  function killUnit(u) {
+    u.dead = true;
+    u.el.classList.add('dying');
+    setTimeout(() => u.el.remove(), 200);
+  }
+
+  function hurtUnit(u, dmg) {
+    u.hp -= dmg;
+    u.el.classList.remove('hurt');
+    void u.el.offsetWidth;
+    u.el.classList.add('hurt');
+    u.hpEl.style.width = Math.max(0, u.hp / u.spec.hp * 100) + '%';
+    if (u.hp <= 0) killUnit(u);
+  }
+
+  function shootProj(x0, y0, x1, y1, type) {
+    const p = document.createElement('div');
+    p.className = 'proj' + (type ? ' ' + type : '');
+    laneEl.appendChild(p);
+    const rot = type === 'arrow' ? ` rotate(${(Math.atan2(y1 - y0, x1 - x0) * 180 / Math.PI).toFixed(1)}deg)` : '';
+    p.style.transform = `translate(${x0}px, ${y0}px)` + rot;
+    p.animate(
+      [{ transform: `translate(${x0}px, ${y0}px)` + rot }, { transform: `translate(${x1}px, ${y1}px)` + rot }],
+      { duration: 130, easing: 'linear', fill: 'forwards' }
+    );
+    setTimeout(() => p.remove(), 170);
+  }
+
+  function atkFx(u) {
+    u.el.classList.remove('atk');
+    void u.el.offsetWidth;
+    u.el.classList.add('atk');
+  }
+
+  function attack(u, target) {
+    atkFx(u);
+    if (u.spec.ranged) shootProj(u.x, u.y, target.x, target.y, u.spec.proj);
+    if (u.spec.splash) {
+      for (const v of units) {
+        if (v.dead || v.side === u.side) continue;
+        if (Math.hypot(v.x - target.x, v.y - target.y) <= u.spec.splash) hurtUnit(v, u.spec.dmg);
+      }
+    } else {
+      hurtUnit(target, u.spec.dmg);
+    }
+  }
+
+  function simulate(dt) {
+    const laneW = laneEl.clientWidth, laneH = laneEl.clientHeight;
+
+    for (const u of units) {
+      if (u.dead) continue;
+      u.cd -= dt;
+
+      // nearest living enemy, freeform across the whole lane
+      let nearest = null, nd = Infinity;
+      for (const v of units) {
+        if (v.dead || v.side === u.side) continue;
+        const d = Math.hypot(v.x - u.x, v.y - u.y);
+        if (d < nd) { nd = d; nearest = v; }
+      }
+
+      if (nearest) {
+        const eff = u.spec.range + (u.spec.size + nearest.spec.size) / 4;
+        if (nd <= eff) {
+          if (u.cd <= 0) { u.cd = u.spec.per; attack(u, nearest); }
+        } else {
+          const s = u.spec.speed * dt / nd;
+          u.x += (nearest.x - u.x) * s;
+          u.y += (nearest.y - u.y) * s;
+        }
+      } else if (state !== 'fight') {
+        // mode 1 only — no enemies left: march on the enemy avatar
+        const enemySide = u.side === 'me' ? 'ai' : 'me';
+        const ax = laneW / 2;
+        const ay = u.side === 'me' ? 8 : laneH - 8;
+        const d = Math.hypot(ax - u.x, ay - u.y);
+        if (d <= u.spec.range + 12) {
+          if (u.cd <= 0) {
+            u.cd = u.spec.per;
+            atkFx(u);
+            if (u.spec.ranged) shootProj(u.x, u.y, ax, ay, u.spec.proj);
+            applyDamage(enemySide, u.spec.dmg);
+            if (!inCombat()) return;
+          }
+        } else {
+          const s = u.spec.speed * dt / d;
+          u.x += (ax - u.x) * s;
+          u.y += (ay - u.y) * s;
+        }
+      }
+    }
+
+    // gentle separation between same-side units so they don't stack
+    for (let i = 0; i < units.length; i++) {
+      const a = units[i];
+      if (a.dead) continue;
+      for (let j = i + 1; j < units.length; j++) {
+        const b = units[j];
+        if (b.dead || b.side !== a.side) continue;
+        const dx = b.x - a.x, dy = b.y - a.y;
+        const d = Math.hypot(dx, dy);
+        const min = (a.spec.size + b.spec.size) / 2;
+        if (d > 0 && d < min) {
+          const push = (min - d) / 2;
+          a.x -= dx / d * push; a.y -= dy / d * push;
+          b.x += dx / d * push; b.y += dy / d * push;
+        }
+      }
+    }
+
+    for (const u of units) {
+      if (u.dead) continue;
+      u.x = Math.min(laneW - 8, Math.max(8, u.x));
+      u.y = Math.min(laneH - 8, Math.max(8, u.y));
+      u.el.style.transform = `translate(${u.x}px, ${u.y}px) translate(-50%, -50%)`;
+    }
+
+    units = units.filter(u => !u.dead);
+
+    // arena mode: a wiped-out army ends the battle immediately
+    if (state === 'fight') {
+      const mAlive = units.some(u => u.side === 'me');
+      const aAlive = units.some(u => u.side === 'ai');
+      if (!mAlive || !aAlive) finish('army');
+    }
+  }
+
+  let lastTick = 0;
+  function battleLoop(ts) {
+    if (!inCombat()) return;
+    const dt = Math.min(0.05, (ts - lastTick) / 1000 || 0.016);
+    lastTick = ts;
+    simulate(dt);
+    requestAnimationFrame(battleLoop);
+  }
+
+  function clearUnits() {
+    for (const u of units) u.el.remove();
+    units = [];
+    spawnIx.me = 0;
+    spawnIx.ai = 0;
+  }
+
+  /* ---------- Deploy (tile → unit or bank) ---------- */
+
+  function deploy(game, tile, side) {
+    game.beginFire(tile);
+    const value = tile.value;
+    setTimeout(() => {
+      game.deleteTile(tile);
+      if (mode === 1) {
+        if (state === 'running') spawnUnit(side, value);
+      } else if (state === 'build' || state === 'fightsplash') {
+        bankUnit(side, value);
+      }
+    }, DEPLOY_CAST_MS);
+  }
+
+  /* ---------- Match controller ---------- */
+
+  let state = 'idle'; // idle | countdown | running | build | fightsplash | fight | ended
+  let diffKey = storage.get('vs2048diff') || 'mid';
+  if (!DIFFS[diffKey]) diffKey = 'mid';
+  let mode = +(storage.get('vs2048mode') || 1);
+  if (mode !== 2) mode = 1;
+  let clockTimer = null, aiTimer = null, endAt = 0;
+  let lastDeploy = 0;
+
+  const MODE_DESC = {
+    1: "Canlı savaş: dokunduğun taş anında sol lane'e asker olarak çıkar; askerler önce düşman ordusunu, yol boşsa avatarı döver. 5 dakikada rakibin 500 HP'sini ilk eriten kazanır.",
+    2: "Arena: 30 saniye taş biriktir — her dokunuş orduna asker ekler (ortadaki tabloda sayılır). Süre bitince FIGHT: ordular arenada çarpışır; rakip ordusunu tamamen yok eden kazanır, 45 sn dolarsa kalan ordu gücü sayılır."
+  };
+
+  const overlay = $('overlay');
+  const startPanel = $('startPanel');
+  const countPanel = $('countPanel');
+  const endPanel = $('endPanel');
+  const timerEl = $('timer');
+
+  const me = new Game($('meBoard'));
+  const ai = new Game($('aiBoard'));
+
+  // spawn point markers (top + bottom, percent-based)
+  for (const pct of SPAWN_COLS) {
+    for (const top of [true, false]) {
+      const m = document.createElement('i');
+      m.className = 'mark';
+      m.style.left = pct + '%';
+      m.style[top ? 'top' : 'bottom'] = '4px';
+      laneEl.appendChild(m);
+    }
+  }
+
+  function renderTimer(ms) {
+    const sec = Math.ceil(ms / 1000);
+    timerEl.textContent = Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0');
+    const active = state === 'running' || state === 'build' || state === 'fight';
+    timerEl.classList.toggle('urgent', active && sec <= 10);
+  }
+
+  function startClock(ms, onEnd) {
+    clearInterval(clockTimer);
+    endAt = performance.now() + ms;
+    renderTimer(ms);
+    clockTimer = setInterval(() => {
+      const rem = endAt - performance.now();
+      if (rem <= 0) {
+        clearInterval(clockTimer);
+        renderTimer(0);
+        onEnd();
+      } else renderTimer(rem);
+    }, 100);
+  }
+
+  /* ---------- Mode layouts (shared elements get re-parented) ---------- */
+
+  const aiColEl = $('aiCol'), meColEl = $('meCol');
+  const aiBoardEl = $('aiBoard'), meBoardEl = $('meBoard');
+
+  function layoutMode1() {
+    $('m2Build').hidden = true;
+    $('m2Fight').hidden = true;
+    $('m1Left').hidden = false;
+    $('m1Right').hidden = false;
+    $('m1Left').append(aiColEl, laneEl, meColEl);
+    $('m1Right').insertBefore(aiBoardEl, $('hud'));
+    $('m1Right').insertBefore(meBoardEl, $('bnameBottom'));
+    $('hud').append(timerEl);
+  }
+
+  function layoutBuild() {
+    $('m1Left').hidden = true;
+    $('m1Right').hidden = true;
+    $('m2Fight').hidden = true;
+    const b = $('m2Build');
+    b.hidden = false;
+    b.insertBefore(aiBoardEl, $('m2TimerSlot'));
+    $('m2TimerSlot').append(timerEl);
+    b.append(meBoardEl);
+  }
+
+  function layoutFight() {
+    $('m2Build').hidden = true;
+    const f = $('m2Fight');
+    f.hidden = false;
+    $('m2fHud').append(timerEl);
+    f.append(aiColEl, laneEl, meColEl);
+  }
+
+  /* ---------- Unit bank + meters (mode 2) ---------- */
+
+  const bank = { me: {}, ai: {} };
+  const meterCells = { me: {}, ai: {} };
+
+  function buildMeters() {
+    const strip = $('m2Meter');
+    for (const v of Object.keys(UNITS)) {
+      const col = document.createElement('div');
+      col.className = 'mcol';
+      col.innerHTML = `
+        <div class="mcnt ai zero"><span class="ic">${SPRITES[v]}</span><b>0</b></div>
+        <div class="vchip t${v}">${v}</div>
+        <div class="mcnt me zero"><span class="ic">${SPRITES[v]}</span><b>0</b></div>`;
+      strip.appendChild(col);
+      for (const side of ['ai', 'me']) {
+        const cell = col.querySelector('.mcnt.' + side);
+        cell.addEventListener('animationend', () => cell.classList.remove('bump'));
+        meterCells[side][v] = cell;
+      }
+    }
+  }
+
+  function resetBanks() {
+    for (const side of ['me', 'ai']) {
+      for (const v of Object.keys(UNITS)) {
+        bank[side][v] = 0;
+        const cell = meterCells[side][v];
+        cell.querySelector('b').textContent = '0';
+        cell.classList.add('zero');
+      }
+    }
+  }
+
+  function bankUnit(side, value) {
+    bank[side][value]++;
+    const cell = meterCells[side][value];
+    cell.querySelector('b').textContent = bank[side][value];
+    cell.classList.remove('zero');
+    cell.classList.remove('bump');
+    void cell.offsetWidth;
+    cell.classList.add('bump');
+  }
+
+  function showPanel(panel) {
+    for (const p of [startPanel, countPanel, endPanel]) p.hidden = p !== panel;
+    overlay.classList.toggle('show', !!panel);
+  }
+
+  function loadTally() {
+    try { return JSON.parse(storage.get('vs2048tally')) || { w: 0, l: 0, d: 0 }; }
+    catch { return { w: 0, l: 0, d: 0 }; }
+  }
+  function renderTally() {
+    const t = loadTally();
+    const text = `Seri: ${t.w}G · ${t.l}M · ${t.d}B`;
+    $('tallyStart').textContent = text;
+    $('tallyEnd').textContent = text;
+  }
+  function addTally(result) {
+    const t = loadTally();
+    t[result]++;
+    storage.set('vs2048tally', JSON.stringify(t));
+    renderTally();
+  }
+
+  function setDiff(key) {
+    diffKey = key;
+    storage.set('vs2048diff', key);
+    $('diffLabel').textContent = DIFFS[key].label;
+    for (const b of $('diffSeg').children) b.classList.toggle('on', b.dataset.d === key);
+  }
+
+  function beginCountdown() {
+    state = 'countdown';
+    if (mode === 1) layoutMode1();
+    else layoutBuild();
+    let n = 3;
+    countPanel.textContent = n;
+    showPanel(countPanel);
+    const step = () => {
+      n--;
+      if (n === 0) { showPanel(null); startMatch(); return; }
+      countPanel.textContent = n;
+      setTimeout(step, 650);
+    };
+    setTimeout(step, 650);
+  }
+
+  function startMatch() {
+    me.reset();
+    ai.reset();
+    clearUnits();
+    resetBanks();
+    hp.me = MAX_HP;
+    hp.ai = MAX_HP;
+    renderHP('me');
+    renderHP('ai');
+    if (mode === 1) {
+      state = 'running';
+      startClock(MATCH_MS, () => finish('time'));
+      lastTick = performance.now();
+      requestAnimationFrame(battleLoop);
+    } else {
+      state = 'build';
+      startClock(BUILD_MS, beginFightSplash);
+    }
+    aiTick();
+  }
+
+  function beginFightSplash() {
+    state = 'fightsplash';
+    clearTimeout(aiTimer);
+    const sp = document.createElement('div');
+    sp.className = 'fight-splash';
+    sp.innerHTML = '<span>FIGHT!</span>';
+    $('game').appendChild(sp);
+    setTimeout(() => sp.remove(), 950);
+    setTimeout(startFight, 900);
+  }
+
+  function startFight() {
+    layoutFight();
+    state = 'fight';
+    const laneW = laneEl.clientWidth, laneH = laneEl.clientHeight;
+    const zone = Math.min(70, laneH * .2);
+    for (const side of ['me', 'ai']) {
+      for (const [v, count] of Object.entries(bank[side])) {
+        for (let i = 0; i < count; i++) {
+          const x = 12 + Math.random() * (laneW - 24);
+          const y = side === 'me'
+            ? laneH - 14 - Math.random() * zone
+            : 14 + Math.random() * zone;
+          spawnUnit(side, +v, x, y);
+        }
+      }
+    }
+    startClock(BATTLE_MS, () => finish('ftime'));
+    lastTick = performance.now();
+    requestAnimationFrame(battleLoop);
+  }
+
+  function aiDeploy(tile) {
+    deploy(ai, tile, 'ai');
+  }
+
+  function aiAct() {
+    if (ai.busy) return;
+    const live = ai.liveTiles();
+    if (!live.length) return;
+    const eligible = live.filter(t => UNITS[t.value]);
+    const capOk = mode === 2 || unitCount('ai') < MAX_UNITS_PER_SIDE;
+    const canDeploy = live.length > 1 && eligible.length > 0 && capOk;
+    const biggest = eligible.reduce((a, b) => (b.value > a.value ? b : a), eligible[0]);
+    const smallest = eligible.reduce((a, b) => (b.value < a.value ? b : a), eligible[0]);
+
+    if (ai.locked) {
+      if (canDeploy) aiDeploy(smallest);
+      return;
+    }
+    const g = ai.gridValues();
+    if (diffKey === 'easy') {
+      if (canDeploy && Math.random() < 0.15) { aiDeploy(eligible[(Math.random() * eligible.length) | 0]); return; }
+      const d = pickRandom(g);
+      if (d) ai.move(d[0], d[1]);
+    } else if (diffKey === 'mid') {
+      if (canDeploy && biggest && biggest.value >= 16 && Math.random() < 0.3) { aiDeploy(biggest); return; }
+      const d = pickOrdered(g);
+      if (d) ai.move(d[0], d[1]);
+    } else {
+      const empties = g.flat().filter(v => !v).length;
+      if (canDeploy && biggest && (biggest.value >= 32 || (empties <= 2 && biggest.value >= 8))) { aiDeploy(biggest); return; }
+      const d = pickGreedy(g);
+      if (d) ai.move(d[0], d[1]);
+    }
+  }
+
+  function aiTick() {
+    if (state !== 'running' && state !== 'build') return;
+    aiAct();
+    aiTimer = setTimeout(aiTick, DIFFS[diffKey].tempo * (0.85 + Math.random() * 0.3));
+  }
+
+  function livingUnitHp(side) {
+    return units.reduce((s, u) => s + (u.side === side && !u.dead ? u.hp : 0), 0);
+  }
+
+  function livingUnitCount(side) {
+    return units.filter(u => u.side === side && !u.dead).length;
+  }
+
+  function finish(kind) {
+    if (!inCombat()) return;
+    state = 'ended';
+    clearInterval(clockTimer);
+    clearTimeout(aiTimer);
+    timerEl.classList.remove('urgent');
+
+    let result;
+    if (kind === 'ko') result = hp.ai === 0 ? 'w' : 'l';
+    else if (kind === 'army' || kind === 'ftime') {
+      // arena: surviving army (strength as tiebreak on timeout) decides
+      const m = livingUnitHp('me'), a = livingUnitHp('ai');
+      result = m > a ? 'w' : m < a ? 'l' : 'd';
+    }
+    else result = hp.me > hp.ai ? 'w' : hp.me < hp.ai ? 'l' : 'd';
+
+    $('endTitle').textContent = result === 'w' ? 'Kazandın!' : result === 'l' ? 'Kaybettin' : 'Berabere';
+    if (kind === 'army' || kind === 'ftime') {
+      $('endSub').textContent = `Kalan birim: Sen ${livingUnitCount('me')} · Rakip ${livingUnitCount('ai')}`;
+    } else {
+      const why = kind === 'ko' ? 'Nakavt! · ' : '';
+      $('endSub').textContent = `${why}Sen ${hp.me} HP · Rakip ${hp.ai} HP`;
+    }
+    addTally(result);
+    showPanel(endPanel);
+  }
+
+  /* ---------- Input ---------- */
+
+  function denyTile(tile) {
+    tile.el.classList.remove('deny');
+    void tile.el.offsetWidth;
+    tile.el.classList.add('deny');
+  }
+
+  function tryDeploy(el) {
+    if ((state !== 'running' && state !== 'build') || me.busy) return;
+    const tile = me.tileByEl(el);
+    if (!tile || tile.firing) return;
+    const capFull = mode === 1 && unitCount('me') >= MAX_UNITS_PER_SIDE;
+    if (!UNITS[tile.value] || me.liveTiles().length <= 1 || capFull) {
+      denyTile(tile);
+      return;
+    }
+    const now = performance.now();
+    if (now - lastDeploy < DEPLOY_COOLDOWN) return;
+    lastDeploy = now;
+    deploy(me, tile, 'me');
+  }
+
+  const KEYS = {
+    ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1],
+    w: [-1, 0], s: [1, 0], a: [0, -1], d: [0, 1]
+  };
+  window.addEventListener('keydown', e => {
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    const dir = KEYS[e.key.length === 1 ? e.key.toLowerCase() : e.key];
+    if (!dir) return;
+    e.preventDefault();
+    if (state === 'running' || state === 'build') me.move(dir[0], dir[1]);
+  });
+
+  let pStart = null;
+  window.addEventListener('pointerdown', e => {
+    if (!e.isPrimary) return;
+    pStart = {
+      x: e.clientX, y: e.clientY,
+      t: performance.now(),
+      target: e.target,
+      touch: e.pointerType !== 'mouse'
+    };
+  });
+  window.addEventListener('pointerup', e => {
+    if (!e.isPrimary || !pStart) return;
+    const dx = e.clientX - pStart.x;
+    const dy = e.clientY - pStart.y;
+    const dist = Math.max(Math.abs(dx), Math.abs(dy));
+    const dt = performance.now() - pStart.t;
+    const s = pStart;
+    pStart = null;
+    if (state !== 'running' && state !== 'build') return;
+    const tapMax = s.touch ? 18 : 10; // finger jitter tolerance
+    if (dist < tapMax && dt < 350) {
+      const tileEl = s.target.closest?.('.tile');
+      if (tileEl) tryDeploy(tileEl); // AI tiles resolve to null in me.tileByEl
+    } else if (dist >= 22) {
+      if (Math.abs(dx) > Math.abs(dy)) me.move(0, dx > 0 ? 1 : -1);
+      else me.move(dy > 0 ? 1 : -1, 0);
+    }
+  });
+  window.addEventListener('pointercancel', () => { pStart = null; });
+  // Block page scroll only mid-match so full-screen swipes stay game input.
+  window.addEventListener('touchmove', e => {
+    if (state !== 'idle' && state !== 'ended') e.preventDefault();
+  }, { passive: false });
+
+  /* ---------- Wiring ---------- */
+
+  function setMode(m) {
+    mode = m;
+    storage.set('vs2048mode', m);
+    $('modeDesc').textContent = MODE_DESC[m];
+    for (const b of $('modeSeg').children) b.classList.toggle('on', +b.dataset.m === m);
+  }
+
+  $('modeSeg').addEventListener('click', e => {
+    const b = e.target.closest('button');
+    if (b) setMode(+b.dataset.m);
+  });
+  $('diffSeg').addEventListener('click', e => {
+    const b = e.target.closest('button');
+    if (b) setDiff(b.dataset.d);
+  });
+  $('startBtn').addEventListener('click', beginCountdown);
+  $('againBtn').addEventListener('click', beginCountdown);
+  $('chgBtn').addEventListener('click', () => {
+    state = 'idle';
+    showPanel(startPanel);
+  });
+
+  const rosterEl = $('roster');
+  for (const [v, spec] of Object.entries(UNITS)) {
+    const d = document.createElement('div');
+    d.className = 'ri';
+    d.innerHTML = `<span class="ic">${SPRITES[v]}</span><b>${v}</b><span>${spec.name}</span>`;
+    rosterEl.appendChild(d);
+  }
+
+  buildMeters();
+  setMode(mode);
+  setDiff(diffKey);
+  renderTally();
+  renderHP('me');
+  renderHP('ai');
+  showPanel(startPanel);
+</script>
