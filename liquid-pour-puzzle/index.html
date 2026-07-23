@@ -1,0 +1,2284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Liquid Pour Puzzle</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
+  html, body {
+    height: 100%;
+    background: radial-gradient(ellipse at top, #1a1f3a 0%, #0a0d1f 70%, #05060f 100%);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    color: #e8ecff;
+    overflow: hidden;
+  }
+  body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 16px;
+  }
+  .frame {
+    position: relative;
+    width: 420px;
+    height: 760px;
+    border-radius: 36px;
+    background: linear-gradient(180deg, #0e1430 0%, #0a0e25 100%);
+    box-shadow:
+      0 30px 80px rgba(0, 0, 0, 0.6),
+      0 0 0 8px #15192e,
+      0 0 0 10px #1f2547,
+      inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    overflow: hidden;
+  }
+  .frame::before {
+    /* Soft inner glow */
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: radial-gradient(ellipse at 50% 0%, rgba(80, 110, 220, 0.15), transparent 60%);
+    pointer-events: none;
+    z-index: 1;
+  }
+  .topbar {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 18px;
+    z-index: 5;
+  }
+  .icon-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: none;
+    background: linear-gradient(180deg, #2a3060 0%, #1a1f44 100%);
+    color: #c8d0ff;
+    font-size: 20px;
+    cursor: pointer;
+    box-shadow:
+      0 2px 6px rgba(0,0,0,0.4),
+      inset 0 1px 0 rgba(255,255,255,0.15),
+      inset 0 -2px 0 rgba(0,0,0,0.25);
+    transition: transform 0.08s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .icon-btn:hover { background: linear-gradient(180deg, #313870 0%, #1f2552 100%); }
+  .icon-btn:active { transform: translateY(1px); }
+  .level-label {
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    color: #e8ecff;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+  }
+  canvas {
+    position: absolute;
+    top: 60px;
+    left: 0;
+    width: 420px;
+    height: 700px;
+    z-index: 2;
+    cursor: pointer;
+  }
+  .modal {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(5, 8, 20, 0.78);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    animation: fadeIn 0.25s ease forwards;
+  }
+  .modal.show { display: flex; }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes pop {
+    0% { transform: scale(0.6); opacity: 0; }
+    70% { transform: scale(1.06); opacity: 1; }
+    100% { transform: scale(1); }
+  }
+  .modal-card {
+    width: 300px;
+    padding: 28px 24px;
+    border-radius: 28px;
+    background: linear-gradient(180deg, #1c2348 0%, #131838 100%);
+    box-shadow:
+      0 18px 50px rgba(0,0,0,0.5),
+      inset 0 1px 0 rgba(255,255,255,0.1);
+    text-align: center;
+    animation: pop 0.32s cubic-bezier(0.18,0.89,0.32,1.28);
+  }
+  .modal-title {
+    font-size: 28px;
+    font-weight: 800;
+    margin-bottom: 6px;
+    background: linear-gradient(180deg, #fff 0%, #b8c4ff 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .modal-sub {
+    font-size: 14px;
+    color: #a4adda;
+    margin-bottom: 22px;
+  }
+  .modal-btn {
+    padding: 14px 32px;
+    font-size: 16px;
+    font-weight: 700;
+    color: #fff;
+    background: linear-gradient(180deg, #4a7cff 0%, #2e58e0 100%);
+    border: none;
+    border-radius: 18px;
+    cursor: pointer;
+    box-shadow:
+      0 6px 14px rgba(46, 88, 224, 0.4),
+      inset 0 1px 0 rgba(255,255,255,0.25),
+      inset 0 -3px 0 rgba(0,0,0,0.18);
+    letter-spacing: 0.5px;
+  }
+  .modal-btn:hover { filter: brightness(1.08); }
+  .modal-btn:active { transform: translateY(1px); }
+  .modal-btn.ghost {
+    background: linear-gradient(180deg, #3a416a 0%, #232847 100%);
+    box-shadow:
+      0 4px 10px rgba(0,0,0,0.3),
+      inset 0 1px 0 rgba(255,255,255,0.1),
+      inset 0 -2px 0 rgba(0,0,0,0.2);
+    margin-left: 10px;
+  }
+  .audio-toggle {
+    position: absolute;
+    bottom: 12px;
+    right: 16px;
+    z-index: 5;
+    font-size: 14px;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.05);
+    border: none;
+    color: #8590bf;
+    cursor: pointer;
+  }
+  .audio-toggle:hover { color: #c8d0ff; }
+</style>
+</head>
+<body>
+<div class="frame" id="frame">
+  <div class="topbar">
+    <button class="icon-btn" id="restartBtn" title="Restart">↻</button>
+    <div class="level-label" id="levelLabel">LEVEL 1</div>
+    <button class="icon-btn" id="levelMenuBtn" title="Levels">☰</button>
+  </div>
+  <canvas id="game" width="420" height="700"></canvas>
+  <button class="audio-toggle" id="audioToggle" title="Sound">♪</button>
+
+  <div class="modal" id="winModal">
+    <div class="modal-card">
+      <div class="modal-title" id="winTitle">Cleared!</div>
+      <div class="modal-sub" id="winSub">Nicely done.</div>
+      <button class="modal-btn" id="nextBtn">Next →</button>
+    </div>
+  </div>
+
+  <div class="modal" id="stuckModal">
+    <div class="modal-card">
+      <div class="modal-title">Stuck</div>
+      <div class="modal-sub">No valid pour remains. Try again?</div>
+      <button class="modal-btn" id="restartFromStuckBtn">Restart</button>
+    </div>
+  </div>
+
+  <div class="modal" id="completeModal">
+    <div class="modal-card">
+      <div class="modal-title">All 30 Cleared!</div>
+      <div class="modal-sub">You've mastered every level.</div>
+      <button class="modal-btn" id="playAgainBtn">Play Again</button>
+    </div>
+  </div>
+
+  <div class="modal" id="menuModal">
+    <div class="modal-card" style="width: 320px;">
+      <div class="modal-title" style="font-size: 22px; margin-bottom: 18px;">Levels</div>
+      <div id="levelGrid" style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-bottom: 20px;"></div>
+      <button class="modal-btn ghost" id="closeMenuBtn">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+// =============================================================================
+// CONFIG & PALETTE
+// =============================================================================
+
+const W = 420;
+const H = 700;
+
+// Color palette: each color has outline (saturated), fill (lighter saturated), dim (very dark for empty cell hint)
+const PALETTE = {
+  red:    { outline: '#ff5874', fill: '#ff8da0', glow: '#ff5874', dim: '#3a1521' },
+  blue:   { outline: '#4ea7ff', fill: '#83c4ff', glow: '#4ea7ff', dim: '#142844' },
+  green:  { outline: '#4ddc83', fill: '#88ebab', glow: '#4ddc83', dim: '#143a23' },
+  yellow: { outline: '#ffd14a', fill: '#ffe287', glow: '#ffd14a', dim: '#3d3010' },
+  purple: { outline: '#b369ff', fill: '#cf95ff', glow: '#b369ff', dim: '#2a1542' },
+  orange: { outline: '#ff9a3c', fill: '#ffbb78', glow: '#ff9a3c', dim: '#3a2110' },
+  pink:   { outline: '#ff7eb6', fill: '#ffa8cc', glow: '#ff7eb6', dim: '#3a1a2a' },
+  cyan:   { outline: '#46e7d6', fill: '#86f0e3', glow: '#46e7d6', dim: '#103231' },
+};
+
+// Tube max capacity (cells of liquid)
+const TUBE_MAX_CELLS = 8;
+
+// Pour rate: seconds per cell of liquid
+const POUR_SECONDS_PER_CELL = 0.18;
+
+// Gravity animation duration per cell-row of fall
+const GRAVITY_SECONDS_PER_ROW = 0.09;
+
+// Clear pop animation duration
+const CLEAR_ANIM_DUR = 0.28;
+
+// =============================================================================
+// LEVELS — 15 hand-designed, balanced (liquid total per color = holder cells per color)
+// =============================================================================
+
+const LEVELS = [
+  // ========== LEVEL 1 ========== Teach the basic pour. 1×1 only, no stacking.
+  {
+    cols: 3, rows: 4,
+    holders: [
+      { color: 'red',  cells: [[0,3]] },
+      { color: 'blue', cells: [[1,3]] },
+      { color: 'red',  cells: [[2,3]] },
+    ],
+    tubes: [
+      { col: 0, stack: [{c:'red',v:1}] },
+      { col: 1, stack: [{c:'blue',v:1}] },
+      { col: 2, stack: [{c:'red',v:1}] },
+    ],
+  },
+
+  // ========== LEVEL 2 ========== Stacking: tube has two colors, must dispense top first.
+  {
+    cols: 3, rows: 5,
+    holders: [
+      { color: 'red',  cells: [[0,3]] },
+      { color: 'red',  cells: [[2,3]] },
+      { color: 'blue', cells: [[0,1]] },
+      { color: 'blue', cells: [[1,4]] },
+      { color: 'blue', cells: [[2,1]] },
+    ],
+    tubes: [
+      { col: 0, stack: [{c:'red',v:1},{c:'blue',v:1}] },
+      { col: 1, stack: [{c:'blue',v:1}] },
+      { col: 2, stack: [{c:'red',v:1},{c:'blue',v:1}] },
+    ],
+  },
+
+  // ========== LEVEL 3 ========== Multi-cell holder: a 1×4 spans the bottom; multiple tubes pour into it.
+  {
+    cols: 4, rows: 5,
+    holders: [
+      { color: 'red',  cells: [[1,3],[2,3]] },
+      { color: 'blue', cells: [[0,4],[1,4],[2,4],[3,4]] },
+    ],
+    tubes: [
+      { col: 0, stack: [{c:'blue',v:1}] },
+      { col: 1, stack: [{c:'blue',v:1},{c:'red',v:1}] },
+      { col: 2, stack: [{c:'blue',v:1},{c:'red',v:1}] },
+      { col: 3, stack: [{c:'blue',v:1}] },
+    ],
+  },
+
+  // ========== LEVEL 4 ========== Line-of-sight: green blocks red until cleared.
+  {
+    cols: 3, rows: 5,
+    holders: [
+      { color: 'red',   cells: [[1,0]] },
+      { color: 'green', cells: [[0,2],[1,2],[2,2]] },
+      { color: 'blue',  cells: [[0,4]] },
+      { color: 'blue',  cells: [[2,4]] },
+    ],
+    tubes: [
+      { col: 0, stack: [{c:'blue',v:1},{c:'green',v:1}] },
+      { col: 1, stack: [{c:'green',v:1},{c:'red',v:1}] },
+      { col: 2, stack: [{c:'blue',v:1},{c:'green',v:1}] },
+    ],
+  },
+
+  // ========== LEVEL 5 ========== L-shape introduced.
+  {
+    cols: 4, rows: 5,
+    holders: [
+      // L-shape (vertical bar with bottom-right foot): green
+      { color: 'green', cells: [[0,2],[0,3],[0,4],[1,4]] },
+      // 1x1 red, isolated
+      { color: 'red', cells: [[3,4]] },
+      // 1x2 blue
+      { color: 'blue', cells: [[2,4],[3,3]] },
+    ],
+    // Wait, blue cells are [2,4] and [3,3] — those aren't adjacent. Let me fix.
+    // (Re-designing inline below)
+  },
+
+  // ========== LEVEL 6 ========== Gravity-dependent: clearing red drops blue into reachable column.
+  {
+    cols: 3, rows: 6,
+    holders: [
+      { color: 'blue',  cells: [[0,0]] },
+      { color: 'blue',  cells: [[2,0]] },
+      { color: 'red',   cells: [[0,3]] },
+      { color: 'red',   cells: [[2,3]] },
+      { color: 'green', cells: [[1,5]] },
+    ],
+    tubes: [
+      { col: 0, stack: [{c:'red',v:1},{c:'blue',v:1}] },
+      { col: 1, stack: [{c:'green',v:1}] },
+      { col: 2, stack: [{c:'red',v:1},{c:'blue',v:1}] },
+    ],
+  },
+
+  // ========== LEVEL 7 ========== T-shape, 4 colors. Inverted T with foot at floor —
+  // under the per-column ground rule, only the foot's column (col 1) can pour into Y.
+  {
+    cols: 4, rows: 6,
+    holders: [
+      { color: 'yellow', cells: [[0,1],[1,1],[2,1],[1,2]] },  // T (foot down)
+      { color: 'red',    cells: [[0,3]] },
+      { color: 'blue',   cells: [[3,3]] },
+      { color: 'green',  cells: [[1,5],[2,5]] },
+    ],
+    tubes: [
+      { col: 0, stack: [{c:'red',v:1}] },
+      { col: 1, stack: [{c:'green',v:1},{c:'yellow',v:4}] },
+      { col: 2, stack: [{c:'green',v:1}] },
+      { col: 3, stack: [{c:'blue',v:1}] },
+    ],
+  },
+
+  // ========== LEVEL 8 ========== Mixed shapes, gravity cascade.
+  // The 3-cell red J on the right can only be reached by col 3 (col 2 has no R liquid),
+  // so col 3 must carry all 3 cells of red itself.
+  {
+    cols: 4, rows: 7,
+    holders: [
+      { color: 'purple', cells: [[1,0],[2,0]] },
+      { color: 'red',    cells: [[0,2],[1,2]] },
+      { color: 'blue',   cells: [[2,2],[3,2]] },
+      { color: 'yellow', cells: [[0,4],[0,5],[1,5]] },  // L (3 cells)
+      { color: 'red',    cells: [[2,5],[3,5],[3,6]] },  // J (3 cells)
+      { color: 'green',  cells: [[1,6],[2,6]] },
+    ],
+    tubes: [
+      { col: 0, stack: [{c:'yellow',v:3}] },
+      { col: 1, stack: [{c:'green',v:1},{c:'red',v:2},{c:'purple',v:1}] },
+      { col: 2, stack: [{c:'green',v:1},{c:'blue',v:1},{c:'purple',v:1}] },
+      { col: 3, stack: [{c:'red',v:3},{c:'blue',v:1}] },
+    ],
+  },
+
+  // ========== LEVEL 9 ========== Plus shape. Per the per-column rule, after the plus
+  // drops to its final position only its central column has a chain to the floor —
+  // so all 5 orange cells must be supplied by col 2.
+  {
+    cols: 5, rows: 7,
+    holders: [
+      { color: 'orange', cells: [[2,2],[1,3],[2,3],[3,3],[2,4]] },
+      { color: 'blue',   cells: [[0,4],[0,5],[0,6]] },
+      { color: 'blue',   cells: [[4,4],[4,5],[4,6]] },
+      { color: 'red',    cells: [[1,6],[2,6],[3,6]] },
+    ],
+    tubes: [
+      { col: 0, stack: [{c:'blue',v:3}] },
+      { col: 1, stack: [{c:'red',v:1}] },
+      { col: 2, stack: [{c:'red',v:1},{c:'orange',v:5}] },
+      { col: 3, stack: [{c:'red',v:1}] },
+      { col: 4, stack: [{c:'blue',v:3}] },
+    ],
+  },
+
+  // ========== LEVEL 10 ========== Dense 4-color, deeper stacks.
+  {
+    cols: 4, rows: 7,
+    holders: [
+      { color: 'blue',   cells: [[0,1],[1,1]] },
+      { color: 'red',    cells: [[2,1],[3,1]] },
+      { color: 'green',  cells: [[0,3],[1,3],[2,3],[3,3]] },
+      { color: 'yellow', cells: [[0,5],[1,5]] },
+      { color: 'yellow', cells: [[2,5],[3,5]] },
+      { color: 'red',    cells: [[0,6],[1,6]] },
+      { color: 'blue',   cells: [[2,6],[3,6]] },
+    ],
+    tubes: [
+      { col: 0, stack: [{c:'red',v:1},{c:'yellow',v:1},{c:'green',v:1},{c:'blue',v:1}] },
+      { col: 1, stack: [{c:'red',v:1},{c:'yellow',v:1},{c:'green',v:1},{c:'blue',v:1}] },
+      { col: 2, stack: [{c:'blue',v:1},{c:'yellow',v:1},{c:'green',v:1},{c:'red',v:1}] },
+      { col: 3, stack: [{c:'blue',v:1},{c:'yellow',v:1},{c:'green',v:1},{c:'red',v:1}] },
+    ],
+  },
+
+  // ========== LEVEL 11 ========== 5 colors. Mixed shapes.
+  {
+    cols: 5, rows: 7,
+    holders: [
+      { color: 'cyan',   cells: [[0,0],[1,0]] },
+      { color: 'pink',   cells: [[3,0],[4,0]] },
+      { color: 'red',    cells: [[2,1],[2,2]] },
+      { color: 'blue',   cells: [[0,3],[1,3]] },
+      { color: 'blue',   cells: [[3,3],[4,3]] },
+      { color: 'yellow', cells: [[0,5],[0,6],[1,6]] },
+      { color: 'yellow', cells: [[3,6],[4,5],[4,6]] },
+      { color: 'red',    cells: [[2,5],[2,6]] },
+    ],
+    tubes: [
+      { col: 0, stack: [{c:'yellow',v:2},{c:'blue',v:1},{c:'cyan',v:1}] },
+      { col: 1, stack: [{c:'yellow',v:1},{c:'blue',v:1},{c:'cyan',v:1}] },
+      { col: 2, stack: [{c:'red',v:4}] },
+      { col: 3, stack: [{c:'yellow',v:1},{c:'blue',v:1},{c:'pink',v:1}] },
+      { col: 4, stack: [{c:'yellow',v:2},{c:'blue',v:1},{c:'pink',v:1}] },
+    ],
+  },
+
+  // ========== LEVEL 12 ========== Tubeless columns force gravity routing.
+  // Only col 2 is in line-of-sight for the central column (purple, orange, blue),
+  // so col 2 carries all of those colors; greens never appear in col 2,
+  // so all green liquid must live in cols 0 and 4.
+  {
+    cols: 5, rows: 7,
+    holders: [
+      { color: 'purple', cells: [[2,0],[2,1]] },
+      { color: 'green',  cells: [[0,2],[1,2]] },
+      { color: 'green',  cells: [[3,2],[4,2]] },
+      { color: 'orange', cells: [[2,3],[2,4]] },
+      { color: 'red',    cells: [[0,5],[0,6]] },
+      { color: 'red',    cells: [[4,5],[4,6]] },
+      { color: 'blue',   cells: [[1,6],[2,6],[3,6]] },
+    ],
+    tubes: [
+      { col: 0, stack: [{c:'red',v:2},{c:'green',v:2}] },
+      { col: 2, stack: [{c:'blue',v:3},{c:'orange',v:2},{c:'purple',v:2}] },
+      { col: 4, stack: [{c:'red',v:2},{c:'green',v:2}] },
+    ],
+  },
+
+  // ========== LEVEL 13 ========== Tight ordering. One mistake = unsolvable.
+  {
+    cols: 4, rows: 6,
+    holders: [
+      { color: 'red',    cells: [[1,0],[2,0]] },
+      { color: 'yellow', cells: [[0,2],[1,2],[2,2],[3,2]] },
+      { color: 'blue',   cells: [[1,4]] },
+      { color: 'blue',   cells: [[2,4]] },
+      { color: 'green',  cells: [[0,5],[1,5],[2,5],[3,5]] },
+    ],
+    tubes: [
+      { col: 0, stack: [{c:'green',v:1},{c:'yellow',v:1}] },
+      { col: 1, stack: [{c:'green',v:1},{c:'blue',v:1},{c:'yellow',v:1},{c:'red',v:1}] },
+      { col: 2, stack: [{c:'green',v:1},{c:'blue',v:1},{c:'yellow',v:1},{c:'red',v:1}] },
+      { col: 3, stack: [{c:'green',v:1},{c:'yellow',v:1}] },
+    ],
+  },
+
+  // ========== LEVEL 14 ========== Plus-shape buried, requires careful clearing.
+  // Pink (the plus) only ever lives in cols 1, 2, 3 — so all 5 pink units must
+  // come from those tubes. Side tubes (0, 4) end with C as their last band,
+  // which hits the cyans after they drop to row 7.
+  {
+    cols: 5, rows: 8,
+    holders: [
+      { color: 'cyan',   cells: [[0,0]] },
+      { color: 'cyan',   cells: [[4,0]] },
+      { color: 'pink',   cells: [[2,1],[1,2],[2,2],[3,2],[2,3]] },  // plus
+      { color: 'yellow', cells: [[0,4],[0,5]] },
+      { color: 'yellow', cells: [[4,4],[4,5]] },
+      { color: 'green',  cells: [[1,5],[2,5],[3,5]] },
+      { color: 'red',    cells: [[0,7],[1,7]] },
+      { color: 'red',    cells: [[3,7],[4,7]] },
+      { color: 'blue',   cells: [[2,6],[2,7]] },
+    ],
+    tubes: [
+      { col: 0, stack: [{c:'red',v:1},{c:'yellow',v:2},{c:'cyan',v:1}] },
+      { col: 1, stack: [{c:'red',v:1},{c:'green',v:1}] },
+      { col: 2, stack: [{c:'blue',v:2},{c:'green',v:1},{c:'pink',v:5}] },
+      { col: 3, stack: [{c:'red',v:1},{c:'green',v:1}] },
+      { col: 4, stack: [{c:'red',v:1},{c:'yellow',v:2},{c:'cyan',v:1}] },
+    ],
+  },
+
+  // ========== LEVEL 15 ========== HARD — Red L is wedged above row 5. It can only be
+  // touched after BOTH the blue and yellow under it clear, so it can drop to the floor.
+  // Cols 0 and 3 only carry green; the L never lands in those columns, so red liquid
+  // must come from the middle two tubes.
+  {
+    cols: 4, rows: 6,
+    holders: [
+      { color: 'red',    cells: [[1,2],[1,3],[2,3]] },
+      { color: 'green',  cells: [[0,5]] },
+      { color: 'blue',   cells: [[1,5]] },
+      { color: 'yellow', cells: [[2,5]] },
+      { color: 'green',  cells: [[3,5]] },
+    ],
+    tubes: [
+      { col: 0, stack: [{c:'green',v:1}] },
+      { col: 1, stack: [{c:'blue',v:1},{c:'red',v:2}] },
+      { col: 2, stack: [{c:'yellow',v:1},{c:'red',v:1}] },
+      { col: 3, stack: [{c:'green',v:1}] },
+    ],
+  },
+
+  // ========== LEVEL 16 ========== Medium: 4-color layer cake.
+  {
+    cols: 4, rows: 6,
+    holders: [
+      { color: 'yellow', cells: [[0,3],[1,3],[2,3],[3,3]] },
+      { color: 'red',    cells: [[1,4],[2,4]] },
+      { color: 'blue',   cells: [[0,5],[1,5]] },
+      { color: 'green',  cells: [[2,5],[3,5]] },
+    ],
+    tubes: [
+      { col: 0, stack: [{c:'blue',v:1},{c:'yellow',v:1}] },
+      { col: 1, stack: [{c:'blue',v:1},{c:'red',v:1},{c:'yellow',v:1}] },
+      { col: 2, stack: [{c:'green',v:1},{c:'red',v:1},{c:'yellow',v:1}] },
+      { col: 3, stack: [{c:'green',v:1},{c:'yellow',v:1}] },
+    ],
+  },
+
+  // ========== LEVEL 17 ========== Medium: 4-color, deeper stacks.
+  {
+    cols: 4, rows: 7,
+    holders: [
+      { color: 'orange', cells: [[0,3],[1,3],[2,3],[3,3]] },
+      { color: 'red',    cells: [[1,4],[2,4]] },
+      { color: 'green',  cells: [[0,5]] },
+      { color: 'green',  cells: [[3,5]] },
+      { color: 'blue',   cells: [[0,6],[1,6],[2,6],[3,6]] },
+    ],
+    tubes: [
+      { col: 0, stack: [{c:'blue',v:1},{c:'green',v:1},{c:'orange',v:1}] },
+      { col: 1, stack: [{c:'blue',v:1},{c:'red',v:1},{c:'orange',v:1}] },
+      { col: 2, stack: [{c:'blue',v:1},{c:'red',v:1},{c:'orange',v:1}] },
+      { col: 3, stack: [{c:'blue',v:1},{c:'green',v:1},{c:'orange',v:1}] },
+    ],
+  },
+
+  // ========== LEVEL 18 ========== HARD — Blue inverted T. Under per-column rule,
+  // only col 1 (the foot column) can pour into B once it drops to the floor — so
+  // all 4 cells of B must come from col 1.
+  {
+    cols: 4, rows: 7,
+    holders: [
+      { color: 'blue',   cells: [[0,3],[1,3],[2,3],[1,4]] },
+      { color: 'green',  cells: [[0,6]] },
+      { color: 'yellow', cells: [[1,6]] },
+      { color: 'yellow', cells: [[2,6]] },
+      { color: 'green',  cells: [[3,6]] },
+    ],
+    tubes: [
+      { col: 0, stack: [{c:'green',v:1}] },
+      { col: 1, stack: [{c:'yellow',v:1},{c:'blue',v:4}] },
+      { col: 2, stack: [{c:'yellow',v:1}] },
+      { col: 3, stack: [{c:'green',v:1}] },
+    ],
+  },
+
+  // ========== LEVEL 19 ========== Medium: 5-col with split bottom row.
+  {
+    cols: 5, rows: 7,
+    holders: [
+      { color: 'yellow', cells: [[0,4],[1,4],[2,4],[3,4],[4,4]] },
+      { color: 'red',    cells: [[1,5],[2,5],[3,5]] },
+      { color: 'blue',   cells: [[0,6],[1,6]] },
+      { color: 'green',  cells: [[2,6]] },
+      { color: 'blue',   cells: [[3,6],[4,6]] },
+    ],
+    tubes: [
+      { col: 0, stack: [{c:'blue',v:1},{c:'yellow',v:1}] },
+      { col: 1, stack: [{c:'blue',v:1},{c:'red',v:1},{c:'yellow',v:1}] },
+      { col: 2, stack: [{c:'green',v:1},{c:'red',v:1},{c:'yellow',v:1}] },
+      { col: 3, stack: [{c:'blue',v:1},{c:'red',v:1},{c:'yellow',v:1}] },
+      { col: 4, stack: [{c:'blue',v:1},{c:'yellow',v:1}] },
+    ],
+  },
+
+  // ========== LEVEL 20 ========== Medium: cyan/pink/yellow with single-cell row.
+  {
+    cols: 5, rows: 7,
+    holders: [
+      { color: 'cyan',   cells: [[0,4],[1,4],[2,4],[3,4],[4,4]] },
+      { color: 'pink',   cells: [[1,5]] },
+      { color: 'yellow', cells: [[2,5]] },
+      { color: 'pink',   cells: [[3,5]] },
+      { color: 'blue',   cells: [[0,6],[1,6],[2,6],[3,6],[4,6]] },
+    ],
+    tubes: [
+      { col: 0, stack: [{c:'blue',v:1},{c:'cyan',v:1}] },
+      { col: 1, stack: [{c:'blue',v:1},{c:'pink',v:1},{c:'cyan',v:1}] },
+      { col: 2, stack: [{c:'blue',v:1},{c:'yellow',v:1},{c:'cyan',v:1}] },
+      { col: 3, stack: [{c:'blue',v:1},{c:'pink',v:1},{c:'cyan',v:1}] },
+      { col: 4, stack: [{c:'blue',v:1},{c:'cyan',v:1}] },
+    ],
+  },
+
+  // ========== LEVEL 21 ========== HARD — Plus shape. Per-column rule means only
+  // col 2 (the central spine) can ever pour into the plus; all 5 orange units live there.
+  {
+    cols: 5, rows: 7,
+    holders: [
+      { color: 'orange', cells: [[2,1],[1,2],[2,2],[3,2],[2,3]] },
+      { color: 'red',    cells: [[0,6]] },
+      { color: 'blue',   cells: [[1,6]] },
+      { color: 'green',  cells: [[2,6]] },
+      { color: 'blue',   cells: [[3,6]] },
+      { color: 'red',    cells: [[4,6]] },
+    ],
+    tubes: [
+      { col: 0, stack: [{c:'red',v:1}] },
+      { col: 1, stack: [{c:'blue',v:1}] },
+      { col: 2, stack: [{c:'green',v:1},{c:'orange',v:5}] },
+      { col: 3, stack: [{c:'blue',v:1}] },
+      { col: 4, stack: [{c:'red',v:1}] },
+    ],
+  },
+
+  // ========== LEVEL 22 ========== Medium: 5-color spread.
+  {
+    cols: 5, rows: 8,
+    holders: [
+      { color: 'orange', cells: [[0,3],[1,3],[2,3],[3,3],[4,3]] },
+      { color: 'yellow', cells: [[1,5],[2,5],[3,5]] },
+      { color: 'red',    cells: [[0,6]] },
+      { color: 'red',    cells: [[4,6]] },
+      { color: 'blue',   cells: [[0,7],[1,7]] },
+      { color: 'pink',   cells: [[2,7]] },
+      { color: 'blue',   cells: [[3,7],[4,7]] },
+    ],
+    tubes: [
+      { col: 0, stack: [{c:'blue',v:1},{c:'red',v:1},{c:'orange',v:1}] },
+      { col: 1, stack: [{c:'blue',v:1},{c:'yellow',v:1},{c:'orange',v:1}] },
+      { col: 2, stack: [{c:'pink',v:1},{c:'yellow',v:1},{c:'orange',v:1}] },
+      { col: 3, stack: [{c:'blue',v:1},{c:'yellow',v:1},{c:'orange',v:1}] },
+      { col: 4, stack: [{c:'blue',v:1},{c:'red',v:1},{c:'orange',v:1}] },
+    ],
+  },
+
+  // ========== LEVEL 23 ========== Medium: 4-color layer cake with split bottom.
+  {
+    cols: 5, rows: 7,
+    holders: [
+      { color: 'blue',   cells: [[0,5],[1,5],[2,5],[3,5],[4,5]] },
+      { color: 'red',    cells: [[1,6],[2,6],[3,6]] },
+      { color: 'green',  cells: [[0,7]] },
+      { color: 'yellow', cells: [[1,7],[2,7],[3,7]] },
+      { color: 'green',  cells: [[4,7]] },
+    ],
+    tubes: [
+      { col: 0, stack: [{c:'green',v:1},{c:'blue',v:1}] },
+      { col: 1, stack: [{c:'yellow',v:1},{c:'red',v:1},{c:'blue',v:1}] },
+      { col: 2, stack: [{c:'yellow',v:1},{c:'red',v:1},{c:'blue',v:1}] },
+      { col: 3, stack: [{c:'yellow',v:1},{c:'red',v:1},{c:'blue',v:1}] },
+      { col: 4, stack: [{c:'green',v:1},{c:'blue',v:1}] },
+    ],
+  },
+
+  // ========== LEVEL 24 ========== HARD — Two interlocking L's (red and blue) hover above
+  // a fully-cluttered floor. Each L drops into a different column pair; the puzzle is to
+  // clear floor pieces in an order that lets BOTH L's land grounded without any cell
+  // ending in a column whose tube can't supply that color.
+  {
+    cols: 5, rows: 7,
+    holders: [
+      { color: 'red',    cells: [[0,2],[0,3],[1,3]] },     // R L (3 cells, foot to right)
+      { color: 'blue',   cells: [[4,2],[4,3],[3,3]] },     // B L mirrored (3 cells, foot to left)
+      { color: 'green',  cells: [[0,6]] },
+      { color: 'yellow', cells: [[1,6]] },
+      { color: 'purple', cells: [[2,6]] },
+      { color: 'yellow', cells: [[3,6]] },
+      { color: 'green',  cells: [[4,6]] },
+    ],
+    tubes: [
+      { col: 0, stack: [{c:'green',v:1},{c:'red',v:2}] },
+      { col: 1, stack: [{c:'yellow',v:1},{c:'red',v:1}] },
+      { col: 2, stack: [{c:'purple',v:1}] },
+      { col: 3, stack: [{c:'yellow',v:1},{c:'blue',v:1}] },
+      { col: 4, stack: [{c:'green',v:1},{c:'blue',v:2}] },
+    ],
+  },
+
+  // ========== LEVEL 25 ========== Medium: pink/cyan/orange/yellow.
+  {
+    cols: 5, rows: 7,
+    holders: [
+      { color: 'pink',   cells: [[0,5],[1,5],[2,5],[3,5],[4,5]] },
+      { color: 'orange', cells: [[1,6],[2,6],[3,6]] },
+      { color: 'cyan',   cells: [[0,7]] },
+      { color: 'yellow', cells: [[1,7],[2,7],[3,7]] },
+      { color: 'cyan',   cells: [[4,7]] },
+    ],
+    tubes: [
+      { col: 0, stack: [{c:'cyan',v:1},{c:'pink',v:1}] },
+      { col: 1, stack: [{c:'yellow',v:1},{c:'orange',v:1},{c:'pink',v:1}] },
+      { col: 2, stack: [{c:'yellow',v:1},{c:'orange',v:1},{c:'pink',v:1}] },
+      { col: 3, stack: [{c:'yellow',v:1},{c:'orange',v:1},{c:'pink',v:1}] },
+      { col: 4, stack: [{c:'cyan',v:1},{c:'pink',v:1}] },
+    ],
+  },
+
+  // ========== LEVEL 26 ========== Medium: 6 cols, 5 colors.
+  {
+    cols: 6, rows: 8,
+    holders: [
+      { color: 'orange', cells: [[1,4],[2,4],[3,4],[4,4]] },
+      { color: 'green',  cells: [[0,5],[1,5]] },
+      { color: 'green',  cells: [[4,5],[5,5]] },
+      { color: 'red',    cells: [[1,6],[2,6],[3,6],[4,6]] },
+      { color: 'blue',   cells: [[0,7],[1,7]] },
+      { color: 'pink',   cells: [[2,7],[3,7]] },
+      { color: 'blue',   cells: [[4,7],[5,7]] },
+    ],
+    tubes: [
+      { col: 0, stack: [{c:'blue',v:1},{c:'green',v:1}] },
+      { col: 1, stack: [{c:'blue',v:1},{c:'green',v:1},{c:'red',v:1},{c:'orange',v:1}] },
+      { col: 2, stack: [{c:'pink',v:1},{c:'red',v:1},{c:'orange',v:1}] },
+      { col: 3, stack: [{c:'pink',v:1},{c:'red',v:1},{c:'orange',v:1}] },
+      { col: 4, stack: [{c:'blue',v:1},{c:'green',v:1},{c:'red',v:1},{c:'orange',v:1}] },
+      { col: 5, stack: [{c:'blue',v:1},{c:'green',v:1}] },
+    ],
+  },
+
+  // ========== LEVEL 27 ========== HARD — Two inverted T-shapes. Under the per-column rule,
+  // each T can only be poured from its own foot column (R from col 1, B from col 3).
+  {
+    cols: 5, rows: 7,
+    holders: [
+      { color: 'red',    cells: [[0,1],[1,1],[2,1],[1,2]] },
+      { color: 'blue',   cells: [[2,3],[3,3],[4,3],[3,4]] },
+      { color: 'yellow', cells: [[0,6]] },
+      { color: 'green',  cells: [[1,6]] },
+      { color: 'green',  cells: [[2,6]] },
+      { color: 'yellow', cells: [[3,6]] },
+      { color: 'orange', cells: [[4,6]] },
+    ],
+    tubes: [
+      { col: 0, stack: [{c:'yellow',v:1}] },
+      { col: 1, stack: [{c:'green',v:1},{c:'red',v:4}] },
+      { col: 2, stack: [{c:'green',v:1}] },
+      { col: 3, stack: [{c:'yellow',v:1},{c:'blue',v:4}] },
+      { col: 4, stack: [{c:'orange',v:1}] },
+    ],
+  },
+
+  // ========== LEVEL 28 ========== Medium: 6 cols, 5 colors.
+  {
+    cols: 6, rows: 8,
+    holders: [
+      { color: 'orange', cells: [[0,4],[1,4],[2,4],[3,4],[4,4],[5,4]] },
+      { color: 'red',    cells: [[1,5],[2,5],[3,5],[4,5]] },
+      { color: 'green',  cells: [[2,6],[3,6]] },
+      { color: 'blue',   cells: [[0,7],[1,7]] },
+      { color: 'yellow', cells: [[2,7],[3,7]] },
+      { color: 'blue',   cells: [[4,7],[5,7]] },
+    ],
+    tubes: [
+      { col: 0, stack: [{c:'blue',v:1},{c:'orange',v:1}] },
+      { col: 1, stack: [{c:'blue',v:1},{c:'red',v:1},{c:'orange',v:1}] },
+      { col: 2, stack: [{c:'yellow',v:1},{c:'green',v:1},{c:'red',v:1},{c:'orange',v:1}] },
+      { col: 3, stack: [{c:'yellow',v:1},{c:'green',v:1},{c:'red',v:1},{c:'orange',v:1}] },
+      { col: 4, stack: [{c:'blue',v:1},{c:'red',v:1},{c:'orange',v:1}] },
+      { col: 5, stack: [{c:'blue',v:1},{c:'orange',v:1}] },
+    ],
+  },
+
+  // ========== LEVEL 29 ========== Medium: 6 cols with floating top piece.
+  {
+    cols: 6, rows: 8,
+    holders: [
+      { color: 'orange', cells: [[2,3],[3,3]] },
+      { color: 'purple', cells: [[0,5],[1,5],[2,5],[3,5],[4,5],[5,5]] },
+      { color: 'red',    cells: [[2,6],[3,6]] },
+      { color: 'blue',   cells: [[0,7],[1,7]] },
+      { color: 'yellow', cells: [[2,7],[3,7]] },
+      { color: 'blue',   cells: [[4,7],[5,7]] },
+    ],
+    tubes: [
+      { col: 0, stack: [{c:'blue',v:1},{c:'purple',v:1}] },
+      { col: 1, stack: [{c:'blue',v:1},{c:'purple',v:1}] },
+      { col: 2, stack: [{c:'yellow',v:1},{c:'red',v:1},{c:'purple',v:1},{c:'orange',v:1}] },
+      { col: 3, stack: [{c:'yellow',v:1},{c:'red',v:1},{c:'purple',v:1},{c:'orange',v:1}] },
+      { col: 4, stack: [{c:'blue',v:1},{c:'purple',v:1}] },
+      { col: 5, stack: [{c:'blue',v:1},{c:'purple',v:1}] },
+    ],
+  },
+
+  // ========== LEVEL 30 ========== HARD final boss — Plus + two L's stacked above a 5-color
+  // floor. Order matters at every step: clearing the wrong floor color first leaves
+  // a shape unable to drop, or drops it into a column with no matching tube color.
+  {
+    cols: 5, rows: 8,
+    holders: [
+      { color: 'orange', cells: [[2,1],[1,2],[2,2],[3,2],[2,3]] },  // plus (5 cells)
+      { color: 'red',    cells: [[0,4],[0,5],[1,5]] },              // R L
+      { color: 'blue',   cells: [[4,4],[4,5],[3,5]] },              // B L mirrored
+      { color: 'green',  cells: [[0,7]] },
+      { color: 'yellow', cells: [[1,7]] },
+      { color: 'pink',   cells: [[2,7]] },
+      { color: 'yellow', cells: [[3,7]] },
+      { color: 'green',  cells: [[4,7]] },
+    ],
+    tubes: [
+      { col: 0, stack: [{c:'green',v:1},{c:'red',v:2}] },
+      { col: 1, stack: [{c:'yellow',v:1},{c:'red',v:1}] },
+      { col: 2, stack: [{c:'pink',v:1},{c:'orange',v:5}] },
+      { col: 3, stack: [{c:'yellow',v:1},{c:'blue',v:1}] },
+      { col: 4, stack: [{c:'green',v:1},{c:'blue',v:2}] },
+    ],
+  },
+];
+
+// LEVEL 5 fix (G L can only be reached via col 0 and col 1 — col 2 is blocked by B; put R at top so it falls after B clears)
+LEVELS[4] = {
+  cols: 4, rows: 5,
+  holders: [
+    { color: 'green', cells: [[0,2],[0,3],[0,4],[1,4]] }, // L
+    { color: 'blue',  cells: [[2,4],[3,4]] },             // 1x2
+    { color: 'red',   cells: [[3,0]] },                   // R falls into col 3 after B clears
+  ],
+  tubes: [
+    { col: 0, stack: [{c:'green',v:2}] },
+    { col: 1, stack: [{c:'green',v:2}] },
+    { col: 2, stack: [{c:'blue',v:1}] },
+    { col: 3, stack: [{c:'blue',v:1},{c:'red',v:1}] },
+  ],
+};
+
+// LEVEL 6 redesign — teaches gravity-dependent ordering: G blocks R until cleared,
+// then R drops into col 1 where its tube can reach it.
+LEVELS[5] = {
+  cols: 3, rows: 5,
+  holders: [
+    { color: 'red',   cells: [[1,0]] },
+    { color: 'green', cells: [[0,2],[1,2],[2,2]] },
+  ],
+  tubes: [
+    { col: 0, stack: [{c:'green',v:1}] },
+    { col: 1, stack: [{c:'green',v:1},{c:'red',v:1}] },
+    { col: 2, stack: [{c:'green',v:1}] },
+  ],
+};
+
+// =============================================================================
+// AUDIO (Web Audio API synthesis)
+// =============================================================================
+
+const Audio_ = (() => {
+  let ctx = null;
+  let muted = false;
+  let pourGain = null;
+  let pourSource = null;
+  let masterGain = null;
+
+  function ensure() {
+    if (!ctx) {
+      ctx = new (window.AudioContext || window.webkitAudioContext)();
+      masterGain = ctx.createGain();
+      masterGain.gain.value = 0.5;
+      masterGain.connect(ctx.destination);
+    }
+    if (ctx.state === 'suspended') ctx.resume();
+  }
+
+  function tone(freq, dur, type='sine', vol=0.18, attack=0.005, decay=null) {
+    if (muted) return;
+    ensure();
+    const osc = ctx.createOscillator();
+    const g = ctx.createGain();
+    osc.type = type;
+    osc.frequency.value = freq;
+    g.gain.setValueAtTime(0, ctx.currentTime);
+    g.gain.linearRampToValueAtTime(vol, ctx.currentTime + attack);
+    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + (decay || dur));
+    osc.connect(g); g.connect(masterGain);
+    osc.start();
+    osc.stop(ctx.currentTime + dur + 0.05);
+  }
+
+  function noiseTone(freq, dur, vol=0.12) {
+    if (muted) return;
+    ensure();
+    const bufSize = Math.floor(ctx.sampleRate * dur);
+    const buffer = ctx.createBuffer(1, bufSize, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufSize; i++) data[i] = (Math.random() * 2 - 1) * 0.5;
+    const src = ctx.createBufferSource();
+    src.buffer = buffer;
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.value = freq;
+    filter.Q.value = 4;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0, ctx.currentTime);
+    g.gain.linearRampToValueAtTime(vol, ctx.currentTime + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
+    src.connect(filter); filter.connect(g); g.connect(masterGain);
+    src.start();
+    src.stop(ctx.currentTime + dur + 0.02);
+  }
+
+  function startPour() {
+    if (muted) return;
+    ensure();
+    if (pourSource) return;
+    const bufSize = ctx.sampleRate * 0.5;
+    const buffer = ctx.createBuffer(1, bufSize, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufSize; i++) data[i] = (Math.random() * 2 - 1) * 0.4;
+    pourSource = ctx.createBufferSource();
+    pourSource.buffer = buffer;
+    pourSource.loop = true;
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.value = 800;
+    filter.Q.value = 2;
+    pourGain = ctx.createGain();
+    pourGain.gain.setValueAtTime(0, ctx.currentTime);
+    pourGain.gain.linearRampToValueAtTime(0.06, ctx.currentTime + 0.05);
+    pourSource.connect(filter); filter.connect(pourGain); pourGain.connect(masterGain);
+    pourSource.start();
+  }
+
+  function stopPour() {
+    if (!pourSource) return;
+    const src = pourSource, g = pourGain;
+    g.gain.cancelScheduledValues(ctx.currentTime);
+    g.gain.setValueAtTime(g.gain.value, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.08);
+    src.stop(ctx.currentTime + 0.1);
+    pourSource = null; pourGain = null;
+  }
+
+  return {
+    drop:       () => tone(900, 0.07, 'triangle', 0.07, 0.002, 0.06),
+    fillDone:   () => { tone(800, 0.08, 'sine', 0.16); setTimeout(() => tone(1200, 0.10, 'sine', 0.14), 60); setTimeout(() => tone(1600, 0.16, 'sine', 0.12), 120); },
+    clearPuff:  () => noiseTone(280, 0.18, 0.10),
+    landThud:   () => tone(110, 0.13, 'sine', 0.15, 0.003, 0.12),
+    refuse:     () => tone(180, 0.04, 'square', 0.04, 0.002, 0.04),
+    levelDone:  () => {
+      const notes = [523.25, 659.25, 783.99, 1046.50];
+      notes.forEach((f, i) => setTimeout(() => tone(f, 0.22, 'triangle', 0.15), i * 90));
+    },
+    tap:        () => tone(440, 0.05, 'square', 0.05, 0.002, 0.04),
+    transition: () => tone(480, 0.06, 'triangle', 0.08, 0.002, 0.05),
+    startPour, stopPour,
+    setMuted: m => { muted = m; if (m) stopPour(); },
+    isMuted: () => muted,
+    ensure,
+  };
+})();
+
+// =============================================================================
+// GAME STATE
+// =============================================================================
+
+let game = null;
+
+let _genCounter = 0;
+function buildState(levelIdx) {
+  const lvl = LEVELS[levelIdx];
+  const grid = [];
+  for (let r = 0; r < lvl.rows; r++) {
+    grid.push(new Array(lvl.cols).fill(null));
+  }
+  const holders = {};
+  let nextId = 1;
+  for (const h of lvl.holders) {
+    const id = nextId++;
+    holders[id] = {
+      id,
+      color: h.color,
+      cells: h.cells.slice(),
+      rowGroups: null,                 // computed below; bottom-row-first list of {row, cols, cellsBelow}
+      filled: 0,
+      // animation state
+      pos: { dx: 0, dy: 0 },          // pixel offset for falling animation
+      fallTarget: null,                // {dr: rows to fall, t: progress 0..1, dur}
+      pulse: 0,                        // brief pulse on cell-fill
+      landSquash: 0,                   // 0..1, decays after a fall lands
+      clearAnim: 0,                    // 0..1 on clear; once >=1, holder removed
+    };
+    holders[id].rowGroups = computeRowGroups(holders[id]);
+    for (const [c, r] of h.cells) {
+      grid[r][c] = id;
+    }
+  }
+  // Tubes: clone stack
+  const tubes = lvl.tubes.map((t, i) => ({
+    idx: i,
+    col: t.col,
+    stack: t.stack.map(b => ({ color: b.c, volume: b.v, originalVolume: b.v })),
+    refuseFlash: 0,                    // 0..1 fading
+    bubbles: [],
+    // for visual: a smoothly-decreasing volume of the topmost band as it dispenses
+    visualTopV: t.stack[0] ? t.stack[0].v : 0,
+  }));
+  // Init bubbles per tube
+  for (const t of tubes) {
+    for (let i = 0; i < 6; i++) {
+      t.bubbles.push({
+        x: 0.2 + Math.random() * 0.6,
+        y: Math.random(),
+        r: 1 + Math.random() * 2,
+        speed: 0.06 + Math.random() * 0.12,
+      });
+    }
+  }
+  return {
+    gen: ++_genCounter,                // bumped per level load; used to invalidate stale setTimeouts
+    levelIdx,
+    cols: lvl.cols,
+    rows: lvl.rows,
+    grid,
+    holders,
+    clearingHolders: [],               // holders that have been cleared and are animating away
+    tubes,
+    pour: null,                        // active pour state
+    pendingResume: false,              // set while waiting for clear+gravity animations to settle
+    pressedTube: null,                 // tube idx currently pressed (or null)
+    particles: [],
+    pourStream: null,                  // visual pour stream params
+    won: false,
+    stuck: false,
+    time: 0,
+    cameraShake: 0,
+  };
+}
+
+// =============================================================================
+// MECHANICS
+// =============================================================================
+
+function topHolderInColumn(col) {
+  // Returns the holder whose cell is the lowest (largest r) in this column
+  // (i.e., the first holder a tube would hit pouring upward).
+  for (let r = game.rows - 1; r >= 0; r--) {
+    const id = game.grid[r][col];
+    if (id != null) return game.holders[id];
+  }
+  return null;
+}
+
+// Per-column ground rule. A tube under column `col` can fire into `holder` only
+// if the holder's bottom-most cell in `col` has an unbroken chain of own cells
+// going down through `col` to the floor row. If any cell in that column-segment
+// is missing (i.e. another holder or empty space), liquid would "fall out"
+// the side and the pour is refused.
+function isGroundedFromCol(holder, col) {
+  const floorRow = game.rows - 1;
+  let entryR = -1;
+  for (const [c, r] of holder.cells) {
+    if (c === col && r > entryR) entryR = r;
+  }
+  if (entryR === -1) return false;
+  const cellSet = new Set(holder.cells.map(([cc, rr]) => cc + ',' + rr));
+  for (let r = entryR; r <= floorRow; r++) {
+    if (!cellSet.has(col + ',' + r)) return false;
+  }
+  return true;
+}
+
+// Per-cell liveness. A cell is "live" (visually full-brightness) if going
+// straight down its column from the cell, every row down to the floor is
+// occupied by the same holder. Otherwise the cell renders dim — it can still
+// fill (as a side effect of the holder filling) but no tube can target it
+// directly.
+function isCellLive(holder, c, r) {
+  const floorRow = game.rows - 1;
+  const cellSet = new Set(holder.cells.map(([cc, rr]) => cc + ',' + rr));
+  for (let rr = r; rr <= floorRow; rr++) {
+    if (!cellSet.has(c + ',' + rr)) return false;
+  }
+  return true;
+}
+
+function tryStartPour(tubeIdx) {
+  const tube = game.tubes[tubeIdx];
+  if (!tube.stack.length) return null;
+  const band = tube.stack[0];
+  if (band.volume <= 0) return null;
+  const target = topHolderInColumn(tube.col);
+  if (!target || target.color !== band.color) return null;
+  if (target.filled >= target.cells.length) return null;
+  if (!isGroundedFromCol(target, tube.col)) return null;   // per-column ground rule
+  return {
+    tubeIdx,
+    color: band.color,
+    targetId: target.id,
+    accumulator: 0,
+  };
+}
+
+function deliverOneCell() {
+  const p = game.pour;
+  if (!p) return;
+  const tube = game.tubes[p.tubeIdx];
+  const holder = game.holders[p.targetId];
+  if (!tube || !holder || !tube.stack.length) {
+    game.pour = null;
+    return;
+  }
+  // Decrement tube's top band, increment holder's filled.
+  tube.stack[0].volume -= 1;
+  holder.filled += 1;
+  holder.pulse = 1;
+  Audio_.drop();
+
+  // Splash particles at the holder entry cell
+  const entryCell = entryCellFor(holder, tube.col);
+  if (entryCell) {
+    spawnSplash(entryCell);
+  }
+
+  if (tube.stack[0].volume <= 0) {
+    const oldColor = tube.stack[0].color;
+    tube.stack.shift();
+    if (tube.stack.length > 0) {
+      tube.visualTopV = tube.stack[0].volume;
+      if (tube.stack[0].color !== oldColor) Audio_.transition();
+    } else {
+      tube.visualTopV = 0;
+    }
+  }
+
+  if (holder.filled >= holder.cells.length) {
+    // Holder clears!
+    Audio_.fillDone();
+    Audio_.clearPuff();
+    holder.clearAnim = 0.001;          // start clear animation
+    spawnClearBurst(holder);
+    // Mark the cells as already empty in the grid (the animation just visualizes the disappearance)
+    for (const [c, r] of holder.cells) {
+      game.grid[r][c] = null;
+    }
+    // Move from holders → clearingHolders so further game logic ignores it.
+    game.clearingHolders.push(holder);
+    delete game.holders[holder.id];
+    // Stop the active pour. Continuation will be evaluated after gravity settles.
+    game.pour = null;
+    game.pourStream = null;
+    game.pendingResume = true;
+    Audio_.stopPour();
+    const myGen = game.gen;
+    // After clear animation, run gravity (which schedules fall animations).
+    setTimeout(() => {
+      if (!game || game.gen !== myGen) return;
+      const fallDur = applyGravity();
+      // After gravity animation also settles, run end-of-turn evaluation.
+      setTimeout(() => {
+        if (!game || game.gen !== myGen) return;
+        game.pendingResume = false;
+        // Win/stuck takes priority over resuming pour.
+        if (checkWin()) {
+          game.won = true;
+          setTimeout(() => Audio_.levelDone(), 220);
+          showWinModal();
+          return;
+        }
+        if (checkStuck()) {
+          game.stuck = true;
+          showStuckModal();
+          return;
+        }
+        if (game.pressedTube != null) {
+          const next = tryStartPour(game.pressedTube);
+          if (next) {
+            game.pour = next;
+            startVisualStream();
+            Audio_.startPour();
+          } else if (game.tubes[game.pressedTube].stack.length > 0) {
+            game.tubes[game.pressedTube].refuseFlash = 0.6;
+            Audio_.refuse();
+          }
+        }
+      }, Math.max(40, fallDur * 1000 + 30));
+    }, CLEAR_ANIM_DUR * 1000);
+    return;
+  }
+
+  // Continue pour: check next cell (band may have transitioned)
+  if (!tube.stack.length) {
+    game.pour = null;
+    Audio_.stopPour();
+    return;
+  }
+  const newBand = tube.stack[0];
+  // The target holder may need a different color now, or be the same — re-evaluate.
+  const target = topHolderInColumn(tube.col);
+  if (!target || target.color !== newBand.color || target.filled >= target.cells.length || !isGroundedFromCol(target, tube.col)) {
+    // Pour stops here (also stops if next target's column-segment isn't grounded).
+    game.pour = null;
+    Audio_.stopPour();
+    return;
+  }
+  game.pour.color = newBand.color;
+  game.pour.targetId = target.id;
+}
+
+function entryCellFor(holder, col) {
+  // The cell of `holder` in `col` with the largest r (bottom-most in that column).
+  let best = null;
+  for (const cell of holder.cells) {
+    if (cell[0] === col) {
+      if (!best || cell[1] > best[1]) best = cell;
+    }
+  }
+  return best;
+}
+
+function applyGravity(silent = false) {
+  // For each holder, attempt to drop until no holder can drop.
+  // Order: process holders with largest max-row first to allow chains.
+  let didDrop = true;
+  const fallAmounts = {}; // id -> rows fell (for animation)
+  while (didDrop) {
+    didDrop = false;
+    const ids = Object.keys(game.holders).map(Number);
+    // Sort by max row descending so lower holders drop first
+    ids.sort((a, b) => maxRow(game.holders[b]) - maxRow(game.holders[a]));
+    for (const id of ids) {
+      const holder = game.holders[id];
+      if (canDrop(holder)) {
+        dropOne(holder);
+        fallAmounts[id] = (fallAmounts[id] || 0) + 1;
+        didDrop = true;
+      }
+    }
+  }
+  if (silent) return 0;
+
+  // Animate any holder that fell. Track the longest dur so caller can wait.
+  let maxDur = 0;
+  for (const idStr of Object.keys(fallAmounts)) {
+    const id = +idStr;
+    const dr = fallAmounts[id];
+    const holder = game.holders[id];
+    if (!holder) continue;
+    holder.pos.dy = -dr * cellSize();   // start above target by dr cells
+    const dur = GRAVITY_SECONDS_PER_ROW * dr + 0.05;
+    holder.fallTarget = { dur, t: 0, dr };
+    if (dur > maxDur) maxDur = dur;
+  }
+  if (Object.keys(fallAmounts).length > 0) {
+    setTimeout(() => Audio_.landThud(), Math.floor(maxDur * 700));
+    game.cameraShake = 0.5;
+  }
+  return maxDur;
+}
+
+function maxRow(holder) {
+  let m = 0;
+  for (const [c, r] of holder.cells) if (r > m) m = r;
+  return m;
+}
+
+function canDrop(holder) {
+  for (const [c, r] of holder.cells) {
+    const nr = r + 1;
+    if (nr >= game.rows) return false;
+    const occ = game.grid[nr][c];
+    if (occ != null && occ !== holder.id) return false;
+  }
+  return true;
+}
+
+function dropOne(holder) {
+  // Remove cells from grid, increment all rows by 1, place back.
+  for (const [c, r] of holder.cells) game.grid[r][c] = null;
+  for (let i = 0; i < holder.cells.length; i++) {
+    holder.cells[i] = [holder.cells[i][0], holder.cells[i][1] + 1];
+  }
+  for (const [c, r] of holder.cells) game.grid[r][c] = holder.id;
+  // Recompute row groups for fill rendering (rows shifted down by 1)
+  holder.rowGroups = computeRowGroups(holder);
+}
+
+// Group a holder's cells by row, sorted bottom-first.
+// Returns: [{row, cols:[...], cellsBelow}] where cellsBelow is the cumulative
+// cell count of all rows below this one. Used to compute per-cell water level.
+function computeRowGroups(holder) {
+  const rowMap = new Map();
+  for (const [c, r] of holder.cells) {
+    if (!rowMap.has(r)) rowMap.set(r, []);
+    rowMap.get(r).push(c);
+  }
+  const sorted = [...rowMap.entries()].sort((a, b) => b[0] - a[0]);
+  const groups = [];
+  let cellsBelow = 0;
+  for (const [r, cols] of sorted) {
+    groups.push({ row: r, cols, cellsBelow });
+    cellsBelow += cols.length;
+  }
+  return groups;
+}
+
+// For a given cell of `holder`, return its 0..1 water-level fill ratio,
+// driven by the holder's continuous fill amount `cont` (= filled + accumulator).
+function cellFillRatio(holder, c, r, cont) {
+  for (const grp of holder.rowGroups) {
+    if (grp.row !== r) continue;
+    if (cont <= grp.cellsBelow) return 0;
+    if (cont >= grp.cellsBelow + grp.cols.length) return 1;
+    return (cont - grp.cellsBelow) / grp.cols.length;
+  }
+  return 0;
+}
+
+function checkWin() {
+  // Holders that are still active (not cleared) live in game.holders.
+  // Cleared ones are in game.clearingHolders (visual only). Win = no active holders.
+  return Object.keys(game.holders).length === 0;
+}
+
+function checkStuck() {
+  // No tube can pour right now → stuck (heuristic).
+  if (Object.keys(game.holders).length === 0) return false;
+  for (const tube of game.tubes) {
+    if (tube.stack.length === 0) continue;
+    const band = tube.stack[0];
+    const target = topHolderInColumn(tube.col);
+    if (target && target.color === band.color && target.filled < target.cells.length && isGroundedFromCol(target, tube.col)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+// =============================================================================
+// LAYOUT (computed each frame; depends on level dims)
+// =============================================================================
+
+let layout = null;
+
+function computeLayout() {
+  if (!game) return;
+  // Top zone for UI is ~0 (handled by HTML overlay above canvas; canvas top = 0 is right under topbar)
+  // Allocate vertical regions:
+  //   - Title gap (12px)
+  //   - Board area: variable
+  //   - Tube zone: 180px
+  //   - Bottom margin: 18px
+  const tubeZoneH = 180;
+  const sideMargin = 24;
+  const topGap = 16;
+  const bottomMargin = 22;
+  const availW = W - sideMargin * 2;
+  const availH = H - topGap - tubeZoneH - bottomMargin;
+  const cs = Math.floor(Math.min(availW / game.cols, availH / game.rows, 64));
+  const boardW = cs * game.cols;
+  const boardH = cs * game.rows;
+  const boardX = Math.floor((W - boardW) / 2);
+  const boardY = topGap + Math.floor((availH - boardH) / 2);
+  // Tube layout
+  const tubeUnitH = 16;
+  const tubeH = TUBE_MAX_CELLS * tubeUnitH; // 128
+  const tubeW = Math.max(28, Math.floor(cs * 0.7));
+  const tubeY = boardY + boardH + 32;
+  layout = {
+    cs, boardX, boardY, boardW, boardH,
+    tubeUnitH, tubeH, tubeW, tubeY,
+  };
+}
+
+function cellSize() { return layout ? layout.cs : 48; }
+function cellX(c) { return layout.boardX + c * layout.cs; }
+function cellY(r) { return layout.boardY + r * layout.cs; }
+function tubeX(tube) {
+  // Center tube on its column
+  const cx = layout.boardX + tube.col * layout.cs + layout.cs / 2;
+  return Math.floor(cx - layout.tubeW / 2);
+}
+function tubeNozzleY() { return layout.tubeY; }
+function tubeBottomY() { return layout.tubeY + layout.tubeH; }
+
+// =============================================================================
+// RENDERING
+// =============================================================================
+
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d', { alpha: false });
+
+function render() {
+  // Background
+  ctx.fillStyle = '#0a0e25';
+  ctx.fillRect(0, 0, W, H);
+
+  // Subtle background star/glitter
+  drawBackgroundGlow();
+
+  if (!game) return;
+  computeLayout();
+
+  // Camera shake
+  ctx.save();
+  if (game.cameraShake > 0) {
+    const sx = (Math.random() - 0.5) * game.cameraShake * 4;
+    const sy = (Math.random() - 0.5) * game.cameraShake * 4;
+    ctx.translate(sx, sy);
+  }
+
+  drawBoard();
+  drawHolders();
+  drawPourStream();
+  drawParticles();
+  drawTubes();
+
+  ctx.restore();
+}
+
+function drawBackgroundGlow() {
+  // Soft top-down gradient already on body; add a subtle glint
+  ctx.save();
+  const g = ctx.createRadialGradient(W/2, 0, 20, W/2, 0, W);
+  g.addColorStop(0, 'rgba(80,120,220,0.10)');
+  g.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, H);
+  ctx.restore();
+}
+
+function drawBoard() {
+  const { boardX, boardY, boardW, boardH, cs } = layout;
+
+  // Outer tray: navy with gradient + rounded corners
+  const trayPad = 10;
+  const tx = boardX - trayPad, ty = boardY - trayPad;
+  const tw = boardW + trayPad * 2, th = boardH + trayPad * 2;
+
+  ctx.save();
+  // Tray shadow
+  ctx.shadowColor = 'rgba(0,0,0,0.5)';
+  ctx.shadowBlur = 18;
+  ctx.shadowOffsetY = 6;
+  roundRectPath(ctx, tx, ty, tw, th, 18);
+  const trayGrad = ctx.createLinearGradient(tx, ty, tx, ty + th);
+  trayGrad.addColorStop(0, '#1c2147');
+  trayGrad.addColorStop(1, '#131732');
+  ctx.fillStyle = trayGrad;
+  ctx.fill();
+  ctx.shadowColor = 'transparent';
+
+  // Inner inset shadow
+  ctx.save();
+  roundRectPath(ctx, tx, ty, tw, th, 18);
+  ctx.clip();
+  const inset = ctx.createLinearGradient(tx, ty, tx, ty + 16);
+  inset.addColorStop(0, 'rgba(0,0,0,0.45)');
+  inset.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = inset;
+  ctx.fillRect(tx, ty, tw, 16);
+  ctx.restore();
+
+  // Top highlight
+  ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+  ctx.lineWidth = 1;
+  roundRectPath(ctx, tx + 0.5, ty + 0.5, tw - 1, th - 1, 17.5);
+  ctx.stroke();
+
+  // Cell grid
+  for (let r = 0; r < game.rows; r++) {
+    for (let c = 0; c < game.cols; c++) {
+      const x = boardX + c * cs;
+      const y = boardY + r * cs;
+      // Cell background: slightly lighter purple-blue
+      ctx.fillStyle = '#222a55';
+      const pad = 2;
+      roundRectPath(ctx, x + pad, y + pad, cs - pad * 2, cs - pad * 2, 6);
+      ctx.fill();
+      // Subtle cell inner shadow at top
+      ctx.fillStyle = 'rgba(0,0,0,0.16)';
+      ctx.fillRect(x + pad, y + pad, cs - pad * 2, 2);
+    }
+  }
+  ctx.restore();
+}
+
+function drawHolders() {
+  // Holders never overlap on the board, so render order is cosmetic.
+  for (const id of Object.keys(game.holders)) {
+    drawHolder(game.holders[id]);
+  }
+  // Render clearing holders on top (they fade out)
+  for (const h of game.clearingHolders) {
+    drawHolder(h);
+  }
+}
+
+function drawHolder(h) {
+  const cs = layout.cs;
+  const pal = PALETTE[h.color];
+
+  // Compute pose offset (fall + pulse + clear anim)
+  const fallDy = h.pos.dy;            // pixel offset y
+  const clearScale = h.clearAnim > 0 ? Math.max(0, 1 - h.clearAnim * 1.0) : 1;
+  const clearAlpha = h.clearAnim > 0 ? Math.max(0, 1 - h.clearAnim) : 1;
+  const pulse = 1 + h.pulse * 0.04;
+  // Per-cell liveness handled inside the cell loop below; whole-holder alpha
+  // stays at 1 here (clear animation already adjusts via clearAlpha).
+  const liveAlpha = 1;
+
+  // Squash on landing
+  let squashY = 1, squashX = 1;
+  if (h.landSquash > 0) {
+    squashY = 1 - h.landSquash * 0.10;
+    squashX = 1 + h.landSquash * 0.08;
+  }
+
+  const cx = bboxCenter(h);
+
+  ctx.save();
+  ctx.translate(0, fallDy);
+  ctx.translate(cx.x, cx.y);
+  ctx.scale(clearScale * squashX * pulse, clearScale * squashY * pulse);
+  ctx.translate(-cx.x, -cx.y);
+  ctx.globalAlpha = clearAlpha * liveAlpha;
+
+  // Continuous fill amount: integer cells delivered + fractional in-progress pour
+  let cont = h.filled;
+  const isPouringIntoMe = !!(game.pour && game.pour.targetId === h.id);
+  if (isPouringIntoMe) cont += game.pour.accumulator;
+
+  // Each cell renders water rising from its bottom according to its row's fill ratio.
+  // Cells without a chain of own cells to the floor in their column are rendered
+  // dim (no tube can target them directly — they'll only fill via spillover).
+  const isClearing = h.clearAnim > 0;
+  for (const [c, r] of h.cells) {
+    const x = cellX(c), y = cellY(r);
+    const ratio = cellFillRatio(h, c, r, cont);
+    const live = isClearing ? true : isCellLive(h, c, r);
+    drawHolderCell(x, y, cs, pal, ratio, isPouringIntoMe, h, live);
+  }
+
+  // Silhouette outline
+  drawHolderSilhouette(h, pal);
+
+  ctx.restore();
+}
+
+function drawHolderCell(x, y, cs, pal, ratio, isPouring, h, live) {
+  const pad = 4;
+  const innerX = x + pad;
+  const innerY = y + pad;
+  const innerW = cs - pad * 2;
+  const innerH = cs - pad * 2;
+
+  // Wrap with reduced alpha for non-live cells (no tube can target them).
+  ctx.save();
+  if (live === false) ctx.globalAlpha *= 0.45;
+
+  // 1) Empty interior tint (always visible — translucent color hint)
+  ctx.fillStyle = hexAlpha(pal.outline, 0.10);
+  roundRectPath(ctx, innerX, innerY, innerW, innerH, 5);
+  ctx.fill();
+  // Inner inset shadow at top
+  ctx.fillStyle = 'rgba(0,0,0,0.18)';
+  ctx.fillRect(innerX, innerY, innerW, 2);
+
+  if (ratio <= 0) { ctx.restore(); return; }
+
+  // 2) Water — rises from the bottom by `ratio`. Clipped to the rounded cell.
+  ctx.save();
+  roundRectPath(ctx, innerX, innerY, innerW, innerH, 5);
+  ctx.clip();
+
+  const fillH = innerH * ratio;
+  const fillTopY = innerY + innerH - fillH;
+
+  // Liquid body gradient
+  const grad = ctx.createLinearGradient(innerX, fillTopY, innerX, innerY + innerH);
+  grad.addColorStop(0, hexAlpha(pal.fill, 0.95));
+  grad.addColorStop(1, hexAlpha(pal.outline, 0.92));
+  ctx.fillStyle = grad;
+
+  // Animated wave at the surface — bigger when actively pouring, calm when settled.
+  const waveAmp = ratio < 1 ? (isPouring ? 1.6 : 0.6) : 0;
+  const waveFreq = 0.18;
+  const phase = game.time * (isPouring ? 7 : 2.5);
+
+  ctx.beginPath();
+  ctx.moveTo(innerX, innerY + innerH);
+  ctx.lineTo(innerX, fillTopY);
+  for (let xi = 0; xi <= innerW; xi += 2) {
+    const wy = fillTopY + Math.sin((innerX + xi) * waveFreq + phase) * waveAmp;
+    ctx.lineTo(innerX + xi, wy);
+  }
+  ctx.lineTo(innerX + innerW, innerY + innerH);
+  ctx.closePath();
+  ctx.fill();
+
+  // Surface highlight — thin glossy line just at the water's top
+  if (ratio < 1) {
+    ctx.fillStyle = 'rgba(255,255,255,0.30)';
+    for (let xi = 0; xi <= innerW; xi += 2) {
+      const wy = fillTopY + Math.sin((innerX + xi) * waveFreq + phase) * waveAmp;
+      ctx.fillRect(innerX + xi, wy - 1, 2, 1);
+    }
+  }
+
+  // Tiny rising bubbles within the water
+  const bubbleCount = Math.max(1, Math.floor(ratio * 3));
+  for (let i = 0; i < bubbleCount; i++) {
+    const bx = innerX + ((i * 11 + h.id * 7 + game.time * 18) % (innerW - 4)) + 2;
+    const cycle = ((game.time * 20 + i * 13 + h.id * 5) % (fillH + 6));
+    const by = innerY + innerH - cycle;
+    if (by > fillTopY + 1 && by < innerY + innerH - 2) {
+      ctx.fillStyle = 'rgba(255,255,255,0.32)';
+      ctx.beginPath();
+      ctx.arc(bx, by, 1.2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  ctx.restore();   // unclip rounded cell
+  ctx.restore();   // un-dim if not live
+}
+
+function drawHolderSilhouette(h, pal) {
+  const polys = computeOutlinePolygons(h.cells, layout.boardX, layout.boardY, layout.cs);
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  // Drop-shadow stroke
+  ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+  ctx.lineWidth = 7;
+  for (const poly of polys) strokePolygon(poly, true);
+  // Outer outline
+  ctx.strokeStyle = pal.outline;
+  ctx.lineWidth = 5;
+  for (const poly of polys) strokePolygon(poly, true);
+  // Inner highlight
+  ctx.strokeStyle = hexAlpha('#ffffff', 0.35);
+  ctx.lineWidth = 1.5;
+  for (const poly of polys) strokePolygon(poly, true);
+}
+
+function strokePolygon(poly, close) {
+  if (poly.length < 2) return;
+  ctx.beginPath();
+  ctx.moveTo(poly[0].x, poly[0].y);
+  for (let i = 1; i < poly.length; i++) ctx.lineTo(poly[i].x, poly[i].y);
+  if (close) ctx.closePath();
+  ctx.stroke();
+}
+
+function computeOutlinePolygons(cells, ox, oy, cs) {
+  const cellSet = new Set(cells.map(([c,r]) => c + ',' + r));
+  // Build directed edges (clockwise around the holder, going around its outside)
+  const edges = new Map();   // "vc,vr" -> "vc,vr"
+  for (const [c, r] of cells) {
+    if (!cellSet.has(c + ',' + (r-1))) edges.set(c + ',' + r, (c+1) + ',' + r);                  // top
+    if (!cellSet.has((c+1) + ',' + r)) edges.set((c+1) + ',' + r, (c+1) + ',' + (r+1));         // right
+    if (!cellSet.has(c + ',' + (r+1))) edges.set((c+1) + ',' + (r+1), c + ',' + (r+1));         // bottom
+    if (!cellSet.has((c-1) + ',' + r)) edges.set(c + ',' + (r+1), c + ',' + r);                  // left
+  }
+  const polys = [];
+  while (edges.size > 0) {
+    const start = edges.keys().next().value;
+    const poly = [];
+    let cur = start;
+    let safety = 5000;
+    while (edges.has(cur) && safety-- > 0) {
+      const [vc, vr] = cur.split(',').map(Number);
+      poly.push({ x: ox + vc * cs, y: oy + vr * cs });
+      const nxt = edges.get(cur);
+      edges.delete(cur);
+      cur = nxt;
+    }
+    if (poly.length > 0) polys.push(poly);
+  }
+  return polys;
+}
+
+function bboxCenter(h) {
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (const [c, r] of h.cells) {
+    minX = Math.min(minX, cellX(c));
+    maxX = Math.max(maxX, cellX(c) + layout.cs);
+    minY = Math.min(minY, cellY(r));
+    maxY = Math.max(maxY, cellY(r) + layout.cs);
+  }
+  return { x: (minX + maxX) / 2, y: (minY + maxY) / 2 };
+}
+
+function drawTubes() {
+  for (const tube of game.tubes) {
+    drawTube(tube);
+  }
+}
+
+function drawTube(tube) {
+  const x = tubeX(tube);
+  const y = layout.tubeY;
+  const w = layout.tubeW;
+  const h = layout.tubeH;
+  const unitH = layout.tubeUnitH;
+  const radius = w * 0.35;
+
+  // Tube outer body (dark glass)
+  ctx.save();
+  // Shadow
+  ctx.shadowColor = 'rgba(0,0,0,0.45)';
+  ctx.shadowBlur = 10;
+  ctx.shadowOffsetY = 4;
+  roundRectPath(ctx, x, y, w, h, radius);
+  ctx.fillStyle = 'rgba(20,24,55,0.95)';
+  ctx.fill();
+  ctx.shadowColor = 'transparent';
+
+  // Inner area, clipped
+  ctx.save();
+  roundRectPath(ctx, x + 2, y + 2, w - 4, h - 4, radius - 1);
+  ctx.clip();
+
+  // Inner background (deep)
+  ctx.fillStyle = '#0c1024';
+  ctx.fillRect(x, y, w, h);
+
+  // Liquid bands. The liquid sits at the BOTTOM of the tube; topmost band of stack is the top of the liquid.
+  let totalV = 0;
+  for (const b of tube.stack) totalV += b.volume;
+  if (totalV < tube.visualTopV) {
+    // smooth dispense — top band visually shrinks
+    // Note: for simplicity we just use band volume directly. visualTopV not animated here.
+  }
+  let yPos = y + h - totalV * unitH;
+  for (let i = 0; i < tube.stack.length; i++) {
+    const b = tube.stack[i];
+    const bandH = b.volume * unitH;
+    const pal = PALETTE[b.color];
+
+    // Band fill with vertical gradient
+    const grad = ctx.createLinearGradient(x, yPos, x, yPos + bandH);
+    grad.addColorStop(0, lighten(pal.fill, 0.08));
+    grad.addColorStop(0.5, pal.fill);
+    grad.addColorStop(1, pal.outline);
+    ctx.fillStyle = grad;
+    ctx.fillRect(x, yPos, w, bandH);
+
+    // Top highlight strip on each band
+    ctx.fillStyle = hexAlpha('#ffffff', 0.22);
+    ctx.fillRect(x, yPos, w, 2);
+
+    // Band separator (thin)
+    if (i < tube.stack.length - 1) {
+      ctx.fillStyle = 'rgba(0,0,0,0.18)';
+      ctx.fillRect(x, yPos + bandH - 1, w, 1);
+    }
+
+    // Bubbles within band
+    const palOut = pal.outline;
+    for (const bub of tube.bubbles) {
+      const bx = x + bub.x * w;
+      const byRel = (1 - bub.y);   // higher Y in our anim → near top of tube
+      const by = y + h - byRel * h;
+      if (by < yPos || by > yPos + bandH) continue;
+      ctx.fillStyle = hexAlpha('#ffffff', 0.4);
+      ctx.beginPath();
+      ctx.arc(bx, by, bub.r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    yPos += bandH;
+  }
+
+  // Wave at the top of liquid (subtle)
+  if (totalV > 0) {
+    const liquidTopY = y + h - totalV * unitH;
+    ctx.fillStyle = 'rgba(255,255,255,0.20)';
+    ctx.beginPath();
+    ctx.moveTo(x, liquidTopY);
+    for (let xi = 0; xi <= w; xi += 4) {
+      const wy = liquidTopY + Math.sin((xi + game.time * 60) * 0.2) * 1.2;
+      ctx.lineTo(x + xi, wy);
+    }
+    ctx.lineTo(x + w, liquidTopY + 3);
+    ctx.lineTo(x, liquidTopY + 3);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // Vertical glass highlight strip (left)
+  ctx.fillStyle = hexAlpha('#ffffff', 0.10);
+  ctx.fillRect(x + 4, y + 6, 3, h - 12);
+  // Right edge faint shadow
+  ctx.fillStyle = 'rgba(0,0,0,0.18)';
+  ctx.fillRect(x + w - 4, y + 6, 2, h - 12);
+
+  ctx.restore();   // unclip
+
+  // Outer outline + cap
+  roundRectPath(ctx, x + 0.5, y + 0.5, w - 1, h - 1, radius);
+  ctx.strokeStyle = 'rgba(180,200,255,0.18)';
+  ctx.lineWidth = 1.2;
+  ctx.stroke();
+
+  // Top cap (rim)
+  ctx.save();
+  const capH = 5;
+  roundRectPath(ctx, x - 3, y - capH, w + 6, capH + 4, capH * 0.6);
+  const capGrad = ctx.createLinearGradient(x, y - capH, x, y + 2);
+  capGrad.addColorStop(0, '#3d4a78');
+  capGrad.addColorStop(1, '#1d2347');
+  ctx.fillStyle = capGrad;
+  ctx.fill();
+  // Cap highlight
+  ctx.fillStyle = 'rgba(255,255,255,0.18)';
+  ctx.fillRect(x - 1, y - capH + 1, w + 2, 1);
+  ctx.restore();
+
+  // Refuse flash
+  if (tube.refuseFlash > 0) {
+    ctx.save();
+    ctx.globalAlpha = tube.refuseFlash;
+    roundRectPath(ctx, x - 2, y - 2, w + 4, h + 4, radius + 2);
+    ctx.strokeStyle = '#ff5874';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // If the player is pressing this tube and it's pouring, glow it
+  if (game.pressedTube === tube.idx && game.pour) {
+    ctx.save();
+    ctx.shadowColor = PALETTE[game.pour.color].glow;
+    ctx.shadowBlur = 16;
+    roundRectPath(ctx, x, y, w, h, radius);
+    ctx.strokeStyle = hexAlpha(PALETTE[game.pour.color].outline, 0.85);
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.restore();
+  } else if (game.pressedTube === tube.idx) {
+    // Pressed but refused: subtle red rim already drawn via refuseFlash
+  }
+
+  ctx.restore();
+}
+
+function drawPourStream() {
+  if (!game.pour) return;
+  const tube = game.tubes[game.pour.tubeIdx];
+  const holder = game.holders[game.pour.targetId];
+  if (!holder) return;
+  const entry = entryCellFor(holder, tube.col);
+  if (!entry) return;
+
+  const startX = tubeX(tube) + layout.tubeW / 2;
+  const startY = tubeNozzleY() - 4;
+  const endX = cellX(entry[0]) + layout.cs / 2;
+  const endY = cellY(entry[1]) + layout.cs * 0.6;
+
+  // Stream is a tall vertical narrow rectangle from end (top) to start (bottom),
+  // since liquid travels UP. Visually it's a column of liquid color.
+  const pal = PALETTE[game.pour.color];
+
+  ctx.save();
+  // Glow
+  ctx.shadowColor = pal.glow;
+  ctx.shadowBlur = 14;
+  // Stream main body
+  const streamW = 7 + Math.sin(game.time * 22) * 0.6;
+  ctx.fillStyle = hexAlpha(pal.fill, 0.90);
+  ctx.fillRect(startX - streamW / 2, endY, streamW, startY - endY);
+
+  // Inner highlight
+  ctx.shadowColor = 'transparent';
+  ctx.fillStyle = hexAlpha('#ffffff', 0.45);
+  ctx.fillRect(startX - 1.5, endY, 1.5, startY - endY);
+
+  // Animated chevrons rising up the stream
+  const period = 14;
+  const phase = (game.time * 200) % period;
+  for (let yp = startY - phase; yp > endY; yp -= period) {
+    if (yp < endY + 2) continue;
+    ctx.fillStyle = hexAlpha('#ffffff', 0.55);
+    ctx.fillRect(startX - 2, yp, 4, 2);
+  }
+  ctx.restore();
+
+  // Splash at top (entry into holder)
+  ctx.save();
+  ctx.fillStyle = hexAlpha(pal.fill, 0.6);
+  ctx.beginPath();
+  ctx.arc(endX, endY, 6 + Math.sin(game.time * 18) * 1.2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawParticles() {
+  for (const p of game.particles) {
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, p.life / p.maxLife);
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+}
+
+function startVisualStream() {
+  game.pourStream = { t: 0 };
+}
+
+function spawnSplash(entryCell) {
+  const pal = PALETTE[game.pour ? game.pour.color : 'blue'];
+  const x = cellX(entryCell[0]) + layout.cs / 2;
+  const y = cellY(entryCell[1]) + layout.cs * 0.6;
+  for (let i = 0; i < 6; i++) {
+    const a = Math.random() * Math.PI - Math.PI; // upward-spread
+    const sp = 60 + Math.random() * 60;
+    game.particles.push({
+      x, y,
+      vx: Math.cos(a) * sp,
+      vy: Math.sin(a) * sp - 30,
+      life: 0.4, maxLife: 0.4,
+      r: 2 + Math.random() * 1.5,
+      color: hexAlpha(pal.fill, 0.9),
+      gravity: 240,
+    });
+  }
+}
+
+function spawnClearBurst(holder) {
+  const pal = PALETTE[holder.color];
+  const c = bboxCenter(holder);
+  for (let i = 0; i < 28; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const sp = 80 + Math.random() * 160;
+    game.particles.push({
+      x: c.x, y: c.y,
+      vx: Math.cos(a) * sp,
+      vy: Math.sin(a) * sp,
+      life: 0.7, maxLife: 0.7,
+      r: 2 + Math.random() * 2.5,
+      color: hexAlpha(pal.fill, 0.95),
+      gravity: 100,
+    });
+  }
+}
+
+// =============================================================================
+// UPDATE LOOP
+// =============================================================================
+
+let lastTime = performance.now();
+function tick(now) {
+  const dt = Math.min(0.05, (now - lastTime) / 1000);
+  lastTime = now;
+  if (game) {
+    game.time += dt;
+    update(dt);
+    render();
+  }
+  requestAnimationFrame(tick);
+}
+
+function update(dt) {
+  // Pour
+  if (game.pour) {
+    game.pour.accumulator += dt / POUR_SECONDS_PER_CELL;
+    while (game.pour && game.pour.accumulator >= 1) {
+      game.pour.accumulator -= 1;
+      deliverOneCell();
+    }
+  }
+  // Particles
+  for (let i = game.particles.length - 1; i >= 0; i--) {
+    const p = game.particles[i];
+    p.life -= dt;
+    if (p.life <= 0) { game.particles.splice(i, 1); continue; }
+    p.vy += (p.gravity || 0) * dt;
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+  }
+  // Active holders: fall + pulse animations
+  for (const id of Object.keys(game.holders)) {
+    const h = game.holders[id];
+    if (h.fallTarget) {
+      h.fallTarget.t += dt / h.fallTarget.dur;
+      if (h.fallTarget.t >= 1) {
+        h.pos.dy = 0;
+        h.fallTarget = null;
+        h.landSquash = 1;
+      } else {
+        // Ease out (cubic)
+        const t = h.fallTarget.t;
+        const e = 1 - Math.pow(1 - t, 3);
+        const totalPx = h.fallTarget.dr * layout.cs;
+        h.pos.dy = -totalPx * (1 - e);
+      }
+    }
+    if (h.landSquash > 0) h.landSquash = Math.max(0, h.landSquash - dt * 6);
+    if (h.pulse > 0) h.pulse = Math.max(0, h.pulse - dt * 4);
+  }
+  // Clearing holders: fade out
+  for (let i = game.clearingHolders.length - 1; i >= 0; i--) {
+    const h = game.clearingHolders[i];
+    h.clearAnim = Math.min(1, h.clearAnim + dt / CLEAR_ANIM_DUR);
+    if (h.clearAnim >= 1) game.clearingHolders.splice(i, 1);
+  }
+  // Tubes
+  for (const tube of game.tubes) {
+    if (tube.refuseFlash > 0) tube.refuseFlash = Math.max(0, tube.refuseFlash - dt * 1.6);
+    for (const bub of tube.bubbles) {
+      bub.y -= bub.speed * dt * 0.6;
+      if (bub.y < 0) {
+        bub.y = 1;
+        bub.x = 0.2 + Math.random() * 0.6;
+        bub.r = 1 + Math.random() * 2;
+      }
+    }
+  }
+  // Camera shake decay
+  if (game.cameraShake > 0) game.cameraShake = Math.max(0, game.cameraShake - dt * 3);
+}
+
+// =============================================================================
+// HELPERS
+// =============================================================================
+
+function roundRectPath(ctx, x, y, w, h, r) {
+  if (w < 2 * r) r = w / 2;
+  if (h < 2 * r) r = h / 2;
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+function hexAlpha(hex, a) {
+  // hex like '#aabbcc'
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r},${g},${b},${a})`;
+}
+
+function lighten(hex, amt) {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  const nr = Math.min(255, Math.floor(r + (255 - r) * amt));
+  const ng = Math.min(255, Math.floor(g + (255 - g) * amt));
+  const nb = Math.min(255, Math.floor(b + (255 - b) * amt));
+  return '#' + nr.toString(16).padStart(2, '0') + ng.toString(16).padStart(2, '0') + nb.toString(16).padStart(2, '0');
+}
+
+// =============================================================================
+// INPUT
+// =============================================================================
+
+function tubeAtPoint(x, y) {
+  if (!layout) return -1;
+  // Check each tube's bounding box
+  for (let i = 0; i < game.tubes.length; i++) {
+    const t = game.tubes[i];
+    const tx = tubeX(t);
+    const tw = layout.tubeW;
+    const ty = layout.tubeY - 8;
+    const th = layout.tubeH + 16;
+    if (x >= tx && x <= tx + tw && y >= ty && y <= ty + th) return i;
+  }
+  return -1;
+}
+
+function onPress(x, y) {
+  Audio_.ensure();
+  if (!game) return;
+  if (game.won || game.stuck) return;
+  const idx = tubeAtPoint(x, y);
+  if (idx < 0) return;
+  // While clear+gravity is settling, register the press so it auto-resumes after.
+  game.pressedTube = idx;
+  if (game.pendingResume) return;
+  const next = tryStartPour(idx);
+  if (next) {
+    game.pour = next;
+    startVisualStream();
+    Audio_.startPour();
+  } else {
+    // Refused
+    if (game.tubes[idx].stack.length > 0) {
+      game.tubes[idx].refuseFlash = 0.7;
+      Audio_.refuse();
+    }
+  }
+}
+
+function onRelease() {
+  game.pressedTube = null;
+  if (game.pour) {
+    game.pour = null;
+    game.pourStream = null;
+    Audio_.stopPour();
+  }
+}
+
+canvas.addEventListener('mousedown', e => {
+  const rect = canvas.getBoundingClientRect();
+  const x = (e.clientX - rect.left) * (canvas.width / rect.width);
+  const y = (e.clientY - rect.top) * (canvas.height / rect.height);
+  onPress(x, y);
+});
+window.addEventListener('mouseup', () => onRelease());
+canvas.addEventListener('mouseleave', () => onRelease());
+
+// =============================================================================
+// LEVEL LOADING / PERSISTENCE / UI
+// =============================================================================
+
+const LS_KEY = 'liquidPourPuzzle.progress';
+function loadProgress() {
+  try {
+    const v = localStorage.getItem(LS_KEY);
+    return v ? JSON.parse(v) : { current: 0, completed: [] };
+  } catch (e) {
+    return { current: 0, completed: [] };
+  }
+}
+function saveProgress(p) {
+  try { localStorage.setItem(LS_KEY, JSON.stringify(p)); } catch (e) {}
+}
+
+function loadLevel(idx) {
+  if (idx < 0 || idx >= LEVELS.length) return;
+  game = buildState(idx);
+  computeLayout();
+  // Settle the board: any holder placed mid-air in the level data falls to its
+  // resting position before the player begins. No animation, no sound.
+  applyGravity(true);
+  document.getElementById('levelLabel').textContent = `LEVEL ${idx + 1}`;
+  hideAllModals();
+  Audio_.stopPour();
+}
+
+function showWinModal() {
+  const subs = ['Nicely done.', 'Smooth pour.', 'Perfect order.', 'Crisp.', 'Solved!', 'On the dot.', 'Aha.', 'Tidy.'];
+  document.getElementById('winSub').textContent = subs[game.levelIdx % subs.length];
+  document.getElementById('winModal').classList.add('show');
+  // Persist progress
+  const p = loadProgress();
+  if (!p.completed.includes(game.levelIdx)) p.completed.push(game.levelIdx);
+  if (game.levelIdx + 1 < LEVELS.length) p.current = game.levelIdx + 1;
+  saveProgress(p);
+}
+
+function showStuckModal() {
+  document.getElementById('stuckModal').classList.add('show');
+}
+
+function showCompleteModal() {
+  document.getElementById('completeModal').classList.add('show');
+}
+
+function hideAllModals() {
+  document.querySelectorAll('.modal').forEach(m => m.classList.remove('show'));
+}
+
+document.getElementById('restartBtn').addEventListener('click', () => {
+  Audio_.tap();
+  loadLevel(game ? game.levelIdx : 0);
+});
+document.getElementById('nextBtn').addEventListener('click', () => {
+  Audio_.tap();
+  if (game.levelIdx + 1 >= LEVELS.length) {
+    hideAllModals();
+    showCompleteModal();
+  } else {
+    loadLevel(game.levelIdx + 1);
+  }
+});
+document.getElementById('restartFromStuckBtn').addEventListener('click', () => {
+  Audio_.tap();
+  loadLevel(game.levelIdx);
+});
+document.getElementById('playAgainBtn').addEventListener('click', () => {
+  Audio_.tap();
+  saveProgress({ current: 0, completed: [] });
+  loadLevel(0);
+});
+
+const audioToggleBtn = document.getElementById('audioToggle');
+audioToggleBtn.addEventListener('click', () => {
+  Audio_.setMuted(!Audio_.isMuted());
+  audioToggleBtn.textContent = Audio_.isMuted() ? '×' : '♪';
+  audioToggleBtn.style.color = Audio_.isMuted() ? '#555c80' : '#8590bf';
+});
+
+// Level menu
+document.getElementById('levelMenuBtn').addEventListener('click', () => {
+  Audio_.tap();
+  buildLevelGrid();
+  document.getElementById('menuModal').classList.add('show');
+});
+document.getElementById('closeMenuBtn').addEventListener('click', () => {
+  Audio_.tap();
+  document.getElementById('menuModal').classList.remove('show');
+});
+
+function buildLevelGrid() {
+  const grid = document.getElementById('levelGrid');
+  grid.innerHTML = '';
+  const p = loadProgress();
+  for (let i = 0; i < LEVELS.length; i++) {
+    const btn = document.createElement('button');
+    btn.textContent = i + 1;
+    const completed = p.completed.includes(i);
+    const unlocked = i <= (p.current || 0) || completed;
+    btn.style.cssText = `
+      padding: 10px 0;
+      border: none;
+      border-radius: 12px;
+      font-weight: 700;
+      font-size: 14px;
+      cursor: ${unlocked ? 'pointer' : 'not-allowed'};
+      color: ${unlocked ? '#fff' : '#555'};
+      background: ${completed
+        ? 'linear-gradient(180deg, #4ddc83 0%, #2c9a59 100%)'
+        : unlocked
+          ? 'linear-gradient(180deg, #4a7cff 0%, #2e58e0 100%)'
+          : 'linear-gradient(180deg, #2a3060 0%, #1a1f44 100%)'};
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.15);
+    `;
+    if (unlocked) {
+      btn.addEventListener('click', () => {
+        Audio_.tap();
+        document.getElementById('menuModal').classList.remove('show');
+        loadLevel(i);
+      });
+    }
+    grid.appendChild(btn);
+  }
+}
+
+// =============================================================================
+// BOOT
+// =============================================================================
+
+const progress = loadProgress();
+loadLevel(progress.current || 0);
+requestAnimationFrame(tick);
+
+</script>
+</body>
+</html>
