@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <meta name="theme-color" content="#dfe9f8">
-<title>Savaş Bandı — Demo v7</title>
+<title>Savaş Bandı — Demo v8</title>
 <style>
   html,body{margin:0;height:100%;background:#dfe9f8;overflow:hidden;font-family:'Nunito','Quicksand','Trebuchet MS','Segoe UI',system-ui,sans-serif;-webkit-user-select:none;user-select:none}
   #wrap{position:fixed;inset:0;display:flex;align-items:center;justify-content:center}
@@ -19,6 +19,10 @@
   .leg i{display:inline-block;width:10px;height:10px;margin-right:3px;border-radius:4px;vertical-align:-1px}
   .btn{margin-top:12px;background:linear-gradient(#ffb03a,#ff8b3d);color:#fff;border:0;padding:12px 34px;font:800 15px 'Nunito','Trebuchet MS',sans-serif;letter-spacing:1px;cursor:pointer;box-shadow:0 6px 0 #d96f22;border-radius:16px}
   .btn:active{transform:translateY(4px);box-shadow:0 2px 0 #d96f22}
+  .btn{display:block;width:100%;margin-top:10px}
+  .btn small{display:block;font-size:10px;font-weight:700;opacity:.9;letter-spacing:0}
+  .btn2{background:linear-gradient(#4db6ff,#2f8fe0);box-shadow:0 6px 0 #1f6cb0}
+  .btn2:active{box-shadow:0 2px 0 #1f6cb0}
   #endStats{text-align:center;font-size:12px;line-height:1.7}
 </style>
 </head>
@@ -28,11 +32,12 @@
 <div class="overlay" id="menuOv">
   <div class="panel">
     <h1>SAVAŞ BANDI</h1>
-    <div class="sub">SEPET TAKTİK — v7</div>
+    <div class="sub">SEPET TAKTİK — v8</div>
     <p><b>1.</b> Bant soldan sağa akar, üzerinde <b>tek sepet</b> olur. Slottaki sepete dokun: banda biner, geçerken kendi renginden <b>en öndeki</b> askerleri üstüne yükler.</p>
     <p><b>2.</b> Askerler 6 <b>şarjör sütunundan</b> beslenir; sadece öndeki alınabilir, alınınca kapıdan yenisi gelir. Ara sıra bir hattın önünde <b>EJDERHA</b> belirir: <b>her sepet</b> alabilir ama oyalanırsan kaçar!</p>
     <p><b>3.</b> Sepet bandı <b>tek yönde</b> geçer, sağdan çıkınca kaybolur ve yükü <b>orduna katılır</b>. Geri dönüş yok — boş kapasite israftır. Süre <b>60 sn</b>.</p>
     <p><b>4.</b> Süre bitince <b>zemin açılır</b> ve <b>GÜÇ RULETİ</b> başlar: 10 saniyede bir güçlendirme seç. Seçmezsen rulet rastgele seçer! Sonra ordular arenada savaşır.</p>
+    <p><b>KAPIŞMA modunda</b> bantlar ve şarjörler <b>ortaktır</b>: iki tarafın sepetleri aynı devrede döner ve aynı askerler için yarışır!</p>
     <div class="leg">
       <span><i style="background:#ff5a4e"></i>Kılıçlı</span>
       <span><i style="background:#3ecb6c"></i>Okçu</span>
@@ -41,7 +46,8 @@
       <span><i style="background:#7e93ab"></i>Kalkanlı</span>
       <span><i style="background:#19d9c1"></i>Ejderha</span>
     </div>
-    <button class="btn" id="startBtn">BAŞLA</button>
+    <button class="btn" id="mode1Btn">DÜELLO<small>herkes kendi bandında</small></button>
+    <button class="btn btn2" id="mode2Btn">KAPIŞMA<small>ortak bantlarda yarış</small></button>
   </div>
 </div>
 
@@ -50,6 +56,7 @@
     <h1 id="endTitle">ZAFER!</h1>
     <p id="endStats"></p>
     <button class="btn" id="againBtn">TEKRAR OYNA</button>
+    <button class="btn btn2" id="menuBtn">ANA MENÜ</button>
   </div>
 </div>
 
@@ -114,17 +121,33 @@ function fx(f,d,type,v,slide){if(!AC)return;try{
 }catch(e){}}
 
 // ---------------- geometri ----------------
+let MODE='duel';   // 'duel' | 'shared'
 const BELT={
  p:{y:344,x0:24,x1:216,dir: 1,spd:68},
  a:{y:64, x0:24,x1:216,dir:-1,spd:62}
 };
+// kapışma modu: iki ORTAK bant, uçları tünellerle bağlı (sepet ışınlanır)
+const BELT2={
+ p:{y:316,x0:24,x1:216,dir: 1,spd:95},
+ a:{y:96, x0:24,x1:216,dir:-1,spd:88}
+};
+// rotalar: ent=giriş, tin=tünel girişi, tout=tünel çıkışı, end=teslim deliği
+const R2={
+ p:{ent:{x:24, y:316}, tin:{x:216,y:316}, tout:{x:216,y:96}, end:{x:24, y:96}},
+ a:{ent:{x:216,y:96},  tin:{x:24, y:96},  tout:{x:24, y:316}, end:{x:216,y:316}}
+};
+const beltOf=team=>MODE==='shared'?BELT2[team]:BELT[team];
 const colX=c=>60+c*24;
-const cellY=(team,r)=>team==='p'?276+r*12:132-r*12;
+const cellY=(team,r)=>MODE==='shared'
+ ?(team==='p'?246+r*12:164-r*12)
+ :(team==='p'?272+r*12:132-r*12);
 const slotX=i=>48+i*36;
 const SLOTY={p:378,a:36};
-const entryX=team=>BELT[team].dir<0?BELT[team].x1:BELT[team].x0;
-const exitX =team=>BELT[team].dir<0?BELT[team].x0:BELT[team].x1;
-const gateY =team=>team==='p'?262:146;
+const entryX=team=>{const B=beltOf(team);return B.dir<0?B.x1:B.x0;};
+const exitX =team=>{const B=beltOf(team);return B.dir<0?B.x0:B.x1;};
+const gateY =team=>MODE==='shared'
+ ?(team==='p'?232:178)
+ :(team==='p'?258:146);
 
 // ---------------- state ----------------
 let state='menu';
@@ -137,7 +160,25 @@ let aiThink=0,beltT=0;
 let cells,dragonEv,pSlots,aSlots,pPrev,aPrev,baskets=[];
 let powerT=0,pCards,aCards,pPick,aPick,aiPickAt=0,goT=0,ups;
 
-const newBob=()=>({type:rt(),cap:2+((R()*3)|0)});
+// yeni sepetin türü tahtaya bakar: öndekiler ve yaklaşanlar ağırlık kazanır,
+// küçük bir taban pay "organik" ıskaları korur
+const COMMONS=['sword','archer','mage','spear','tank'];
+const ROWCOEF=[0,0.5,0.8,1.2,2.0]; // r0=kapıdan yeni gelen sayılmaz, öne yaklaştıkça ağırlık artar
+function newBob(team){
+ const w={};COMMONS.forEach(t=>w[t]=0.4);
+ const keys=MODE==='shared'?['p','a']:[team];
+ if(cells)keys.forEach(k=>{
+  if(!cells[k])return;
+  const cs=cells[k];
+  for(let r=1;r<ROWS;r++)for(let c=0;c<COLS;c++){
+   const t=cs[r][c].type;if(w[t]!==undefined)w[t]+=ROWCOEF[r];
+  }
+ });
+ let tot=0;COMMONS.forEach(t=>tot+=w[t]);
+ let x=R()*tot,type=COMMONS[0];
+ for(const t of COMMONS){x-=w[t];if(x<=0){type=t;break;}}
+ return{type,cap:2+((R()*3)|0)};
+}
 
 function initBoard(){
  cells={p:[],a:[]};
@@ -155,11 +196,11 @@ function initBoard(){
            a:{active:false,c:0,ttl:0,next:9+R()*6}};
  pSlots=[];aSlots=[];
  for(let i=0;i<SLOTN;i++){
-  pSlots.push(i<4?{state:'ready',...newBob()}:{state:'empty',rtm:0.8,rt0:0.8});
-  aSlots.push(i<4?{state:'ready',...newBob()}:{state:'empty',rtm:1.6,rt0:1.6});
+  pSlots.push(i<4?{state:'ready',...newBob('p')}:{state:'empty',rtm:0.8,rt0:0.8});
+  aSlots.push(i<4?{state:'ready',...newBob('a')}:{state:'empty',rtm:1.6,rt0:1.6});
  }
- pPrev=[newBob(),newBob(),newBob()];
- aPrev=[newBob(),newBob(),newBob()];
+ pPrev=[newBob('p'),newBob('p'),newBob('p')];
+ aPrev=[newBob('a'),newBob('a'),newBob('a')];
  armies={p:{},a:{}};TYPES.forEach(t=>{armies.p[t]=0;armies.a[t]=0;});
  baskets=[];parts=[];floats=[];flyers=[];units=[];bprojs=[];
  timeLeft=COLLECT_TIME;aiThink=1.2;beltT=0;
@@ -248,11 +289,13 @@ function deploySlot(team,idx){
  if(!s||s.state!=='ready')return;
  if(baskets.some(b=>b.team===team)){
   if(team==='p'){fx(140,.08,'sawtooth',.04,-40);
-   floats.push({x:120,y:BELT.p.y-16,txt:'BANT MEŞGUL',col:SUB,t:0,sz:8});}
+   floats.push({x:120,y:beltOf('p').y-16,txt:'BANT MEŞGUL',col:SUB,t:0,sz:8});}
   return;
  }
- const b={team,type:s.type,cap:s.cap,got:0,loot:[],pk:0,state:'toBelt',lt:0,
-  sx:slotX(idx),sy:SLOTY[team],tx:entryX(team),ty:BELT[team].y,x:slotX(idx),y:SLOTY[team]};
+ const ep=MODE==='shared'?R2[team].ent:{x:entryX(team),y:beltOf(team).y};
+ const b={team,type:s.type,cap:s.cap,got:0,loot:[],pk:0,trav:0,state:'toBelt',lt:0,
+  seg:'b1',curBelt:team==='p'?'p':'a',tt:0,tsc:1,
+  sx:slotX(idx),sy:SLOTY[team],tx:ep.x,ty:ep.y,x:slotX(idx),y:SLOTY[team]};
  const rt0=team==='p'?4.6+R()*0.8:5.6+R()*1.0;
  slots[idx]={state:'empty',rtm:rt0,rt0};
  baskets.push(b);
@@ -275,11 +318,55 @@ function deliver(b){
 function deliverAll(){for(const b of baskets)deliver(b);baskets.length=0;}
 function updBaskets(dt){
  for(let i=baskets.length-1;i>=0;i--){
-  const b=baskets[i],B=BELT[b.team];
+  const b=baskets[i],B=beltOf(b.team);
   if(b.state==='toBelt'){
    b.lt+=dt/0.3;const e=smooth(b.lt);
    b.x=b.sx+(b.tx-b.sx)*e;b.y=b.sy+(b.ty-b.sy)*e;
    if(b.lt>=1)b.state='ride';
+   continue;
+  }
+  if(MODE==='shared'){
+   const rt2=R2[b.team];
+   if(b.seg==='tun'){ // tünelde: ilk yarı delikte küçül, ikinci yarı çıkışta büyü
+    b.tt+=dt/0.4;
+    if(b.tt<0.5){b.x=rt2.tin.x;b.y=rt2.tin.y;b.tsc=1-b.tt*2;}
+    else{b.x=rt2.tout.x;b.y=rt2.tout.y;b.tsc=(b.tt-0.5)*2;}
+    if(b.tt>=1){b.seg='b2';b.tsc=1;
+     b.curBelt=b.curBelt==='p'?'a':'p';
+     if(b.team==='p')fx(520,.08,'square',.04,160);
+    }
+    continue;
+   }
+   const CB=BELT2[b.curBelt];
+   b.x+=CB.dir*B.spd*dt;b.y=CB.y;b.pk-=dt;
+   if(b.pk<=0&&b.cap>0){
+    const blk=b.curBelt; // alt bant → 'p' bloğu, üst bant → 'a' bloğu
+    let bc=-1,bd=10;
+    for(let c=0;c<COLS;c++){const d=Math.abs(b.x-colX(c));
+     const ft=frontType(blk,c);
+     if(d<bd&&(ft===b.type||ft==='dragon')){bd=d;bc=c;}}
+    if(bc>=0){
+     const py=cellY(blk,ROWS-1);
+     const tk=takeFront(blk,bc);
+     b.cap--;b.got++;b.pk=0.11;
+     flyers.push({x0:colX(bc),y0:py,type:tk,b,t:0});
+     if(b.team==='p'){
+      if(tk==='dragon')floats.push({x:colX(bc),y:py-8,txt:'EJDER!',col:TI.dragon.col,t:0,sz:9});
+      fx(tk==='dragon'?880:560+b.got*60,.08,'square',.05,180);
+     }else fx(600,.05,'square',.015,150);
+    }
+   }
+   const past=CB.dir>0?b.x>=CB.x1:b.x<=CB.x0;
+   if(past){
+    if(b.seg==='b1'){ // tünel girişine ulaştı
+     b.seg='tun';b.tt=0;
+     puff(rt2.tin.x,rt2.tin.y,'#8fa5c8',7,45);
+     if(b.team==='p')fx(300,.12,'square',.04,-140);
+    }else{ // teslim deliği
+     puff(rt2.end.x,rt2.end.y,'#8fa5c8',7,45);
+     deliver(b);baskets.splice(i,1);
+    }
+   }
    continue;
   }
   b.x+=B.dir*B.spd*dt;b.y=B.y;b.pk-=dt;
@@ -308,13 +395,16 @@ function updSlots(dt){
   slots.forEach((s,i)=>{
    if(s.state==='empty'){s.rtm-=dt;
     if(s.rtm<=0){
-     const nb=prev.shift();prev.push(newBob());
+     const nb=prev.shift();prev.push(newBob(tm));
      slots[i]={state:'ready',type:nb.type,cap:nb.cap};
      if(tm==='p')fx(660,.06,'square',.03,200);
     }
    }
   });
  });
+}
+function fCount(team,t){
+ return MODE==='shared'?frontCount('p',t)+frontCount('a',t):frontCount(team,t);
 }
 function updAI(dt){
  aiThink-=dt;if(aiThink>0)return;
@@ -327,11 +417,11 @@ function updAI(dt){
  const roll=R();
  if(roll<0.2){
   let best=idx,bc=-1;
-  for(const ri of ready){const c=frontCount('a',aSlots[ri].type);if(c>bc){bc=c;best=ri;}}
+  for(const ri of ready){const c=fCount('a',aSlots[ri].type);if(c>bc){bc=c;best=ri;}}
   idx=best;
  }else if(roll<0.3){
   let worst=idx,wc=1e9;
-  for(const ri of ready){const c=frontCount('a',aSlots[ri].type);if(c<wc){wc=c;worst=ri;}}
+  for(const ri of ready){const c=fCount('a',aSlots[ri].type);if(c<wc){wc=c;worst=ri;}}
   idx=worst;
  }
  deploySlot('a',idx);
@@ -561,13 +651,13 @@ function tile(t,front,alp){
  g.globalAlpha=1;
 }
 function drawStraightBelt(team){
- const B=BELT[team],tc=TEAM[team];
+ const B=beltOf(team),tc=TEAM[team];
  soft(true);
  g.fillStyle='#c9d5e9';rr(g,B.x0-10,B.y-10,B.x1-B.x0+20,20,10);g.fill();
  soft(false);
  g.fillStyle='#e6edf9';rr(g,B.x0-7,B.y-7,B.x1-B.x0+14,14,7);g.fill();
  // yön okları
- g.fillStyle=tc;g.globalAlpha=.4;
+ g.fillStyle=MODE==='shared'?'#8fa5c8':tc;g.globalAlpha=.4;
  const ph=(beltT*B.spd)%18;
  for(let x=B.x0;x<=B.x1;x+=18){
   const xx=B.dir<0?x-ph:x+ph;
@@ -578,9 +668,27 @@ function drawStraightBelt(team){
   }
  }
  g.globalAlpha=1;
- // giriş/çıkış kapıları
- g.fillStyle=tc;rr(g,entryX(team)+(B.dir<0?3:-9),B.y-10,6,20,3);g.fill();
- g.fillStyle='#aab8d2';rr(g,exitX(team)+(B.dir<0?-9:3),B.y-10,6,20,3);g.fill();
+ if(MODE!=='shared'){
+  g.fillStyle=tc;rr(g,entryX(team)+(B.dir<0?3:-9),B.y-10,6,20,3);g.fill();
+  g.fillStyle='#aab8d2';rr(g,exitX(team)+(B.dir<0?-9:3),B.y-10,6,20,3);g.fill();
+ }
+}
+// kapışma: dört köşede tünel delikleri (giriş halkaları takım renkli)
+function drawTunnels(){
+ const holes=[
+  {p:R2.p.ent, ring:TEAM.p},   // sen buradan girersin
+  {p:R2.p.tin, ring:null},{p:R2.p.tout,ring:null},
+  {p:R2.p.end, ring:null},
+  {p:R2.a.ent, ring:TEAM.a}    // AI buradan girer
+ ];
+ for(const h of holes){
+  soft(true);
+  g.fillStyle='#3a4a68';g.beginPath();g.ellipse(h.p.x,h.p.y,9,7,0,0,6.29);g.fill();
+  soft(false);
+  g.fillStyle='#1c2740';g.beginPath();g.ellipse(h.p.x,h.p.y,6.5,4.8,0,0,6.29);g.fill();
+  g.strokeStyle=h.ring||'#8fa5c8';g.lineWidth=h.ring?2:1.4;
+  g.beginPath();g.ellipse(h.p.x,h.p.y,9,7,0,0,6.29);g.stroke();
+ }
 }
 function drawMagazines(team){
  const gy=gateY(team),dir=team==='p'?1:-1;
@@ -613,11 +721,12 @@ function drawMagazines(team){
 }
 function drawBasket(b,small){
  const inf=TI[b.type],w=small?14:20,h=small?6:8;
- if(b.state==='ride'){
-  const B=BELT[b.team];
+ if(b.state==='ride'&&b.seg!=='tun'){
+  const B=MODE==='shared'?BELT2[b.curBelt||b.team]:beltOf(b.team);
   for(let k=6;k<=18;k+=4){
    g.globalAlpha=(1-k/20)*0.35;
-   g.fillStyle=inf.col;g.beginPath();g.arc(b.x-B.dir*k,b.y+3,1.5,0,6.29);g.fill();
+   g.fillStyle=inf.col;
+   g.beginPath();g.arc(b.x-B.dir*k,b.y+3,1.5,0,6.29);g.fill();
   }
   g.globalAlpha=1;
  }
@@ -648,6 +757,25 @@ function drawBasket(b,small){
  soft(false);
  g.strokeStyle=inf.col;g.lineWidth=1.6;g.beginPath();g.arc(bx,by,small?4.5:5.5,0,6.29);g.stroke();
  T(b.cap,bx,by+0.5,small?7:8,INK,'center',true);
+ // sahip rozeti (placeholder avatar) — sepetin altında
+ if(!small&&(b.state==='ride'||b.state==='toBelt')){
+  const ay=b.y+14;
+  g.fillStyle=TEAM[b.team];g.beginPath();g.arc(b.x,ay,5.5,0,6.29);g.fill();
+  g.strokeStyle='#ffffff';g.lineWidth=1.6;g.beginPath();g.arc(b.x,ay,5.5,0,6.29);g.stroke();
+  if(b.team==='p'){ // gülen yüz
+   g.fillStyle='#ffffff';
+   g.beginPath();g.arc(b.x-1.8,ay-1.2,0.9,0,6.29);g.fill();
+   g.beginPath();g.arc(b.x+1.8,ay-1.2,0.9,0,6.29);g.fill();
+   g.strokeStyle='#ffffff';g.lineWidth=1;
+   g.beginPath();g.arc(b.x,ay+0.6,2,0.35,2.8);g.stroke();
+  }else{ // robot
+   g.strokeStyle='#ffffff';g.lineWidth=1;
+   g.beginPath();g.moveTo(b.x,ay-5.5);g.lineTo(b.x,ay-7.5);g.stroke();
+   g.fillStyle='#ffffff';g.beginPath();g.arc(b.x,ay-8,1,0,6.29);g.fill();
+   g.fillRect(b.x-2.8,ay-1.8,1.8,1.8);g.fillRect(b.x+1,ay-1.8,1.8,1.8);
+   g.fillRect(b.x-1.8,ay+1.4,3.6,1);
+  }
+ }
 }
 function miniIcon(t,x,y,sc){
  g.save();g.translate(x,y);g.scale(sc||.55,sc||.55);
@@ -681,8 +809,8 @@ function countsRow(team,y,label,lcol){
  T('TOP '+countArmy(team),W-4,y,8,SUB,'right',true);
 }
 function hudCollect(){
- // düşman ordusu: geri sayımın ÜSTÜNDE
- countsRow('a',172,'AI','#ff8b3d');
+ const aY=MODE==='shared'?10:172, pY=MODE==='shared'?404:240;
+ countsRow('a',aY,'AI','#ff8b3d');
  // süre çipi
  soft(true);
  g.fillStyle='#ffffff';rr(g,84,195,72,22,11);g.fill();
@@ -690,12 +818,26 @@ function hudCollect(){
  g.strokeStyle=timeLeft<10?'#ff5a4e':LINE;g.lineWidth=2;rr(g,84,195,72,22,11);g.stroke();
  const s=Math.ceil(timeLeft),mm=(s/60)|0,ss=s%60;
  T(mm+':'+(ss<10?'0':'')+ss,120,206,12,timeLeft<10?'#ff5a4e':INK,'center',true);
- // bizim ordu: geri sayımın ALTINDA
- countsRow('p',240,'SEN','#2fa8ff');
- // sıradaki sepetler (sağ kenar, dikey)
- T('›',228,290,10,SUB,'center',true);
- for(let k=0;k<3;k++)
-  drawBasket({team:'p',type:pPrev[k].type,cap:pPrev[k].cap,loot:[],x:228,y:302+k*15,state:'q'},true);
+ countsRow('p',pY,'SEN','#2fa8ff');
+ // SIRA paneli: bir sonraki sepetler
+ const qx=226, qy=MODE==='shared'?326:262;
+ soft(true);
+ g.fillStyle='#ffffff';rr(g,qx-13,qy,26,64,9);g.fill();
+ soft(false);
+ g.strokeStyle=LINE;g.lineWidth=1.4;rr(g,qx-13,qy,26,64,9);g.stroke();
+ g.fillStyle='#eef3fc';rr(g,qx-13,qy,26,13,9);g.fill();
+ T('SIRA',qx,qy+7,5.8,SUB,'center',true);
+ const qys=[qy+24,qy+41,qy+55],qsc=[.8,.6,.5],qal=[1,.75,.5];
+ for(let k=0;k<3;k++){
+  g.save();g.globalAlpha=qal[k];
+  g.translate(qx,qys[k]);g.scale(qsc[k],qsc[k]);g.translate(-qx,-qys[k]);
+  drawBasket({team:'p',type:pPrev[k].type,cap:pPrev[k].cap,loot:[],x:qx,y:qys[k],state:'q'},true);
+  g.restore();g.globalAlpha=1;
+ }
+ // ilk sıradaki: altın vurgu halkası
+ g.strokeStyle='#ffb03a';g.globalAlpha=.75+.25*Math.sin(time*4);
+ g.lineWidth=1.6;g.beginPath();g.arc(qx,qys[0],9.5,0,6.29);g.stroke();
+ g.globalAlpha=1;
 }
 function drawCollect(){
  const gr=g.createLinearGradient(0,0,0,H);
@@ -706,10 +848,18 @@ function drawCollect(){
   g.fillStyle=b.c;g.beginPath();g.arc(b.x,b.y,b.r,0,6.29);g.fill();
  }
  g.globalAlpha=1;
- drawStraightBelt('a');drawStraightBelt('p');
+ if(MODE==='shared'){
+  drawStraightBelt('a');drawStraightBelt('p');
+  drawTunnels();
+ }else{
+  drawStraightBelt('a');drawStraightBelt('p');
+ }
  drawMagazines('a');drawMagazines('p');
  drawSlots('a');drawSlots('p');
- for(const b of baskets)drawBasket(b);
+ for(const b of baskets){
+  if(b.tsc!==undefined&&b.tsc<1){g.save();g.translate(b.x,b.y);g.scale(Math.max(0.02,b.tsc),Math.max(0.02,b.tsc));g.translate(-b.x,-b.y);drawBasket(b);g.restore();}
+  else drawBasket(b);
+ }
  drawFlyers();
  drawParts();drawFloats();
  hudCollect();
@@ -937,10 +1087,16 @@ function fit(){
 }
 window.addEventListener('resize',fit);
 
-document.getElementById('startBtn').addEventListener('click',()=>{
- ac();document.getElementById('menuOv').style.display='none';startGame();});
+document.getElementById('mode1Btn').addEventListener('click',()=>{
+ ac();MODE='duel';document.getElementById('menuOv').style.display='none';startGame();});
+document.getElementById('mode2Btn').addEventListener('click',()=>{
+ ac();MODE='shared';document.getElementById('menuOv').style.display='none';startGame();});
 document.getElementById('againBtn').addEventListener('click',()=>{
  ac();document.getElementById('endOv').style.display='none';startGame();});
+document.getElementById('menuBtn').addEventListener('click',()=>{
+ ac();document.getElementById('endOv').style.display='none';
+ MODE='duel';initBoard();state='menu';
+ document.getElementById('menuOv').style.display='flex';});
 
 initBoard();fit();
 requestAnimationFrame(frame);
