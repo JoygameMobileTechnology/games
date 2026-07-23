@@ -83,6 +83,33 @@ test('canMove: tamamen kilitli', () => {
   assert.equal(C.canMove(b), false);
 });
 
+test('emissionFor: eşleme tablosu', () => {
+  assert.equal(C.emissionFor(32), null);
+  assert.equal(C.emissionFor(64), 'tohum_tozu');
+  assert.equal(C.emissionFor(128), 'cicek_ozu');
+  assert.equal(C.emissionFor(256), 'meyve');
+  assert.equal(C.emissionFor(512), 'nadir_tohum');
+  assert.equal(C.emissionFor(1024), 'agac_fidani');
+  assert.equal(C.emissionFor(2048), 'efsanevi');
+  assert.equal(C.emissionFor(4096), 'efsanevi');
+});
+test('move: 64 birleşmesi emisyon üretir, konumuyla', () => {
+  const b = C.emptyBoard(); b[2][0] = 32; b[2][1] = 32;
+  const r = C.move(b, 'left');
+  assert.deepEqual(r.emissions, [{ type: 'tohum_tozu', y: 2, x: 0 }]);
+});
+test('move: 64 altı birleşme emisyon üretmez', () => {
+  const b = C.emptyBoard(); b[0][0] = 2; b[0][1] = 2;
+  assert.deepEqual(C.move(b, 'left').emissions, []);
+});
+test('move: aynı hamlede çoklu emisyon', () => {
+  const b = C.emptyBoard();
+  b[0][0] = 32; b[0][1] = 32; b[1][0] = 64; b[1][1] = 64;
+  const r = C.move(b, 'left');
+  assert.equal(r.emissions.length, 2);
+  assert.deepEqual(r.emissions.map(e => e.type).sort(), ['cicek_ozu', 'tohum_tozu']);
+});
+
 let fail = 0;
 for (const [name, fn] of tests) {
   try { fn(); console.log('PASS', name); }
