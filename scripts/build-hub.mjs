@@ -1,4 +1,52 @@
-<!DOCTYPE html>
+import { cpSync, mkdirSync, readdirSync, readFileSync, writeFileSync, existsSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
+
+const ROOT = process.cwd();
+const OUT = join(ROOT, '_site');
+const EXCLUDE = new Set(['.git', '.github', 'scripts', 'node_modules', '_site']);
+
+rmSync(OUT, { recursive: true, force: true });
+mkdirSync(OUT, { recursive: true });
+
+const games = [];
+for (const entry of readdirSync(ROOT, { withFileTypes: true })) {
+  if (!entry.isDirectory() || EXCLUDE.has(entry.name)) continue;
+  const dir = join(ROOT, entry.name);
+  if (!existsSync(join(dir, 'index.html'))) continue;
+
+  let title = entry.name;
+  let description = '';
+  const metaPath = join(dir, 'game.json');
+  if (existsSync(metaPath)) {
+    try {
+      const meta = JSON.parse(readFileSync(metaPath, 'utf8'));
+      if (meta.title) title = meta.title;
+      if (meta.description) description = meta.description;
+    } catch {
+      console.warn(`WARN: ${entry.name}/game.json is not valid JSON, falling back to <title>`);
+    }
+  }
+  if (title === entry.name) {
+    const m = readFileSync(join(dir, 'index.html'), 'utf8').match(/<title>(.*?)<\/title>/i);
+    if (m) title = m[1].trim();
+  }
+
+  cpSync(dir, join(OUT, entry.name), { recursive: true });
+  games.push({ slug: entry.name, title, description });
+}
+
+games.sort((a, b) => a.slug.localeCompare(b.slug, 'tr'));
+
+const esc = s => String(s)
+  .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+const cards = games.map(g => `    <a class="card" href="${esc(g.slug)}/">
+      <b>${esc(g.title)}</b>
+      ${g.description ? `<p>${esc(g.description)}</p>` : ''}
+    </a>`).join('\n');
+
+writeFileSync(join(OUT, 'index.html'), `<!DOCTYPE html>
 <html lang="tr">
 <head>
 <meta charset="utf-8">
@@ -11,7 +59,6 @@
     --ink: #1D2740;
     --muted: #65718C;
     --gold: #EFAD12;
-    --gold-ink: #3A2B00;
     --shadow: 0 1px 3px rgba(29, 39, 64, .12);
   }
   @media (prefers-color-scheme: dark) {
@@ -21,7 +68,6 @@
       --ink: #EDF2FA;
       --muted: #8B99B5;
       --gold: #F7BE2A;
-      --gold-ink: #3A2B00;
       --shadow: 0 1px 3px rgba(0, 0, 0, .35);
     }
   }
@@ -71,19 +117,6 @@
     font-size: 13.5px;
     line-height: 1.5;
   }
-  .tagline {
-    display: inline-block;
-    margin-left: 8px;
-    font-size: 11px;
-    font-weight: 800;
-    letter-spacing: .08em;
-    text-transform: uppercase;
-    color: var(--gold-ink);
-    background: var(--gold);
-    border-radius: 999px;
-    padding: 2px 9px;
-    vertical-align: 2px;
-  }
 </style>
 </head>
 <body>
@@ -91,11 +124,11 @@
   <h1>Game <span>Experiments</span></h1>
   <p class="sub">Tek dosyalık HTML oyun prototipleri. Her klasör bağımsız bir deneme.</p>
   <div class="games">
-    <a class="card" href="2048-vs/">
-      <b>2048 VS</b><span class="tagline">prototip</span>
-      <p>2048 boardu asker üretir: canlı lane savaşı (Mod 1) veya 30 saniye biriktirip arena düellosu (Mod 2). AI rakip, 3 zorluk.</p>
-    </a>
+${cards}
   </div>
 </div>
 </body>
 </html>
+`);
+
+console.log(`Built hub with ${games.length} game(s): ${games.map(g => g.slug).join(', ') || '(none)'}`);
