@@ -118,6 +118,19 @@ footer{flex:none;text-align:center;font-size:13px;font-weight:700;opacity:.55;pa
   transition:transform .08s, box-shadow .08s;
 }
 .btn:active{transform:translateY(4px);box-shadow:0 1px 0 #3b6fc4}
+.mode-btn{
+  display:block;width:100%;margin-top:12px;text-align:left;
+  padding:13px 16px;border-radius:16px;border:none;cursor:pointer;
+  font-family:var(--font);color:#fff;font-size:17px;font-weight:800;
+  transition:transform .08s, box-shadow .08s;
+}
+.mode-btn small{display:block;font-weight:600;font-size:12.5px;opacity:.9;margin-top:2px;line-height:1.35}
+.mode-btn.m1{background:linear-gradient(135deg,#4d9df6,#7c6cf6);box-shadow:0 4px 0 #3b6fc4}
+.mode-btn.m2{background:linear-gradient(135deg,#18b0a4,#0f8ca0);box-shadow:0 4px 0 #0d7280}
+.mode-btn:active{transform:translateY(3px);box-shadow:none}
+#btn-home{cursor:pointer;padding:4px 11px}
+#paint-wrap.off{display:none}
+#ov-win.bottom{align-items:flex-end;padding-bottom:34px;background:rgba(43,51,80,.10);backdrop-filter:none}
 .mini-demo{display:flex;align-items:center;justify-content:center;gap:8px;margin:6px 0}
 .confetti{
   position:absolute;top:-16px;z-index:60;pointer-events:none;
@@ -130,7 +143,10 @@ footer{flex:none;text-align:center;font-size:13px;font-weight:700;opacity:.55;pa
 <body>
 <div id="app">
   <header>
-    <span class="chip" id="lvl-chip">Bölüm 1</span>
+    <div style="display:flex;gap:8px;align-items:center">
+      <span class="chip" id="btn-home" title="Mod seç">☰</span>
+      <span class="chip" id="lvl-chip">Bölüm 1</span>
+    </div>
     <span id="hearts"></span>
   </header>
 
@@ -145,16 +161,39 @@ footer{flex:none;text-align:center;font-size:13px;font-weight:700;opacity:.55;pa
 
   <div id="board-wrap"><svg id="board"></svg></div>
 
-  <footer>Hedefe bak: altta kalan renk önce boyanır! 🎨</footer>
+  <footer id="foot">Hedefe bak: altta kalan renk önce boyanır! 🎨</footer>
 
-  <!-- Intro -->
-  <div class="overlay" id="ov-intro">
+  <!-- Mod seçimi -->
+  <div class="overlay" id="ov-menu">
     <div class="card">
       <h1>🎨 Arrow Paint</h1>
+      <p>Okları serbest bırak, boya! Modunu seç:</p>
+      <button class="mode-btn m1" id="btn-mode-resim">🖼️ Resim Modu
+        <small>Hedef resmi katman sırasına göre boya — yanlış sıra ❤️ götürür!</small></button>
+      <button class="mode-btn m2" id="btn-mode-desen">🌀 Desen Modu
+        <small>Çıkan her ok, yattığı yeri kendi rengine boyar — tahta desene dönüşür.</small></button>
+    </div>
+  </div>
+
+  <!-- Resim intro -->
+  <div class="overlay hidden" id="ov-intro">
+    <div class="card">
+      <h1>🖼️ Resim Modu</h1>
       <p>Her ok bir boya rulosu: tahtadan çıkınca resimdeki <b>kendi renkli parçasını</b> boyar.</p>
       <p>Okun <b>ucunun baktığı yol</b> boşsa çıkar, doluysa toslar.</p>
       <p>⚠️ <b>Sıra önemli:</b> Hedef resimde <b>altta kalan</b> parçalar önce boyanmalı. Yanlış üst üste bindirirsen ❤️ kaybedersin!</p>
       <button class="btn" id="btn-start">Başla</button>
+    </div>
+  </div>
+
+  <!-- Desen intro -->
+  <div class="overlay hidden" id="ov-intro-desen">
+    <div class="card">
+      <h1>🌀 Desen Modu</h1>
+      <p>Ucunun yolu <b>açık</b> olan okları tahtadan çıkar.</p>
+      <p>Çıkan ok, gövdesinin yattığı hücreleri <b>kendi rengiyle</b> boyar.</p>
+      <p>Tüm oklar çıkınca tahta rengarenk bir desene dönüşür! 🎨</p>
+      <button class="btn" id="btn-start-desen">Başla</button>
     </div>
   </div>
 
@@ -243,8 +282,21 @@ const DIRS = [[0,-1],[1,0],[0,1],[-1,0]];
 const CELL = 12;                    // svg birimi / hücre
 const NS = 'http://www.w3.org/2000/svg';
 
+/* ===== Desen modu: paletler ve büyüyen tahtalar ===== */
+const DPALETTES = [
+  { name:'Okyanus',   colors:['#0e3d4d','#15697c','#2aa7bd','#69cede','#b7e9f2'] },
+  { name:'Günbatımı', colors:['#4b2a70','#c0395b','#ef6a3a','#f6a428','#ffd166'] },
+  { name:'Orman',     colors:['#1b4332','#2d6a4f','#40916c','#74c69d','#b7e4c7'] },
+  { name:'Şeker',     colors:['#c9366e','#ff5d8f','#ff9fb8','#9d4edd','#5fb8ff'] },
+  { name:'Gece',      colors:['#22223b','#4a4e69','#9a8c98','#c9ada7','#f2e9e4'] },
+];
+const DSIZES = [[7,8,5],[7,9,6],[8,9,6],[8,10,7],[8,11,8],[9,12,9]]; // [C,R,ok sayısı]
+
 /* ================= Durum ================= */
-let lvl = +(localStorage.getItem('ap2_lvl') || 0);
+let mode = null;                 // 'resim' | 'desen'
+let lvl  = +(localStorage.getItem('ap2_lvl')  || 0);
+let dlvl = +(localStorage.getItem('ap2_dlvl') || 0);
+let curPal = DPALETTES[0];
 let L = null, C = 0, R = 0;
 let snakes = [];        // {cells:[[x,y]..], shape, exited, els:{}}
 let painted = [];       // boyanmış shape indexleri (boyama sırasıyla)
@@ -360,9 +412,15 @@ const sndFail  = () => [330, 262, 208].forEach((f, i) => tone(f, .3, 'sine', .25
 
 /* ================= HUD ================= */
 function updateHud(){
-  $('lvl-chip').textContent = 'Bölüm ' + (lvl + 1) + ' — ' + L.name;
-  $('hearts').innerHTML = [0,1,2].map(i =>
-    `<span class="${i < hearts ? '' : 'off'}">❤️</span>`).join('');
+  if (mode === 'desen'){
+    $('lvl-chip').textContent = 'Desen ' + (dlvl + 1) + ' — ' + curPal.name;
+    const left = snakes.filter(s => !s.exited).length;
+    $('hearts').innerHTML = `<span class="chip" style="font-size:14px">🖌️ ${snakes.length - left}/${snakes.length}</span>`;
+  } else {
+    $('lvl-chip').textContent = 'Bölüm ' + (lvl + 1) + ' — ' + L.name;
+    $('hearts').innerHTML = [0,1,2].map(i =>
+      `<span class="${i < hearts ? '' : 'off'}">❤️</span>`).join('');
+  }
 }
 function toast(msg){
   const t = $('toast');
@@ -418,6 +476,8 @@ function el(tag, attrs, parent){
   return e;
 }
 
+let paintG = null;   // desen modunda boya izleri bu katmana çizilir
+
 function renderBoard(){
   boardSvg.innerHTML = '';
   boardSvg.setAttribute('viewBox', `0 0 ${C * CELL} ${R * CELL}`);
@@ -426,9 +486,10 @@ function renderBoard(){
   for (let y = 0; y < R; y++)
     for (let x = 0; x < C; x++)
       el('circle', { cx: x * CELL + CELL/2, cy: y * CELL + CELL/2, r: 1.3, fill: 'var(--dot)' }, dots);
+  paintG = el('g', {}, boardSvg);   // izler: noktaların üstünde, okların altında
 
   snakes.forEach((s, i) => {
-    const color = L.shapes[s.shape].color;
+    const color = mode === 'desen' ? s.color : L.shapes[s.shape].color;
     const pts = s.cells.map(cellCenter);
     const g = el('g', { class: 'snake', 'data-i': i }, boardSvg);
     if (s.exited) g.style.display = 'none';
@@ -525,6 +586,10 @@ function animateSnake(s, from, to, dur, ease, onDone){
     const shift = from + (to - from) * p;
     for (const k of ['under', 'main', 'hit'])
       s.els[k].setAttribute('stroke-dashoffset', -shift);
+    if (s._trail){ // desen: gövdenin boşalttığı hücreler boyanır (kuyruktan başa)
+      const vis = Math.max(0, Math.min(shift, B));
+      s._trail.setAttribute('stroke-dasharray', `${vis} ${B + 10}`);
+    }
     const headD = Math.min(B + shift, T - .01);
     const { p: hp, a } = pointAt(route, cum, headD);
     s.els.head.setAttribute('transform', `translate(${hp[0]} ${hp[1]}) rotate(${a})`);
@@ -563,6 +628,12 @@ function tapSnake(i){
 
   // ---- kayarak çıkış ----
   s.exited = true; s.animating = true;
+  if (mode === 'desen'){ // boya izi: okun gövdesiyle aynı yol, kalın fırça
+    const d = 'M' + s.cells.map(cellCenter).map(p => p.join(' ')).join(' L');
+    s._trail = el('path', { d, fill:'none', stroke: s.color, 'stroke-width': 5.6,
+      'stroke-linecap':'round', 'stroke-linejoin':'round', 'stroke-opacity': .92,
+      'stroke-dasharray': `0 ${s._route.B + 10}` }, paintG);
+  }
   sndSlide();
   navigator.vibrate && navigator.vibrate(12);
   const dur = Math.max(380, s._route.T / (CELL * 15) * 1000);
@@ -575,6 +646,18 @@ function tapSnake(i){
 
 function onExited(i){
   const s = snakes[i];
+
+  if (mode === 'desen'){ // ---- iz tamamlandı ----
+    if (s._trail) s._trail.setAttribute('stroke-dasharray', `${s._route.B} ${s._route.B + 10}`);
+    sndPaint();
+    updateHud();
+    if (snakes.every(t => t.exited)){
+      locked = true;
+      setTimeout(win, 700);
+    }
+    return;
+  }
+
   const shapeIdx = s.shape;
   const dirVec = DIRS[headDir(s.cells)];
   // bu parçanın ALTINDA kalması gereken bir parça henüz boyanmadıysa hata
@@ -612,7 +695,9 @@ function onExited(i){
 }
 
 /* ================= Akış ================= */
-function loadLevel(){
+function loadLevel(){ mode === 'desen' ? loadDesen() : loadResim(); }
+
+function loadResim(){
   L = LEVELS[lvl % LEVELS.length];
   C = L.C; R = L.R;
   const N = L.shapes.length;
@@ -621,9 +706,26 @@ function loadLevel(){
   gb.order.forEach((si, k) => { snakes[si].shape = k; });
   painted = [];
   hearts = 3;
+  $('paint-wrap').classList.remove('off');
+  $('foot').textContent = 'Hedefe bak: altta kalan renk önce boyanır! 🎨';
   renderBoard();
   renderTarget();
   clearCanvas();
+  updateHud();
+}
+
+function loadDesen(){
+  const [c, r, n] = DSIZES[Math.min(dlvl, DSIZES.length - 1)];
+  C = c; R = r;
+  curPal = DPALETTES[dlvl % DPALETTES.length];
+  const gb = genBoard(C, R, n);
+  snakes = gb.list.map(cells => ({ cells, shape: 0, color: '', exited: false, animating: false }));
+  // renkler sökülme sırasına göre paletten: çözüm ilerledikçe tonlar akar
+  gb.order.forEach((si, k) => { snakes[si].color = curPal.colors[k % curPal.colors.length]; });
+  painted = [];
+  $('paint-wrap').classList.add('off');
+  $('foot').textContent = 'Yolu açık okları çıkar — izleri tahtayı boyasın! 🌀';
+  renderBoard();
   updateHud();
 }
 
@@ -644,19 +746,51 @@ function win(){
   sndWin();
   confetti();
   navigator.vibrate && navigator.vibrate([30, 40, 30]);
-  $('win-stars').textContent = '⭐'.repeat(Math.max(1, hearts)) + '·'.repeat(0);
-  $('win-title').textContent = L.name + ' tamam!';
-  $('win-sub').textContent = hearts === 3 ? 'Hiç hata yapmadan boyadın!' : 'Resmi tamamladın!';
-  $('ov-win').classList.remove('hidden');
+  const ov = $('ov-win');
+  if (mode === 'desen'){
+    ov.classList.add('bottom');   // kart alta: desen görünür kalsın
+    $('win-stars').textContent = '🌀';
+    $('win-title').textContent = curPal.name + ' deseni tamam!';
+    $('win-sub').textContent = 'Tahta rengarenk oldu!';
+  } else {
+    ov.classList.remove('bottom');
+    $('win-stars').textContent = '⭐'.repeat(Math.max(1, hearts));
+    $('win-title').textContent = L.name + ' tamam!';
+    $('win-sub').textContent = hearts === 3 ? 'Hiç hata yapmadan boyadın!' : 'Resmi tamamladın!';
+  }
+  ov.classList.remove('hidden');
 }
-$('btn-start').addEventListener('click', () => {
+
+/* ---- menü & butonlar ---- */
+function startMode(m){
   ac();
+  mode = m;
+  $('ov-menu').classList.add('hidden');
+  loadLevel();
+  const seenKey = 'ap2_seen_' + m;
+  if (!localStorage.getItem(seenKey)){
+    localStorage.setItem(seenKey, 1);
+    $(m === 'desen' ? 'ov-intro-desen' : 'ov-intro').classList.remove('hidden');
+    locked = true;
+  } else locked = false;
+}
+$('btn-mode-resim').addEventListener('click', () => startMode('resim'));
+$('btn-mode-desen').addEventListener('click', () => startMode('desen'));
+$('btn-home').addEventListener('click', () => {
+  locked = true;
+  $('ov-menu').classList.remove('hidden');
+});
+$('btn-start').addEventListener('click', () => {
   $('ov-intro').classList.add('hidden');
   locked = false;
 });
+$('btn-start-desen').addEventListener('click', () => {
+  $('ov-intro-desen').classList.add('hidden');
+  locked = false;
+});
 $('btn-next').addEventListener('click', () => {
-  lvl++;
-  localStorage.setItem('ap2_lvl', lvl);
+  if (mode === 'desen'){ dlvl++; localStorage.setItem('ap2_dlvl', dlvl); }
+  else { lvl++; localStorage.setItem('ap2_lvl', lvl); }
   $('ov-win').classList.add('hidden');
   loadLevel();
   locked = false;
@@ -667,7 +801,10 @@ $('btn-retry').addEventListener('click', () => {
   locked = false;
 });
 
+// açılış: mod menüsü açık, arkada resim modu tahtası hazır dursun
+mode = 'resim';
 loadLevel();
+mode = null;
 </script>
 </body>
 </html>
