@@ -21,8 +21,4 @@ node scripts/build-hub.mjs   # builds ./_site
 python3 -m http.server -d _site 8080
 ```
 
-## Games
-
-| Game | Path |
-|------|------|
-| 2048 VS | `2048-vs/` |
+The full game list lives on the hub page — it is generated from the folders, so this README never needs updating when a game is added.
