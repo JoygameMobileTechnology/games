@@ -481,7 +481,14 @@ function scheduleChirp() {
     scheduleChirp();
   }, 2500 + Math.random() * 6000);
 }
-function showGameOver() {}             // placeholder — Task 12
+function showGameOver() {
+  showOverlay(
+    'Hamle kalmadı 🌾',
+    `Skor: ${state.score}. Bu koşuda bahçene ${state.runEmissions} kaynak kattın — bahçen kalıcı, hiçbir şey kaybolmadı.`,
+    'Yeni koşu',
+    startRun
+  );
+}
 
 // --- Bahçe render ---
 const SLOT_ART = {
@@ -569,7 +576,10 @@ function checkIdle() {
 }
 function touchLastSeen() { state.lastSeen = Date.now(); save(); }
 addEventListener('pagehide', touchLastSeen);
-document.addEventListener('visibilitychange', () => { if (document.hidden) touchLastSeen(); });
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { touchLastSeen(); }
+  else { checkIdle(); touchLastSeen(); }
+});
 
 // --- Girdi: ok tuşları + dokunmatik kaydırma ---
 const KEYS = { ArrowLeft:'left', ArrowRight:'right', ArrowUp:'up', ArrowDown:'down' };
