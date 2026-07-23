@@ -1,0 +1,1347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SlitherDrop</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #1a1a2e; }
+  canvas { display: block; width: 100%; height: 100%; cursor: default; }
+</style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+<script>
+'use strict';
+
+// ==================== CONFIGURATION ====================
+const MOVE_ANIM_DURATION = 0.08;
+const COLLECT_ANIM_DURATION = 0.35;
+const HOLE_REMOVE_DURATION = 0.5;
+const CONFETTI_COUNT = 150;
+const STICKMAN_BOUNCE_SPEED = 2.5;
+const STICKMAN_BOUNCE_AMP = 3;
+const BLINK_INTERVAL = 3.0;
+const BLINK_DURATION = 0.15;
+
+// ==================== COLOR PALETTE ====================
+const COLORS = [
+  { name:'red',    fill:'#FF4757', light:'#FF6B81', dark:'#CC3945', glow:'rgba(255,71,87,0.4)' },
+  { name:'blue',   fill:'#3742FA', light:'#5352ED', dark:'#2C34C7', glow:'rgba(55,66,250,0.4)' },
+  { name:'green',  fill:'#2ED573', light:'#7BED9F', dark:'#26B960', glow:'rgba(46,213,115,0.4)' },
+  { name:'yellow', fill:'#FFC312', light:'#FFD93D', dark:'#D4A00A', glow:'rgba(255,195,18,0.4)' },
+  { name:'purple', fill:'#A55EEA', light:'#CD84F1', dark:'#8844CC', glow:'rgba(165,94,234,0.4)' },
+  { name:'orange', fill:'#FF6348', light:'#FF7F66', dark:'#E05535', glow:'rgba(255,99,72,0.4)' },
+];
+
+const BG_COLOR = '#16213E';
+const GRID_BG = '#1a1a2e';
+const CELL_BG = '#222244';
+const CELL_BORDER = '#2a2a4a';
+const TEXT_COLOR = '#E8E8F0';
+const TEXT_DIM = '#8888AA';
+const ACCENT = '#FF6348';
+
+// ==================== LEVEL DATA ====================
+// s: stickmen [row, col, colorIndex]
+// h: holes [{c: colorIndex, p: [[row,col],...]}]  (first = head)
+const LEVELS = [
+  // --- TUTORIAL (1-6) ---
+  // Level 1: First Steps - drag straight up
+  { r:5, c:5, s:[[0,2,0],[1,2,0]], h:[{c:0, p:[[4,2],[3,2]]}] },
+  // Level 2: Corner Turn - go right then up
+  { r:5, c:5, s:[[0,4,1],[1,4,1]], h:[{c:1, p:[[4,0],[4,1]]}] },
+  // Level 3: Three in Line
+  { r:6, c:5, s:[[0,2,2],[1,2,2],[2,2,2]], h:[{c:2, p:[[5,2],[5,1],[5,0]]}] },
+  // Level 4: Two Colors - parallel paths
+  { r:5, c:6, s:[[0,1,0],[1,1,0],[0,4,1],[1,4,1]], h:[{c:0, p:[[4,1],[4,0]]},{c:1, p:[[4,4],[4,5]]}] },
+  // Level 5: Color Wall - blue blocks green's path
+  { r:6, c:6, s:[[0,0,2],[0,5,2],[2,2,1],[2,3,1]], h:[{c:2, p:[[5,3],[5,2]]},{c:1, p:[[5,5],[5,4]]}] },
+  // Level 6: Clear the Way - must move blue first
+  { r:6, c:6, s:[[0,2,0],[0,3,0],[2,2,1],[2,3,1]], h:[{c:0, p:[[5,2],[5,3]]},{c:1, p:[[5,0],[5,1]]}] },
+
+  // --- EASY (7-12) ---
+  // Level 7: Big Hole
+  { r:6, c:6, s:[[0,1,0],[0,3,0],[0,5,0],[3,2,1],[3,3,1]], h:[{c:0, p:[[5,2],[5,1],[5,0]]},{c:1, p:[[5,4],[5,5]]}] },
+  // Level 8: Zigzag
+  { r:7, c:6, s:[[0,5,2],[2,0,2],[4,5,2]], h:[{c:2, p:[[6,2],[6,1],[6,0]]}] },
+  // Level 9: Three Colors
+  { r:6, c:8, s:[[0,0,0],[0,1,0],[0,6,1],[0,7,1],[3,3,2],[3,4,2]], h:[{c:0, p:[[5,0],[5,1]]},{c:1, p:[[5,6],[5,7]]},{c:2, p:[[5,3],[5,4]]}] },
+  // Level 10: Crossing Paths
+  { r:7, c:7, s:[[0,0,0],[0,1,0],[0,2,0],[0,4,1],[0,5,1],[0,6,1]], h:[{c:0, p:[[6,4],[6,5],[6,6]]},{c:1, p:[[6,0],[6,1],[6,2]]}] },
+  // Level 11: Narrow Corridor
+  { r:7, c:5, s:[[0,0,0],[0,4,0],[2,2,1],[4,2,1]], h:[{c:0, p:[[6,2],[6,1]]},{c:1, p:[[6,3],[6,4]]}] },
+  // Level 12: Four Piece
+  { r:7, c:7, s:[[0,0,0],[0,6,0],[0,3,1],[3,0,1],[3,3,2],[3,6,2]], h:[{c:0, p:[[6,3],[6,2]]},{c:1, p:[[6,0],[6,1]]},{c:2, p:[[6,5],[6,6]]}] },
+
+  // --- MEDIUM (13-18) ---
+  // Level 13: Dense Grid
+  { r:7, c:7, s:[[0,1,0],[0,3,0],[0,5,0],[2,0,1],[2,6,1],[4,3,2],[4,4,2]], h:[{c:0, p:[[6,0],[6,1],[6,2]]},{c:1, p:[[6,4],[6,5]]},{c:2, p:[[6,3],[5,3]]}] },
+  // Level 14: Color Maze
+  { r:7, c:7, s:[[0,0,0],[0,6,0],[0,3,1],[6,3,1],[3,0,2],[3,6,2]], h:[{c:0, p:[[3,3],[3,2]]},{c:1, p:[[3,4],[3,5]]},{c:2, p:[[6,0],[6,1]]}] },
+  // Level 15: Four Colors Intro
+  { r:7, c:8, s:[[0,0,0],[0,1,0],[0,6,1],[0,7,1],[3,0,2],[3,1,2],[3,6,3],[3,7,3]], h:[{c:0, p:[[6,0],[6,1]]},{c:1, p:[[6,6],[6,7]]},{c:2, p:[[6,2],[6,3]]},{c:3, p:[[6,4],[6,5]]}] },
+  // Level 16: Weave
+  { r:8, c:7, s:[[0,1,0],[0,5,0],[2,3,0],[1,0,1],[1,6,1],[3,3,1],[5,1,2],[5,5,2]], h:[{c:0, p:[[7,3],[7,2],[7,1]]},{c:1, p:[[7,4],[7,5],[7,6]]},{c:2, p:[[7,0],[6,0]]}] },
+  // Level 17: Tight Squeeze
+  { r:8, c:7, s:[[0,0,0],[0,2,0],[0,4,0],[0,6,1],[2,6,1],[4,6,1],[4,0,2],[4,2,2],[4,4,2]], h:[{c:0, p:[[7,6],[7,5],[7,4]]},{c:1, p:[[7,0],[7,1],[7,2]]},{c:2, p:[[7,3],[6,3],[5,3]]}] },
+  // Level 18: Color Ring
+  { r:8, c:8, s:[[0,2,0],[0,5,0],[0,7,1],[3,7,1],[7,5,2],[7,2,2],[3,0,3],[0,0,3]], h:[{c:0, p:[[7,0],[7,1]]},{c:1, p:[[7,7],[7,6]]},{c:3, p:[[7,3],[7,4]]},{c:2, p:[[3,3],[3,4]]}] },
+
+  // --- HARD (19-24) ---
+  // Level 19: Five Color Intro
+  { r:8, c:9, s:[[0,0,0],[0,1,0],[0,4,1],[0,5,1],[0,7,2],[0,8,2],[4,0,3],[4,1,3],[4,7,4],[4,8,4]], h:[{c:0, p:[[7,0],[7,1]]},{c:1, p:[[7,4],[7,3]]},{c:2, p:[[7,7],[7,8]]},{c:3, p:[[7,2],[6,2]]},{c:4, p:[[7,5],[7,6]]}] },
+  // Level 20: Corridor Run
+  { r:8, c:8, s:[[0,0,0],[0,3,0],[0,7,0],[2,1,1],[2,4,1],[2,6,1],[5,0,2],[5,3,2],[5,7,2]], h:[{c:0, p:[[7,4],[7,3],[7,2]]},{c:1, p:[[7,5],[7,6],[7,7]]},{c:2, p:[[7,1],[7,0],[6,0]]}] },
+  // Level 21: Boxed In
+  { r:8, c:8, s:[[0,0,0],[0,7,0],[2,3,0],[2,4,0],[1,1,1],[1,6,1],[3,1,1],[3,6,1],[5,2,2],[5,5,2],[5,3,3],[5,4,3]], h:[{c:0, p:[[7,0],[7,1],[7,2],[7,3]]},{c:1, p:[[7,4],[7,5],[7,6],[7,7]]},{c:2, p:[[7,0],[6,0]]},{c:3, p:[[3,3],[3,4]]}] },
+  // Level 22: Snake Pit
+  { r:9, c:8, s:[[0,1,0],[0,6,0],[2,0,1],[2,7,1],[4,1,2],[4,6,2],[6,3,3],[6,4,3],[0,3,4],[0,4,4]], h:[{c:0, p:[[8,0],[8,1]]},{c:1, p:[[8,7],[8,6]]},{c:2, p:[[8,3],[8,2]]},{c:3, p:[[8,4],[8,5]]},{c:4, p:[[4,3],[4,4]]}] },
+  // Level 23: Gauntlet
+  { r:9, c:9, s:[[0,0,0],[0,4,0],[0,8,0],[2,2,1],[2,4,1],[2,6,1],[4,0,2],[4,4,2],[4,8,2],[6,2,3],[6,6,3]], h:[{c:0, p:[[8,4],[8,3],[8,2]]},{c:1, p:[[8,5],[8,6],[8,7]]},{c:2, p:[[8,0],[8,1],[7,1]]},{c:3, p:[[6,4],[7,4]]}] },
+  // Level 24: Labyrinth
+  { r:9, c:9, s:[[0,0,0],[0,8,0],[0,4,1],[8,4,1],[4,0,2],[4,8,2],[2,2,3],[2,6,3],[6,2,4],[6,6,4]], h:[{c:0, p:[[4,4],[4,3]]},{c:1, p:[[4,5],[4,6]]},{c:2, p:[[8,0],[8,1]]},{c:3, p:[[8,2],[8,3]]},{c:4, p:[[8,6],[8,7]]}] },
+
+  // --- EXPERT (25-30) ---
+  // Level 25: Six Colors
+  { r:9, c:10, s:[[0,0,0],[0,1,0],[0,4,1],[0,5,1],[0,8,2],[0,9,2],[4,0,3],[4,1,3],[4,8,4],[4,9,4],[4,4,5],[4,5,5]], h:[{c:0, p:[[8,0],[8,1]]},{c:1, p:[[8,4],[8,5]]},{c:2, p:[[8,8],[8,9]]},{c:3, p:[[8,2],[8,3]]},{c:4, p:[[8,6],[8,7]]},{c:5, p:[[2,4],[2,5]]}] },
+  // Level 26: Fortress
+  { r:9, c:9, s:[[0,1,0],[0,7,0],[0,4,0],[2,0,1],[2,8,1],[2,4,1],[4,1,2],[4,7,2],[6,0,3],[6,8,3],[6,4,4],[8,4,5]], h:[{c:0, p:[[8,1],[8,0],[7,0]]},{c:1, p:[[8,7],[8,8],[7,8]]},{c:2, p:[[8,3],[8,2]]},{c:3, p:[[8,5],[8,6]]},{c:4, p:[[4,4],[5,4]]},{c:5, p:[[6,3],[6,2]]}] },
+  // Level 27: Spiral
+  { r:9, c:9, s:[[0,0,0],[0,4,0],[0,8,0],[2,2,1],[2,6,1],[4,0,1],[4,8,2],[6,2,2],[6,6,2],[8,0,3],[8,4,3],[8,8,3]], h:[{c:0, p:[[4,4],[4,3],[4,2]]},{c:1, p:[[8,2],[8,1],[8,3]]},{c:2, p:[[2,4],[3,4],[1,4]]},{c:3, p:[[6,4],[7,4],[5,4]]}] },
+  // Level 28: Grand Maze
+  { r:10, c:10, s:[[0,0,0],[0,5,0],[0,9,0],[2,2,1],[2,7,1],[4,0,1],[4,9,2],[4,4,2],[6,2,2],[6,7,3],[6,0,3],[8,5,3],[8,9,4],[8,0,4],[3,4,4]], h:[{c:0, p:[[9,0],[9,1],[9,2]]},{c:1, p:[[9,3],[9,4],[9,5]]},{c:2, p:[[9,6],[9,7],[9,8]]},{c:3, p:[[2,4],[2,5],[2,3]]},{c:4, p:[[6,4],[6,5],[6,3]]}] },
+  // Level 29: Inferno
+  { r:10, c:10, s:[[0,0,0],[0,3,0],[0,6,0],[0,9,1],[2,9,1],[4,9,1],[1,4,2],[3,4,2],[5,0,2],[5,5,3],[5,9,3],[7,2,3],[7,7,4],[9,0,4],[9,5,4],[9,9,5],[7,4,5]], h:[{c:0, p:[[9,3],[9,2],[9,1]]},{c:1, p:[[9,7],[9,8],[8,8]]},{c:2, p:[[9,4],[8,4],[7,4]]},{c:3, p:[[3,0],[4,0],[5,0]]},{c:4, p:[[9,6],[8,6],[7,6]]},{c:5, p:[[5,4],[6,4]]}] },
+  // Level 30: Ultimate
+  { r:10, c:10, s:[[0,0,0],[0,9,0],[5,4,0],[0,3,1],[0,6,1],[5,0,1],[9,0,2],[9,9,2],[5,9,2],[2,2,3],[2,7,3],[7,4,3],[4,0,4],[4,9,4],[7,7,4],[7,0,5],[7,9,5],[2,4,5]], h:[{c:0, p:[[9,4],[9,5],[9,3]]},{c:1, p:[[9,1],[9,2],[8,2]]},{c:2, p:[[9,6],[9,7],[9,8]]},{c:3, p:[[5,2],[5,3],[5,1]]},{c:4, p:[[5,7],[5,6],[5,8]]},{c:5, p:[[4,4],[3,4],[4,5]]}] },
+];
+
+// Fix Level 21 - holes can't share starting cells
+LEVELS[20] = { r:8, c:8, s:[[0,0,0],[0,7,0],[2,3,0],[2,4,0],[1,1,1],[1,6,1],[3,1,1],[3,6,1],[5,2,2],[5,5,2],[5,3,3],[5,4,3]], h:[{c:0, p:[[7,0],[7,1],[7,2],[7,3]]},{c:1, p:[[7,4],[7,5],[7,6],[7,7]]},{c:2, p:[[6,2],[6,3]]},{c:3, p:[[6,5],[6,6]]}] };
+// Fix Level 29 - ensure no overlap with stickmen on hole positions
+LEVELS[28] = { r:10, c:10, s:[[0,0,0],[0,3,0],[0,6,0],[0,9,1],[2,9,1],[4,9,1],[1,4,2],[3,5,2],[5,0,2],[5,5,3],[5,9,3],[7,2,3],[7,7,4],[9,0,4],[9,5,4],[9,9,5],[7,5,5]], h:[{c:0, p:[[9,3],[9,2],[9,1]]},{c:1, p:[[9,7],[9,8],[8,8]]},{c:2, p:[[8,4],[8,5],[8,3]]},{c:3, p:[[3,0],[4,0],[2,0]]},{c:4, p:[[9,6],[8,6],[8,7]]},{c:5, p:[[6,4],[6,5]]}] };
+
+// ==================== CANVAS SETUP ====================
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+let W, H, dpr;
+
+function resize() {
+  dpr = window.devicePixelRatio || 1;
+  W = window.innerWidth;
+  H = window.innerHeight;
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+window.addEventListener('resize', resize);
+resize();
+
+// ==================== UTILITY ====================
+function lerp(a, b, t) { return a + (b - a) * t; }
+function clamp(v, mn, mx) { return Math.max(mn, Math.min(mx, v)); }
+function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
+function easeOutBack(t) { const c = 1.7; return 1 + (c + 1) * Math.pow(t - 1, 3) + c * Math.pow(t - 1, 2); }
+function easeInBack(t) { const c = 1.7; return (c + 1) * t * t * t - c * t * t; }
+function rand(a, b) { return a + Math.random() * (b - a); }
+function randInt(a, b) { return Math.floor(rand(a, b + 1)); }
+function hexToRgb(hex) {
+  const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+  return {r,g,b};
+}
+
+// ==================== PARTICLE SYSTEM ====================
+let particles = [];
+
+function spawnParticles(x, y, color, count, spread, speed, life) {
+  for (let i = 0; i < count; i++) {
+    const angle = rand(0, Math.PI * 2);
+    const spd = rand(speed * 0.3, speed);
+    particles.push({
+      x, y,
+      vx: Math.cos(angle) * spd * rand(0.5, 1),
+      vy: Math.sin(angle) * spd * rand(0.5, 1),
+      life: rand(life * 0.6, life),
+      maxLife: life,
+      size: rand(2, 5),
+      color,
+      gravity: rand(30, 80),
+      rotation: rand(0, Math.PI * 2),
+      rotSpeed: rand(-5, 5),
+    });
+  }
+}
+
+function spawnConfetti(x, y) {
+  for (let i = 0; i < CONFETTI_COUNT; i++) {
+    const angle = rand(-Math.PI, 0);
+    const spd = rand(100, 400);
+    const col = COLORS[randInt(0, 5)].fill;
+    particles.push({
+      x: x + rand(-100, 100), y: y + rand(-20, 20),
+      vx: Math.cos(angle) * spd,
+      vy: Math.sin(angle) * spd - rand(50, 200),
+      life: rand(1.5, 3),
+      maxLife: 3,
+      size: rand(3, 8),
+      color: col,
+      gravity: rand(150, 300),
+      rotation: rand(0, Math.PI * 2),
+      rotSpeed: rand(-8, 8),
+      isConfetti: true,
+    });
+  }
+}
+
+function updateParticles(dt) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.vy += p.gravity * dt;
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+    p.life -= dt;
+    p.rotation += p.rotSpeed * dt;
+    if (p.life <= 0) particles.splice(i, 1);
+  }
+}
+
+function renderParticles() {
+  for (const p of particles) {
+    const alpha = clamp(p.life / p.maxLife, 0, 1);
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.rotate(p.rotation);
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = p.color;
+    if (p.isConfetti) {
+      ctx.fillRect(-p.size / 2, -p.size / 4, p.size, p.size / 2);
+    } else {
+      ctx.beginPath();
+      ctx.arc(0, 0, p.size * alpha, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+  ctx.globalAlpha = 1;
+}
+
+// ==================== GAME STATE ====================
+const SCREEN = { TITLE: 0, LEVELS: 1, PLAYING: 2, WIN: 3 };
+let screen = SCREEN.TITLE;
+let currentLevel = 0;
+let moveCount = 0;
+let gameTime = 0;
+let grid = [];       // 2D array [row][col] = { stickman: null|colorIdx, holeId: null|id }
+let holes = [];      // Array of hole objects
+let stickmen = [];   // Array of stickman objects
+let gridRows = 0, gridCols = 0;
+let cellSize = 0;
+let gridOffsetX = 0, gridOffsetY = 0;
+let selectedHole = null;
+let dragStartX = 0, dragStartY = 0;
+let animations = []; // Active animations
+let winTime = 0;
+let winTriggered = false;
+let levelSelectScroll = 0;
+
+// Progress (localStorage)
+let progress = JSON.parse(localStorage.getItem('slitherdrop_progress') || '{"completed":[],"best":{}}');
+function saveProgress() { localStorage.setItem('slitherdrop_progress', JSON.stringify(progress)); }
+
+// ==================== LEVEL LOADING ====================
+function loadLevel(idx) {
+  const lv = LEVELS[idx];
+  currentLevel = idx;
+  moveCount = 0;
+  gameTime = 0;
+  winTriggered = false;
+  selectedHole = null;
+  animations = [];
+  particles = [];
+
+  gridRows = lv.r;
+  gridCols = lv.c;
+
+  // Compute cell size to fit grid in screen
+  const margin = 100;
+  const topBar = 70;
+  const maxW = W - margin;
+  const maxH = H - margin - topBar;
+  cellSize = Math.min(Math.floor(maxW / gridCols), Math.floor(maxH / gridRows));
+  cellSize = Math.min(cellSize, 70);
+  gridOffsetX = (W - gridCols * cellSize) / 2;
+  gridOffsetY = topBar + (maxH - gridRows * cellSize) / 2 + 20;
+
+  // Init grid
+  grid = [];
+  for (let r = 0; r < gridRows; r++) {
+    grid[r] = [];
+    for (let c = 0; c < gridCols; c++) {
+      grid[r][c] = { stickman: null, holeId: null };
+    }
+  }
+
+  // Place stickmen
+  stickmen = [];
+  for (const s of lv.s) {
+    const sm = { row: s[0], col: s[1], color: s[2], id: stickmen.length, alive: true, collectAnim: 0, collectTarget: null };
+    stickmen.push(sm);
+    grid[s[0]][s[1]].stickman = sm.id;
+  }
+
+  // Place holes
+  holes = [];
+  for (const hd of lv.h) {
+    const hole = {
+      id: holes.length,
+      color: hd.c,
+      cells: hd.p.map(p => ({row: p[0], col: p[1]})),
+      capacity: hd.p.length,
+      filled: 0,
+      alive: true,
+      animPrev: null,
+      animProgress: 1,
+      removeAnim: 0,
+      removing: false,
+      burstDone: false,
+    };
+    holes.push(hole);
+    for (const cell of hole.cells) {
+      grid[cell.row][cell.col].holeId = hole.id;
+    }
+  }
+
+  screen = SCREEN.PLAYING;
+}
+
+// ==================== GAME LOGIC ====================
+function cellCenter(row, col) {
+  return {
+    x: gridOffsetX + col * cellSize + cellSize / 2,
+    y: gridOffsetY + row * cellSize + cellSize / 2
+  };
+}
+
+function inBounds(r, c) {
+  return r >= 0 && r < gridRows && c >= 0 && c < gridCols;
+}
+
+function canMoveTo(hole, r, c) {
+  if (!inBounds(r, c)) return false;
+  const cell = grid[r][c];
+
+  // Check stickman blocking
+  if (cell.stickman !== null) {
+    const sm = stickmen[cell.stickman];
+    if (sm.alive && sm.color !== hole.color) return false;
+  }
+
+  // Check other hole blocking
+  if (cell.holeId !== null && cell.holeId !== hole.id) return false;
+
+  // Check own body (not tail - tail will move)
+  if (cell.holeId === hole.id) {
+    const tail = hole.cells[hole.cells.length - 1];
+    if (r !== tail.row || c !== tail.col) return false;
+  }
+
+  return true;
+}
+
+function moveHole(hole, dr, dc) {
+  const head = hole.cells[0];
+  const nr = head.row + dr;
+  const nc = head.col + dc;
+
+  if (!canMoveTo(hole, nr, nc)) return false;
+
+  // Save previous positions for animation
+  hole.animPrev = hole.cells.map(c => ({row: c.row, col: c.col}));
+  hole.animProgress = 0;
+
+  // Remove tail from grid
+  const tail = hole.cells[hole.cells.length - 1];
+  if (grid[tail.row][tail.col].holeId === hole.id) {
+    grid[tail.row][tail.col].holeId = null;
+  }
+
+  // Shift cells: each cell takes position of previous
+  for (let i = hole.cells.length - 1; i > 0; i--) {
+    hole.cells[i].row = hole.cells[i - 1].row;
+    hole.cells[i].col = hole.cells[i - 1].col;
+  }
+  // Move head
+  hole.cells[0].row = nr;
+  hole.cells[0].col = nc;
+
+  // Update grid
+  for (const cell of hole.cells) {
+    grid[cell.row][cell.col].holeId = hole.id;
+  }
+
+  // Check for stickman collection
+  const gcell = grid[nr][nc];
+  if (gcell.stickman !== null) {
+    const sm = stickmen[gcell.stickman];
+    if (sm.alive && sm.color === hole.color) {
+      collectStickman(sm, hole);
+    }
+  }
+
+  moveCount++;
+  return true;
+}
+
+function collectStickman(sm, hole) {
+  sm.alive = false;
+  sm.collectAnim = COLLECT_ANIM_DURATION;
+  sm.collectTarget = { row: hole.cells[0].row, col: hole.cells[0].col };
+  grid[sm.row][sm.col].stickman = null;
+  hole.filled++;
+
+  const pos = cellCenter(sm.row, sm.col);
+  spawnParticles(pos.x, pos.y, COLORS[sm.color].fill, 8, 20, 80, 0.5);
+
+  if (hole.filled >= hole.capacity) {
+    hole.removing = true;
+    hole.removeAnim = HOLE_REMOVE_DURATION;
+  }
+}
+
+function checkWin() {
+  if (winTriggered) return;
+  const allStickmenGone = stickmen.every(s => !s.alive);
+  const allHolesGone = holes.every(h => !h.alive);
+  if (allStickmenGone && allHolesGone) {
+    winTriggered = true;
+    winTime = 0;
+    if (!progress.completed.includes(currentLevel)) {
+      progress.completed.push(currentLevel);
+    }
+    if (!progress.best[currentLevel] || moveCount < progress.best[currentLevel]) {
+      progress.best[currentLevel] = moveCount;
+    }
+    saveProgress();
+    const cx = W / 2, cy = H / 2 - 50;
+    spawnConfetti(cx, cy);
+    setTimeout(() => { screen = SCREEN.WIN; }, 600);
+  }
+}
+
+function resetLevel() {
+  loadLevel(currentLevel);
+}
+
+// ==================== INPUT HANDLING ====================
+let mouseX = 0, mouseY = 0;
+let mouseDown = false;
+let lastMoveDir = null;
+
+function getGridCell(x, y) {
+  const col = Math.floor((x - gridOffsetX) / cellSize);
+  const row = Math.floor((y - gridOffsetY) / cellSize);
+  if (row >= 0 && row < gridRows && col >= 0 && col < gridCols) return { row, col };
+  return null;
+}
+
+function getHoleAt(row, col) {
+  const hid = grid[row][col].holeId;
+  if (hid !== null) {
+    const h = holes[hid];
+    if (h.alive && !h.removing) return h;
+  }
+  return null;
+}
+
+canvas.addEventListener('mousedown', (e) => {
+  const x = e.clientX, y = e.clientY;
+  mouseX = x; mouseY = y;
+  mouseDown = true;
+
+  if (screen === SCREEN.PLAYING) {
+    const cell = getGridCell(x, y);
+    if (cell) {
+      const hole = getHoleAt(cell.row, cell.col);
+      if (hole) {
+        selectedHole = hole;
+        dragStartX = x;
+        dragStartY = y;
+        lastMoveDir = null;
+      }
+    }
+  }
+});
+
+canvas.addEventListener('mousemove', (e) => {
+  mouseX = e.clientX;
+  mouseY = e.clientY;
+
+  if (screen === SCREEN.PLAYING && mouseDown && selectedHole && selectedHole.alive && !selectedHole.removing) {
+    tryDragMove();
+  }
+});
+
+canvas.addEventListener('mouseup', () => {
+  mouseDown = false;
+  selectedHole = null;
+  lastMoveDir = null;
+});
+
+canvas.addEventListener('mouseleave', () => {
+  mouseDown = false;
+  selectedHole = null;
+  lastMoveDir = null;
+});
+
+function tryDragMove() {
+  if (!selectedHole || !selectedHole.alive || selectedHole.removing) return;
+  if (selectedHole.animProgress < 1) return; // Wait for current animation
+
+  const head = selectedHole.cells[0];
+  const hx = gridOffsetX + head.col * cellSize + cellSize / 2;
+  const hy = gridOffsetY + head.row * cellSize + cellSize / 2;
+
+  const dx = mouseX - hx;
+  const dy = mouseY - hy;
+  const threshold = cellSize * 0.45;
+
+  let dr = 0, dc = 0;
+  if (Math.abs(dx) > Math.abs(dy)) {
+    if (Math.abs(dx) > threshold) {
+      dc = dx > 0 ? 1 : -1;
+    }
+  } else {
+    if (Math.abs(dy) > threshold) {
+      dr = dy > 0 ? 1 : -1;
+    }
+  }
+
+  if (dr !== 0 || dc !== 0) {
+    moveHole(selectedHole, dr, dc);
+  }
+}
+
+// ==================== UI BUTTON HANDLING ====================
+let buttons = [];
+
+function addButton(id, x, y, w, h, label, action, style) {
+  buttons.push({ id, x, y, w, h, label, action, style: style || 'primary' });
+}
+
+function clearButtons() { buttons = []; }
+
+function checkButtonClick(mx, my) {
+  for (const b of buttons) {
+    if (mx >= b.x && mx <= b.x + b.w && my >= b.y && my <= b.y + b.h) {
+      b.action();
+      return true;
+    }
+  }
+  return false;
+}
+
+canvas.addEventListener('click', (e) => {
+  const x = e.clientX, y = e.clientY;
+  if (checkButtonClick(x, y)) return;
+
+  if (screen === SCREEN.TITLE) {
+    screen = SCREEN.LEVELS;
+  } else if (screen === SCREEN.LEVELS) {
+    handleLevelSelectClick(x, y);
+  }
+});
+
+function handleLevelSelectClick(x, y) {
+  const cols = 5;
+  const btnSize = 55;
+  const gap = 15;
+  const totalW = cols * btnSize + (cols - 1) * gap;
+  const startX = (W - totalW) / 2;
+  const startY = 130;
+
+  for (let i = 0; i < LEVELS.length; i++) {
+    const row = Math.floor(i / cols);
+    const col = i % cols;
+    const bx = startX + col * (btnSize + gap);
+    const by = startY + row * (btnSize + gap) - levelSelectScroll;
+
+    if (x >= bx && x <= bx + btnSize && y >= by && y <= by + btnSize) {
+      // Level is unlocked if previous is completed or it's level 0
+      if (i === 0 || progress.completed.includes(i - 1)) {
+        loadLevel(i);
+        return;
+      }
+    }
+  }
+}
+
+// Scroll for level select
+canvas.addEventListener('wheel', (e) => {
+  if (screen === SCREEN.LEVELS) {
+    levelSelectScroll += e.deltaY * 0.5;
+    levelSelectScroll = Math.max(0, levelSelectScroll);
+  }
+});
+
+// ==================== RENDERING ====================
+function drawRoundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+
+function drawGrid() {
+  // Grid background
+  ctx.fillStyle = '#0f0f23';
+  drawRoundRect(gridOffsetX - 6, gridOffsetY - 6, gridCols * cellSize + 12, gridRows * cellSize + 12, 12);
+  ctx.fill();
+
+  // Cells
+  for (let r = 0; r < gridRows; r++) {
+    for (let c = 0; c < gridCols; c++) {
+      const x = gridOffsetX + c * cellSize;
+      const y = gridOffsetY + r * cellSize;
+      const pad = 2;
+
+      ctx.fillStyle = CELL_BG;
+      drawRoundRect(x + pad, y + pad, cellSize - pad * 2, cellSize - pad * 2, 4);
+      ctx.fill();
+
+      ctx.strokeStyle = CELL_BORDER;
+      ctx.lineWidth = 1;
+      drawRoundRect(x + pad, y + pad, cellSize - pad * 2, cellSize - pad * 2, 4);
+      ctx.stroke();
+    }
+  }
+}
+
+function drawStickman(sm, time) {
+  if (!sm.alive && sm.collectAnim <= 0) return;
+
+  let cx, cy, scale = 1, alpha = 1;
+  const pos = cellCenter(sm.row, sm.col);
+  cx = pos.x;
+  cy = pos.y;
+
+  if (sm.collectAnim > 0) {
+    const t = 1 - sm.collectAnim / COLLECT_ANIM_DURATION;
+    const et = easeInBack(t);
+    if (sm.collectTarget) {
+      const tgt = cellCenter(sm.collectTarget.row, sm.collectTarget.col);
+      cx = lerp(pos.x, tgt.x, et);
+      cy = lerp(pos.y, tgt.y, et);
+    }
+    scale = 1 - et * 0.8;
+    alpha = 1 - t;
+  }
+
+  // Bounce
+  const bounce = Math.sin(time * STICKMAN_BOUNCE_SPEED + sm.id * 1.3) * STICKMAN_BOUNCE_AMP;
+  cy += bounce * scale;
+
+  const size = cellSize * 0.7 * scale;
+  const color = COLORS[sm.color].fill;
+  const lightColor = COLORS[sm.color].light;
+
+  ctx.save();
+  ctx.globalAlpha = alpha;
+
+  const headR = size * 0.16;
+  const headY = cy - size * 0.22;
+  const bodyTop = headY + headR;
+  const bodyBot = bodyTop + size * 0.28;
+  const armLen = size * 0.22;
+  const legLen = size * 0.22;
+  const armY = bodyTop + size * 0.12;
+
+  // Shadow
+  ctx.fillStyle = 'rgba(0,0,0,0.2)';
+  ctx.beginPath();
+  ctx.ellipse(cx, cy + size * 0.32, size * 0.18, size * 0.05, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.strokeStyle = color;
+  ctx.lineWidth = Math.max(2, size * 0.06);
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  // Legs
+  const legSpread = size * 0.14;
+  ctx.beginPath();
+  ctx.moveTo(cx - legSpread, bodyBot + legLen);
+  ctx.lineTo(cx, bodyBot);
+  ctx.lineTo(cx + legSpread, bodyBot + legLen);
+  ctx.stroke();
+
+  // Body
+  ctx.beginPath();
+  ctx.moveTo(cx, bodyTop);
+  ctx.lineTo(cx, bodyBot);
+  ctx.stroke();
+
+  // Arms (slightly waving)
+  const armWave = Math.sin(time * 3 + sm.id * 2) * 0.15;
+  ctx.beginPath();
+  ctx.moveTo(cx - armLen, armY + armLen * 0.3 + Math.sin(time * 2.5 + sm.id) * 3);
+  ctx.lineTo(cx, armY);
+  ctx.lineTo(cx + armLen, armY + armLen * 0.3 - Math.sin(time * 2.5 + sm.id) * 3);
+  ctx.stroke();
+
+  // Head
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.arc(cx, headY, headR, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = COLORS[sm.color].dark;
+  ctx.lineWidth = Math.max(1, size * 0.03);
+  ctx.stroke();
+
+  // Eyes
+  const eyeR = headR * 0.22;
+  const eyeY = headY - headR * 0.1;
+  const eyeSpread = headR * 0.4;
+
+  // Blink
+  const blinkPhase = (time + sm.id * 0.7) % BLINK_INTERVAL;
+  const isBlinking = blinkPhase < BLINK_DURATION;
+
+  ctx.fillStyle = '#fff';
+  ctx.beginPath();
+  ctx.arc(cx - eyeSpread, eyeY, eyeR, 0, Math.PI * 2);
+  ctx.arc(cx + eyeSpread, eyeY, eyeR, 0, Math.PI * 2);
+  ctx.fill();
+
+  if (!isBlinking) {
+    ctx.fillStyle = '#222';
+    ctx.beginPath();
+    ctx.arc(cx - eyeSpread, eyeY, eyeR * 0.55, 0, Math.PI * 2);
+    ctx.arc(cx + eyeSpread, eyeY, eyeR * 0.55, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Smile
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = Math.max(1, size * 0.03);
+  ctx.beginPath();
+  ctx.arc(cx, headY + headR * 0.15, headR * 0.35, 0.15, Math.PI - 0.15);
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+function drawHole(hole, time) {
+  if (!hole.alive && hole.removeAnim <= 0) return;
+
+  const color = COLORS[hole.color];
+  let scale = 1, alpha = 1;
+
+  if (hole.removing || hole.removeAnim > 0) {
+    const t = 1 - hole.removeAnim / HOLE_REMOVE_DURATION;
+    scale = 1 - easeInBack(clamp(t, 0, 1)) * 0.9;
+    alpha = 1 - t;
+    if (t > 0.5 && !hole.burstDone) {
+      hole.burstDone = true;
+      for (const cell of hole.cells) {
+        const pos = cellCenter(cell.row, cell.col);
+        spawnParticles(pos.x, pos.y, color.fill, 12, 15, 120, 0.6);
+      }
+    }
+  }
+
+  ctx.save();
+  ctx.globalAlpha = alpha;
+
+  // Draw connections between adjacent cells
+  for (let i = 0; i < hole.cells.length - 1; i++) {
+    let r1, c1, r2, c2;
+
+    if (hole.animPrev && hole.animProgress < 1) {
+      const t = easeOutCubic(hole.animProgress);
+      r1 = lerp(hole.animPrev[i].row, hole.cells[i].row, t);
+      c1 = lerp(hole.animPrev[i].col, hole.cells[i].col, t);
+      r2 = lerp(hole.animPrev[i + 1].row, hole.cells[i + 1].row, t);
+      c2 = lerp(hole.animPrev[i + 1].col, hole.cells[i + 1].col, t);
+    } else {
+      r1 = hole.cells[i].row; c1 = hole.cells[i].col;
+      r2 = hole.cells[i + 1].row; c2 = hole.cells[i + 1].col;
+    }
+
+    const x1 = gridOffsetX + c1 * cellSize + cellSize / 2;
+    const y1 = gridOffsetY + r1 * cellSize + cellSize / 2;
+    const x2 = gridOffsetX + c2 * cellSize + cellSize / 2;
+    const y2 = gridOffsetY + r2 * cellSize + cellSize / 2;
+
+    const thick = cellSize * 0.55 * scale;
+    ctx.fillStyle = '#0a0a18';
+    ctx.strokeStyle = color.dark;
+    ctx.lineWidth = 2;
+
+    if (Math.abs(r1 - r2) < 0.01) {
+      // Horizontal connection
+      const minX = Math.min(x1, x2);
+      ctx.fillRect(minX - thick / 2, y1 - thick / 2, Math.abs(x2 - x1) + thick, thick);
+    } else {
+      // Vertical connection
+      const minY = Math.min(y1, y2);
+      ctx.fillRect(x1 - thick / 2, minY - thick / 2, thick, Math.abs(y2 - y1) + thick);
+    }
+  }
+
+  // Draw each cell
+  for (let i = hole.cells.length - 1; i >= 0; i--) {
+    let r, c;
+    if (hole.animPrev && hole.animProgress < 1) {
+      const t = easeOutCubic(hole.animProgress);
+      r = lerp(hole.animPrev[i].row, hole.cells[i].row, t);
+      c = lerp(hole.animPrev[i].col, hole.cells[i].col, t);
+    } else {
+      r = hole.cells[i].row;
+      c = hole.cells[i].col;
+    }
+
+    const x = gridOffsetX + c * cellSize + cellSize / 2;
+    const y = gridOffsetY + r * cellSize + cellSize / 2;
+    const radius = cellSize * 0.32 * scale;
+    const isHead = (i === 0);
+
+    // Glow
+    const grad = ctx.createRadialGradient(x, y, radius * 0.3, x, y, radius * 1.8);
+    grad.addColorStop(0, color.glow);
+    grad.addColorStop(1, 'transparent');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(x, y, radius * 1.8, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Hole body
+    ctx.fillStyle = '#0a0a18';
+    ctx.beginPath();
+    ctx.arc(x, y, radius, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Color ring
+    ctx.strokeStyle = isHead ? color.light : color.fill;
+    ctx.lineWidth = isHead ? 3 : 2;
+    ctx.beginPath();
+    ctx.arc(x, y, radius, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Filled indicator
+    if (hole.filled > 0) {
+      const fillRatio = hole.filled / hole.capacity;
+      ctx.fillStyle = color.fill + '40';
+      ctx.beginPath();
+      ctx.arc(x, y, radius * fillRatio * 0.7, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Head eyes
+    if (isHead) {
+      const eyeR = radius * 0.18;
+      const eyeY = y - radius * 0.15;
+      const eyeSpread = radius * 0.35;
+
+      ctx.fillStyle = color.light;
+      ctx.beginPath();
+      ctx.arc(x - eyeSpread, eyeY, eyeR, 0, Math.PI * 2);
+      ctx.arc(x + eyeSpread, eyeY, eyeR, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#fff';
+      ctx.beginPath();
+      ctx.arc(x - eyeSpread, eyeY, eyeR * 0.5, 0, Math.PI * 2);
+      ctx.arc(x + eyeSpread, eyeY, eyeR * 0.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Tail indicator
+    if (i === hole.cells.length - 1 && hole.cells.length > 1) {
+      ctx.fillStyle = color.dark + '60';
+      ctx.beginPath();
+      ctx.arc(x, y, radius * 0.3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  // Selected highlight
+  if (selectedHole === hole) {
+    const head = hole.cells[0];
+    let hr = head.row, hc = head.col;
+    if (hole.animPrev && hole.animProgress < 1) {
+      const t = easeOutCubic(hole.animProgress);
+      hr = lerp(hole.animPrev[0].row, head.row, t);
+      hc = lerp(hole.animPrev[0].col, head.col, t);
+    }
+    const hx = gridOffsetX + hc * cellSize + cellSize / 2;
+    const hy = gridOffsetY + hr * cellSize + cellSize / 2;
+    const pulse = Math.sin(time * 6) * 0.1 + 0.9;
+
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2;
+    ctx.globalAlpha = 0.5 * pulse * alpha;
+    ctx.beginPath();
+    ctx.arc(hx, hy, cellSize * 0.42 * scale, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.globalAlpha = alpha;
+  }
+
+  ctx.restore();
+}
+
+function drawHUD() {
+  // Top bar
+  ctx.fillStyle = BG_COLOR + 'DD';
+  ctx.fillRect(0, 0, W, 60);
+
+  // Level name
+  ctx.fillStyle = TEXT_COLOR;
+  ctx.font = 'bold 18px "Segoe UI", Arial, sans-serif';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('Level ' + (currentLevel + 1), 20, 30);
+
+  // Tier label
+  const tier = currentLevel < 6 ? 'Tutorial' : currentLevel < 12 ? 'Easy' : currentLevel < 18 ? 'Medium' : currentLevel < 24 ? 'Hard' : 'Expert';
+  ctx.fillStyle = TEXT_DIM;
+  ctx.font = '13px "Segoe UI", Arial, sans-serif';
+  ctx.fillText(tier, 20, 50);
+
+  // Move counter
+  ctx.fillStyle = TEXT_COLOR;
+  ctx.font = '16px "Segoe UI", Arial, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('Moves: ' + moveCount, W / 2, 30);
+
+  // Remaining stickmen
+  const remaining = stickmen.filter(s => s.alive).length;
+  ctx.fillStyle = TEXT_DIM;
+  ctx.font = '13px "Segoe UI", Arial, sans-serif';
+  ctx.fillText(remaining + ' remaining', W / 2, 50);
+
+  // Reset button
+  drawTextButton(W - 80, 15, 60, 32, 'Reset', () => resetLevel(), '#FF6348');
+
+  // Back button
+  drawTextButton(W - 155, 15, 60, 32, 'Back', () => { screen = SCREEN.LEVELS; clearButtons(); }, '#8888AA');
+}
+
+function drawTextButton(x, y, w, h, label, action, color) {
+  const hovered = mouseX >= x && mouseX <= x + w && mouseY >= y && mouseY <= y + h;
+
+  ctx.fillStyle = hovered ? color : color + '88';
+  drawRoundRect(x, y, w, h, 6);
+  ctx.fill();
+
+  if (hovered) {
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 1;
+    drawRoundRect(x, y, w, h, 6);
+    ctx.stroke();
+  }
+
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 13px "Segoe UI", Arial, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(label, x + w / 2, y + h / 2);
+
+  // Register button
+  addButton(label, x, y, w, h, label, action);
+}
+
+// ==================== SCREENS ====================
+function drawTitleScreen(time) {
+  // Background gradient
+  const grad = ctx.createLinearGradient(0, 0, 0, H);
+  grad.addColorStop(0, '#0f0f23');
+  grad.addColorStop(0.5, '#16213E');
+  grad.addColorStop(1, '#1a1a2e');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, H);
+
+  // Floating decorative circles
+  for (let i = 0; i < 8; i++) {
+    const cx = W * 0.15 + (i % 4) * W * 0.22;
+    const cy = H * 0.3 + Math.floor(i / 4) * H * 0.35 + Math.sin(time * 0.8 + i) * 20;
+    const r = 25 + Math.sin(time * 0.5 + i * 0.8) * 8;
+    const col = COLORS[i % 6];
+
+    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r * 2);
+    g.addColorStop(0, col.glow);
+    g.addColorStop(1, 'transparent');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r * 2, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#0a0a18';
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = col.fill;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  // Title
+  ctx.save();
+  const titleY = H * 0.22;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  // Shadow
+  ctx.fillStyle = 'rgba(0,0,0,0.3)';
+  ctx.font = 'bold 64px "Segoe UI", Arial, sans-serif';
+  ctx.fillText('SlitherDrop', W / 2 + 3, titleY + 3);
+
+  // Title text with gradient
+  const tGrad = ctx.createLinearGradient(W / 2 - 200, titleY, W / 2 + 200, titleY);
+  tGrad.addColorStop(0, COLORS[0].fill);
+  tGrad.addColorStop(0.2, COLORS[3].fill);
+  tGrad.addColorStop(0.4, COLORS[2].fill);
+  tGrad.addColorStop(0.6, COLORS[1].fill);
+  tGrad.addColorStop(0.8, COLORS[4].fill);
+  tGrad.addColorStop(1, COLORS[5].fill);
+  ctx.fillStyle = tGrad;
+  ctx.font = 'bold 64px "Segoe UI", Arial, sans-serif';
+  ctx.fillText('SlitherDrop', W / 2, titleY);
+  ctx.restore();
+
+  // Subtitle
+  ctx.fillStyle = TEXT_DIM;
+  ctx.font = '18px "Segoe UI", Arial, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('A Puzzle Game', W / 2, titleY + 50);
+
+  // Play button
+  const btnW = 180, btnH = 50;
+  const btnX = W / 2 - btnW / 2;
+  const btnY = H * 0.55;
+  const pulse = Math.sin(time * 3) * 0.05 + 1;
+
+  ctx.save();
+  ctx.translate(W / 2, btnY + btnH / 2);
+  ctx.scale(pulse, pulse);
+  ctx.translate(-W / 2, -(btnY + btnH / 2));
+
+  ctx.fillStyle = ACCENT;
+  drawRoundRect(btnX, btnY, btnW, btnH, 12);
+  ctx.fill();
+
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 22px "Segoe UI", Arial, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('PLAY', W / 2, btnY + btnH / 2);
+  ctx.restore();
+
+  // Instructions
+  ctx.fillStyle = TEXT_DIM;
+  ctx.font = '14px "Segoe UI", Arial, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('Drag holes to swallow matching stickmen', W / 2, H * 0.72);
+  ctx.fillText('Plan your path — every cell counts!', W / 2, H * 0.72 + 24);
+
+  // Version
+  ctx.fillStyle = TEXT_DIM + '66';
+  ctx.font = '11px "Segoe UI", Arial, sans-serif';
+  ctx.fillText('v1.0', W / 2, H - 20);
+}
+
+function drawLevelSelect(time) {
+  const grad = ctx.createLinearGradient(0, 0, 0, H);
+  grad.addColorStop(0, '#0f0f23');
+  grad.addColorStop(1, '#16213E');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, H);
+
+  // Header
+  ctx.fillStyle = TEXT_COLOR;
+  ctx.font = 'bold 28px "Segoe UI", Arial, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('Select Level', W / 2, 45);
+
+  // Back to title
+  ctx.fillStyle = TEXT_DIM;
+  ctx.font = '14px "Segoe UI", Arial, sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText('< Back', 20, 45);
+  addButton('levelBack', 10, 25, 80, 40, 'Back', () => { screen = SCREEN.TITLE; clearButtons(); });
+
+  // Level grid
+  const cols = 5;
+  const btnSize = 55;
+  const gap = 15;
+  const totalW = cols * btnSize + (cols - 1) * gap;
+  const startX = (W - totalW) / 2;
+  const startY = 100;
+
+  const tiers = [
+    { name: 'Tutorial', start: 0, end: 5, color: '#2ED573' },
+    { name: 'Easy', start: 6, end: 11, color: '#3742FA' },
+    { name: 'Medium', start: 12, end: 17, color: '#FFC312' },
+    { name: 'Hard', start: 18, end: 23, color: '#FF6348' },
+    { name: 'Expert', start: 24, end: 29, color: '#A55EEA' },
+  ];
+
+  for (let i = 0; i < LEVELS.length; i++) {
+    const row = Math.floor(i / cols);
+    const col = i % cols;
+    const bx = startX + col * (btnSize + gap);
+    const by = startY + row * (btnSize + gap) - levelSelectScroll;
+
+    if (by < 70 || by > H + btnSize) continue;
+
+    const completed = progress.completed.includes(i);
+    const unlocked = i === 0 || progress.completed.includes(i - 1);
+    const tier = tiers.find(t => i >= t.start && i <= t.end);
+    const tierColor = tier ? tier.color : '#888';
+
+    const hovered = mouseX >= bx && mouseX <= bx + btnSize && mouseY >= by && mouseY <= by + btnSize && unlocked;
+
+    // Button background
+    if (!unlocked) {
+      ctx.fillStyle = '#1a1a30';
+    } else if (hovered) {
+      ctx.fillStyle = tierColor + '44';
+    } else {
+      ctx.fillStyle = '#222244';
+    }
+    drawRoundRect(bx, by, btnSize, btnSize, 10);
+    ctx.fill();
+
+    // Border
+    ctx.strokeStyle = completed ? tierColor : unlocked ? tierColor + '66' : '#333355';
+    ctx.lineWidth = completed ? 2 : 1;
+    drawRoundRect(bx, by, btnSize, btnSize, 10);
+    ctx.stroke();
+
+    // Level number
+    ctx.fillStyle = unlocked ? TEXT_COLOR : TEXT_DIM + '44';
+    ctx.font = 'bold 18px "Segoe UI", Arial, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(String(i + 1), bx + btnSize / 2, by + btnSize / 2 - (completed ? 5 : 0));
+
+    // Completed check
+    if (completed) {
+      ctx.fillStyle = tierColor;
+      ctx.font = '14px "Segoe UI", Arial, sans-serif';
+      ctx.fillText('\u2713', bx + btnSize / 2, by + btnSize / 2 + 14);
+    }
+
+    // Lock icon
+    if (!unlocked) {
+      ctx.fillStyle = TEXT_DIM + '44';
+      ctx.font = '18px "Segoe UI", Arial, sans-serif';
+      ctx.fillText('\u{1F512}', bx + btnSize / 2, by + btnSize / 2 + 14);
+    }
+
+    // Best moves
+    if (completed && progress.best[i]) {
+      ctx.fillStyle = TEXT_DIM;
+      ctx.font = '10px "Segoe UI", Arial, sans-serif';
+      ctx.fillText(progress.best[i] + ' moves', bx + btnSize / 2, by + btnSize - 6);
+    }
+
+    // Tier label at start of each row
+    if (col === 0 && tier && i === tier.start) {
+      ctx.fillStyle = tierColor;
+      ctx.font = 'bold 11px "Segoe UI", Arial, sans-serif';
+      ctx.textAlign = 'right';
+      ctx.fillText(tier.name, bx - 10, by + btnSize / 2);
+    }
+  }
+}
+
+function drawWinScreen(time) {
+  // Darken background
+  ctx.fillStyle = 'rgba(10, 10, 30, 0.85)';
+  ctx.fillRect(0, 0, W, H);
+
+  renderParticles();
+
+  const scale = Math.min(1, winTime * 3);
+  const et = easeOutBack(clamp(scale, 0, 1));
+
+  ctx.save();
+  ctx.translate(W / 2, H * 0.35);
+  ctx.scale(et, et);
+  ctx.translate(-W / 2, -H * 0.35);
+
+  // Panel
+  ctx.fillStyle = '#1a1a3e';
+  drawRoundRect(W / 2 - 160, H * 0.35 - 80, 320, 220, 16);
+  ctx.fill();
+  ctx.strokeStyle = ACCENT + '66';
+  ctx.lineWidth = 2;
+  drawRoundRect(W / 2 - 160, H * 0.35 - 80, 320, 220, 16);
+  ctx.stroke();
+
+  // Title
+  ctx.fillStyle = '#FFD93D';
+  ctx.font = 'bold 32px "Segoe UI", Arial, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('Level Complete!', W / 2, H * 0.35 - 35);
+
+  // Stats
+  ctx.fillStyle = TEXT_COLOR;
+  ctx.font = '18px "Segoe UI", Arial, sans-serif';
+  ctx.fillText('Moves: ' + moveCount, W / 2, H * 0.35 + 15);
+
+  const best = progress.best[currentLevel];
+  if (best) {
+    ctx.fillStyle = TEXT_DIM;
+    ctx.font = '14px "Segoe UI", Arial, sans-serif';
+    ctx.fillText('Best: ' + best + ' moves', W / 2, H * 0.35 + 42);
+  }
+
+  // Buttons
+  const btnW = 120, btnH = 40;
+
+  // Next Level button
+  if (currentLevel < LEVELS.length - 1) {
+    const nx = W / 2 + 10;
+    const ny = H * 0.35 + 75;
+    ctx.fillStyle = ACCENT;
+    drawRoundRect(nx, ny, btnW, btnH, 8);
+    ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 14px "Segoe UI", Arial, sans-serif';
+    ctx.fillText('Next Level', nx + btnW / 2, ny + btnH / 2);
+    addButton('next', nx, ny, btnW, btnH, 'Next', () => { loadLevel(currentLevel + 1); clearButtons(); });
+  }
+
+  // Level Select button
+  const lx = currentLevel < LEVELS.length - 1 ? W / 2 - btnW - 10 : W / 2 - btnW / 2;
+  const ly = H * 0.35 + 75;
+  ctx.fillStyle = '#444466';
+  drawRoundRect(lx, ly, btnW, btnH, 8);
+  ctx.fill();
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 14px "Segoe UI", Arial, sans-serif';
+  ctx.fillText('Levels', lx + btnW / 2, ly + btnH / 2);
+  addButton('levels', lx, ly, btnW, btnH, 'Levels', () => { screen = SCREEN.LEVELS; clearButtons(); });
+
+  ctx.restore();
+}
+
+// ==================== UPDATE ====================
+function update(dt) {
+  gameTime += dt;
+
+  // Update hole animations
+  for (const hole of holes) {
+    if (hole.animProgress < 1) {
+      hole.animProgress = Math.min(1, hole.animProgress + dt / MOVE_ANIM_DURATION);
+    }
+
+    if (hole.removing && hole.removeAnim > 0) {
+      hole.removeAnim -= dt;
+      if (hole.removeAnim <= 0) {
+        hole.alive = false;
+        // Clear from grid
+        for (const cell of hole.cells) {
+          if (grid[cell.row] && grid[cell.row][cell.col] && grid[cell.row][cell.col].holeId === hole.id) {
+            grid[cell.row][cell.col].holeId = null;
+          }
+        }
+        checkWin();
+      }
+    }
+  }
+
+  // Update stickman animations
+  for (const sm of stickmen) {
+    if (sm.collectAnim > 0) {
+      sm.collectAnim -= dt;
+    }
+  }
+
+  // Update particles
+  updateParticles(dt);
+
+  // Win timer
+  if (winTriggered) {
+    winTime += dt;
+  }
+}
+
+// ==================== GAME LOOP ====================
+let lastTime = performance.now();
+
+function gameLoop(timestamp) {
+  const dt = Math.min((timestamp - lastTime) / 1000, 0.05);
+  lastTime = timestamp;
+
+  clearButtons();
+  update(dt);
+
+  // Clear
+  ctx.fillStyle = BG_COLOR;
+  ctx.fillRect(0, 0, W, H);
+
+  switch (screen) {
+    case SCREEN.TITLE:
+      drawTitleScreen(gameTime);
+      break;
+
+    case SCREEN.LEVELS:
+      drawLevelSelect(gameTime);
+      break;
+
+    case SCREEN.PLAYING:
+      drawGrid();
+
+      // Draw stickmen first (below holes)
+      for (const sm of stickmen) {
+        drawStickman(sm, gameTime);
+      }
+
+      // Draw holes (sorted: non-selected first, selected last)
+      const sortedHoles = [...holes].sort((a, b) => {
+        if (a === selectedHole) return 1;
+        if (b === selectedHole) return -1;
+        return 0;
+      });
+      for (const hole of sortedHoles) {
+        drawHole(hole, gameTime);
+      }
+
+      renderParticles();
+      drawHUD();
+      break;
+
+    case SCREEN.WIN:
+      // Draw game state behind
+      drawGrid();
+      for (const sm of stickmen) drawStickman(sm, gameTime);
+      for (const hole of holes) drawHole(hole, gameTime);
+
+      drawWinScreen(gameTime);
+      break;
+  }
+
+  requestAnimationFrame(gameLoop);
+}
+
+// ==================== INIT ====================
+requestAnimationFrame(gameLoop);
+</script>
+</body>
+</html>
