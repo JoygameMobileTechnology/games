@@ -1,0 +1,1764 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Siege Rush</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #0f0f1a;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  overflow: hidden;
+  font-family: 'Segoe UI', Arial, sans-serif;
+  touch-action: none;
+}
+canvas { display: block; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<script>
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+
+// ========== LAYOUT ==========
+const MAX_W = 480, MAX_H = 850;
+let scale = 1;
+function resize() {
+  scale = Math.min(window.innerWidth / MAX_W, window.innerHeight / MAX_H, 2);
+  canvas.width = MAX_W * scale;
+  canvas.height = MAX_H * scale;
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+}
+resize();
+window.addEventListener('resize', resize);
+
+const CELL = 32;
+const BOARD_COLS = 8, BOARD_ROWS = 8;
+const BOARD_PX_W = BOARD_COLS * CELL; // 256
+const BOARD_PX_H = BOARD_ROWS * CELL; // 256
+const BOARD_X = (MAX_W - BOARD_PX_W) / 2; // 112
+const BOARD_Y = 70;
+const CONV_W = 24;
+const CONV_X = BOARD_X - CONV_W;
+const CONV_Y = BOARD_Y - CONV_W;
+const CONV_OUTER_W = BOARD_PX_W + CONV_W * 2;
+const CONV_OUTER_H = BOARD_PX_H + CONV_W * 2;
+const BENCH_Y = BOARD_Y + BOARD_PX_H + CONV_W + 12;
+const BENCH_H = 56;
+const BENCH_CAPACITY = 3;
+const CORRIDOR_TOP = BENCH_Y + BENCH_H + 10;
+const CORRIDOR_BOT = MAX_H - 10;
+const CONV_SPEED = 180;
+const CONV_CAPACITY = 5;
+
+// ========== CONVEYOR PATH (clockwise from bottom-center) ==========
+function buildPath() {
+  const x1 = CONV_X + CONV_W / 2;
+  const y1 = CONV_Y + CONV_W / 2;
+  const x2 = CONV_X + CONV_OUTER_W - CONV_W / 2;
+  const y2 = CONV_Y + CONV_OUTER_H - CONV_W / 2;
+  const mx = (x1 + x2) / 2;
+  return [
+    { x: mx, y: y2 },   // 0: bottom-center (entry)
+    { x: x2, y: y2 },   // 1: bottom-right
+    { x: x2, y: y1 },   // 2: top-right
+    { x: x1, y: y1 },   // 3: top-left
+    { x: x1, y: y2 },   // 4: bottom-left
+    { x: mx, y: y2 },   // 5: back to start
+  ];
+}
+const CONV_PATH = buildPath();
+
+function pathLength() {
+  let l = 0;
+  for (let i = 1; i < CONV_PATH.length; i++) {
+    const dx = CONV_PATH[i].x - CONV_PATH[i-1].x;
+    const dy = CONV_PATH[i].y - CONV_PATH[i-1].y;
+    l += Math.sqrt(dx*dx + dy*dy);
+  }
+  return l;
+}
+const CONV_TOTAL = pathLength();
+
+function posOnConveyor(dist) {
+  let d = ((dist % CONV_TOTAL) + CONV_TOTAL) % CONV_TOTAL;
+  let acc = 0;
+  for (let i = 1; i < CONV_PATH.length; i++) {
+    const dx = CONV_PATH[i].x - CONV_PATH[i-1].x;
+    const dy = CONV_PATH[i].y - CONV_PATH[i-1].y;
+    const seg = Math.sqrt(dx*dx + dy*dy);
+    if (acc + seg >= d) {
+      const t = (d - acc) / seg;
+      return { x: CONV_PATH[i-1].x + dx*t, y: CONV_PATH[i-1].y + dy*t, seg: i-1 };
+    }
+    acc += seg;
+  }
+  return { x: CONV_PATH[0].x, y: CONV_PATH[0].y, seg: 0 };
+}
+
+// ========== COLORS ==========
+const TROOP_COLORS = {
+  red:    { fill: '#EF4444', light: '#FCA5A5', dark: '#B91C1C' },
+  green:  { fill: '#22C55E', light: '#86EFAC', dark: '#15803D' },
+  blue:   { fill: '#3B82F6', light: '#93C5FD', dark: '#1D4ED8' },
+  yellow: { fill: '#EAB308', light: '#FDE68A', dark: '#A16207' },
+  purple: { fill: '#A855F7', light: '#D8B4FE', dark: '#7E22CE' },
+  orange: { fill: '#F97316', light: '#FDBA74', dark: '#C2410C' },
+};
+const COLOR_KEYS = Object.keys(TROOP_COLORS);
+
+// ========== TROOP LEVELS ==========
+const TROOP_DEFS = [
+  { level: 1, name: 'Archer',  dmg: 1,  fireRate: 0.75,  hp: 10, ammo: 20, weapon: 'arrow',  projColor: '#8BC34A', size: 10 },
+  { level: 2, name: 'Gunner',  dmg: 3,  fireRate: 0.5,   hp: 20, ammo: 15, weapon: 'bullet', projColor: '#FFEB3B', size: 12 },
+  { level: 3, name: 'Bomber',  dmg: 5,  fireRate: 0.375, hp: 30, ammo: 10, weapon: 'bomb',   projColor: '#FF9800', size: 14 },
+  { level: 4, name: 'Mech',    dmg: 8,  fireRate: 0.25,  hp: 45, ammo: 8,  weapon: 'energy', projColor: '#00E5FF', size: 16 },
+  { level: 5, name: 'Titan',   dmg: 12, fireRate: 0.175, hp: 60, ammo: 6,  weapon: 'plasma', projColor: '#E040FB', size: 18 },
+];
+
+// ========== STRUCTURES ==========
+const S = {
+  EMPTY: 0,
+  WOOD_WALL: 1, STONE_WALL: 2, STEEL_WALL: 3,
+  WOOD_BASE: 4, STONE_BASE: 5, STEEL_BASE: 6, TECH_BASE: 7,
+  WOOD_TURRET: 8, STONE_TURRET: 9, STEEL_TURRET: 10,
+  WATCHTOWER: 11, ARMORY: 12, SUPPLY_TENT: 13, BARRICADE: 14,
+};
+const SINFO = {
+  [S.WOOD_WALL]:    { name:'Wood Wall',    hp:1,  color:'#C8A96E', border:'#8B6914' },
+  [S.STONE_WALL]:   { name:'Stone Wall',   hp:2,  color:'#9E9E9E', border:'#616161' },
+  [S.STEEL_WALL]:   { name:'Steel Wall',   hp:3,  color:'#607D8B', border:'#37474F' },
+  [S.WOOD_BASE]:    { name:'Wood Base',    hp:10, color:'#A1887F', border:'#6D4C41', isBase:true },
+  [S.STONE_BASE]:   { name:'Stone Base',   hp:20, color:'#78909C', border:'#455A64', isBase:true },
+  [S.STEEL_BASE]:   { name:'Steel Base',   hp:22, color:'#546E7A', border:'#263238', isBase:true },
+  [S.TECH_BASE]:    { name:'Tech Base',    hp:35, color:'#7C4DFF', border:'#311B92', isBase:true },
+  [S.WOOD_TURRET]:  { name:'Wood Turret',  hp:8,  color:'#8D6E63', border:'#4E342E', dmg:4,  fireRate:0.6, isTurret:true, turretTier:1 },
+  [S.STONE_TURRET]: { name:'Stone Turret', hp:16, color:'#78909C', border:'#37474F', dmg:8,  fireRate:0.5, isTurret:true, turretTier:2 },
+  [S.STEEL_TURRET]: { name:'Steel Turret', hp:24, color:'#B71C1C', border:'#7F0000', dmg:12, fireRate:0.4, isTurret:true, turretTier:3 },
+  [S.WATCHTOWER]:   { name:'Watchtower',   hp:3,  color:'#FFF176', border:'#F9A825' },
+  [S.ARMORY]:       { name:'Armory',        hp:5,  color:'#81D4FA', border:'#0277BD' },
+  [S.SUPPLY_TENT]:  { name:'Supply Tent',  hp:2,  color:'#CE93D8', border:'#6A1B9A' },
+  [S.BARRICADE]:    { name:'Barricade',    hp:1,  color:'#A1887F', border:'#4E342E' },
+};
+
+// ========== LEVELS ==========
+// corridors: array of lanes, each lane is array of {c: colorKey, l: level} from front (top) to back
+const LEVELS = [
+  // ===== LV 1: TUTORIAL — bare base, 1 corridor, 1 color =====
+  { name:'First Steps', difficulty:'Tutorial',
+    grid:[
+      [0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0],
+      [0,0,0,4,4,0,0,0],
+      [0,0,0,4,4,0,0,0],
+      [0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0]],
+    corridors:[
+      [{c:'green',l:1},{c:'green',l:1},{c:'green',l:1},{c:'green',l:1}]]
+  },
+  // ===== LV 2: 2 corridors, 2 colors, wood walls =====
+  { name:'Two Colors', difficulty:'Tutorial',
+    grid:[
+      [0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0],
+      [0,0,0,1,1,0,0,0],
+      [0,0,0,4,4,0,0,0],
+      [0,0,0,4,4,0,0,0],
+      [0,0,0,1,1,0,0,0],
+      [0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0]],
+    corridors:[
+      [{c:'green',l:1},{c:'green',l:1},{c:'blue',l:1},{c:'green',l:1}],
+      [{c:'blue',l:1},{c:'green',l:1},{c:'blue',l:1},{c:'green',l:1}]]
+  },
+  // ===== LV 3: stone base, more walls =====
+  { name:'Stone Heart', difficulty:'Tutorial',
+    grid:[
+      [0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0],
+      [0,0,0,1,1,0,0,0],
+      [0,0,1,5,5,1,0,0],
+      [0,0,1,5,5,1,0,0],
+      [0,0,0,1,1,0,0,0],
+      [0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0]],
+    corridors:[
+      [{c:'green',l:1},{c:'green',l:1},{c:'green',l:1},{c:'blue',l:1},{c:'green',l:1}],
+      [{c:'blue',l:1},{c:'blue',l:1},{c:'green',l:1},{c:'blue',l:1},{c:'green',l:1}]]
+  },
+  // ===== LV 4: 3 corridors, supply tent =====
+  { name:'Supply Run', difficulty:'Easy',
+    grid:[
+      [0,0,0,0,0,0,0,0],
+      [0,0,0,1,1,0,0,0],
+      [0,0,1,0,0,1,0,0],
+      [0,0,0,5,5,13,0,0],
+      [0,0,0,5,5,0,0,0],
+      [0,0,1,0,0,1,0,0],
+      [0,0,0,1,1,0,0,0],
+      [0,0,0,0,0,0,0,0]],
+    corridors:[
+      [{c:'green',l:1},{c:'green',l:1},{c:'blue',l:1},{c:'green',l:1}],
+      [{c:'blue',l:1},{c:'green',l:1},{c:'green',l:1},{c:'blue',l:1}],
+      [{c:'green',l:1},{c:'blue',l:1},{c:'blue',l:1},{c:'green',l:1}]]
+  },
+  // ===== LV 5: stone walls, barricades =====
+  { name:'Stone Barrier', difficulty:'Easy',
+    grid:[
+      [0,0,0,0,0,0,0,0],
+      [0,0,2,2,2,2,0,0],
+      [0,0,2,0,0,2,0,0],
+      [0,0,0,5,5,0,0,0],
+      [0,0,0,5,5,0,0,0],
+      [0,0,2,14,14,2,0,0],
+      [0,0,2,2,2,2,0,0],
+      [0,0,0,0,0,0,0,0]],
+    corridors:[
+      [{c:'green',l:1},{c:'green',l:1},{c:'blue',l:1},{c:'green',l:1},{c:'blue',l:1}],
+      [{c:'blue',l:1},{c:'green',l:1},{c:'blue',l:1},{c:'green',l:1},{c:'green',l:1}],
+      [{c:'green',l:1},{c:'blue',l:1},{c:'green',l:1},{c:'blue',l:1},{c:'green',l:1}]]
+  },
+  // ===== LV 6: 3rd color + 1 wood turret (deep inside) =====
+  { name:'Three Tribes', difficulty:'Medium',
+    grid:[
+      [0,0,0,0,0,0,0,0],
+      [0,0,2,2,2,2,0,0],
+      [0,0,2,0,0,2,0,0],
+      [0,0,2,5,5,2,0,0],
+      [0,0,2,5,5,2,0,0],
+      [0,0,0,8,0,0,0,0],
+      [0,0,2,2,2,2,0,0],
+      [0,0,0,0,0,0,0,0]],
+    corridors:[
+      [{c:'green',l:1},{c:'red',l:1},{c:'green',l:1},{c:'blue',l:1},{c:'green',l:1}],
+      [{c:'blue',l:1},{c:'green',l:1},{c:'red',l:1},{c:'green',l:1},{c:'blue',l:1}],
+      [{c:'red',l:1},{c:'blue',l:1},{c:'green',l:1},{c:'red',l:1},{c:'green',l:1}]]
+  },
+  // ===== LV 7: watchtower + turret =====
+  { name:'Watchtower Hill', difficulty:'Medium',
+    grid:[
+      [0,0,0,0,0,0,0,0],
+      [0,0,2,2,2,2,0,0],
+      [0,0,2,11,0,2,0,0],
+      [0,0,2,5,5,2,0,0],
+      [0,0,2,5,5,2,0,0],
+      [0,0,2,0,8,2,0,0],
+      [0,0,2,2,2,2,0,0],
+      [0,0,0,0,0,0,0,0]],
+    corridors:[
+      [{c:'green',l:1},{c:'red',l:1},{c:'green',l:1},{c:'green',l:1},{c:'red',l:1}],
+      [{c:'red',l:1},{c:'blue',l:1},{c:'red',l:1},{c:'blue',l:1},{c:'red',l:1}],
+      [{c:'blue',l:1},{c:'green',l:1},{c:'blue',l:1},{c:'green',l:1},{c:'blue',l:1}]]
+  },
+  // ===== LV 8: 4 corridors, steel base, 1 turret =====
+  { name:'Iron Walls', difficulty:'Medium',
+    grid:[
+      [0,0,0,0,0,0,0,0],
+      [0,2,2,2,2,2,2,0],
+      [0,2,0,0,0,0,2,0],
+      [0,0,0,6,6,0,0,0],
+      [0,0,0,6,6,0,0,0],
+      [0,2,0,0,8,0,2,0],
+      [0,2,2,2,2,2,2,0],
+      [0,0,0,0,0,0,0,0]],
+    corridors:[
+      [{c:'green',l:1},{c:'blue',l:1},{c:'red',l:1},{c:'green',l:1},{c:'blue',l:1}],
+      [{c:'red',l:1},{c:'green',l:1},{c:'blue',l:1},{c:'red',l:1},{c:'green',l:1}],
+      [{c:'blue',l:1},{c:'red',l:1},{c:'green',l:1},{c:'blue',l:1},{c:'red',l:1}],
+      [{c:'green',l:1},{c:'green',l:1},{c:'red',l:1},{c:'blue',l:1},{c:'green',l:1}]]
+  },
+  // ===== LV 9: armory + turret, some Lv2 troops =====
+  { name:'Armored Keep', difficulty:'Medium',
+    grid:[
+      [0,0,0,0,0,0,0,0],
+      [0,0,2,2,2,2,0,0],
+      [0,2,0,0,0,0,2,0],
+      [0,2,0,6,6,12,2,0],
+      [0,2,0,6,6,0,2,0],
+      [0,0,8,0,0,0,0,0],
+      [0,0,2,1,1,2,0,0],
+      [0,0,0,0,0,0,0,0]],
+    corridors:[
+      [{c:'green',l:1},{c:'red',l:1},{c:'green',l:2},{c:'blue',l:1},{c:'green',l:1}],
+      [{c:'blue',l:1},{c:'green',l:1},{c:'red',l:1},{c:'blue',l:1},{c:'red',l:1}],
+      [{c:'red',l:1},{c:'blue',l:1},{c:'green',l:1},{c:'red',l:2},{c:'blue',l:1}],
+      [{c:'green',l:1},{c:'red',l:1},{c:'blue',l:1},{c:'green',l:1},{c:'blue',l:1}]]
+  },
+  // ===== LV 10: 2 turrets, mixed walls =====
+  { name:'Walled Town', difficulty:'Medium',
+    grid:[
+      [0,0,0,0,0,0,0,0],
+      [0,2,2,2,2,2,2,0],
+      [0,2,13,0,0,13,2,0],
+      [0,2,0,6,6,0,2,0],
+      [0,2,0,6,6,0,2,0],
+      [0,0,8,0,0,8,0,0],
+      [0,2,2,2,2,2,2,0],
+      [0,0,0,0,0,0,0,0]],
+    corridors:[
+      [{c:'green',l:1},{c:'blue',l:1},{c:'red',l:1},{c:'green',l:1},{c:'blue',l:1}],
+      [{c:'red',l:1},{c:'green',l:1},{c:'blue',l:1},{c:'red',l:1},{c:'green',l:1}],
+      [{c:'blue',l:1},{c:'red',l:1},{c:'green',l:1},{c:'green',l:1},{c:'red',l:1}],
+      [{c:'green',l:1},{c:'blue',l:1},{c:'red',l:1},{c:'blue',l:1},{c:'green',l:1}]]
+  },
+  // ===== LV 11: ★ HARD — steel base, 2 stone turrets, tight walls =====
+  { name:'The Gauntlet', difficulty:'Hard',
+    grid:[
+      [0,0,0,0,0,0,0,0],
+      [0,2,2,2,2,2,2,0],
+      [0,0,9,0,0,0,0,0],
+      [0,2,0,6,6,0,2,0],
+      [0,2,0,6,6,0,2,0],
+      [0,0,0,0,0,9,0,0],
+      [0,2,2,2,2,2,2,0],
+      [0,0,0,0,0,0,0,0]],
+    corridors:[
+      [{c:'green',l:1},{c:'red',l:1},{c:'green',l:1},{c:'blue',l:1},{c:'red',l:1},{c:'green',l:1}],
+      [{c:'blue',l:1},{c:'green',l:1},{c:'red',l:1},{c:'green',l:1},{c:'blue',l:1},{c:'red',l:1}],
+      [{c:'red',l:1},{c:'blue',l:1},{c:'green',l:1},{c:'red',l:1},{c:'green',l:1},{c:'blue',l:1}],
+      [{c:'green',l:1},{c:'red',l:1},{c:'blue',l:1},{c:'green',l:1},{c:'red',l:1},{c:'blue',l:1}]]
+  },
+  // ===== LV 12: 4th color (yellow) =====
+  { name:'Golden Dawn', difficulty:'Medium',
+    grid:[
+      [0,0,0,0,0,0,0,0],
+      [0,0,2,2,2,2,0,0],
+      [0,2,0,0,0,0,2,0],
+      [0,2,0,5,5,0,2,0],
+      [0,2,0,5,5,8,2,0],
+      [0,2,0,0,0,0,2,0],
+      [0,0,2,2,2,2,0,0],
+      [0,0,0,0,0,0,0,0]],
+    corridors:[
+      [{c:'green',l:1},{c:'yellow',l:1},{c:'blue',l:1},{c:'green',l:1},{c:'red',l:1}],
+      [{c:'blue',l:1},{c:'red',l:1},{c:'green',l:1},{c:'yellow',l:1},{c:'blue',l:1}],
+      [{c:'red',l:1},{c:'green',l:1},{c:'yellow',l:1},{c:'blue',l:1},{c:'green',l:1}],
+      [{c:'yellow',l:1},{c:'blue',l:1},{c:'red',l:1},{c:'green',l:1},{c:'yellow',l:1}]]
+  },
+  // ===== LV 13: walls + turret + watchtower =====
+  { name:'Lookout Post', difficulty:'Medium',
+    grid:[
+      [0,0,0,0,0,0,0,0],
+      [0,2,2,2,2,2,2,0],
+      [0,2,11,0,0,0,2,0],
+      [0,2,0,6,6,0,2,0],
+      [0,2,0,6,6,0,2,0],
+      [0,2,0,0,8,0,2,0],
+      [0,2,2,2,2,2,2,0],
+      [0,0,0,0,0,0,0,0]],
+    corridors:[
+      [{c:'green',l:1},{c:'yellow',l:1},{c:'red',l:1},{c:'green',l:1},{c:'blue',l:1}],
+      [{c:'red',l:1},{c:'blue',l:1},{c:'green',l:1},{c:'yellow',l:1},{c:'red',l:1}],
+      [{c:'blue',l:1},{c:'green',l:1},{c:'yellow',l:1},{c:'red',l:1},{c:'green',l:1}],
+      [{c:'yellow',l:1},{c:'red',l:1},{c:'blue',l:1},{c:'green',l:1},{c:'yellow',l:1}]]
+  },
+  // ===== LV 14: 2 turrets, mixed colors =====
+  { name:'Crossfire', difficulty:'Medium',
+    grid:[
+      [0,0,0,0,0,0,0,0],
+      [0,2,2,2,2,2,2,0],
+      [0,2,0,8,0,0,2,0],
+      [0,2,0,6,6,0,2,0],
+      [0,2,0,6,6,0,2,0],
+      [0,2,0,0,8,0,2,0],
+      [0,2,2,2,2,2,2,0],
+      [0,0,0,0,0,0,0,0]],
+    corridors:[
+      [{c:'green',l:1},{c:'red',l:1},{c:'yellow',l:1},{c:'blue',l:1},{c:'green',l:1}],
+      [{c:'yellow',l:1},{c:'blue',l:1},{c:'green',l:1},{c:'red',l:1},{c:'yellow',l:1}],
+      [{c:'blue',l:1},{c:'green',l:1},{c:'red',l:1},{c:'yellow',l:1},{c:'blue',l:1}],
+      [{c:'red',l:1},{c:'yellow',l:1},{c:'blue',l:1},{c:'green',l:1},{c:'red',l:1}]]
+  },
+  // ===== LV 15: tighter layout =====
+  { name:'The Compound', difficulty:'Medium',
+    grid:[
+      [0,0,0,0,0,0,0,0],
+      [0,2,2,2,2,2,2,0],
+      [0,2,14,0,0,14,2,0],
+      [0,2,0,6,6,0,2,0],
+      [0,2,0,6,6,0,2,0],
+      [0,2,0,8,0,0,2,0],
+      [0,2,2,2,2,2,2,0],
+      [0,0,0,0,0,0,0,0]],
+    corridors:[
+      [{c:'green',l:1},{c:'red',l:1},{c:'blue',l:1},{c:'yellow',l:1},{c:'green',l:1}],
+      [{c:'blue',l:1},{c:'yellow',l:1},{c:'green',l:1},{c:'red',l:1},{c:'blue',l:1}],
+      [{c:'yellow',l:1},{c:'green',l:1},{c:'red',l:1},{c:'blue',l:1},{c:'yellow',l:1}],
+      [{c:'red',l:1},{c:'blue',l:1},{c:'yellow',l:1},{c:'green',l:1},{c:'red',l:1}]]
+  },
+  // ===== LV 16: ★ HARD — tech base, 3 turrets, watchtower =====
+  { name:'Iron Fortress', difficulty:'Hard',
+    grid:[
+      [0,0,0,0,0,0,0,0],
+      [0,3,0,3,3,0,3,0],
+      [0,0,9,0,0,11,0,0],
+      [0,0,0,7,7,0,0,0],
+      [0,0,0,7,7,0,0,0],
+      [0,0,8,0,0,9,0,0],
+      [0,3,0,3,3,0,3,0],
+      [0,0,0,0,0,0,0,0]],
+    corridors:[
+      [{c:'green',l:1},{c:'red',l:1},{c:'yellow',l:1},{c:'green',l:1},{c:'blue',l:1},{c:'red',l:1}],
+      [{c:'blue',l:1},{c:'yellow',l:1},{c:'green',l:1},{c:'red',l:1},{c:'blue',l:1},{c:'yellow',l:1}],
+      [{c:'red',l:1},{c:'green',l:1},{c:'blue',l:1},{c:'yellow',l:1},{c:'green',l:1},{c:'red',l:1}],
+      [{c:'yellow',l:1},{c:'blue',l:1},{c:'red',l:1},{c:'green',l:1},{c:'yellow',l:1},{c:'blue',l:1}]]
+  },
+  // ===== LV 17: 5 corridors, varied =====
+  { name:'Five Lanes', difficulty:'Medium',
+    grid:[
+      [0,0,0,0,0,0,0,0],
+      [0,0,2,2,2,2,0,0],
+      [0,2,0,0,0,0,2,0],
+      [0,0,0,6,6,0,0,0],
+      [0,0,0,6,6,0,0,0],
+      [0,0,0,0,8,0,0,0],
+      [0,0,2,2,2,2,0,0],
+      [0,0,0,0,0,0,0,0]],
+    corridors:[
+      [{c:'green',l:1},{c:'red',l:1},{c:'blue',l:1},{c:'green',l:1}],
+      [{c:'blue',l:1},{c:'yellow',l:1},{c:'green',l:1},{c:'red',l:1}],
+      [{c:'red',l:1},{c:'green',l:1},{c:'yellow',l:1},{c:'blue',l:1}],
+      [{c:'yellow',l:1},{c:'blue',l:1},{c:'red',l:1},{c:'green',l:1}],
+      [{c:'green',l:1},{c:'red',l:1},{c:'blue',l:1},{c:'yellow',l:1}]]
+  },
+  // ===== LV 18: 2 turrets, Lv2 troops =====
+  { name:'Reinforced', difficulty:'Medium',
+    grid:[
+      [0,0,0,0,0,0,0,0],
+      [0,2,2,0,0,2,2,0],
+      [0,0,0,0,8,0,0,0],
+      [0,0,8,6,6,0,0,0],
+      [0,0,0,6,6,8,0,0],
+      [0,0,0,0,0,0,0,0],
+      [0,2,2,0,0,2,2,0],
+      [0,0,0,0,0,0,0,0]],
+    corridors:[
+      [{c:'green',l:2},{c:'red',l:1},{c:'blue',l:1},{c:'green',l:1},{c:'red',l:1}],
+      [{c:'blue',l:1},{c:'green',l:1},{c:'yellow',l:1},{c:'blue',l:1},{c:'green',l:1}],
+      [{c:'red',l:1},{c:'yellow',l:1},{c:'green',l:1},{c:'red',l:2},{c:'blue',l:1}],
+      [{c:'yellow',l:1},{c:'blue',l:1},{c:'red',l:1},{c:'green',l:1},{c:'yellow',l:1}],
+      [{c:'green',l:1},{c:'red',l:1},{c:'blue',l:1},{c:'yellow',l:1},{c:'green',l:1}]]
+  },
+  // ===== LV 19: supply tents + turret =====
+  { name:'Loot Camp', difficulty:'Medium',
+    grid:[
+      [0,0,0,0,0,0,0,0],
+      [0,2,2,0,0,2,2,0],
+      [0,0,13,0,13,0,0,0],
+      [0,0,0,6,6,0,0,0],
+      [0,0,0,6,6,0,0,0],
+      [0,0,0,13,8,13,0,0],
+      [0,2,2,0,0,2,2,0],
+      [0,0,0,0,0,0,0,0]],
+    corridors:[
+      [{c:'green',l:1},{c:'blue',l:1},{c:'red',l:1},{c:'yellow',l:1},{c:'green',l:1}],
+      [{c:'red',l:1},{c:'green',l:1},{c:'yellow',l:1},{c:'blue',l:1},{c:'red',l:1}],
+      [{c:'yellow',l:1},{c:'red',l:1},{c:'green',l:1},{c:'red',l:1},{c:'blue',l:1}],
+      [{c:'blue',l:1},{c:'yellow',l:1},{c:'blue',l:1},{c:'green',l:1},{c:'yellow',l:1}],
+      [{c:'green',l:1},{c:'blue',l:1},{c:'red',l:1},{c:'green',l:1},{c:'red',l:1}]]
+  },
+  // ===== LV 20: 2 turrets, stone walls =====
+  { name:'Siege Approach', difficulty:'Medium',
+    grid:[
+      [0,0,0,0,0,0,0,0],
+      [0,2,2,0,0,2,2,0],
+      [0,0,0,0,0,8,0,0],
+      [0,0,0,6,6,0,0,0],
+      [0,0,0,6,6,0,0,0],
+      [0,0,8,0,0,0,0,0],
+      [0,2,2,0,0,2,2,0],
+      [0,0,0,0,0,0,0,0]],
+    corridors:[
+      [{c:'green',l:1},{c:'red',l:1},{c:'blue',l:1},{c:'yellow',l:1},{c:'green',l:1}],
+      [{c:'blue',l:1},{c:'yellow',l:1},{c:'green',l:1},{c:'red',l:1},{c:'blue',l:1}],
+      [{c:'red',l:1},{c:'green',l:1},{c:'yellow',l:1},{c:'blue',l:1},{c:'red',l:1}],
+      [{c:'yellow',l:1},{c:'blue',l:1},{c:'red',l:1},{c:'green',l:1},{c:'yellow',l:1}],
+      [{c:'green',l:1},{c:'red',l:1},{c:'green',l:1},{c:'blue',l:1},{c:'red',l:1}]]
+  },
+  // ===== LV 21: ★ HARD — tech base, 3 steel turrets, armory =====
+  { name:'Steel Storm', difficulty:'Hard',
+    grid:[
+      [0,0,0,0,0,0,0,0],
+      [0,0,0,9,9,0,0,0],
+      [0,0,0,0,0,12,0,0],
+      [0,9,0,7,7,0,9,0],
+      [0,0,0,7,7,0,0,0],
+      [0,0,0,0,0,0,0,0],
+      [0,0,0,9,9,0,0,0],
+      [0,0,0,0,0,0,0,0]],
+    corridors:[
+      [{c:'green',l:2},{c:'red',l:1},{c:'blue',l:1},{c:'green',l:1},{c:'yellow',l:1},{c:'red',l:1}],
+      [{c:'blue',l:1},{c:'yellow',l:1},{c:'red',l:2},{c:'green',l:1},{c:'blue',l:1}],
+      [{c:'red',l:1},{c:'green',l:1},{c:'yellow',l:1},{c:'blue',l:2},{c:'red',l:1},{c:'green',l:1}],
+      [{c:'yellow',l:1},{c:'blue',l:1},{c:'green',l:1},{c:'red',l:1},{c:'yellow',l:2},{c:'blue',l:1}],
+      [{c:'green',l:1},{c:'red',l:1},{c:'blue',l:1},{c:'yellow',l:1},{c:'green',l:1},{c:'red',l:1}]]
+  },
+  // ===== LV 22: mixed structures =====
+  { name:'Outpost Alpha', difficulty:'Medium',
+    grid:[
+      [0,0,0,0,0,0,0,0],
+      [0,2,0,3,3,0,2,0],
+      [0,0,0,0,0,9,0,0],
+      [0,0,0,6,6,0,0,0],
+      [0,0,0,6,6,0,0,0],
+      [0,0,9,0,0,0,0,0],
+      [0,2,0,3,3,0,2,0],
+      [0,0,0,0,0,0,0,0]],
+    corridors:[
+      [{c:'green',l:1},{c:'red',l:1},{c:'yellow',l:1},{c:'blue',l:1},{c:'green',l:1}],
+      [{c:'blue',l:2},{c:'green',l:1},{c:'red',l:1},{c:'yellow',l:1},{c:'blue',l:1}],
+      [{c:'red',l:1},{c:'yellow',l:1},{c:'green',l:1},{c:'blue',l:1},{c:'red',l:1}],
+      [{c:'yellow',l:1},{c:'blue',l:1},{c:'green',l:2},{c:'red',l:1},{c:'yellow',l:1}],
+      [{c:'green',l:1},{c:'red',l:1},{c:'blue',l:1},{c:'green',l:1},{c:'red',l:1}]]
+  },
+  // ===== LV 23: watchtower boosting turret =====
+  { name:'Eagle Eye', difficulty:'Medium',
+    grid:[
+      [0,0,0,0,0,0,0,0],
+      [0,2,2,0,0,2,2,0],
+      [0,0,0,0,0,11,0,0],
+      [0,0,0,6,6,9,0,0],
+      [0,0,0,6,6,0,0,0],
+      [0,0,0,0,0,0,0,0],
+      [0,2,2,0,0,2,2,0],
+      [0,0,0,0,0,0,0,0]],
+    corridors:[
+      [{c:'green',l:1},{c:'red',l:1},{c:'blue',l:1},{c:'yellow',l:1},{c:'green',l:2}],
+      [{c:'blue',l:1},{c:'yellow',l:1},{c:'green',l:1},{c:'red',l:1},{c:'blue',l:1}],
+      [{c:'red',l:1},{c:'green',l:1},{c:'yellow',l:1},{c:'blue',l:1},{c:'red',l:1}],
+      [{c:'yellow',l:2},{c:'blue',l:1},{c:'red',l:1},{c:'green',l:1},{c:'yellow',l:1}],
+      [{c:'green',l:1},{c:'red',l:1},{c:'blue',l:1},{c:'yellow',l:1},{c:'green',l:1}]]
+  },
+  // ===== LV 24: barricades + 2 turrets =====
+  { name:'Barricade Maze', difficulty:'Medium',
+    grid:[
+      [0,0,0,0,0,0,0,0],
+      [0,2,2,0,0,2,2,0],
+      [0,0,14,0,14,0,0,0],
+      [0,0,8,6,6,14,0,0],
+      [0,0,14,6,6,8,0,0],
+      [0,0,0,14,0,14,0,0],
+      [0,2,2,0,0,2,2,0],
+      [0,0,0,0,0,0,0,0]],
+    corridors:[
+      [{c:'green',l:1},{c:'red',l:1},{c:'yellow',l:1},{c:'blue',l:1},{c:'green',l:1},{c:'red',l:1}],
+      [{c:'blue',l:1},{c:'yellow',l:1},{c:'green',l:1},{c:'red',l:1},{c:'blue',l:1}],
+      [{c:'red',l:1},{c:'green',l:1},{c:'blue',l:1},{c:'yellow',l:1},{c:'red',l:1},{c:'green',l:1}],
+      [{c:'yellow',l:1},{c:'blue',l:1},{c:'red',l:1},{c:'green',l:1},{c:'yellow',l:1}],
+      [{c:'green',l:2},{c:'red',l:1},{c:'blue',l:1},{c:'yellow',l:1},{c:'green',l:1},{c:'red',l:1}]]
+  },
+  // ===== LV 25: steel walls, stone turret =====
+  { name:'The Bulwark', difficulty:'Medium',
+    grid:[
+      [0,0,0,0,0,0,0,0],
+      [0,3,3,0,0,3,3,0],
+      [0,0,0,0,0,0,0,0],
+      [0,0,0,6,6,0,0,0],
+      [0,0,0,6,6,0,0,0],
+      [0,0,0,0,9,0,0,0],
+      [0,3,3,0,0,3,3,0],
+      [0,0,0,0,0,0,0,0]],
+    corridors:[
+      [{c:'green',l:1},{c:'red',l:2},{c:'blue',l:1},{c:'yellow',l:1},{c:'green',l:1}],
+      [{c:'blue',l:1},{c:'yellow',l:1},{c:'green',l:1},{c:'red',l:1},{c:'blue',l:2}],
+      [{c:'red',l:1},{c:'green',l:1},{c:'yellow',l:1},{c:'blue',l:1},{c:'red',l:1}],
+      [{c:'yellow',l:2},{c:'blue',l:1},{c:'red',l:1},{c:'green',l:1},{c:'yellow',l:1}],
+      [{c:'green',l:1},{c:'red',l:1},{c:'blue',l:1},{c:'yellow',l:1},{c:'green',l:1}]]
+  },
+  // ===== LV 26: ★ HARD — full steel, tech base, 4 turrets, watchtowers =====
+  { name:'Ironclad', difficulty:'Hard',
+    grid:[
+      [0,0,0,0,0,0,0,0],
+      [0,0,0,9,9,0,0,0],
+      [0,0,9,0,0,11,0,0],
+      [0,0,0,7,7,0,0,0],
+      [0,0,0,7,7,0,0,0],
+      [0,0,11,0,0,9,0,0],
+      [0,0,0,9,9,0,0,0],
+      [0,0,0,0,0,0,0,0]],
+    corridors:[
+      [{c:'green',l:2},{c:'red',l:1},{c:'blue',l:1},{c:'yellow',l:1},{c:'green',l:1},{c:'red',l:2}],
+      [{c:'blue',l:1},{c:'yellow',l:2},{c:'green',l:1},{c:'red',l:1},{c:'blue',l:1},{c:'yellow',l:1}],
+      [{c:'red',l:1},{c:'green',l:1},{c:'yellow',l:1},{c:'blue',l:2},{c:'red',l:1},{c:'green',l:1}],
+      [{c:'yellow',l:1},{c:'blue',l:1},{c:'red',l:2},{c:'green',l:1},{c:'yellow',l:1},{c:'blue',l:1}],
+      [{c:'green',l:1},{c:'red',l:1},{c:'blue',l:1},{c:'yellow',l:1},{c:'green',l:2},{c:'red',l:1}]]
+  },
+  // ===== LV 27: armory + turrets =====
+  { name:'Repair Yard', difficulty:'Medium',
+    grid:[
+      [0,0,0,0,0,0,0,0],
+      [0,3,0,0,0,0,3,0],
+      [0,0,9,0,12,0,0,0],
+      [0,0,0,6,6,0,0,0],
+      [0,0,0,6,6,0,0,0],
+      [0,0,0,0,0,9,0,0],
+      [0,3,0,0,0,0,3,0],
+      [0,0,0,0,0,0,0,0]],
+    corridors:[
+      [{c:'green',l:2},{c:'red',l:1},{c:'blue',l:1},{c:'green',l:1},{c:'yellow',l:1}],
+      [{c:'blue',l:1},{c:'yellow',l:2},{c:'green',l:1},{c:'red',l:1},{c:'blue',l:1}],
+      [{c:'red',l:1},{c:'green',l:1},{c:'yellow',l:1},{c:'blue',l:1},{c:'red',l:2}],
+      [{c:'yellow',l:1},{c:'blue',l:1},{c:'red',l:1},{c:'green',l:2},{c:'yellow',l:1}],
+      [{c:'green',l:1},{c:'red',l:1},{c:'blue',l:1},{c:'yellow',l:1},{c:'green',l:1}]]
+  },
+  // ===== LV 28: open layout, 3 turrets =====
+  { name:'Kill Zone', difficulty:'Medium',
+    grid:[
+      [0,0,0,0,0,0,0,0],
+      [0,0,0,9,9,0,0,0],
+      [0,0,0,0,0,0,0,0],
+      [0,9,0,6,6,0,9,0],
+      [0,0,0,6,6,0,0,0],
+      [0,0,0,0,0,0,0,0],
+      [0,0,2,2,2,2,0,0],
+      [0,0,0,0,0,0,0,0]],
+    corridors:[
+      [{c:'green',l:1},{c:'red',l:2},{c:'blue',l:1},{c:'yellow',l:1},{c:'green',l:1}],
+      [{c:'blue',l:2},{c:'yellow',l:1},{c:'green',l:1},{c:'red',l:1},{c:'blue',l:1}],
+      [{c:'red',l:1},{c:'green',l:1},{c:'yellow',l:2},{c:'blue',l:1},{c:'red',l:1}],
+      [{c:'yellow',l:1},{c:'blue',l:1},{c:'red',l:1},{c:'green',l:1},{c:'yellow',l:2}],
+      [{c:'green',l:1},{c:'red',l:1},{c:'blue',l:1},{c:'yellow',l:1},{c:'green',l:1}]]
+  },
+  // ===== LV 29: full structures =====
+  { name:'War Camp', difficulty:'Medium',
+    grid:[
+      [0,0,0,0,0,0,0,0],
+      [0,3,0,0,0,0,3,0],
+      [0,0,13,9,0,11,0,0],
+      [0,0,0,6,6,0,0,0],
+      [0,0,0,6,6,12,0,0],
+      [0,0,9,0,9,0,0,0],
+      [0,3,0,0,0,0,3,0],
+      [0,0,0,0,0,0,0,0]],
+    corridors:[
+      [{c:'green',l:2},{c:'red',l:1},{c:'blue',l:1},{c:'yellow',l:1},{c:'green',l:1},{c:'red',l:1}],
+      [{c:'blue',l:1},{c:'yellow',l:2},{c:'green',l:1},{c:'red',l:1},{c:'blue',l:1}],
+      [{c:'red',l:1},{c:'green',l:1},{c:'yellow',l:1},{c:'blue',l:2},{c:'red',l:1},{c:'green',l:1}],
+      [{c:'yellow',l:1},{c:'blue',l:1},{c:'red',l:2},{c:'green',l:1},{c:'yellow',l:1}],
+      [{c:'green',l:1},{c:'red',l:1},{c:'blue',l:1},{c:'yellow',l:1},{c:'green',l:1},{c:'red',l:1}]]
+  },
+  // ===== LV 30: pre-boss =====
+  { name:'Last Stand', difficulty:'Medium',
+    grid:[
+      [0,0,0,0,0,0,0,0],
+      [0,3,0,0,0,0,3,0],
+      [0,0,10,0,0,9,0,0],
+      [0,0,0,7,7,0,0,0],
+      [0,0,0,7,7,0,0,0],
+      [0,0,9,0,0,10,0,0],
+      [0,3,0,0,0,0,3,0],
+      [0,0,0,0,0,0,0,0]],
+    corridors:[
+      [{c:'green',l:2},{c:'red',l:1},{c:'blue',l:2},{c:'yellow',l:1},{c:'green',l:1},{c:'red',l:1}],
+      [{c:'blue',l:1},{c:'yellow',l:2},{c:'green',l:1},{c:'red',l:1},{c:'blue',l:1},{c:'yellow',l:1}],
+      [{c:'red',l:2},{c:'green',l:1},{c:'yellow',l:1},{c:'blue',l:1},{c:'red',l:1},{c:'green',l:1}],
+      [{c:'yellow',l:1},{c:'blue',l:1},{c:'red',l:1},{c:'green',l:2},{c:'yellow',l:1},{c:'blue',l:1}],
+      [{c:'green',l:1},{c:'red',l:1},{c:'blue',l:1},{c:'yellow',l:2},{c:'green',l:1},{c:'red',l:1}]]
+  },
+  // ===== LV 31: ★ HARD (FINAL) — tech base, armory, 4 steel turrets, full steel =====
+  { name:'The Citadel', difficulty:'Hard',
+    grid:[
+      [0,0,0,0,0,0,0,0],
+      [0,0,0,10,10,0,0,0],
+      [0,0,0,0,0,0,0,0],
+      [0,0,0,7,7,12,0,0],
+      [0,0,11,7,7,0,0,0],
+      [0,0,0,0,0,0,0,0],
+      [0,0,0,10,10,0,0,0],
+      [0,0,0,0,0,0,0,0]],
+    corridors:[
+      [{c:'green',l:2},{c:'red',l:1},{c:'blue',l:2},{c:'yellow',l:1},{c:'green',l:1},{c:'red',l:2}],
+      [{c:'blue',l:2},{c:'yellow',l:1},{c:'green',l:1},{c:'red',l:2},{c:'blue',l:1},{c:'yellow',l:1}],
+      [{c:'red',l:1},{c:'green',l:2},{c:'yellow',l:1},{c:'blue',l:1},{c:'red',l:1},{c:'green',l:3}],
+      [{c:'yellow',l:2},{c:'blue',l:1},{c:'red',l:1},{c:'green',l:1},{c:'yellow',l:1},{c:'blue',l:2}],
+      [{c:'green',l:1},{c:'red',l:2},{c:'blue',l:1},{c:'yellow',l:2},{c:'green',l:1},{c:'red',l:1}]]
+  },
+];
+
+// ========== GAME STATE ==========
+let state = 'menu'; // menu, intro, playing, levelClear, levelFail
+let currentLevel = 0;
+let grid = [];
+let conveyorTroops = [];
+let bench = []; // [{color, level}] — max BENCH_CAPACITY
+let corridors = []; // [{c, l}[]]
+let projectiles = [];
+let particles = [];
+let damageNums = [];
+let jumpAnims = []; // troops jumping between zones
+let convOffset = 0;
+let introTimer = 0;
+let troopsUsed = 0;
+let totalTroopsStart = 0;
+
+// ========== INIT LEVEL ==========
+function initLevel(idx) {
+  const lvl = LEVELS[idx];
+  grid = [];
+  conveyorTroops = [];
+  bench = [];
+  projectiles = [];
+  particles = [];
+  damageNums = [];
+  jumpAnims = [];
+  troopsUsed = 0;
+
+  // Deep copy corridors
+  corridors = lvl.corridors.map(lane => lane.map(s => ({ ...s })));
+  totalTroopsStart = corridors.reduce((sum, lane) => sum + lane.length, 0);
+
+  for (let r = 0; r < BOARD_ROWS; r++) {
+    grid[r] = [];
+    for (let c = 0; c < BOARD_COLS; c++) {
+      const t = lvl.grid[r][c];
+      if (t === 0) {
+        grid[r][c] = null;
+      } else {
+        const info = SINFO[t];
+        grid[r][c] = { type: t, hp: info.hp, maxHp: info.hp, fireCooldown: 0 };
+      }
+    }
+  }
+  state = 'intro';
+  introTimer = 1.8;
+}
+
+// ========== CORRIDOR LAYOUT ==========
+function getCorridorLayout() {
+  const n = corridors.length;
+  if (n === 0) return [];
+  const laneW = 52;
+  const gap = 10;
+  const totalW = n * laneW + (n - 1) * gap;
+  const startX = (MAX_W - totalW) / 2;
+  const slotH = 50;
+  const layout = [];
+  for (let i = 0; i < n; i++) {
+    const x = startX + i * (laneW + gap);
+    layout.push({ x, y: CORRIDOR_TOP, w: laneW, slotH });
+  }
+  return layout;
+}
+
+// ========== BENCH LAYOUT ==========
+function getBenchLayout() {
+  const slotW = 52, gap = 10;
+  const totalW = BENCH_CAPACITY * slotW + (BENCH_CAPACITY - 1) * gap;
+  const startX = (MAX_W - totalW) / 2;
+  const slots = [];
+  for (let i = 0; i < BENCH_CAPACITY; i++) {
+    slots.push({ x: startX + i * (slotW + gap), y: BENCH_Y, w: slotW, h: BENCH_H });
+  }
+  return slots;
+}
+
+// ========== DEPLOY TROOP ==========
+function activeTroopCount() {
+  return conveyorTroops.filter(t => !t.dead).length;
+}
+
+// Corridor tap → send front troop to bench
+function deployToBench(laneIdx) {
+  const lane = corridors[laneIdx];
+  if (!lane || lane.length === 0) return;
+  const stickman = lane[0];
+
+  // Check for merge match on bench
+  const matchIdx = bench.findIndex(b =>
+    b.color === stickman.c && b.level === stickman.l && b.level < 5
+  );
+
+  // If no merge match, check bench capacity
+  if (matchIdx < 0 && bench.length >= BENCH_CAPACITY) return;
+
+  lane.shift();
+  troopsUsed++;
+
+  const layout = getCorridorLayout();
+  const fromX = layout[laneIdx].x + layout[laneIdx].w / 2;
+  const fromY = layout[laneIdx].y + 20;
+
+  const benchSlots = getBenchLayout();
+
+  if (matchIdx >= 0) {
+    // Jump to the matched bench slot, then merge
+    const slot = benchSlots[matchIdx];
+    jumpAnims.push({
+      color: stickman.c,
+      level: stickman.l,
+      fromX, fromY,
+      toX: slot.x + slot.w / 2,
+      toY: slot.y + slot.h / 2,
+      targetType: 'bench_merge',
+      benchIdx: matchIdx,
+      progress: 0,
+      duration: 0.3,
+    });
+  } else {
+    // Jump to next empty bench slot
+    const newIdx = bench.length;
+    const slot = benchSlots[newIdx];
+    jumpAnims.push({
+      color: stickman.c,
+      level: stickman.l,
+      fromX, fromY,
+      toX: slot.x + slot.w / 2,
+      toY: slot.y + slot.h / 2,
+      targetType: 'bench_new',
+      progress: 0,
+      duration: 0.25,
+    });
+    // Reserve the slot immediately
+    bench.push({ color: stickman.c, level: stickman.l, arriving: true });
+  }
+}
+
+// Bench tap → send troop to conveyor
+function deployFromBench(benchIdx) {
+  if (benchIdx < 0 || benchIdx >= bench.length) return;
+  const b = bench[benchIdx];
+  if (b.arriving) return; // still animating in
+
+  if (activeTroopCount() >= CONV_CAPACITY) return;
+
+  const benchSlots = getBenchLayout();
+  const slot = benchSlots[benchIdx];
+  const fromX = slot.x + slot.w / 2;
+  const fromY = slot.y + slot.h / 2;
+
+  bench.splice(benchIdx, 1);
+
+  const entryPos = posOnConveyor(0);
+  jumpAnims.push({
+    color: b.color,
+    level: b.level,
+    fromX, fromY,
+    toX: entryPos.x,
+    toY: entryPos.y,
+    targetType: 'conveyor',
+    progress: 0,
+    duration: 0.25,
+  });
+}
+
+function performBenchMerge(benchIdx) {
+  const b = bench[benchIdx];
+  if (!b || b.level >= 5) return;
+  const newLevel = b.level + 1;
+  b.level = newLevel;
+
+  // Merge particles at bench slot
+  const benchSlots = getBenchLayout();
+  const slot = benchSlots[benchIdx];
+  const px = slot.x + slot.w / 2, py = slot.y + slot.h / 2;
+  const col = TROOP_COLORS[b.color];
+  for (let i = 0; i < 12; i++) {
+    const a = Math.random() * Math.PI * 2;
+    particles.push({ x: px, y: py, vx: Math.cos(a)*70, vy: Math.sin(a)*70,
+      life: 0.5, maxLife: 0.5, color: '#FFD700', size: 5 });
+  }
+  for (let i = 0; i < 6; i++) {
+    const a = Math.random() * Math.PI * 2;
+    particles.push({ x: px, y: py, vx: Math.cos(a)*40, vy: Math.sin(a)*40,
+      life: 0.4, maxLife: 0.4, color: col.light, size: 4 });
+  }
+
+  // Chain merge: check if another bench troop now matches
+  const chainIdx = bench.findIndex((other, idx) =>
+    idx !== benchIdx && other.color === b.color && other.level === b.level && !other.arriving && b.level < 5
+  );
+  if (chainIdx >= 0) {
+    // Auto-merge: remove the other and upgrade this one
+    const otherSlot = benchSlots[chainIdx];
+    jumpAnims.push({
+      color: bench[chainIdx].color,
+      level: bench[chainIdx].level,
+      fromX: otherSlot.x + otherSlot.w / 2,
+      fromY: otherSlot.y + otherSlot.h / 2,
+      toX: px, toY: py,
+      targetType: 'bench_merge',
+      benchIdx: benchIdx > chainIdx ? benchIdx - 1 : benchIdx, // adjust for splice
+      progress: 0,
+      duration: 0.25,
+    });
+    bench.splice(chainIdx, 1);
+  }
+}
+
+// ========== SHOOTING ==========
+function shootDir(pos) {
+  if (pos.seg === 0 || pos.seg === 4) return { dx: 0, dy: -1 }; // bottom
+  if (pos.seg === 1) return { dx: -1, dy: 0 }; // right
+  if (pos.seg === 2) return { dx: 0, dy: 1 };  // top
+  if (pos.seg === 3) return { dx: 1, dy: 0 };  // left
+  return { dx: 0, dy: 0 };
+}
+
+function findTarget(tpos, dir) {
+  let best = null, bestDist = Infinity;
+  for (let r = 0; r < BOARD_ROWS; r++) {
+    for (let c = 0; c < BOARD_COLS; c++) {
+      if (!grid[r][c] || grid[r][c].hp <= 0) continue;
+      const cx = BOARD_X + c * CELL + CELL / 2;
+      const cy = BOARD_Y + r * CELL + CELL / 2;
+      if (dir.dx !== 0) {
+        if (Math.abs(cy - tpos.y) < CELL * 0.8) {
+          if ((dir.dx > 0 && cx > tpos.x) || (dir.dx < 0 && cx < tpos.x)) {
+            const d = Math.abs(cx - tpos.x);
+            if (d < bestDist) { bestDist = d; best = { r, c }; }
+          }
+        }
+      } else if (dir.dy !== 0) {
+        if (Math.abs(cx - tpos.x) < CELL * 0.8) {
+          if ((dir.dy > 0 && cy > tpos.y) || (dir.dy < 0 && cy < tpos.y)) {
+            const d = Math.abs(cy - tpos.y);
+            if (d < bestDist) { bestDist = d; best = { r, c }; }
+          }
+        }
+      }
+    }
+  }
+  return best;
+}
+
+function findNearestTroop(cx, cy) {
+  let best = null, bestD = Infinity;
+  for (const t of conveyorTroops) {
+    if (t.dead || t.enterAnim) continue;
+    const p = posOnConveyor(t.dist);
+    // Bottom segments (0 and 4) are safe zone — turrets can't target troops there
+    if (p.seg === 0 || p.seg === 4) continue;
+    const d = Math.hypot(p.x - cx, p.y - cy);
+    if (d < bestD) { bestD = d; best = t; }
+  }
+  return best;
+}
+
+function getFireRateMult(r, c) {
+  for (let dr = -1; dr <= 1; dr++)
+    for (let dc = -1; dc <= 1; dc++) {
+      if (dr === 0 && dc === 0) continue;
+      const nr = r+dr, nc = c+dc;
+      if (nr >= 0 && nr < BOARD_ROWS && nc >= 0 && nc < BOARD_COLS)
+        if (grid[nr][nc] && grid[nr][nc].type === S.WATCHTOWER && grid[nr][nc].hp > 0)
+          return 0.75;
+    }
+  return 1;
+}
+
+// ========== UPDATE ==========
+function update(dt) {
+  if (state === 'intro') {
+    introTimer -= dt;
+    if (introTimer <= 0) state = 'playing';
+    return;
+  }
+  if (state !== 'playing') return;
+  convOffset = (convOffset + CONV_SPEED * dt) % 20;
+
+  // Jump animations
+  for (const j of jumpAnims) {
+    j.progress += dt / j.duration;
+    if (j.progress >= 1) {
+      j.done = true;
+      if (j.targetType === 'bench_merge') {
+        // Merge into existing bench troop
+        if (bench[j.benchIdx]) {
+          performBenchMerge(j.benchIdx);
+        }
+      } else if (j.targetType === 'bench_new') {
+        // Mark the reserved bench slot as arrived
+        const slot = bench.find(b => b.arriving && b.color === j.color && b.level === j.level);
+        if (slot) slot.arriving = false;
+      } else if (j.targetType === 'conveyor') {
+        // Spawn on conveyor
+        const def = TROOP_DEFS[j.level - 1];
+        conveyorTroops.push({
+          color: j.color,
+          level: j.level,
+          hp: def.hp,
+          maxHp: def.hp,
+          ammo: def.ammo,
+          dmg: def.dmg,
+          fireRate: def.fireRate,
+          fireCooldown: 0,
+          dist: 0,
+          dead: false,
+          loopCount: 0,
+          enterAnim: null,
+        });
+      }
+    }
+  }
+  jumpAnims = jumpAnims.filter(j => !j.done);
+
+  // Troop movement & enter animation
+  for (const t of conveyorTroops) {
+    if (t.dead) continue;
+    if (t.enterAnim) {
+      t.enterAnim.progress += dt / t.enterAnim.duration;
+      if (t.enterAnim.progress >= 1) {
+        t.enterAnim = null;
+      }
+      continue; // don't move on conveyor during enter anim
+    }
+    const prevDist = t.dist;
+    t.dist += CONV_SPEED * dt;
+    t.fireCooldown = Math.max(0, t.fireCooldown - dt);
+
+    // Track loops
+    if (Math.floor(t.dist / CONV_TOTAL) > Math.floor(prevDist / CONV_TOTAL)) {
+      t.loopCount++;
+    }
+  }
+
+  // Troop shooting
+  for (const t of conveyorTroops) {
+    if (t.dead || t.ammo <= 0 || t.fireCooldown > 0 || t.enterAnim) continue;
+    const pos = posOnConveyor(t.dist);
+    const dir = shootDir(pos);
+    const target = findTarget(pos, dir);
+    if (target) {
+      t.fireCooldown = t.fireRate;
+      t.ammo--;
+      const tx = BOARD_X + target.c * CELL + CELL / 2;
+      const ty = BOARD_Y + target.r * CELL + CELL / 2;
+      const def = TROOP_DEFS[t.level - 1];
+      projectiles.push({
+        x: pos.x, y: pos.y, tx, ty, tr: target.r, tc: target.c,
+        dmg: t.dmg, speed: 420, color: def.projColor, fromTroop: true,
+        size: 2 + t.level
+      });
+    }
+  }
+
+  // Turret shooting
+  for (let r = 0; r < BOARD_ROWS; r++) {
+    for (let c = 0; c < BOARD_COLS; c++) {
+      const cell = grid[r][c];
+      if (!cell || cell.hp <= 0) continue;
+      const info = SINFO[cell.type];
+      if (!info.isTurret) continue;
+      cell.fireCooldown = Math.max(0, cell.fireCooldown - dt);
+      if (cell.fireCooldown <= 0 && conveyorTroops.some(t => !t.dead && !t.enterAnim)) {
+        const cx = BOARD_X + c * CELL + CELL / 2;
+        const cy = BOARD_Y + r * CELL + CELL / 2;
+        const target = findNearestTroop(cx, cy);
+        if (target) {
+          cell.fireCooldown = info.fireRate * getFireRateMult(r, c);
+          const tp = posOnConveyor(target.dist);
+          projectiles.push({
+            x: cx, y: cy, tx: tp.x, ty: tp.y, targetTroop: target,
+            dmg: info.dmg, speed: 270, color: '#FF1744', fromTroop: false, size: 3
+          });
+        }
+      }
+    }
+  }
+
+  // Armory healing
+  for (let r = 0; r < BOARD_ROWS; r++) {
+    for (let c = 0; c < BOARD_COLS; c++) {
+      const cell = grid[r][c];
+      if (!cell || cell.type !== S.ARMORY || cell.hp <= 0) continue;
+      cell.fireCooldown += dt;
+      if (cell.fireCooldown >= 3.0) {
+        cell.fireCooldown -= 3.0;
+        for (let dr = -1; dr <= 1; dr++)
+          for (let dc = -1; dc <= 1; dc++) {
+            if (dr === 0 && dc === 0) continue;
+            const nr = r+dr, nc = c+dc;
+            if (nr >= 0 && nr < BOARD_ROWS && nc >= 0 && nc < BOARD_COLS) {
+              const adj = grid[nr][nc];
+              if (adj && [S.WOOD_WALL,S.STONE_WALL,S.STEEL_WALL].includes(adj.type) && adj.hp > 0 && adj.hp < adj.maxHp) {
+                adj.hp = Math.min(adj.hp + 1, adj.maxHp);
+                particles.push({ x: BOARD_X+nc*CELL+CELL/2, y: BOARD_Y+nr*CELL+CELL/2,
+                  vx:0, vy:-15, life:0.5, maxLife:0.5, color:'#81D4FA', size:4 });
+              }
+            }
+          }
+      }
+    }
+  }
+
+  // Projectiles
+  for (const p of projectiles) {
+    const dx = p.tx - p.x, dy = p.ty - p.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist < p.speed * dt) {
+      p.dead = true;
+      if (p.fromTroop) {
+        const cell = grid[p.tr]?.[p.tc];
+        if (cell && cell.hp > 0) {
+          cell.hp -= p.dmg;
+          damageNums.push({ x: p.tx, y: p.ty - 10, text: `-${p.dmg}`, life: 0.6, maxLife: 0.6, color: '#FFD54F' });
+          if (cell.hp <= 0) {
+            cell.hp = 0;
+            for (let i = 0; i < 10; i++) {
+              const a = Math.random() * Math.PI * 2;
+              particles.push({ x: p.tx, y: p.ty, vx: Math.cos(a)*80, vy: Math.sin(a)*80,
+                life: 0.7, maxLife: 0.7, color: SINFO[cell.type].color, size: 4 });
+            }
+          }
+        }
+      } else if (p.targetTroop && !p.targetTroop.dead) {
+        p.targetTroop.hp -= p.dmg;
+        const tp = posOnConveyor(p.targetTroop.dist);
+        damageNums.push({ x: tp.x, y: tp.y - 15, text: `-${p.dmg}`, life: 0.6, maxLife: 0.6, color: '#FF5252' });
+      }
+    } else {
+      const m = p.speed * dt / dist;
+      p.x += dx * m;
+      p.y += dy * m;
+    }
+  }
+  projectiles = projectiles.filter(p => !p.dead);
+
+  // Remove dead / out-of-ammo troops
+  conveyorTroops = conveyorTroops.filter(t => {
+    if (t.dead) return false;
+    if (t.hp <= 0) {
+      const pos = posOnConveyor(t.dist);
+      for (let i = 0; i < 8; i++) {
+        const a = Math.random() * Math.PI * 2;
+        particles.push({ x: pos.x, y: pos.y, vx: Math.cos(a)*50, vy: Math.sin(a)*50,
+          life: 0.5, maxLife: 0.5, color: TROOP_COLORS[t.color].fill, size: 3 });
+      }
+      return false;
+    }
+    if (t.ammo <= 0 && !t.enterAnim) return false;
+    return true;
+  });
+
+  // Particles
+  for (const p of particles) { p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt; }
+  particles = particles.filter(p => p.life > 0);
+  for (const d of damageNums) { d.y -= 30 * dt; d.life -= dt; }
+  damageNums = damageNums.filter(d => d.life > 0);
+
+  // Win check
+  let allDead = true;
+  for (let r = 0; r < BOARD_ROWS; r++)
+    for (let c = 0; c < BOARD_COLS; c++)
+      if (grid[r][c] && grid[r][c].hp > 0) { allDead = false; break; }
+
+  if (allDead) { state = 'levelClear'; return; }
+
+  // Fail check
+  const troopsLeft = corridors.reduce((s, l) => s + l.length, 0);
+  const benchReady = bench.filter(b => !b.arriving).length;
+  if (conveyorTroops.length === 0 && troopsLeft === 0 && benchReady === 0 && jumpAnims.length === 0) {
+    state = 'levelFail';
+  }
+}
+
+// ========== DRAW ==========
+function drawConveyor() {
+  // Track
+  ctx.strokeStyle = '#2a2a3e';
+  ctx.lineWidth = CONV_W;
+  ctx.lineCap = 'square'; ctx.lineJoin = 'miter';
+  ctx.beginPath();
+  ctx.moveTo(CONV_PATH[0].x, CONV_PATH[0].y);
+  for (let i = 1; i < CONV_PATH.length; i++) ctx.lineTo(CONV_PATH[i].x, CONV_PATH[i].y);
+  ctx.stroke();
+
+  ctx.strokeStyle = '#353550';
+  ctx.lineWidth = CONV_W - 4;
+  ctx.beginPath();
+  ctx.moveTo(CONV_PATH[0].x, CONV_PATH[0].y);
+  for (let i = 1; i < CONV_PATH.length; i++) ctx.lineTo(CONV_PATH[i].x, CONV_PATH[i].y);
+  ctx.stroke();
+
+  // Animated dots
+  ctx.fillStyle = '#4a4a6a';
+  const spacing = 20;
+  const marks = Math.floor(CONV_TOTAL / spacing);
+  for (let i = 0; i < marks; i++) {
+    const d = (i * spacing + convOffset) % CONV_TOTAL;
+    const p = posOnConveyor(d);
+    ctx.beginPath(); ctx.arc(p.x, p.y, 2, 0, Math.PI * 2); ctx.fill();
+  }
+
+  // Entry indicator
+  const ep = posOnConveyor(0);
+  ctx.fillStyle = '#4CAF50';
+  ctx.font = '9px Arial'; ctx.textAlign = 'center';
+  ctx.fillText('▲ ENTRY', ep.x, ep.y + 16);
+}
+
+function drawBoard() {
+  ctx.fillStyle = '#1e1e32';
+  ctx.fillRect(BOARD_X, BOARD_Y, BOARD_PX_W, BOARD_PX_H);
+
+  ctx.strokeStyle = '#2a2a40';
+  ctx.lineWidth = 0.5;
+  for (let r = 0; r <= BOARD_ROWS; r++) {
+    ctx.beginPath();
+    ctx.moveTo(BOARD_X, BOARD_Y + r * CELL);
+    ctx.lineTo(BOARD_X + BOARD_PX_W, BOARD_Y + r * CELL);
+    ctx.stroke();
+  }
+  for (let c = 0; c <= BOARD_COLS; c++) {
+    ctx.beginPath();
+    ctx.moveTo(BOARD_X + c * CELL, BOARD_Y);
+    ctx.lineTo(BOARD_X + c * CELL, BOARD_Y + BOARD_PX_H);
+    ctx.stroke();
+  }
+
+  for (let r = 0; r < BOARD_ROWS; r++) {
+    for (let c = 0; c < BOARD_COLS; c++) {
+      const cell = grid[r][c];
+      if (!cell || cell.hp <= 0) continue;
+      const info = SINFO[cell.type];
+      const x = BOARD_X + c * CELL, y = BOARD_Y + r * CELL;
+      const p = 2;
+      ctx.fillStyle = info.color;
+      ctx.fillRect(x+p, y+p, CELL-p*2, CELL-p*2);
+      ctx.strokeStyle = info.border;
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(x+p, y+p, CELL-p*2, CELL-p*2);
+
+      const cx = x + CELL/2, cy = y + CELL/2;
+      ctx.fillStyle = '#fff';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+
+      if (info.isBase) {
+        ctx.font = '14px Arial'; ctx.fillText('🏰', cx, cy);
+      } else if (info.isTurret) {
+        const tier = info.turretTier || 1;
+        if (tier === 1) {
+          // Wood turret: brown base, single barrel
+          ctx.fillStyle = '#5D4037';
+          ctx.beginPath(); ctx.arc(cx, cy, 9, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = '#3E2723';
+          ctx.beginPath(); ctx.arc(cx, cy, 5, 0, Math.PI * 2); ctx.fill();
+          ctx.strokeStyle = '#8D6E63'; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+          ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx, cy - 11); ctx.stroke();
+          ctx.fillStyle = '#FFAB91';
+          ctx.beginPath(); ctx.arc(cx, cy - 11, 2, 0, Math.PI * 2); ctx.fill();
+        } else if (tier === 2) {
+          // Stone turret: grey fortified, double barrel, orange muzzle
+          ctx.fillStyle = '#455A64';
+          ctx.beginPath(); ctx.arc(cx, cy, 10, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = '#263238';
+          ctx.beginPath(); ctx.arc(cx, cy, 6, 0, Math.PI * 2); ctx.fill();
+          ctx.strokeStyle = '#90A4AE'; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+          ctx.beginPath(); ctx.moveTo(cx - 3, cy); ctx.lineTo(cx - 3, cy - 12); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(cx + 3, cy); ctx.lineTo(cx + 3, cy - 12); ctx.stroke();
+          ctx.fillStyle = '#FF6D00';
+          ctx.beginPath(); ctx.arc(cx - 3, cy - 12, 2.5, 0, Math.PI * 2); ctx.fill();
+          ctx.beginPath(); ctx.arc(cx + 3, cy - 12, 2.5, 0, Math.PI * 2); ctx.fill();
+          // Pulse ring
+          ctx.strokeStyle = 'rgba(255,109,0,0.3)'; ctx.lineWidth = 1.5;
+          ctx.beginPath(); ctx.arc(cx, cy, 13, 0, Math.PI * 2); ctx.stroke();
+        } else {
+          // Steel turret: red aggressive, triple barrel star, danger glow
+          // Danger glow ring
+          ctx.strokeStyle = 'rgba(255,0,0,0.4)'; ctx.lineWidth = 2;
+          ctx.beginPath(); ctx.arc(cx, cy, 15, 0, Math.PI * 2); ctx.stroke();
+          ctx.strokeStyle = 'rgba(255,0,0,0.2)'; ctx.lineWidth = 1;
+          ctx.beginPath(); ctx.arc(cx, cy, 18, 0, Math.PI * 2); ctx.stroke();
+          // Base
+          ctx.fillStyle = '#B71C1C';
+          ctx.beginPath(); ctx.arc(cx, cy, 11, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = '#7F0000';
+          ctx.beginPath(); ctx.arc(cx, cy, 7, 0, Math.PI * 2); ctx.fill();
+          // Triple barrel star
+          ctx.strokeStyle = '#E57373'; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+          for (let b = 0; b < 3; b++) {
+            const ba = (b * Math.PI * 2 / 3) - Math.PI / 2;
+            ctx.beginPath();
+            ctx.moveTo(cx, cy);
+            ctx.lineTo(cx + Math.cos(ba) * 13, cy + Math.sin(ba) * 13);
+            ctx.stroke();
+            ctx.fillStyle = '#FF1744';
+            ctx.beginPath();
+            ctx.arc(cx + Math.cos(ba) * 13, cy + Math.sin(ba) * 13, 2.5, 0, Math.PI * 2);
+            ctx.fill();
+          }
+          // Center dot
+          ctx.fillStyle = '#FF1744';
+          ctx.beginPath(); ctx.arc(cx, cy, 3, 0, Math.PI * 2); ctx.fill();
+        }
+      } else if (cell.type === S.WATCHTOWER) {
+        ctx.font = '12px Arial'; ctx.fillText('👁', cx, cy);
+      } else if (cell.type === S.ARMORY) {
+        ctx.font = '12px Arial'; ctx.fillText('🔧', cx, cy);
+      } else if (cell.type === S.SUPPLY_TENT) {
+        ctx.font = '12px Arial'; ctx.fillText('⛺', cx, cy);
+      } else if (cell.type === S.BARRICADE) {
+        ctx.strokeStyle = info.border; ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(x+5, y+CELL-5); ctx.lineTo(cx, y+5); ctx.lineTo(x+CELL-5, y+CELL-5);
+        ctx.closePath(); ctx.stroke();
+      }
+
+      // HP bar
+      if (cell.hp < cell.maxHp) {
+        const bw = CELL - 6, bh = 3, bx = x + 3, by = y;
+        ctx.fillStyle = '#222'; ctx.fillRect(bx, by, bw, bh);
+        const ratio = cell.hp / cell.maxHp;
+        ctx.fillStyle = ratio > 0.5 ? '#4CAF50' : ratio > 0.25 ? '#FF9800' : '#F44336';
+        ctx.fillRect(bx, by, bw * ratio, bh);
+      }
+    }
+  }
+}
+
+function drawStickman(x, y, color, level, size, highlight) {
+  const col = TROOP_COLORS[color];
+  const headR = size * 0.35;
+
+  // Glow for highlighted
+  if (highlight) {
+    ctx.shadowColor = col.light;
+    ctx.shadowBlur = 12;
+  }
+
+  ctx.strokeStyle = col.fill;
+  ctx.fillStyle = col.fill;
+  ctx.lineWidth = Math.max(1.5, size * 0.15);
+  ctx.lineCap = 'round';
+
+  // Head
+  ctx.beginPath();
+  ctx.arc(x, y - size, headR, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Body
+  ctx.beginPath();
+  ctx.moveTo(x, y - size + headR);
+  ctx.lineTo(x, y + size * 0.15);
+  ctx.stroke();
+
+  // Arms
+  const armY = y - size * 0.35;
+  ctx.beginPath();
+  ctx.moveTo(x - size * 0.5, armY);
+  ctx.lineTo(x + size * 0.5, armY);
+  ctx.stroke();
+
+  // Weapon indicator based on level
+  if (level >= 4) {
+    // Mech / Titan - shoulder pads
+    ctx.fillStyle = col.dark;
+    ctx.fillRect(x - size * 0.6, armY - 3, 5, 6);
+    ctx.fillRect(x + size * 0.6 - 5, armY - 3, 5, 6);
+  }
+  if (level >= 3) {
+    // Bomber+ - backpack
+    ctx.fillStyle = col.dark;
+    ctx.fillRect(x - 4, y - size * 0.6, 8, 8);
+  }
+  if (level >= 5) {
+    // Titan - helmet lines
+    ctx.strokeStyle = col.light;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x - headR, y - size - 2);
+    ctx.lineTo(x, y - size - headR - 4);
+    ctx.lineTo(x + headR, y - size - 2);
+    ctx.stroke();
+  }
+
+  // Legs
+  ctx.strokeStyle = col.fill;
+  ctx.lineWidth = Math.max(1.5, size * 0.15);
+  ctx.beginPath();
+  ctx.moveTo(x, y + size * 0.15);
+  ctx.lineTo(x - size * 0.35, y + size * 0.6);
+  ctx.moveTo(x, y + size * 0.15);
+  ctx.lineTo(x + size * 0.35, y + size * 0.6);
+  ctx.stroke();
+
+  ctx.shadowBlur = 0;
+
+  // Level badge
+  ctx.fillStyle = '#fff';
+  ctx.font = `bold ${Math.max(8, size * 0.6)}px Arial`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(level, x, y - size);
+}
+
+function drawConveyorTroops() {
+  for (const t of conveyorTroops) {
+    if (t.dead) continue;
+    const def = TROOP_DEFS[t.level - 1];
+    let dx, dy;
+
+    if (t.enterAnim) {
+      const p = Math.min(t.enterAnim.progress, 1);
+      const ep = posOnConveyor(0);
+      // Ease out
+      const ease = 1 - (1 - p) * (1 - p);
+      dx = t.enterAnim.fromX + (ep.x - t.enterAnim.fromX) * ease;
+      dy = t.enterAnim.fromY + (ep.y - t.enterAnim.fromY) * ease;
+    } else {
+      const pos = posOnConveyor(t.dist);
+      dx = pos.x; dy = pos.y;
+    }
+
+    drawStickman(dx, dy, t.color, t.level, def.size, false);
+
+    // HP bar
+    const barW = 18, barY2 = dy + def.size * 0.7;
+    ctx.fillStyle = '#222'; ctx.fillRect(dx - barW/2, barY2, barW, 3);
+    const hpR = t.hp / t.maxHp;
+    ctx.fillStyle = hpR > 0.5 ? '#4CAF50' : '#F44336';
+    ctx.fillRect(dx - barW/2, barY2, barW * hpR, 3);
+
+    // Ammo
+    ctx.fillStyle = '#FFD54F'; ctx.font = '7px Arial'; ctx.textAlign = 'center';
+    ctx.fillText(t.ammo, dx, barY2 + 10);
+  }
+}
+
+function drawJumpAnims() {
+  for (const j of jumpAnims) {
+    if (j.done) continue;
+    const def = TROOP_DEFS[j.level - 1];
+    const tx = j.toX, ty = j.toY;
+
+    const p = Math.min(j.progress, 1);
+    const ease = p;
+    const x = j.fromX + (tx - j.fromX) * ease;
+    const linearY = j.fromY + (ty - j.fromY) * ease;
+    const arcHeight = -60 * Math.sin(p * Math.PI);
+    const y = linearY + arcHeight;
+
+    drawStickman(x, y, j.color, j.level, def.size, false);
+
+    // Trail particles
+    if (Math.random() < 0.5) {
+      particles.push({ x, y: y + 5, vx: (Math.random()-0.5)*20, vy: 10,
+        life: 0.3, maxLife: 0.3, color: TROOP_COLORS[j.color].light, size: 3 });
+    }
+  }
+}
+
+function drawBench() {
+  const slots = getBenchLayout();
+  // Background
+  const pad = 10;
+  ctx.fillStyle = '#1a1a38';
+  ctx.beginPath();
+  ctx.roundRect(slots[0].x - pad, BENCH_Y - pad,
+    slots[slots.length-1].x + slots[slots.length-1].w - slots[0].x + pad*2,
+    BENCH_H + pad*2, 8);
+  ctx.fill();
+
+  // Label
+  ctx.fillStyle = '#666';
+  ctx.font = 'bold 10px Arial';
+  ctx.textAlign = 'center';
+  ctx.fillText('MERGE BENCH — TAP TO DEPLOY', MAX_W / 2, BENCH_Y - 2);
+
+  for (let i = 0; i < BENCH_CAPACITY; i++) {
+    const s = slots[i];
+    // Slot background
+    ctx.fillStyle = i < bench.length ? '#252545' : '#16162e';
+    ctx.strokeStyle = i < bench.length ? '#4a4a7a' : '#2a2a50';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.roundRect(s.x, s.y, s.w, s.h, 6); ctx.fill();
+    ctx.beginPath(); ctx.roundRect(s.x, s.y, s.w, s.h, 6); ctx.stroke();
+
+    if (i < bench.length) {
+      const b = bench[i];
+      if (b.arriving) continue; // still flying in
+      const def = TROOP_DEFS[b.level - 1];
+      const cx = s.x + s.w / 2;
+      const cy = s.y + s.h / 2;
+      drawStickman(cx, cy, b.color, b.level, Math.min(def.size, 14), true);
+
+      // Level name below
+      ctx.fillStyle = '#aaa';
+      ctx.font = '8px Arial'; ctx.textAlign = 'center';
+      ctx.fillText(def.name, cx, s.y + s.h - 3);
+    } else {
+      // Empty slot indicator
+      ctx.fillStyle = '#333';
+      ctx.font = '18px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('+', s.x + s.w/2, s.y + s.h/2);
+      ctx.textBaseline = 'alphabetic';
+    }
+  }
+}
+
+function drawCorridors() {
+  const layout = getCorridorLayout();
+  if (layout.length === 0) return;
+
+  // Background
+  ctx.fillStyle = '#13132a';
+  ctx.beginPath();
+  ctx.roundRect(layout[0].x - 10, CORRIDOR_TOP - 10,
+    layout[layout.length-1].x + layout[layout.length-1].w - layout[0].x + 20,
+    CORRIDOR_BOT - CORRIDOR_TOP + 15, 10);
+  ctx.fill();
+
+  // Label
+  ctx.fillStyle = '#666';
+  ctx.font = 'bold 10px Arial';
+  ctx.textAlign = 'center';
+  ctx.fillText('TAP FRONT TROOP → BENCH', MAX_W / 2, CORRIDOR_TOP - 1);
+
+  for (let i = 0; i < corridors.length; i++) {
+    const lane = corridors[i];
+    const { x, y, w, slotH } = layout[i];
+
+    // Lane background
+    ctx.fillStyle = '#1a1a35';
+    ctx.beginPath();
+    ctx.roundRect(x, y, w, CORRIDOR_BOT - y - 5, 6);
+    ctx.fill();
+    ctx.strokeStyle = '#2a2a50';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.roundRect(x, y, w, CORRIDOR_BOT - y - 5, 6);
+    ctx.stroke();
+
+    // Stickmen in lane
+    const maxVisible = Math.floor((CORRIDOR_BOT - y - 20) / slotH);
+    for (let j = 0; j < Math.min(lane.length, maxVisible); j++) {
+      const stk = lane[j];
+      const def = TROOP_DEFS[stk.l - 1];
+      const sx = x + w / 2;
+      const sy = y + 25 + j * slotH;
+      const isFirst = j === 0;
+      const drawSize = Math.min(def.size, 13);
+
+      drawStickman(sx, sy, stk.c, stk.l, drawSize, isFirst);
+
+      // Highlight ring for first
+      if (isFirst) {
+        ctx.strokeStyle = TROOP_COLORS[stk.c].light;
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([3, 3]);
+        ctx.beginPath();
+        ctx.arc(sx, sy - 2, 18, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    }
+
+    // Count if more than visible
+    if (lane.length > maxVisible) {
+      ctx.fillStyle = '#888';
+      ctx.font = '9px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText(`+${lane.length - maxVisible} more`, x + w/2, CORRIDOR_BOT - 8);
+    }
+  }
+}
+
+function drawProjectiles() {
+  for (const p of projectiles) {
+    ctx.fillStyle = p.color;
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 0.3;
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.size + 2, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+}
+
+function drawParticles() {
+  for (const p of particles) {
+    ctx.globalAlpha = Math.max(0, p.life / p.maxLife);
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size * (p.life / p.maxLife), 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawDamageNums() {
+  for (const d of damageNums) {
+    ctx.globalAlpha = Math.max(0, d.life / d.maxLife);
+    ctx.fillStyle = d.color;
+    ctx.font = 'bold 11px Arial'; ctx.textAlign = 'center';
+    ctx.fillText(d.text, d.x, d.y);
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawHUD() {
+  ctx.fillStyle = '#12122a';
+  ctx.fillRect(0, 0, MAX_W, 48);
+  const lvl = LEVELS[currentLevel];
+  ctx.fillStyle = '#eee';
+  ctx.font = 'bold 14px Arial'; ctx.textAlign = 'left';
+  ctx.fillText(`Lv ${currentLevel + 1}: ${lvl.name}`, 12, 20);
+  ctx.font = '10px Arial'; ctx.fillStyle = '#888';
+  ctx.fillText(lvl.difficulty, 12, 36);
+
+  ctx.textAlign = 'right';
+  const onField = activeTroopCount();
+  ctx.fillStyle = onField >= CONV_CAPACITY ? '#F44336' : '#4CAF50';
+  ctx.font = 'bold 11px Arial';
+  ctx.fillText(`Conv: ${onField}/${CONV_CAPACITY}  Bench: ${bench.length}/${BENCH_CAPACITY}`, MAX_W - 12, 20);
+  let rem = 0;
+  for (let r = 0; r < BOARD_ROWS; r++)
+    for (let c = 0; c < BOARD_COLS; c++)
+      if (grid[r][c] && grid[r][c].hp > 0) rem++;
+  ctx.fillStyle = '#FF9800';
+  ctx.fillText(`Targets: ${rem}`, MAX_W - 12, 36);
+}
+
+function drawOverlay(title, sub, btn) {
+  ctx.fillStyle = 'rgba(0,0,0,0.75)';
+  ctx.fillRect(0, 0, MAX_W, MAX_H);
+  ctx.fillStyle = '#fff'; ctx.font = 'bold 30px Arial'; ctx.textAlign = 'center';
+  ctx.fillText(title, MAX_W/2, MAX_H/2 - 60);
+  ctx.font = '15px Arial'; ctx.fillStyle = '#aaa';
+  ctx.fillText(sub, MAX_W/2, MAX_H/2 - 25);
+  const bx = MAX_W/2 - 75, by = MAX_H/2 + 10, bw = 150, bh = 46;
+  ctx.fillStyle = '#4CAF50';
+  ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, 10); ctx.fill();
+  ctx.fillStyle = '#fff'; ctx.font = 'bold 17px Arial';
+  ctx.fillText(btn, MAX_W/2, by + 28);
+  return { x: bx, y: by, w: bw, h: bh };
+}
+
+let overlayBtn = null;
+
+function getStars() {
+  const ratio = troopsUsed / Math.max(totalTroopsStart, 1);
+  if (ratio <= 0.4) return 3;
+  if (ratio <= 0.7) return 2;
+  return 1;
+}
+
+function draw() {
+  ctx.clearRect(0, 0, MAX_W, MAX_H);
+  ctx.fillStyle = '#0f0f1a'; ctx.fillRect(0, 0, MAX_W, MAX_H);
+
+  if (state === 'menu') {
+    ctx.fillStyle = '#fff'; ctx.font = 'bold 38px Arial'; ctx.textAlign = 'center';
+    ctx.fillText('SIEGE RUSH', MAX_W/2, MAX_H/2 - 90);
+    ctx.font = '15px Arial'; ctx.fillStyle = '#888';
+    ctx.fillText('Deploy. Merge. Destroy.', MAX_W/2, MAX_H/2 - 55);
+    const bx = MAX_W/2-75, by = MAX_H/2-15, bw = 150, bh = 50;
+    ctx.fillStyle = '#4CAF50';
+    ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, 10); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.font = 'bold 20px Arial';
+    ctx.fillText('PLAY', MAX_W/2, by + 32);
+    overlayBtn = { x: bx, y: by, w: bw, h: bh };
+    return;
+  }
+
+  drawConveyor();
+  drawBoard();
+  drawConveyorTroops();
+  drawJumpAnims();
+  drawProjectiles();
+  drawParticles();
+  drawDamageNums();
+  drawBench();
+  drawCorridors();
+  drawHUD();
+
+  if (state === 'intro') {
+    ctx.fillStyle = 'rgba(0,0,0,0.55)';
+    ctx.fillRect(0, 0, MAX_W, MAX_H);
+    ctx.fillStyle = '#fff'; ctx.font = 'bold 24px Arial'; ctx.textAlign = 'center';
+    ctx.fillText(LEVELS[currentLevel].name, MAX_W/2, MAX_H/2 - 20);
+    ctx.font = '13px Arial'; ctx.fillStyle = '#aaa';
+    ctx.fillText('Destroy all structures!', MAX_W/2, MAX_H/2 + 8);
+    ctx.fillText('Tap to start', MAX_W/2, MAX_H/2 + 30);
+    overlayBtn = null;
+  } else if (state === 'levelClear') {
+    const stars = getStars();
+    overlayBtn = drawOverlay('LEVEL CLEAR!',
+      '★'.repeat(stars) + '☆'.repeat(3-stars) + `  (${troopsUsed} troops)`,
+      currentLevel < LEVELS.length-1 ? 'NEXT LEVEL' : 'PLAY AGAIN');
+  } else if (state === 'levelFail') {
+    overlayBtn = drawOverlay('LEVEL FAILED', 'No troops remaining!', 'RETRY');
+  } else {
+    overlayBtn = null;
+  }
+}
+
+// ========== INPUT ==========
+function clickPos(e) {
+  const rect = canvas.getBoundingClientRect();
+  const cx = e.touches ? e.touches[0].clientX : e.clientX;
+  const cy = e.touches ? e.touches[0].clientY : e.clientY;
+  return { x: (cx - rect.left) / scale, y: (cy - rect.top) / scale };
+}
+
+function inRect(p, r) {
+  return p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y && p.y <= r.y + r.h;
+}
+
+function handleClick(e) {
+  e.preventDefault();
+  const pos = clickPos(e);
+
+  if (state === 'menu' && overlayBtn && inRect(pos, overlayBtn)) {
+    currentLevel = 0; initLevel(0); return;
+  }
+  if (state === 'intro') { state = 'playing'; return; }
+  if (state === 'levelClear' && overlayBtn && inRect(pos, overlayBtn)) {
+    if (currentLevel < LEVELS.length - 1) { currentLevel++; initLevel(currentLevel); }
+    else { currentLevel = 0; state = 'menu'; }
+    return;
+  }
+  if (state === 'levelFail' && overlayBtn && inRect(pos, overlayBtn)) {
+    initLevel(currentLevel); return;
+  }
+
+  if (state === 'playing') {
+    // Check bench taps — deploy bench troop to conveyor
+    const benchSlots = getBenchLayout();
+    for (let i = 0; i < bench.length; i++) {
+      const s = benchSlots[i];
+      if (pos.x >= s.x && pos.x <= s.x + s.w && pos.y >= s.y && pos.y <= s.y + s.h) {
+        deployFromBench(i);
+        return;
+      }
+    }
+
+    // Check corridor taps — send front troop to bench
+    const layout = getCorridorLayout();
+    for (let i = 0; i < corridors.length; i++) {
+      const lane = corridors[i];
+      if (lane.length === 0) continue;
+      const { x, y, w, slotH } = layout[i];
+      const hitX = x;
+      const hitY = y + 5;
+      const hitW = w;
+      const hitH = slotH;
+      if (pos.x >= hitX && pos.x <= hitX + hitW && pos.y >= hitY && pos.y <= hitY + hitH) {
+        deployToBench(i);
+        return;
+      }
+    }
+  }
+}
+
+canvas.addEventListener('click', handleClick);
+canvas.addEventListener('touchstart', handleClick, { passive: false });
+
+// ========== LOOP ==========
+let lastTime = performance.now();
+function loop(now) {
+  const dt = Math.min((now - lastTime) / 1000, 0.05);
+  lastTime = now;
+  update(dt);
+  draw();
+  requestAnimationFrame(loop);
+}
+state = 'menu';
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
