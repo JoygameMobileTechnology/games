@@ -267,7 +267,7 @@ function drainBank(g, rnd) {
 const IDLE_STEP_MS = 4 * 3600 * 1000;
 
 function idleGrowth(g, elapsedMs) {
-  const steps = Math.min(2, Math.floor(elapsedMs / IDLE_STEP_MS));
+  const steps = Math.max(0, Math.min(2, Math.floor(elapsedMs / IDLE_STEP_MS)));
   let grown = 0;
   if (steps > 0) for (const k in g.plots) {
     const p = g.plots[k];
@@ -277,9 +277,25 @@ function idleGrowth(g, elapsedMs) {
   return { steps, grown };
 }
 
+const STATE_KEY = 'bahce-2048-v1';
+
+function defaultState() {
+  return { board: null, score: 0, best: 0, garden: newGarden(), lastSeen: 0, muted: false, runEmissions: 0 };
+}
+function serialize(st) { return JSON.stringify(st); }
+function deserialize(json) {
+  try {
+    const o = JSON.parse(json);
+    if (!o || typeof o !== 'object' || Array.isArray(o) || !o.garden) return defaultState();
+    const st = Object.assign(defaultState(), o);
+    st.garden = Object.assign(newGarden(), o.garden);
+    return st;
+  } catch { return defaultState(); }
+}
+
 const CORE = { SIZE, emptyBoard, slideRow, move, spawn, canMove, emissionFor,
                ZONES, SLOT_FOR, MAX_ANIMALS, MAX_STAGE, newGarden, zoneComplete, activeZone, applyResource,
-               idleGrowth, IDLE_STEP_MS };
+               idleGrowth, IDLE_STEP_MS, STATE_KEY, defaultState, serialize, deserialize };
 /* CORE-END */
 window.CORE = CORE;
 </script>

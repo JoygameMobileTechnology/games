@@ -201,6 +201,24 @@ test('koruma invariantı: hiçbir kaynak kaybolmaz, tüm bölgeler açılır', (
   assert.equal(planted + animals + variants + stillBanked <= 200, true);
   assert.equal(planted + animals + variants >= 200 - stillBanked - banked, true);
 });
+test('deserialize: bozuk/boş girdi -> temiz varsayılan', () => {
+  for (const bad of [null, '', '{}', 'çöp{', '[1,2]']) {
+    const st = C.deserialize(bad);
+    assert.equal(st.score, 0);
+    assert.equal(st.garden.unlocked, 1);
+    assert.equal(st.muted, false);
+  }
+});
+test('serialize/deserialize roundtrip', () => {
+  const st = C.defaultState();
+  st.score = 120; st.best = 500; st.muted = true;
+  C.applyResource(st.garden, 'tohum_tozu', makeRnd(0));
+  const back = C.deserialize(C.serialize(st));
+  assert.equal(back.score, 120);
+  assert.equal(back.best, 500);
+  assert.equal(back.muted, true);
+  assert.equal(Object.keys(back.garden.plots).length, 1);
+});
 
 let fail = 0;
 for (const [name, fn] of tests) {
