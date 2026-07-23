@@ -17,7 +17,7 @@ const test = (name, fn) => tests.push([name, fn]);
 // Deterministik rnd: verilen değerleri sırayla döndürür, sonra son değeri tekrarlar
 const makeRnd = (...vals) => { let i = 0; return () => vals[Math.min(i++, vals.length - 1)]; };
 
-// === Testler buraya eklenecek (Task 2+) ===
+// === Testler ===
 
 test('slideRow: basit birleşme', () => {
   const r = C.slideRow([2, 2, 0, 0]);
@@ -218,6 +218,22 @@ test('serialize/deserialize roundtrip', () => {
   assert.equal(back.best, 500);
   assert.equal(back.muted, true);
   assert.equal(Object.keys(back.garden.plots).length, 1);
+});
+test('cicek_ozu: bankadayken çiçek ekilince otomatik kullanılır', () => {
+  const g = C.newGarden();
+  C.applyResource(g, 'cicek_ozu', makeRnd(0));            // banka: 1
+  assert.equal(g.bank.cicek_ozu, 1);
+  const evs = C.applyResource(g, 'tohum_tozu', makeRnd(0)); // çiçek ekilir
+  assert.equal(g.bank.cicek_ozu, 0);
+  assert.ok(evs.some(e => e.kind === 'variant'), 'ekim sonrası banka özü varyanta dönüşmeli');
+});
+test('deserialize: bozuk bahçe içi alanlar temizlenir', () => {
+  const bad = JSON.stringify({ garden: { unlocked: 99, plots: 'x', variants: null, animals: 'y', bank: null } });
+  const st = C.deserialize(bad);
+  assert.equal(typeof st.garden.plots, 'object');
+  assert.equal(typeof st.garden.bank, 'object');
+  assert.ok(Array.isArray(st.garden.animals));
+  assert.ok(st.garden.unlocked >= 1 && st.garden.unlocked <= C.ZONES.length);
 });
 
 let fail = 0;

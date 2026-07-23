@@ -240,6 +240,14 @@ function applyResource(g, type, rnd) {
       events.push({ kind: 'unlock', zone: g.unlocked - 1 });
       events.push(...drainBank(g, rnd));
     }
+    if (ZONES[z].slots[idx].type === 'cicek') {
+      while ((g.bank.cicek_ozu || 0) > 0) {
+        g.bank.cicek_ozu--;
+        const evs = applyResource(g, 'cicek_ozu', rnd);
+        if (evs.some(e => e.kind === 'bank')) break;
+        events.push(...evs);
+      }
+    }
     return events;
   }
   if (type === 'meyve' && g.animals[z] < MAX_ANIMALS) {
@@ -291,6 +299,12 @@ function deserialize(json) {
     if (st.board && !(Array.isArray(st.board) && st.board.length === SIZE &&
         st.board.every(r => Array.isArray(r) && r.length === SIZE && r.every(v => Number.isInteger(v) && v >= 0)))) st.board = null;
     st.garden = Object.assign(newGarden(), o.garden);
+    const g = st.garden, fresh = newGarden();
+    if (!g.plots || typeof g.plots !== 'object' || Array.isArray(g.plots)) g.plots = fresh.plots;
+    if (!g.variants || typeof g.variants !== 'object' || Array.isArray(g.variants)) g.variants = fresh.variants;
+    if (!g.bank || typeof g.bank !== 'object' || Array.isArray(g.bank)) g.bank = fresh.bank;
+    if (!Array.isArray(g.animals) || !g.animals.every(n => Number.isInteger(n) && n >= 0)) g.animals = fresh.animals;
+    if (!Number.isInteger(g.unlocked) || g.unlocked < 1 || g.unlocked > ZONES.length) g.unlocked = 1;
     return st;
   } catch { return defaultState(); }
 }
@@ -613,6 +627,7 @@ addEventListener('keydown', () => audioCtx(), { once: true });
 
 // --- Açılış ---
 if (!state.board) startRun(); else renderBoard();
+if (state.board && !C.canMove(state.board)) showGameOver();
 renderGarden();
 scrollToZone(C.activeZone(state.garden), false);
 checkIdle();
