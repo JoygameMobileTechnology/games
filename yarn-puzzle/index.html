@@ -1,0 +1,1069 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Yarn Puzzle</title>
+<style>
+:root {
+  --bg: #f6e8d6;
+  --bg-dark: #e8d5b8;
+  --wood: #8b6f47;
+  --wood-dark: #5a4530;
+  --text: #4a3520;
+  --accent: #c14545;
+  --warning: #d97f3a;
+  --danger: #c14545;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Georgia', serif;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+}
+#app {
+  position: relative;
+  width: 420px;
+  height: 780px;
+  background: var(--bg);
+  border-radius: 24px;
+  box-shadow: 0 8px 32px rgba(74, 53, 32, 0.2);
+  overflow: hidden;
+}
+#hud {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 18px;
+  background: var(--bg-dark);
+  border-radius: 24px 24px 0 0;
+  z-index: 10;
+}
+.hud-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: bold;
+}
+.hud-pill {
+  background: var(--bg);
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 2px solid var(--wood);
+  min-width: 46px;
+  text-align: center;
+  transition: all 0.2s;
+}
+.hud-pill.warning { background: var(--warning); color: white; border-color: var(--warning); }
+.hud-pill.danger { background: var(--danger); color: white; border-color: var(--danger); animation: pulse 0.6s infinite; }
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.08); }
+}
+.btn {
+  background: var(--wood);
+  color: var(--bg);
+  border: none;
+  padding: 7px 14px;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.btn:hover { background: var(--wood-dark); transform: translateY(-1px); }
+.btn:active { transform: translateY(1px); }
+.btn.primary {
+  background: var(--accent);
+  font-size: 17px;
+  padding: 11px 28px;
+}
+.btn.primary:hover { background: #a03838; }
+#game {
+  position: absolute;
+  top: 60px;
+  left: 0;
+  width: 420px;
+  height: 720px;
+  display: block;
+  background: #e8d5b8;
+}
+.overlay {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  background: rgba(74, 53, 32, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  border-radius: 24px;
+  backdrop-filter: blur(4px);
+}
+.overlay.hidden { display: none; }
+.modal {
+  background: var(--bg);
+  padding: 30px 32px;
+  border-radius: 16px;
+  text-align: center;
+  box-shadow: 0 16px 48px rgba(0,0,0,0.3);
+  border: 3px solid var(--wood);
+  max-width: 340px;
+  width: 86%;
+}
+.modal h1 { font-size: 38px; margin-bottom: 8px; color: var(--text); letter-spacing: 2px; }
+.modal h2 { font-size: 24px; margin-bottom: 14px; color: var(--text); }
+.modal p { margin-bottom: 18px; font-size: 14px; color: #6b513b; line-height: 1.5; }
+.subtitle { font-size: 16px; margin-bottom: 26px; color: #6b513b; font-style: italic; }
+.btn-group { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+.tutorial-bar {
+  position: absolute;
+  top: 70px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(74, 53, 32, 0.92);
+  color: var(--bg);
+  padding: 9px 16px;
+  border-radius: 999px;
+  font-size: 12px;
+  z-index: 50;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  max-width: 380px;
+  width: 90%;
+  text-align: center;
+  animation: fadeIn 0.4s;
+}
+.tutorial-bar.hidden { display: none; }
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(-10px); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="hud">
+    <div class="hud-item">
+      <span>Level</span>
+      <span class="hud-pill" id="levelLabel">1</span>
+    </div>
+    <div class="hud-item">
+      <span>Belt</span>
+      <span class="hud-pill" id="beltCounter">0/8</span>
+    </div>
+    <div class="hud-item">
+      <button class="btn" id="menuBtn">Menu</button>
+    </div>
+  </div>
+  <canvas id="game" width="420" height="720"></canvas>
+  <div class="tutorial-bar hidden" id="tutorialBar"></div>
+  <div class="overlay" id="menu">
+    <div class="modal">
+      <h1>Yarn Puzzle</h1>
+      <p class="subtitle">Untangle the knot, fill the spools</p>
+      <div class="btn-group">
+        <button class="btn primary" id="playBtn">Play</button>
+      </div>
+      <p style="margin-top: 22px; font-size: 12px;">Tap a yarn to pull it out.<br>It travels clockwise on the conveyor to its matching spool.<br>Keep the belt clear &mdash; it only holds 8.</p>
+    </div>
+  </div>
+  <div class="overlay hidden" id="endModal">
+    <div class="modal">
+      <h2 id="endTitle">Level Complete!</h2>
+      <p id="endMessage"></p>
+      <div class="btn-group">
+        <button class="btn" id="endRetryBtn">Try Again</button>
+        <button class="btn primary" id="endNextBtn">Next Level</button>
+        <button class="btn" id="endMenuBtn">Menu</button>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+// ===== CONFIG =====
+const CANVAS_W = 420;
+const CANVAS_H = 720;
+const BELT_W = 60;
+const GRID_COLS = 5;
+const GRID_ROWS = 10;
+const CELL_SIZE = 60;
+const GRID_ORIGIN_X = BELT_W;
+const GRID_ORIGIN_Y = BELT_W;
+const GRID_END_X = CANVAS_W - BELT_W;
+const GRID_END_Y = CANVAS_H - BELT_W;
+const BELT_CENTER_LO = BELT_W / 2;
+const BELT_CENTER_HI_X = CANVAS_W - BELT_W / 2;
+const BELT_CENTER_HI_Y = CANVAS_H - BELT_W / 2;
+const BELT_SEG_W = BELT_CENTER_HI_X - BELT_CENTER_LO;  // top/bottom centerline length
+const BELT_SEG_H = BELT_CENTER_HI_Y - BELT_CENTER_LO;  // left/right centerline length
+const BELT_LENGTH = 2 * (BELT_SEG_W + BELT_SEG_H);
+const BELT_SPEED = 190;
+const BELT_CAPACITY = 8;
+const YARN_THICKNESS = 12;
+const EXIT_DURATION = 0.5;
+const ABSORB_DURATION = 0.45;
+
+const COLOR_KEYS = ['red', 'blue', 'green', 'yellow', 'purple', 'orange'];
+const COLORS = {
+  red:    { stroke: '#c95252', dark: '#7a2a2a', light: '#e88282' },
+  blue:   { stroke: '#3f7dbf', dark: '#22497a', light: '#7aa9d6' },
+  green:  { stroke: '#5fa05f', dark: '#326032', light: '#88c188' },
+  yellow: { stroke: '#d49d35', dark: '#8b631c', light: '#e8be62' },
+  purple: { stroke: '#9560a8', dark: '#5d3a6a', light: '#b685c4' },
+  orange: { stroke: '#d47b35', dark: '#8b4a1b', light: '#e8a05c' },
+};
+const TUTORIALS = {
+  1: 'Tap a yarn to pull it out. It travels clockwise on the belt to its matching spool.',
+  2: 'Some yarns block others. The top yarn must be pulled first.',
+  3: 'The belt moves clockwise. Pick the exit that drops the yarn near its spool.',
+  4: 'The belt has only 8 slots — keep absorptions flowing!',
+};
+
+// ===== STATE =====
+let canvas, ctx;
+let yarnTempCanvas = null, yarnTempCtx = null;
+let scene = 'menu';
+let level = 1;
+let yarns = [];
+let spools = [];
+let beltYarns = [];
+let beltAnimOffset = 0;
+let lastTime = 0;
+let tutorialActive = false;
+let burstAnimations = [];
+let mouseHover = null;
+let endTriggered = false;
+
+// ===== GEOMETRY =====
+function cellCenter(row, col) {
+  return {
+    x: GRID_ORIGIN_X + (col + 0.5) * CELL_SIZE,
+    y: GRID_ORIGIN_Y + (row + 0.5) * CELL_SIZE
+  };
+}
+function cellExitPoint(row, col, side) {
+  const c = cellCenter(row, col);
+  switch (side) {
+    case 'N': return { x: c.x, y: BELT_CENTER_LO };
+    case 'S': return { x: c.x, y: BELT_CENTER_HI_Y };
+    case 'W': return { x: BELT_CENTER_LO, y: c.y };
+    case 'E': return { x: BELT_CENTER_HI_X, y: c.y };
+  }
+}
+function exitToBeltPos(row, col, side) {
+  const c = cellCenter(row, col);
+  switch (side) {
+    case 'N': return c.x - BELT_CENTER_LO;                                   // top: 0..BELT_SEG_W
+    case 'E': return BELT_SEG_W + (c.y - BELT_CENTER_LO);                    // right
+    case 'S': return BELT_SEG_W + BELT_SEG_H + (BELT_CENTER_HI_X - c.x);     // bottom (reverses)
+    case 'W': return 2 * BELT_SEG_W + BELT_SEG_H + (BELT_CENTER_HI_Y - c.y); // left (reverses)
+  }
+}
+function beltPosToXY(p) {
+  p = ((p % BELT_LENGTH) + BELT_LENGTH) % BELT_LENGTH;
+  if (p < BELT_SEG_W) return { x: BELT_CENTER_LO + p, y: BELT_CENTER_LO };
+  if (p < BELT_SEG_W + BELT_SEG_H) return { x: BELT_CENTER_HI_X, y: BELT_CENTER_LO + (p - BELT_SEG_W) };
+  if (p < 2 * BELT_SEG_W + BELT_SEG_H) return { x: BELT_CENTER_HI_X - (p - BELT_SEG_W - BELT_SEG_H), y: BELT_CENTER_HI_Y };
+  return { x: BELT_CENTER_LO, y: BELT_CENTER_HI_Y - (p - 2 * BELT_SEG_W - BELT_SEG_H) };
+}
+function canvasToCell(x, y) {
+  if (x < GRID_ORIGIN_X || x >= GRID_END_X || y < GRID_ORIGIN_Y || y >= GRID_END_Y) return null;
+  return {
+    row: Math.floor((y - GRID_ORIGIN_Y) / CELL_SIZE),
+    col: Math.floor((x - GRID_ORIGIN_X) / CELL_SIZE)
+  };
+}
+function shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+// ===== LEVEL GENERATION =====
+function generateLevel(lvl) {
+  const totalYarns = Math.min(3 + Math.floor((lvl - 1) * 0.8), 12);
+  const numColors = Math.min(2 + Math.floor((lvl - 1) / 3), 5);
+  const pathLenMin = 3;
+  const pathLenMax = Math.min(3 + Math.floor((lvl - 1) / 2), 5);
+  const splitChance = Math.min(Math.max(0, (lvl - 3) * 0.12), 0.6);
+
+  const colorPool = [...COLOR_KEYS];
+  shuffle(colorPool);
+  const colors = colorPool.slice(0, numColors);
+
+  const capByColor = {};
+  for (const c of colors) capByColor[c] = 1;
+  for (let i = colors.length; i < totalYarns; i++) {
+    capByColor[pick(colors)]++;
+  }
+
+  const allSpools = [];
+  for (const c of colors) {
+    const cap = capByColor[c];
+    if (cap >= 2 && Math.random() < splitChance) {
+      const split = 1 + Math.floor(Math.random() * (cap - 1));
+      allSpools.push({ color: c, capacity: split, maxCapacity: split });
+      allSpools.push({ color: c, capacity: cap - split, maxCapacity: cap - split });
+    } else {
+      allSpools.push({ color: c, capacity: cap, maxCapacity: cap });
+    }
+  }
+
+  const numSlots = Math.max(allSpools.length + 4, 12);
+  const slots = [];
+  for (let i = 0; i < numSlots; i++) slots.push((i + 0.5) * (BELT_LENGTH / numSlots));
+  shuffle(slots);
+
+  spools = allSpools.map((s, i) => ({
+    ...s,
+    beltPos: slots[i],
+    pulse: 0,
+    sparkle: 0
+  }));
+
+  yarns = [];
+  let layer = 0;
+  const yarnColorList = [];
+  for (const c of colors) {
+    for (let i = 0; i < capByColor[c]; i++) yarnColorList.push(c);
+  }
+  shuffle(yarnColorList);
+  for (const c of yarnColorList) {
+    yarns.push(generateYarn(c, layer++, pathLenMin, pathLenMax));
+  }
+
+  beltYarns = [];
+  beltAnimOffset = 0;
+  burstAnimations = [];
+  endTriggered = false;
+}
+
+function generateYarn(color, layer, lenMin, lenMax) {
+  const len = lenMin + Math.floor(Math.random() * (lenMax - lenMin + 1));
+  const side = pick(['N','E','S','W']);
+  let headRow, headCol, dr, dc;
+  switch (side) {
+    case 'N': headRow = 0;             headCol = Math.floor(Math.random() * GRID_COLS); dr = 1;  dc = 0;  break;
+    case 'S': headRow = GRID_ROWS - 1; headCol = Math.floor(Math.random() * GRID_COLS); dr = -1; dc = 0;  break;
+    case 'W': headRow = Math.floor(Math.random() * GRID_ROWS); headCol = 0;             dr = 0;  dc = 1;  break;
+    case 'E': headRow = Math.floor(Math.random() * GRID_ROWS); headCol = GRID_COLS - 1; dr = 0;  dc = -1; break;
+  }
+  // Yarn is a straight line: head on perimeter, body extending inward in the perpendicular direction.
+  const path = [];
+  for (let i = 0; i < len; i++) {
+    const r = headRow + dr * i;
+    const c = headCol + dc * i;
+    if (r < 0 || r >= GRID_ROWS || c < 0 || c >= GRID_COLS) break;
+    path.push({ row: r, col: c });
+  }
+  // path is currently [head, next, ..., tail]. Reverse to [tail, ..., head].
+  path.reverse();
+  return {
+    color, path,
+    exitSide: side,
+    headRow, headCol,
+    layer,
+    state: 'tangle',
+    exitProgress: 0,
+    beltSpawned: false,
+    shake: 0
+  };
+}
+
+function isBlocked(yarn) {
+  const cells = new Set(yarn.path.map(c => c.row + ',' + c.col));
+  for (const other of yarns) {
+    if (other === yarn) continue;
+    if (other.state !== 'tangle') continue;
+    if (other.layer <= yarn.layer) continue;
+    for (const c of other.path) {
+      if (cells.has(c.row + ',' + c.col)) return true;
+    }
+  }
+  return false;
+}
+
+function yarnAtCell(row, col) {
+  let best = null;
+  for (const y of yarns) {
+    if (y.state !== 'tangle') continue;
+    if (y.path.some(p => p.row === row && p.col === col)) {
+      if (!best || y.layer > best.layer) best = y;
+    }
+  }
+  return best;
+}
+
+// ===== INPUT =====
+function handleClick(e) {
+  if (scene !== 'playing') return;
+  const rect = canvas.getBoundingClientRect();
+  const x = ((e.clientX - rect.left) / rect.width) * CANVAS_W;
+  const y = ((e.clientY - rect.top) / rect.height) * CANVAS_H;
+  const cell = canvasToCell(x, y);
+  if (!cell) return;
+  const candidate = yarnAtCell(cell.row, cell.col);
+  if (!candidate) return;
+  if (isBlocked(candidate)) {
+    candidate.shake = 0.35;
+    return;
+  }
+  const inFlight = yarns.filter(y => y.state === 'exiting' && !y.beltSpawned).length;
+  const onBelt = beltYarns.filter(b => b.state === 'belt').length;
+  if (onBelt + inFlight >= BELT_CAPACITY) return;
+
+  candidate.state = 'exiting';
+  candidate.exitProgress = 0;
+  if (tutorialActive) setTimeout(hideTutorial, 1800);
+}
+
+function handleMove(e) {
+  if (scene !== 'playing') { mouseHover = null; canvas.style.cursor = 'default'; return; }
+  const rect = canvas.getBoundingClientRect();
+  const x = ((e.clientX - rect.left) / rect.width) * CANVAS_W;
+  const y = ((e.clientY - rect.top) / rect.height) * CANVAS_H;
+  const cell = canvasToCell(x, y);
+  mouseHover = cell ? yarnAtCell(cell.row, cell.col) : null;
+  canvas.style.cursor = mouseHover ? 'pointer' : 'default';
+}
+
+// ===== UPDATE =====
+function update(dt) {
+  if (scene === 'menu') return;
+  beltAnimOffset = (beltAnimOffset + BELT_SPEED * dt) % 30;
+
+  for (const yarn of yarns) {
+    if (yarn.state === 'exiting') {
+      yarn.exitProgress = Math.min(1, yarn.exitProgress + dt / EXIT_DURATION);
+      const ext = getYarnExtendedPath(yarn);
+      const totalLen = ext.cumDists[ext.cumDists.length - 1];
+      const ropeLen = ext.cumDists[ext.cumDists.length - 2];
+      const dTail = yarn.exitProgress * totalLen;
+      const dHead = Math.min(totalLen, dTail + ropeLen);
+      if (!yarn.beltSpawned && dHead >= totalLen) {
+        yarn.beltSpawned = true;
+        const beltPos = exitToBeltPos(yarn.headRow, yarn.headCol, yarn.exitSide);
+        beltYarns.push({
+          color: yarn.color,
+          beltPos,
+          state: 'belt',
+          absorbProgress: 0,
+          spool: null,
+          startPos: 0
+        });
+      }
+      if (yarn.exitProgress >= 1) yarn.state = 'done';
+    }
+    if (yarn.shake > 0) {
+      yarn.shake -= dt;
+      if (yarn.shake < 0) yarn.shake = 0;
+    }
+  }
+
+  for (const by of beltYarns) {
+    if (by.state !== 'belt') continue;
+    const prev = by.beltPos;
+    by.beltPos = (by.beltPos + BELT_SPEED * dt) % BELT_LENGTH;
+    for (const spool of spools) {
+      if (spool.color !== by.color || spool.capacity <= 0) continue;
+      const crossed = prev <= by.beltPos
+        ? (spool.beltPos > prev && spool.beltPos <= by.beltPos)
+        : (spool.beltPos > prev || spool.beltPos <= by.beltPos);
+      if (crossed) {
+        by.state = 'absorbing';
+        by.spool = spool;
+        by.startPos = by.beltPos;
+        by.absorbProgress = 0;
+        spool.capacity--;
+        spool.pulse = 1;
+        if (spool.capacity === 0) {
+          spool.sparkle = 1;
+          burstAnimations.push({ spool, t: 0 });
+        }
+        break;
+      }
+    }
+  }
+  for (let i = beltYarns.length - 1; i >= 0; i--) {
+    const by = beltYarns[i];
+    if (by.state === 'absorbing') {
+      by.absorbProgress = Math.min(1, by.absorbProgress + dt / ABSORB_DURATION);
+      if (by.absorbProgress >= 1) beltYarns.splice(i, 1);
+    }
+  }
+  for (let i = burstAnimations.length - 1; i >= 0; i--) {
+    burstAnimations[i].t += dt;
+    if (burstAnimations[i].t > 0.8) burstAnimations.splice(i, 1);
+  }
+  for (const spool of spools) {
+    if (spool.pulse > 0) spool.pulse = Math.max(0, spool.pulse - dt * 2.5);
+    if (spool.sparkle > 0) spool.sparkle = Math.max(0, spool.sparkle - dt * 1.5);
+  }
+
+  if (scene === 'playing' && !endTriggered) {
+    const noTangle = yarns.every(y => y.state === 'done');
+    const allFilled = spools.every(s => s.capacity === 0);
+    if (noTangle && beltYarns.length === 0 && allFilled) {
+      endTriggered = true;
+      scene = 'won';
+      setTimeout(() => showEndModal(true), 700);
+    } else {
+      const beltMoving = beltYarns.filter(b => b.state === 'belt');
+      if (beltMoving.length >= BELT_CAPACITY) {
+        const anyViable = beltMoving.some(by => spools.some(s => s.color === by.color && s.capacity > 0));
+        if (!anyViable) {
+          endTriggered = true;
+          scene = 'lost';
+          setTimeout(() => showEndModal(false), 500);
+        }
+      }
+    }
+  }
+}
+
+// ===== PATH HELPERS =====
+function getYarnExtendedPath(yarn) {
+  const points = yarn.path.map(c => cellCenter(c.row, c.col));
+  points.push(cellExitPoint(yarn.headRow, yarn.headCol, yarn.exitSide));
+  const cumDists = [0];
+  for (let i = 1; i < points.length; i++) {
+    const dx = points[i].x - points[i-1].x;
+    const dy = points[i].y - points[i-1].y;
+    cumDists.push(cumDists[i-1] + Math.sqrt(dx*dx + dy*dy));
+  }
+  return { points, cumDists };
+}
+function pointAtDist(points, cumDists, d) {
+  if (d <= 0) return { ...points[0] };
+  const total = cumDists[cumDists.length - 1];
+  if (d >= total) return { ...points[points.length - 1] };
+  for (let i = 1; i < cumDists.length; i++) {
+    if (cumDists[i] >= d) {
+      const segLen = cumDists[i] - cumDists[i-1];
+      const t = segLen === 0 ? 0 : (d - cumDists[i-1]) / segLen;
+      return {
+        x: points[i-1].x + (points[i].x - points[i-1].x) * t,
+        y: points[i-1].y + (points[i].y - points[i-1].y) * t
+      };
+    }
+  }
+  return { ...points[points.length - 1] };
+}
+function visibleRopePoints(points, cumDists, dStart, dEnd) {
+  if (dStart >= dEnd) return [];
+  const result = [pointAtDist(points, cumDists, dStart)];
+  for (let i = 0; i < cumDists.length; i++) {
+    if (cumDists[i] > dStart && cumDists[i] < dEnd) result.push(points[i]);
+  }
+  result.push(pointAtDist(points, cumDists, dEnd));
+  return result;
+}
+
+// ===== RENDERING =====
+function render() {
+  ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
+  drawBelt();
+  drawGrid();
+  drawSpools();
+  drawTangleYarns();
+  drawBeltYarns();
+  drawBursts();
+}
+
+function drawBelt() {
+  let beltColor = '#c9b89e';
+  const beltCount = beltYarns.filter(b => b.state === 'belt').length;
+  if (beltCount >= BELT_CAPACITY - 1) beltColor = '#d4a67f';
+  if (beltCount >= BELT_CAPACITY) beltColor = '#d4806b';
+  ctx.fillStyle = beltColor;
+  ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+  // Grid background
+  ctx.fillStyle = '#f0dec3';
+  ctx.fillRect(GRID_ORIGIN_X, GRID_ORIGIN_Y, GRID_COLS * CELL_SIZE, GRID_ROWS * CELL_SIZE);
+  // Belt borders
+  ctx.strokeStyle = '#a08960';
+  ctx.lineWidth = 3;
+  ctx.strokeRect(GRID_ORIGIN_X, GRID_ORIGIN_Y, GRID_COLS * CELL_SIZE, GRID_ROWS * CELL_SIZE);
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = 'rgba(90,69,48,0.5)';
+  ctx.strokeRect(3, 3, CANVAS_W - 6, CANVAS_H - 6);
+  // Chevrons moving clockwise
+  ctx.strokeStyle = 'rgba(90, 69, 48, 0.35)';
+  ctx.lineWidth = 2;
+  for (let p = beltAnimOffset; p < BELT_LENGTH; p += 30) {
+    drawBeltChevron(p);
+  }
+}
+
+function drawBeltChevron(p) {
+  const pos = beltPosToXY(p < 0 ? p + BELT_LENGTH : p);
+  const ahead = beltPosToXY(((p + 10) % BELT_LENGTH + BELT_LENGTH) % BELT_LENGTH);
+  const dx = ahead.x - pos.x;
+  const dy = ahead.y - pos.y;
+  const len = Math.sqrt(dx*dx + dy*dy);
+  if (len < 0.1) return;
+  const ux = dx / len, uy = dy / len;
+  const px = -uy, py = ux;
+  const arm = 6;
+  ctx.beginPath();
+  ctx.moveTo(pos.x + px * arm - ux * arm, pos.y + py * arm - uy * arm);
+  ctx.lineTo(pos.x + ux * arm, pos.y + uy * arm);
+  ctx.lineTo(pos.x - px * arm - ux * arm, pos.y - py * arm - uy * arm);
+  ctx.stroke();
+}
+
+function drawGrid() {
+  ctx.strokeStyle = 'rgba(160, 137, 96, 0.12)';
+  ctx.lineWidth = 1;
+  for (let i = 1; i < GRID_COLS; i++) {
+    ctx.beginPath();
+    ctx.moveTo(GRID_ORIGIN_X + i * CELL_SIZE, GRID_ORIGIN_Y);
+    ctx.lineTo(GRID_ORIGIN_X + i * CELL_SIZE, GRID_END_Y);
+    ctx.stroke();
+  }
+  for (let j = 1; j < GRID_ROWS; j++) {
+    ctx.beginPath();
+    ctx.moveTo(GRID_ORIGIN_X, GRID_ORIGIN_Y + j * CELL_SIZE);
+    ctx.lineTo(GRID_END_X, GRID_ORIGIN_Y + j * CELL_SIZE);
+    ctx.stroke();
+  }
+}
+
+function drawSpools() {
+  for (const spool of spools) drawSpool(spool);
+}
+
+function drawSpool(spool) {
+  const pos = beltPosToXY(spool.beltPos);
+  const scale = 1 + spool.pulse * 0.18;
+  ctx.save();
+  ctx.translate(pos.x, pos.y);
+  ctx.scale(scale, scale);
+  // Wood disc
+  ctx.fillStyle = '#8b6f47';
+  ctx.beginPath();
+  ctx.arc(0, 0, 20, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#5a4530';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  if (spool.capacity > 0) {
+    const ratio = spool.capacity / spool.maxCapacity;
+    const yarnR = 6 + 11 * ratio;
+    ctx.fillStyle = COLORS[spool.color].stroke;
+    ctx.beginPath();
+    ctx.arc(0, 0, yarnR, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = COLORS[spool.color].dark;
+    ctx.lineWidth = 1.4;
+    for (let i = 0; i < 5; i++) {
+      const a1 = i * (Math.PI * 2 / 5) + Math.PI / 7;
+      ctx.beginPath();
+      ctx.arc(0, 0, yarnR * 0.65, a1, a1 + Math.PI * 0.5);
+      ctx.stroke();
+    }
+    ctx.fillStyle = COLORS[spool.color].light;
+    ctx.globalAlpha = 0.45;
+    ctx.beginPath();
+    ctx.arc(-yarnR * 0.35, -yarnR * 0.35, yarnR * 0.22, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  } else {
+    ctx.fillStyle = '#4a3520';
+    ctx.beginPath();
+    ctx.arc(0, 0, 9, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.fillStyle = '#3a2c1f';
+  ctx.beginPath();
+  ctx.arc(0, 0, 3, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+  if (spool.sparkle > 0) {
+    ctx.save();
+    ctx.globalAlpha = spool.sparkle;
+    ctx.translate(pos.x, pos.y);
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(0, 0, 24 + (1 - spool.sparkle) * 10, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+  drawSpoolLabel(spool, pos);
+}
+
+function drawSpoolLabel(spool, pos) {
+  let lx = pos.x, ly = pos.y;
+  const off = 30;
+  const p = spool.beltPos;
+  if (p < BELT_SEG_W) ly += off;
+  else if (p < BELT_SEG_W + BELT_SEG_H) lx -= off;
+  else if (p < 2 * BELT_SEG_W + BELT_SEG_H) ly -= off;
+  else lx += off;
+
+  ctx.save();
+  if (spool.capacity > 0) {
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.arc(lx, ly, 11, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = COLORS[spool.color].stroke;
+    ctx.lineWidth = 2.2;
+    ctx.stroke();
+    ctx.fillStyle = COLORS[spool.color].dark;
+    ctx.font = 'bold 13px Georgia';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(spool.capacity.toString(), lx, ly + 1);
+  } else {
+    ctx.fillStyle = '#88c188';
+    ctx.beginPath();
+    ctx.arc(lx, ly, 11, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#326032';
+    ctx.lineWidth = 2.2;
+    ctx.stroke();
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2.2;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.moveTo(lx - 4, ly);
+    ctx.lineTo(lx - 1, ly + 3);
+    ctx.lineTo(lx + 4, ly - 3);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawTangleYarns() {
+  const drawList = yarns
+    .filter(y => y.state === 'tangle' || y.state === 'exiting')
+    .sort((a, b) => a.layer - b.layer);
+  for (const yarn of drawList) drawTangleYarn(yarn);
+}
+
+function ensureYarnTemp() {
+  if (!yarnTempCanvas) {
+    const dpr = window.devicePixelRatio || 1;
+    yarnTempCanvas = document.createElement('canvas');
+    yarnTempCanvas.width = CANVAS_W * dpr;
+    yarnTempCanvas.height = CANVAS_H * dpr;
+    yarnTempCtx = yarnTempCanvas.getContext('2d');
+    yarnTempCtx.scale(dpr, dpr);
+  }
+}
+
+function drawTangleYarn(yarn) {
+  const { points, cumDists } = getYarnExtendedPath(yarn);
+  const totalLen = cumDists[cumDists.length - 1];
+  const ropeLen = cumDists[cumDists.length - 2];
+  let dTail, dHead;
+  if (yarn.state === 'exiting') {
+    dTail = yarn.exitProgress * totalLen;
+    dHead = Math.min(totalLen, dTail + ropeLen);
+  } else {
+    dTail = 0;
+    dHead = ropeLen;
+  }
+  const visible = visibleRopePoints(points, cumDists, dTail, dHead);
+  if (visible.length < 1) return;
+
+  let sx = 0, sy = 0;
+  if (yarn.shake > 0) {
+    sx = (Math.random() - 0.5) * 5 * (yarn.shake / 0.35);
+    sy = (Math.random() - 0.5) * 5 * (yarn.shake / 0.35);
+  }
+
+  ensureYarnTemp();
+  yarnTempCtx.clearRect(0, 0, CANVAS_W, CANVAS_H);
+  const mainCtx = ctx;
+  ctx = yarnTempCtx;
+  ctx.save();
+  if (sx || sy) ctx.translate(sx, sy);
+  drawYarnRope(visible, yarn.color, 1, mouseHover === yarn && yarn.state === 'tangle');
+  ctx.globalCompositeOperation = 'source-atop';
+  drawYarnArrows(points, cumDists, yarn.color, dTail, dHead, 1);
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.restore();
+  ctx = mainCtx;
+  ctx.drawImage(yarnTempCanvas, 0, 0, CANVAS_W, CANVAS_H);
+}
+
+function buildSmoothPath(points) {
+  ctx.beginPath();
+  if (points.length === 1) {
+    ctx.arc(points[0].x, points[0].y, YARN_THICKNESS / 2, 0, Math.PI * 2);
+    return;
+  }
+  ctx.moveTo(points[0].x, points[0].y);
+  if (points.length === 2) {
+    ctx.lineTo(points[1].x, points[1].y);
+    return;
+  }
+  for (let i = 1; i < points.length - 1; i++) {
+    const midX = (points[i].x + points[i+1].x) / 2;
+    const midY = (points[i].y + points[i+1].y) / 2;
+    ctx.quadraticCurveTo(points[i].x, points[i].y, midX, midY);
+  }
+  ctx.lineTo(points[points.length-1].x, points[points.length-1].y);
+}
+
+function drawYarnRope(points, color, opacity, highlight) {
+  if (points.length < 1) return;
+  ctx.save();
+  ctx.globalAlpha = opacity;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  if (highlight) {
+    buildSmoothPath(points);
+    ctx.strokeStyle = COLORS[color].light;
+    ctx.lineWidth = YARN_THICKNESS + 10;
+    ctx.globalAlpha = 0.35 * opacity;
+    ctx.stroke();
+    ctx.globalAlpha = opacity;
+  }
+  buildSmoothPath(points);
+  ctx.strokeStyle = COLORS[color].dark;
+  ctx.lineWidth = YARN_THICKNESS + 3;
+  ctx.stroke();
+  ctx.strokeStyle = COLORS[color].stroke;
+  ctx.lineWidth = YARN_THICKNESS;
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawYarnArrows(points, cumDists, color, dStart, dEnd, opacity) {
+  if (dEnd - dStart < 8) return;
+  const spacing = 20;
+  const arm = 2.5;
+  ctx.save();
+  ctx.strokeStyle = COLORS[color].light;
+  ctx.lineWidth = 1.9;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.globalAlpha = 0.92 * opacity;
+  const span = dEnd - dStart;
+  const count = Math.max(1, Math.floor(span / spacing));
+  const step = span / count;
+  const start = dStart + step * 0.5;
+  for (let i = 0; i < count; i++) {
+    const d = start + i * step;
+    if (d <= dStart + 2 || d >= dEnd - 2) continue;
+    const p = pointAtDist(points, cumDists, d);
+    const ahead = pointAtDist(points, cumDists, Math.min(d + 1, dEnd));
+    const dx = ahead.x - p.x;
+    const dy = ahead.y - p.y;
+    const len = Math.sqrt(dx*dx + dy*dy);
+    if (len < 0.001) continue;
+    const ux = dx / len, uy = dy / len;
+    const px = -uy, py = ux;
+    ctx.beginPath();
+    ctx.moveTo(p.x + px * arm - ux * arm * 0.9, p.y + py * arm - uy * arm * 0.9);
+    ctx.lineTo(p.x + ux * arm * 1.1, p.y + uy * arm * 1.1);
+    ctx.lineTo(p.x - px * arm - ux * arm * 0.9, p.y - py * arm - uy * arm * 0.9);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawBeltYarns() {
+  for (const by of beltYarns) drawBeltYarn(by);
+}
+
+function drawBeltYarn(by) {
+  let x, y, scale = 1, opacity = 1;
+  if (by.state === 'belt') {
+    const pos = beltPosToXY(by.beltPos);
+    x = pos.x; y = pos.y;
+  } else {
+    const startPos = beltPosToXY(by.startPos);
+    const endPos = beltPosToXY(by.spool.beltPos);
+    const t = by.absorbProgress;
+    const e = 1 - (1 - t) * (1 - t);
+    x = startPos.x + (endPos.x - startPos.x) * e;
+    y = startPos.y + (endPos.y - startPos.y) * e;
+    scale = 1 - t * 0.55;
+    opacity = 1 - t * t * 0.9;
+  }
+  drawYarnBall(x, y, by.color, scale, opacity, by.beltPos || 0);
+}
+
+function drawYarnBall(x, y, color, scale, opacity, rotSeed) {
+  ctx.save();
+  ctx.globalAlpha = opacity;
+  ctx.translate(x, y);
+  ctx.scale(scale, scale);
+  ctx.rotate(rotSeed * 0.02);
+  ctx.fillStyle = COLORS[color].dark;
+  ctx.beginPath();
+  ctx.arc(0, 0, 14, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = COLORS[color].stroke;
+  ctx.beginPath();
+  ctx.arc(0, 0, 11.5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = COLORS[color].dark;
+  ctx.lineWidth = 1.4;
+  for (let i = 0; i < 4; i++) {
+    const a = i * Math.PI / 2 + Math.PI / 8;
+    ctx.beginPath();
+    ctx.arc(0, 0, 8, a, a + Math.PI * 0.55);
+    ctx.stroke();
+  }
+  ctx.fillStyle = COLORS[color].light;
+  ctx.globalAlpha = opacity * 0.5;
+  ctx.beginPath();
+  ctx.arc(-3, -3, 2.5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawBursts() {
+  for (const b of burstAnimations) {
+    const pos = beltPosToXY(b.spool.beltPos);
+    const t = b.t / 0.8;
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, 1 - t);
+    for (let i = 0; i < 8; i++) {
+      const angle = i * Math.PI / 4;
+      const r = 20 + t * 30;
+      const x = pos.x + Math.cos(angle) * r;
+      const y = pos.y + Math.sin(angle) * r;
+      ctx.fillStyle = COLORS[b.spool.color].light;
+      ctx.beginPath();
+      ctx.arc(x, y, 3.5 * (1 - t * 0.7), 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+}
+
+// ===== UI / FLOW =====
+function startGame() {
+  level = 1;
+  scene = 'playing';
+  generateLevel(level);
+  hideMenu();
+  hideEndModal();
+  showTutorialIfNeeded();
+  updateHUD();
+}
+function nextLevel() {
+  level++;
+  scene = 'playing';
+  generateLevel(level);
+  hideEndModal();
+  showTutorialIfNeeded();
+  updateHUD();
+}
+function retryLevel() {
+  scene = 'playing';
+  generateLevel(level);
+  hideEndModal();
+  showTutorialIfNeeded();
+  updateHUD();
+}
+function showMenu() {
+  scene = 'menu';
+  hideEndModal();
+  hideTutorial();
+  document.getElementById('menu').classList.remove('hidden');
+}
+function hideMenu() { document.getElementById('menu').classList.add('hidden'); }
+function showEndModal(won) {
+  const modal = document.getElementById('endModal');
+  const title = document.getElementById('endTitle');
+  const message = document.getElementById('endMessage');
+  const nextBtn = document.getElementById('endNextBtn');
+  if (won) {
+    title.textContent = 'Level ' + level + ' Complete!';
+    message.textContent = 'Every spool filled. Nicely untangled.';
+    nextBtn.style.display = '';
+  } else {
+    title.textContent = 'The belt is stuck.';
+    message.textContent = 'Eight yarns on the belt, none with a spool that can take them. Try a different order.';
+    nextBtn.style.display = 'none';
+  }
+  modal.classList.remove('hidden');
+}
+function hideEndModal() { document.getElementById('endModal').classList.add('hidden'); }
+function showTutorialIfNeeded() {
+  const text = TUTORIALS[level];
+  if (text) {
+    const bar = document.getElementById('tutorialBar');
+    bar.textContent = text;
+    bar.classList.remove('hidden');
+    tutorialActive = true;
+  } else {
+    hideTutorial();
+  }
+}
+function hideTutorial() {
+  document.getElementById('tutorialBar').classList.add('hidden');
+  tutorialActive = false;
+}
+function updateHUD() {
+  document.getElementById('levelLabel').textContent = level;
+  const beltCount = beltYarns.filter(b => b.state === 'belt').length;
+  const counter = document.getElementById('beltCounter');
+  counter.textContent = beltCount + '/' + BELT_CAPACITY;
+  counter.classList.remove('warning', 'danger');
+  if (beltCount >= BELT_CAPACITY) counter.classList.add('danger');
+  else if (beltCount >= BELT_CAPACITY - 2) counter.classList.add('warning');
+}
+
+// ===== LOOP =====
+function loop(t) {
+  const dt = Math.min((t - lastTime) / 1000, 0.05);
+  lastTime = t;
+  update(dt);
+  render();
+  if (scene === 'playing') updateHUD();
+  requestAnimationFrame(loop);
+}
+
+// ===== INIT =====
+function init() {
+  canvas = document.getElementById('game');
+  ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = CANVAS_W * dpr;
+  canvas.height = CANVAS_H * dpr;
+  canvas.style.width = CANVAS_W + 'px';
+  canvas.style.height = CANVAS_H + 'px';
+  ctx.scale(dpr, dpr);
+
+  canvas.addEventListener('click', handleClick);
+  canvas.addEventListener('mousemove', handleMove);
+  canvas.addEventListener('mouseleave', () => { mouseHover = null; canvas.style.cursor = 'default'; });
+
+  document.getElementById('playBtn').addEventListener('click', startGame);
+  document.getElementById('menuBtn').addEventListener('click', showMenu);
+  document.getElementById('endNextBtn').addEventListener('click', nextLevel);
+  document.getElementById('endRetryBtn').addEventListener('click', retryLevel);
+  document.getElementById('endMenuBtn').addEventListener('click', showMenu);
+
+  lastTime = performance.now();
+  requestAnimationFrame(loop);
+}
+init();
+</script>
+</body>
+</html>
