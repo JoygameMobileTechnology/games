@@ -300,7 +300,94 @@ const CORE = { SIZE, emptyBoard, slideRow, move, spawn, canMove, emissionFor,
 window.CORE = CORE;
 </script>
 <script>
-// UI katmanı — sonraki görevlerde doldurulacak
+const C = window.CORE;
+const $ = s => document.querySelector(s);
+
+const ICONS = { 2:'🟤', 4:'🌱', 8:'🌿', 16:'🍃', 32:'🌷', 64:'🌸', 128:'🌺', 256:'🍎',
+                512:'🪷', 1024:'🌳', 2048:'⛲', 4096:'🏰' };
+const iconFor = v => ICONS[v] || '⭐';
+
+let state = C.deserialize(localStorage.getItem(C.STATE_KEY));
+function save() { localStorage.setItem(C.STATE_KEY, C.serialize(state)); }
+
+// --- Tahta render (re-render + pop; kayma animasyonu v1'de yok, juice emisyonda) ---
+const POS = i => (2.5 + i * 24.5) + '%';   // 4 hücre + aralıklar
+function renderBoard(popCells) {
+  const board = $('#board');
+  board.innerHTML = '';
+  for (let y = 0; y < C.SIZE; y++) for (let x = 0; x < C.SIZE; x++) {
+    const cell = document.createElement('div');
+    cell.className = 'cell';
+    cell.style.left = POS(x); cell.style.top = POS(y);
+    board.appendChild(cell);
+    const v = state.board[y][x];
+    if (!v) continue;
+    const t = document.createElement('div');
+    t.className = 'tile' + (popCells && popCells.has(y + ':' + x) ? ' pop' : '');
+    t.dataset.pos = y + ':' + x;
+    t.style.left = POS(x); t.style.top = POS(y);
+    t.style.background = tileBg(v);
+    t.innerHTML = `<div class="ico">${iconFor(v)}</div><div class="num">${v}</div>`;
+    board.appendChild(t);
+  }
+  $('#score').textContent = state.score;
+  $('#best').textContent = state.best;
+}
+function tileBg(v) {
+  const tier = Math.min(10, Math.log2(v) - 1);
+  return `hsl(${95 - tier * 4}, ${35 + tier * 5}%, ${88 - tier * 4}%)`;
+}
+
+// --- Oyun akışı ---
+function startRun() {
+  state.board = C.spawn(C.spawn(C.emptyBoard(), Math.random), Math.random);
+  state.score = 0;
+  state.runEmissions = 0;
+  save();
+  renderBoard();
+}
+
+function handleMove(dir) {
+  if (!state.board) return;
+  const r = C.move(state.board, dir);
+  if (!r.moved) return;
+  state.board = C.spawn(r.board, Math.random);
+  state.score += r.gained;
+  state.best = Math.max(state.best, state.score);
+  const pop = new Set(r.merges.map(m => m.y + ':' + m.x));
+  const emitted = [];
+  for (const em of r.emissions) {
+    state.runEmissions++;
+    emitted.push({ em, events: C.applyResource(state.garden, em.type, Math.random) });
+  }
+  save();
+  renderBoard(pop);
+  onEmissions(emitted);                            // Task 8-9'da doldurulacak
+  if (!C.canMove(state.board)) showGameOver();     // Task 12'de doldurulacak
+}
+function onEmissions(emitted) {}       // placeholder — Task 8/9
+function showGameOver() {}             // placeholder — Task 12
+
+// --- Girdi: ok tuşları + dokunmatik kaydırma ---
+const KEYS = { ArrowLeft:'left', ArrowRight:'right', ArrowUp:'up', ArrowDown:'down' };
+addEventListener('keydown', e => {
+  if (KEYS[e.key]) { e.preventDefault(); handleMove(KEYS[e.key]); }
+});
+let touchStart = null;
+const boardWrap = $('#board-wrap');
+boardWrap.addEventListener('pointerdown', e => { touchStart = [e.clientX, e.clientY]; });
+boardWrap.addEventListener('pointerup', e => {
+  if (!touchStart) return;
+  const dx = e.clientX - touchStart[0], dy = e.clientY - touchStart[1];
+  touchStart = null;
+  if (Math.max(Math.abs(dx), Math.abs(dy)) < 24) return;
+  handleMove(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up'));
+});
+
+$('#new-game').addEventListener('click', startRun);   // yalnız tahta sıfırlanır; bahçe kalıcı
+
+// --- Açılış ---
+if (!state.board) startRun(); else renderBoard();
 </script>
 </body>
 </html>
