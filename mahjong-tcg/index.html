@@ -821,7 +821,6 @@ function startMatch(era){
   });
   Object.assign(match,{
     active:true, era, tiles,
-    activeLayer:LAYERS.length-1, // en üst katmandan başla
     open:[], busy:false, turn:'me',
     me:{pairs:[], pts:0}, ai:{pairs:[], pts:0},
     aiMemory:{}, // tileIndex -> glyph
@@ -859,7 +858,6 @@ function renderBoard(){
     const d=document.createElement('div');
     d.className='tile'; d.dataset.i=i;
     d.style.zIndex=t.layer+1;
-    if(t.layer!==match.activeLayer) d.classList.add('locked');
     d.innerHTML=`<div class="tile-inner">
       <div class="tile-face tile-back"><div class="backmark">${match.era.name.split(' ').map(w=>w[0]).join('')}</div></div>
       <div class="tile-face tile-front" style="--rar:${RAR[t.rar].hex}">${GLYPHS[t.glyph]}<span class="rar-tag">${RAR[t.rar].tag}</span></div>
@@ -868,7 +866,41 @@ function renderBoard(){
     board.appendChild(d);
   });
   positionTiles();
+  updateCoverage();
   updateLayerBadge();
+}
+function tileRect(i){
+  const t=match.tiles[i], o=match.layerOrigin[t.layer];
+  return {
+    x:o.x + t.c*(match.tw+o.gap),
+    y:o.y + t.r*(match.th+o.gap),
+    w:match.tw, h:match.th
+  };
+}
+// bir taş, üzerindeki herhangi bir canlı taş onunla yeterince örtüşüyorsa kapalıdır
+function isCovered(i){
+  const t=match.tiles[i];
+  if(t.done) return false;
+  const a=tileRect(i);
+  const minOverlap=a.w*a.h*0.18;
+  for(let j=0;j<match.tiles.length;j++){
+    const u=match.tiles[j];
+    if(u.done || u.layer<=t.layer) continue;
+    const b=tileRect(j);
+    const ox=Math.max(0, Math.min(a.x+a.w,b.x+b.w)-Math.max(a.x,b.x));
+    const oy=Math.max(0, Math.min(a.y+a.h,b.y+b.h)-Math.max(a.y,b.y));
+    if(ox*oy>minOverlap) return true;
+  }
+  return false;
+}
+function updateCoverage(){
+  match.tiles.forEach((t,i)=>{
+    const el=tileEl(i); if(!el||t.done) return;
+    const covered=isCovered(i);
+    const was=el.classList.contains('locked');
+    el.classList.toggle('locked',covered);
+    if(was && !covered){ el.classList.remove('unlock-anim'); void el.offsetWidth; el.classList.add('unlock-anim'); }
+  });
 }
 function positionTiles(){
   match.tiles.forEach((t,i)=>{
@@ -880,10 +912,10 @@ function positionTiles(){
     el.style.top=(o.y + t.r*(match.th+o.gap))+'px';
   });
 }
-window.addEventListener('resize',()=>{ if(match.active){layoutBoard();positionTiles();} });
+window.addEventListener('resize',()=>{ if(match.active){layoutBoard();positionTiles();updateCoverage();} });
 function updateLayerBadge(){
-  const total=LAYERS.length;
-  document.getElementById('layer-badge').textContent=`Katman ${total-match.activeLayer}/${total}`;
+  const left=match.tiles.filter(t=>!t.done).length;
+  document.getElementById('layer-badge').textContent=`Kalan: ${left} taş`;
 }
 function exitMatch(){
   if(!match.active){ go('home'); return; }
@@ -918,7 +950,7 @@ function playerFlip(i){
   if(!match.active||match.busy||match.turn!=='me') return;
   const t=match.tiles[i], el=tileEl(i);
   if(t.done||match.open.includes(i)) return;
-  if(t.layer!==match.activeLayer){ toast('Önce üst katmanı temizle'); return; }
+  if(isCovered(i)){ toast('Bu taşın üstü kapalı'); return; }
   el.classList.add('flipped');
   match.aiMemory[i]=t.glyph; // rakip de görür
   match.open.push(i);
@@ -939,20 +971,9 @@ function resolveFlips(who){
       match.open=[];
       addPairToStrip(who,ta);
       renderMatchHUD();
-      // aktif katman bitti mi? bir alttakini aç
-      const layerLeft=match.tiles.some(x=>x.layer===match.activeLayer && !x.done);
-      if(!layerLeft && match.activeLayer>0){
-        match.activeLayer--;
-        match.tiles.forEach((x,xi)=>{
-          if(x.layer===match.activeLayer){
-            const el2=tileEl(xi);
-            el2.classList.remove('locked');
-            el2.classList.add('unlock-anim');
-          }
-        });
-        updateLayerBadge();
-        toast('Yeni katman açıldı');
-      }
+      updateLayerBadge();
+      // taşlar kalktı — altındakiler açığa çıkabilir
+      setTimeout(updateCoverage, 500);
       if(checkEnd()) return;
       match.busy=false;
       if(who==='ai') setTimeout(aiTurn, 700); // eşleşme = tekrar oyna
@@ -971,13 +992,13 @@ function resolveFlips(who){
 }
 function aiTurn(){
   if(!match.active||match.turn!=='ai') return;
-  const alive=match.tiles.map((t,i)=>(!t.done && t.layer===match.activeLayer)?i:null).filter(i=>i!==null);
+  const alive=match.tiles.map((t,i)=>(!t.done && !isCovered(i))?i:null).filter(i=>i!==null);
   if(!alive.length) return;
   // bilinen çift var mı? (%40 hatırlar — dengeli zorluk)
   let pick=null;
   const known={};
   for(const [i,g] of Object.entries(match.aiMemory)){
-    if(match.tiles[i].done || match.tiles[i].layer!==match.activeLayer) continue;
+    if(match.tiles[i].done || isCovered(+i)) continue;
     if(Math.random()<0.25){ delete match.aiMemory[i]; continue; } // unutkanlık
     if(known[g]!==undefined && Math.random()<0.4){ pick=[+known[g],+i]; break; }
     known[g]=i;
@@ -988,7 +1009,7 @@ function aiTurn(){
     // ilk taşın eşini biliyor mu?
     let second=null;
     for(const [i,gg] of Object.entries(match.aiMemory)){
-      if(+i!==first && gg===g && !match.tiles[i].done && match.tiles[i].layer===match.activeLayer && Math.random()<0.35){ second=+i; break; }
+      if(+i!==first && gg===g && !match.tiles[i].done && !isCovered(+i) && Math.random()<0.35){ second=+i; break; }
     }
     if(second===null){
       const rest=alive.filter(i=>i!==first);
