@@ -52,6 +52,17 @@ test('move down: sütun birleşmesi', () => {
   assert.equal(r.board[3][1], 8);
   assert.deepEqual(r.merges, [{ value: 8, y: 3, x: 1 }]);
 });
+test('move up: sütun birleşmesi', () => {
+  const b = C.emptyBoard(); b[1][2] = 2; b[3][2] = 2;
+  const r = C.move(b, 'up');
+  assert.equal(r.board[0][2], 4);
+  assert.deepEqual(r.merges, [{ value: 4, y: 0, x: 2 }]);
+});
+test('move: girdi tahtasını değiştirmez', () => {
+  const b = C.emptyBoard(); b[0][0] = 2; b[0][1] = 2;
+  C.move(b, 'left');
+  assert.deepEqual(b[0], [2, 2, 0, 0]);
+});
 test('move: hareket yoksa moved=false', () => {
   const b = C.emptyBoard(); b[0][0] = 2;
   const r = C.move(b, 'left');
