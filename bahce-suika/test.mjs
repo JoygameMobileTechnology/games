@@ -152,6 +152,27 @@ test('idleGrowth: 4 saatte 1 evre, 2 evre tavanı', () => {
   assert.deepEqual(C.idleGrowth(g, 100 * H), { steps: 2, grown: 1 });
 });
 
+test('applyWater: 8 damlada bir büyüme', () => {
+  const g = C.newGarden();
+  C.applyResource(g, 'tohum_tozu', makeRnd(0));   // stage 1 bitki
+  for (let i = 0; i < 7; i++) assert.deepEqual(C.applyWater(g, makeRnd(0)), []);
+  assert.equal(g.water, 7);
+  const evs = C.applyWater(g, makeRnd(0));
+  assert.equal(evs[0].kind, 'grow');
+  assert.equal(g.plots[evs[0].key].stage, 2);
+  assert.equal(g.water, 0);
+});
+test('applyWater: sulanacak bitki yoksa tohuma dönüşür', () => {
+  const g = C.newGarden();
+  let evs = [];
+  for (let i = 0; i < 8; i++) evs = C.applyWater(g, makeRnd(0));
+  assert.ok(evs.some(e => e.kind === 'plant'), 'boş bahçede tohum_tozu ekimine dönüşmeli');
+});
+test('deserialize: bozuk water sıfırlanır', () => {
+  const st = C.deserialize(JSON.stringify({ garden: { water: 99 } }));
+  assert.equal(st.garden.water, 0);
+});
+
 // === Persistence ===
 test('deserialize: bozuk girdi → temiz varsayılan', () => {
   for (const bad of [null, '', '{}', 'çöp{', '[1,2]']) {

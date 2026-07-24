@@ -26,14 +26,20 @@
             gap:3px; color:#fff; text-shadow:0 1px 3px #0008; font-size:26px; }
   .lockmsg b{ font-size:14px; } .lockmsg small{ font-size:10px; opacity:.9; }
   .sun{ position:absolute; top:10px; right:14px; width:30px; height:30px; border-radius:50%; z-index:1;
-        background:radial-gradient(circle at 35% 35%,#fff6c9,#ffd95e 70%); box-shadow:0 0 22px #ffd95e77; }
+        background:radial-gradient(circle at 35% 35%,#fff6c9,#ffd95e 70%);
+        animation:sunpulse 5s ease-in-out infinite alternate; }
+  @keyframes sunpulse{ from{ box-shadow:0 0 20px #ffd95e66; } to{ box-shadow:0 0 36px #ffd95ecc; } }
   .cloud{ position:absolute; width:52px; height:15px; border-radius:10px; background:#ffffffcc; z-index:1;
-          box-shadow:13px -6px 0 -2px #ffffffbb; animation:drift 46s ease-in-out infinite alternate; }
-  @keyframes drift{ to{ transform:translateX(52px); } }
+          box-shadow:13px -6px 0 -2px #ffffffbb; animation:cross linear infinite; }
+  @keyframes cross{ from{ left:-18%; } to{ left:104%; } }
   .hillband{ position:absolute; left:-12%; width:124%; height:46%; border-radius:50%; z-index:1; }
   .pond{ position:absolute; left:50%; top:52%; width:46%; height:19%; transform:translate(-50%,-50%); z-index:1;
          border-radius:50%; background:radial-gradient(ellipse at 45% 40%,#d6f0f6,#8fd0e0 60%,#6db8cc);
-         box-shadow:inset 0 3px 8px #00000022; }
+         box-shadow:inset 0 3px 8px #00000022; overflow:hidden; }
+  .pond::after{ content:''; position:absolute; inset:0; border-radius:50%;
+                background:linear-gradient(100deg,transparent 32%,#ffffff59 46%,transparent 62%);
+                animation:shim 4.5s ease-in-out infinite; }
+  @keyframes shim{ 0%,100%{ transform:translateX(-35%); } 50%{ transform:translateX(35%); } }
   .bgdeco{ position:absolute; transform:translate(-50%,-50%); z-index:1; opacity:.4; filter:saturate(.7); }
   .path{ position:absolute; left:4%; right:4%; bottom:8%; height:25%; border-radius:14px; z-index:2;
          background:linear-gradient(#e6cf9e,#d0b47c); box-shadow:inset 0 3px 6px #00000022, 0 2px 4px #0002; }
@@ -48,13 +54,28 @@
   @keyframes bloom{ 0%{ scale:0; } 70%{ scale:1.35; } 100%{ scale:1; } }
   .sway{ transform-origin:50% 100%; animation:sway 3.6s ease-in-out infinite alternate; }
   @keyframes sway{ from{ rotate:-3deg; } to{ rotate:3deg; } }
-  .animal{ position:absolute; font-size:16px; z-index:2; animation:roam 9s ease-in-out infinite alternate; }
-  @keyframes roam{ from{ transform:translate(0,0); } to{ transform:translate(46px,-14px); } }
+  .animal{ position:absolute; font-size:16px; z-index:2; animation:roam 13s ease-in-out infinite; }
+  @keyframes roam{
+    0%  { transform:translate(0,0) scaleX(1); }
+    25% { transform:translate(34px,-14px) scaleX(1); }
+    50% { transform:translate(66px,4px) scaleX(-1); }
+    75% { transform:translate(26px,-20px) scaleX(-1); }
+    100%{ transform:translate(0,0) scaleX(1); }
+  }
+  .petal{ position:absolute; top:4%; z-index:4; font-size:12px; pointer-events:none;
+          animation:fall 5s ease-in forwards; }
+  @keyframes fall{
+    0%  { translate:0 0; rotate:0deg; opacity:0; }
+    12% { opacity:.85; }
+    100%{ translate:-32px 150px; rotate:130deg; opacity:0; }
+  }
   .zone-head{ position:absolute; top:6px; left:10px; z-index:6; color:#fff; text-shadow:0 1px 3px #0007; }
   .zone-head .zn{ font-weight:800; font-size:12px; letter-spacing:.3px; }
   .zone-head .bar{ display:block; width:104px; height:5px; background:#ffffff4d; border-radius:3px; margin-top:3px; }
   .zone-head .bar i{ display:block; height:100%; background:#ffe082; border-radius:3px; transition:width .4s ease; }
   .zone-head .nx{ font-size:10px; opacity:.92; display:block; margin-top:2px; }
+  #water{ position:absolute; right:8px; top:28px; z-index:5; font-size:11px; font-weight:700;
+          color:#fff; text-shadow:0 1px 2px #0008; }
   #bank{ position:absolute; right:8px; top:46px; display:flex; flex-direction:column; gap:2px; z-index:5;
          font-size:11px; font-weight:700; color:#fff; text-shadow:0 1px 2px #0008; }
   #zone-dots{ position:absolute; bottom:4px; left:50%; transform:translateX(-50%); display:flex; gap:5px; z-index:5; }
@@ -107,6 +128,9 @@
   .arrive{ position:fixed; z-index:51; font-size:13px; font-weight:800; color:#fff; pointer-events:none;
            text-shadow:0 1px 3px #0007; animation:arrive .8s ease-out forwards; }
   @keyframes arrive{ from{ opacity:1; translate:0 0; } to{ opacity:0; translate:0 -20px; } }
+  .wdrop{ position:fixed; z-index:47; font-size:13px; opacity:.9; pointer-events:none;
+          filter:drop-shadow(0 0 4px #81d4fa);
+          transition:left .5s cubic-bezier(.3,-.2,.5,1), top .5s cubic-bezier(.2,.6,.4,1); }
 
   /* Overlay */
   #overlay{ position:fixed; inset:0; background:#0007; display:none; align-items:center; justify-content:center; z-index:100; }
@@ -125,6 +149,7 @@
 <div id="app">
   <div id="garden-wrap">
     <div id="garden"></div>
+    <div id="water"></div>
     <div id="bank"></div>
     <div id="zone-dots"></div>
   </div>
@@ -253,7 +278,7 @@ const ZONES = [
 const SLOT_FOR = { tohum_tozu: 'cicek', meyve: 'cali', nadir_tohum: 'nadir', agac_fidani: 'peyzaj', efsanevi: 'prestij' };
 const MAX_ANIMALS = 3, MAX_STAGE = 3;
 
-function newGarden() { return { unlocked: 1, plots: {}, variants: {}, animals: ZONES.map(() => 0), bank: {} }; }
+function newGarden() { return { unlocked: 1, plots: {}, variants: {}, animals: ZONES.map(() => 0), bank: {}, water: 0 }; }
 
 function zoneComplete(g, z) { return ZONES[z].slots.every((_, i) => g.plots[z + ':' + i]); }
 
@@ -318,6 +343,28 @@ function drainBank(g, rnd) {
   return events;
 }
 
+// Küçük birleşmelerin (kademe 1-3) yukarı akışı: her damla sayaç doldurur,
+// 8 damlada bir rastgele olgunlaşmamış bitki bir evre büyür.
+// Sulanacak bitki yoksa damla tohum_tozu'na dönüşür — kaynak asla boşa gitmez.
+const WATER_PER_GROW = 8;
+function applyWater(g, rnd) {
+  g.water = (g.water || 0) + 1;
+  if (g.water < WATER_PER_GROW) return [];
+  g.water = 0;
+  const candidates = [];
+  for (let z = 0; z < g.unlocked; z++)
+    ZONES[z].slots.forEach((s, i) => {
+      const p = g.plots[z + ':' + i];
+      if (p && p.stage < MAX_STAGE) candidates.push(z + ':' + i);
+    });
+  if (candidates.length) {
+    const key = candidates[Math.floor(rnd() * candidates.length)];
+    g.plots[key].stage++;
+    return [{ kind: 'grow', key }];
+  }
+  return applyResource(g, 'tohum_tozu', rnd);
+}
+
 const IDLE_STEP_MS = 4 * 3600 * 1000;
 
 function idleGrowth(g, elapsedMs) {
@@ -357,12 +404,14 @@ function deserialize(json) {
     if (!g.bank || typeof g.bank !== 'object' || Array.isArray(g.bank)) g.bank = fresh.bank;
     if (!Array.isArray(g.animals) || !g.animals.every(n => Number.isInteger(n) && n >= 0)) g.animals = fresh.animals;
     if (!Number.isInteger(g.unlocked) || g.unlocked < 1 || g.unlocked > ZONES.length) g.unlocked = 1;
+    if (!Number.isInteger(g.water) || g.water < 0 || g.water >= WATER_PER_GROW) g.water = 0;
     return st;
   } catch { return defaultState(); }
 }
 
 const CORE = { W, H, DANGER_Y, TIERS, radius, newWorld, addFruit, stepWorld, overflowing, randTier, EMIT_FOR_TIER,
                ZONES, SLOT_FOR, MAX_ANIMALS, MAX_STAGE, newGarden, zoneComplete, activeZone, applyResource,
+               applyWater, WATER_PER_GROW,
                idleGrowth, IDLE_STEP_MS, STATE_KEY, defaultState, serialize, deserialize };
 /* CORE-END */
 window.CORE = CORE;
@@ -491,6 +540,9 @@ function handleMerges(merges) {
     if (type) {
       state.runEmissions++;
       emitted.push({ em: { type, x: m.x, y: m.y }, events: C.applyResource(state.garden, type, Math.random) });
+    } else if (m.tier >= 1) {
+      // küçük birleşmeler de yukarı akar: su damlası
+      flyWater(m, C.applyWater(state.garden, Math.random));
     }
     playChime2(m.tier);
   }
@@ -598,6 +650,38 @@ function flyParticle(em, events) {
   };
   p.addEventListener('transitionend', finish, { once: true });
   setTimeout(finish, 1000);
+}
+
+// Küçük birleşme damlası: birleşme noktasından su sayacına uçar;
+// sayaç dolduysa (events) bir bitki büyür ya da tohuma dönüşür
+function flyWater(m, events) {
+  const cr = cup.getBoundingClientRect();
+  const sx = cr.left + m.x / C.W * cr.width, sy = cr.top + m.y / C.H * cr.height;
+  const wm = $('#water').getBoundingClientRect();
+  const p = document.createElement('div');
+  p.className = 'wdrop';
+  p.textContent = '💧';
+  p.style.left = sx + 'px'; p.style.top = sy + 'px';
+  document.body.appendChild(p);
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    p.style.left = (wm.left + wm.width / 2) + 'px';
+    p.style.top = (wm.top + wm.height / 2) + 'px';
+  }));
+  let done = false;
+  const fin = () => {
+    if (done) return;
+    done = true;
+    p.remove();
+    if (!events.length) { updateWaterMeter(); return; }
+    const blooms = new Set();
+    for (const e of events) {
+      if (e.kind === 'grow') blooms.add(e.key);
+      if (e.kind === 'plant') blooms.add(e.zone + ':' + e.slot);
+    }
+    renderGarden(blooms);
+  };
+  p.addEventListener('transitionend', fin, { once: true });
+  setTimeout(fin, 650);
 }
 
 // --- Ses ---
@@ -712,9 +796,11 @@ function zoneDecor(el, id) {
   const add = (cls, style) => { const d = document.createElement('div'); d.className = cls; Object.assign(d.style, style); el.appendChild(d); return d; };
   if (id === 'cayir' || id === 'golet') add('sun');
   if (id === 'cayir') {
-    add('cloud', { top: '20px', left: '28%' });
+    add('cloud', { top: '18px', animationDuration: '38s' });
+    add('cloud', { top: '38px', animationDuration: '57s', animationDelay: '-22s', opacity: .7, scale: '.75' });
     add('hillband', { bottom: '14%', background: '#00000010' });
   }
+  if (id === 'golet') add('cloud', { top: '22px', animationDuration: '48s', animationDelay: '-12s', opacity: .8 });
   if (id === 'koru') for (const [x, y] of [[10, 26], [32, 22], [58, 24], [84, 27]]) {
     const d = add('bgdeco', { left: x + '%', top: y + '%', fontSize: '26px' }); d.textContent = '🌲';
   }
@@ -780,6 +866,10 @@ function renderGarden(bloomKeys) {
     .filter(([t, n]) => BANK_ICON[t] && n > 0)
     .map(([t, n]) => `<span>${BANK_ICON[t]}×${n}</span>`).join('');
   $('#zone-dots').innerHTML = C.ZONES.map((_, z) => `<i${z === C.activeZone(state.garden) ? ' class="on"' : ''}></i>`).join('');
+  updateWaterMeter();
+}
+function updateWaterMeter() {
+  $('#water').textContent = '💧 ' + (state.garden.water || 0) + '/' + C.WATER_PER_GROW;
 }
 
 function scrollToZone(z, smooth = true) {
@@ -849,6 +939,21 @@ scrollToZone(C.activeZone(state.garden), false);
 checkIdle();
 touchLastSeen();
 requestAnimationFrame(frame);
+// Bahçeye ambiyans: aktif bölgeye ara ara süzülen taç yaprağı/yaprak
+const PETAL_GLYPH = { cayir: '🌸', koru: '🍃', golet: '🍃', anit: '✨' };
+setInterval(() => {
+  if (document.hidden) return;
+  const z = C.activeZone(state.garden);
+  const zoneEl = $('#garden').children[z];
+  if (!zoneEl || zoneEl.classList.contains('locked')) return;
+  const p = document.createElement('div');
+  p.className = 'petal';
+  p.textContent = PETAL_GLYPH[C.ZONES[z].id];
+  p.style.left = (5 + Math.random() * 88) + '%';
+  p.style.animationDuration = (4 + Math.random() * 3) + 's';
+  zoneEl.appendChild(p);
+  setTimeout(() => p.remove(), 7600);
+}, 2600);
 // rAF çalıştırmayan gömülü görünümler için yedek sürücü
 setTimeout(() => {
   if (!rafSeen) setInterval(() => {
