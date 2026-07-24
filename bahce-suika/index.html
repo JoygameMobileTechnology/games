@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
 <title>Bahçe Suika</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.2/anime.min.js"></script>
 <style>
   :root{ --bg:#faf8ef; --panel:#bbada0; --text:#776e65;
          --font-round: ui-rounded, 'Arial Rounded MT Bold', 'Trebuchet MS', system-ui, sans-serif;
@@ -14,99 +15,49 @@
         display:flex; flex-direction:column; align-items:center; overflow:hidden; touch-action:none; }
   #app{ width:min(100vw,480px); height:100%; display:flex; flex-direction:column; }
 
-  /* Bahçe paneli (bahce-2048 C stili) */
-  #garden{ position:relative; height:100%; display:flex; overflow-x:auto;
-           scroll-snap-type:x mandatory; border-radius:0 0 16px 16px; scrollbar-width:none; }
-  #garden::-webkit-scrollbar{ display:none; }
-  .zone{ position:relative; flex:0 0 100%; height:100%; scroll-snap-align:start; overflow:hidden; }
-  .zone.z-cayir{ background:linear-gradient(#aedcf5 0%,#cfe9c3 40%,#9fcf70 58%,#7fb654 100%); }
-  .zone.z-koru { background:linear-gradient(#9cc4e4 0%,#a8cf94 32%,#6da452 52%,#4e7a37 100%); }
-  .zone.z-golet{ background:linear-gradient(#aedcf5 0%,#cde9d4 36%,#8ecfd8 58%,#5aa8b8 100%); }
-  .zone.z-anit { background:linear-gradient(#f6ddb4 0%,#eac89a 38%,#cfae74 58%,#a08c4a 100%); }
-  .zone.locked{ filter:grayscale(.85) brightness(.8); }
-  .lockmsg{ position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;
-            gap:4px; color:#fff; text-shadow:0 1px 3px #0008; font-size:30px; font-family:var(--font-round); }
-  .lockmsg b{ font-size:17px; } .lockmsg small{ font-size:12px; opacity:.92; font-weight:700; }
-  .sun{ position:absolute; top:24px; left:56%; width:30px; height:30px; border-radius:50%; z-index:1;
+  /* Dünya Ağacı sahnesi */
+  #tree-wrap{ position:relative; height:35%; min-height:195px; border-radius:0 0 18px 18px; overflow:hidden;
+              transition:background 1.2s ease; }
+  #tree-wrap.sky0{ background:linear-gradient(#c7e6f7 0%,#e8f4dc 55%,#bfe0a1 78%,#9cc878 100%); }
+  #tree-wrap.sky1{ background:linear-gradient(#aedcf5 0%,#d8eec9 52%,#a9d485 78%,#87b964 100%); }
+  #tree-wrap.sky2{ background:linear-gradient(#ffdfae 0%,#ffe9c4 40%,#b8d98a 75%,#8fbf68 100%); }
+  #tree-wrap.sky3{ background:linear-gradient(#c4a7e0 0%,#f2c9a8 42%,#a3cf75 75%,#7fb654 100%); }
+  #tree-svg{ position:absolute; inset:0; width:100%; height:100%; }
+  #flash{ position:absolute; inset:0; background:#fff8d8; opacity:0; pointer-events:none; z-index:8; }
+
+  .sun{ position:absolute; top:22px; left:56%; width:32px; height:32px; border-radius:50%; z-index:1;
         background:radial-gradient(circle at 35% 35%,#fff6c9,#ffd95e 70%);
         animation:sunpulse 5s ease-in-out infinite alternate; }
   @keyframes sunpulse{ from{ box-shadow:0 0 20px #ffd95e66; } to{ box-shadow:0 0 36px #ffd95ecc; } }
-  .cloud{ position:absolute; width:52px; height:15px; border-radius:10px; background:#ffffffcc; z-index:1;
-          box-shadow:13px -6px 0 -2px #ffffffbb; animation:cross linear infinite; }
+  .cloud{ position:absolute; width:54px; height:16px; border-radius:10px; background:#ffffffd0; z-index:1;
+          box-shadow:14px -6px 0 -2px #ffffffbb; animation:cross linear infinite; }
   @keyframes cross{ from{ left:-18%; } to{ left:104%; } }
-  .hillband{ position:absolute; left:-12%; width:124%; height:46%; border-radius:50%; z-index:1; }
-  .pond{ position:absolute; left:50%; top:52%; width:46%; height:19%; transform:translate(-50%,-50%); z-index:1;
-         border-radius:50%; background:radial-gradient(ellipse at 45% 40%,#d6f0f6,#8fd0e0 60%,#6db8cc);
-         box-shadow:inset 0 3px 8px #00000022; overflow:hidden; }
-  .pond::after{ content:''; position:absolute; inset:0; border-radius:50%;
-                background:linear-gradient(100deg,transparent 32%,#ffffff59 46%,transparent 62%);
-                animation:shim 4.5s ease-in-out infinite; }
-  @keyframes shim{ 0%,100%{ transform:translateX(-35%); } 50%{ transform:translateX(35%); } }
-  .bgdeco{ position:absolute; transform:translate(-50%,-50%); z-index:1; opacity:.4; filter:saturate(.7); }
-  .path{ position:absolute; left:4%; right:4%; bottom:8%; height:26%; border-radius:14px; z-index:2;
-         background:repeating-linear-gradient(90deg, #0000 0 15px, #00000009 15px 17px),
-                    linear-gradient(#ead3a2,#d0b47c);
-         border-top:3px solid #f7e8c5aa;
-         box-shadow:inset 0 4px 8px #0000001f, 0 3px 5px #00000022; }
-  .z-anit .path{ background:repeating-linear-gradient(90deg, #0000 0 15px, #00000009 15px 17px),
-                 linear-gradient(#f0e8d8,#c9bd9d); }
-  .pslot{ position:absolute; bottom:22%; transform:translateX(-50%); font-size:clamp(18px,5.2vw,25px); line-height:1;
-          filter:drop-shadow(0 2px 2px #0004); z-index:3; }
-  .pslot.empty{ width:17px; height:10px; border-radius:50%; bottom:30%;
-                background:radial-gradient(ellipse at 50% 35%, #8a6444, #6e4c31);
-                box-shadow:inset 0 2px 3px #00000038, 0 1px 2px #ffffff40; }
-  .bgslot{ position:absolute; transform:translate(-50%,-50%); font-size:clamp(25px,7.4vw,36px); line-height:1;
-           filter:drop-shadow(0 3px 3px #0004); z-index:2; }
-  .bgslot.empty{ width:20px; height:12px; border-radius:50%;
-                 background:radial-gradient(ellipse at 50% 35%, #00000033, #0000001a); border:2px dashed #ffffff42; }
-  .slot.bloom{ animation:bloom .5s ease; }
-  @keyframes bloom{ 0%{ scale:0; } 70%{ scale:1.35; } 100%{ scale:1; } }
-  .sway{ transform-origin:50% 100%; animation:sway 3.6s ease-in-out infinite alternate; }
-  @keyframes sway{ from{ rotate:-3deg; } to{ rotate:3deg; } }
-  .animal{ position:absolute; font-size:16px; z-index:2; animation:roam 13s ease-in-out infinite; }
-  @keyframes roam{
-    0%  { transform:translate(0,0) scaleX(1); }
-    25% { transform:translate(34px,-14px) scaleX(1); }
-    50% { transform:translate(66px,4px) scaleX(-1); }
-    75% { transform:translate(26px,-20px) scaleX(-1); }
-    100%{ transform:translate(0,0) scaleX(1); }
-  }
-  .petal{ position:absolute; top:4%; z-index:4; font-size:12px; pointer-events:none;
-          animation:fall 5s ease-in forwards; }
-  @keyframes fall{
-    0%  { translate:0 0; rotate:0deg; opacity:0; }
-    12% { opacity:.85; }
-    100%{ translate:-32px 150px; rotate:130deg; opacity:0; }
-  }
-  .zone-head{ position:absolute; top:8px; left:8px; right:8px; z-index:6; display:flex; align-items:flex-start; gap:6px;
-              font-family:var(--font-round); pointer-events:none; }
-  .zh-chip{ background:var(--chip); border-radius:20px; padding:5px 12px; color:#fff;
-            display:flex; align-items:center; gap:8px; box-shadow:0 2px 6px #00000026; }
-  .zh-chip .zn{ font-weight:800; font-size:15px; letter-spacing:.2px; text-shadow:0 1px 2px #0006; white-space:nowrap; }
-  .zh-chip .bar{ width:64px; height:8px; background:#ffffff3d; border-radius:4px; overflow:hidden; }
-  .zh-chip .bar i{ display:block; height:100%; background:linear-gradient(#ffe993,#ffc94d); border-radius:4px;
-                   transition:width .4s ease; }
-  .zh-chip .cnt{ font-weight:800; font-size:13px; color:#ffe993; }
-  .zh-next{ margin-left:auto; background:var(--chip); border-radius:20px; padding:6px 10px; color:#fff;
-            font-size:11.5px; font-weight:700; white-space:nowrap; box-shadow:0 2px 6px #00000026; }
-  #water{ position:absolute; right:8px; top:44px; z-index:5; font-size:13px; font-weight:800;
-          color:#fff; font-family:var(--font-round); background:var(--chip); border-radius:14px; padding:3px 10px;
-          text-shadow:0 1px 2px #0006; }
-  #bank{ position:absolute; right:8px; top:72px; display:flex; flex-direction:column; gap:3px; z-index:5;
-         font-size:13px; font-weight:800; color:#fff; font-family:var(--font-round); text-shadow:0 1px 2px #0006;
-         align-items:flex-end; }
-  #bank span{ background:var(--chip); border-radius:14px; padding:3px 10px; }
-  #zone-dots{ position:absolute; bottom:5px; left:50%; transform:translateX(-50%); display:flex; gap:7px; z-index:5; }
-  #zone-dots i{ width:8px; height:8px; border-radius:50%; background:#ffffff77; box-shadow:0 1px 2px #0003; }
-  #zone-dots i.on{ background:#fff; }
-  #garden-wrap{ position:relative; height:35%; min-height:190px; }
+  .firefly{ position:absolute; width:4px; height:4px; border-radius:50%; background:#fff8ae; z-index:6;
+            box-shadow:0 0 8px 3px #ffe98288; animation:fly 7s ease-in-out infinite alternate; }
+  @keyframes fly{ 0%{ transform:translate(0,0); opacity:.2; } 30%{ opacity:1; }
+                  60%{ opacity:.35; } 100%{ transform:translate(34px,-26px); opacity:.9; } }
+  .inhab{ position:absolute; z-index:5; line-height:1; filter:drop-shadow(0 2px 2px #0004);
+          transform:translate(-50%,-50%); }
+  .inhab.flutter{ animation:flutter 6s ease-in-out infinite alternate; }
+  @keyframes flutter{ 0%{ translate:0 0; } 40%{ translate:22px -14px; } 100%{ translate:-12px -24px; } }
+
+  .chip{ position:absolute; z-index:9; background:var(--chip); border-radius:20px; padding:5px 12px; color:#fff;
+         font-family:var(--font-round); font-weight:800; box-shadow:0 2px 6px #00000026;
+         display:flex; align-items:center; gap:8px; }
+  #energy-chip{ top:8px; left:8px; font-size:14px; }
+  #energy-chip .bar{ width:70px; height:8px; background:#ffffff3d; border-radius:4px; overflow:hidden; }
+  #energy-chip .bar i{ display:block; height:100%; background:linear-gradient(#d8ffa8,#8bd44a); border-radius:4px;
+                       transition:width .35s ease; }
+  #energy-chip .cnt{ font-size:12px; color:#d8ffa8; }
+  #level-chip{ top:8px; right:8px; font-size:12.5px; }
+  #legend-chip{ top:42px; right:8px; font-size:12px; display:none; }
 
   /* HUD */
   #hud{ display:flex; align-items:center; gap:8px; padding:6px 12px; font-family:var(--font-round); }
   #hud h1{ font-size:17px; margin-right:auto; }
   .score{ background:var(--panel); color:#fff; border-radius:8px; padding:3px 9px; font-size:11px; text-align:center; }
   .score b{ display:block; font-size:15px; }
-  #next-wrap{ display:flex; align-items:center; gap:3px; font-size:10px; }
+  #next-wrap{ display:flex; align-items:center; gap:3px; }
   #next-wrap .nx-fruit{ width:24px; height:24px; border-radius:50%; display:flex; align-items:center; justify-content:center;
                         font-size:13px; box-shadow:inset 0 -2px 3px #0002; }
   #next-wrap .nx-fruit.small{ width:17px; height:17px; font-size:9px; opacity:.7; }
@@ -115,7 +66,7 @@
 
   /* Kap */
   #cup-wrap{ flex:1; display:flex; align-items:flex-start; justify-content:center; padding-top:2px; }
-  #cup{ position:relative; width:min(88vw,350px,46vh); aspect-ratio:100/130; overflow:hidden;
+  #cup{ position:relative; width:min(88vw,350px,44vh); aspect-ratio:100/130; overflow:hidden;
         background:linear-gradient(#f3e6c8,#e5d0a4 70%,#d8bf8e); border:3px solid #b89b6a; border-top:0;
         border-radius:0 0 26px 26px; box-shadow:inset 0 6px 14px #0000001a; }
   #danger{ position:absolute; left:0; right:0; border-top:2px dashed #d9453e88; z-index:3; pointer-events:none; }
@@ -131,29 +82,21 @@
   #held{ position:absolute; z-index:4; border-radius:50%; display:flex; align-items:center; justify-content:center;
          box-shadow:inset 0 -3px 6px #00000022, 0 2px 4px #0003; pointer-events:none; }
 
-  /* Emisyon parçacığı: patlama halkası + kuyruklu ana parçacık + varış rozeti */
-  .particle{ position:fixed; z-index:50; font-size:27px; pointer-events:none;
-             filter:drop-shadow(0 0 9px #ffe082) drop-shadow(0 0 18px #ffd95e77);
-             transition:left .85s cubic-bezier(.3,-.3,.45,1), top .85s cubic-bezier(.2,.65,.35,1);
-             animation:pglow .85s ease-in-out; }
-  @keyframes pglow{ 0%{ scale:.5; } 25%{ scale:1.4; } 100%{ scale:1; } }
-  .ptrail{ position:fixed; z-index:49; font-size:15px; opacity:.65; pointer-events:none;
-           filter:drop-shadow(0 0 6px #ffe082);
-           transition:left .85s cubic-bezier(.3,-.3,.45,1), top .85s cubic-bezier(.2,.65,.35,1), opacity .8s ease; }
+  /* Enerji zerresi + patlama */
+  .mote{ position:fixed; z-index:50; font-size:16px; pointer-events:none;
+         filter:drop-shadow(0 0 7px #d8ffa8);
+         transition:left .7s cubic-bezier(.3,-.3,.45,1), top .7s cubic-bezier(.2,.65,.35,1); }
+  .mote.big{ font-size:26px; filter:drop-shadow(0 0 10px #ffe082) drop-shadow(0 0 20px #ffd95e88); }
   .mergeburst{ position:fixed; z-index:48; width:16px; height:16px; margin:-8px; border-radius:50%;
-               border:3px solid #ffe082; pointer-events:none; animation:burst .45s ease-out forwards; }
+               border:3px solid #d8ffa8; pointer-events:none; animation:burst .45s ease-out forwards; }
   @keyframes burst{ from{ scale:.4; opacity:.95; } to{ scale:3.4; opacity:0; } }
-  .arrive{ position:fixed; z-index:51; font-size:13px; font-weight:800; color:#fff; pointer-events:none;
-           text-shadow:0 1px 3px #0007; animation:arrive .8s ease-out forwards; }
-  @keyframes arrive{ from{ opacity:1; translate:0 0; } to{ opacity:0; translate:0 -20px; } }
-  .wdrop{ position:fixed; z-index:47; font-size:13px; opacity:.9; pointer-events:none;
-          filter:drop-shadow(0 0 4px #81d4fa);
-          transition:left .5s cubic-bezier(.3,-.2,.5,1), top .5s cubic-bezier(.2,.6,.4,1); }
+  .spark{ position:absolute; z-index:7; font-size:14px; pointer-events:none; }
 
   /* Overlay */
   #overlay{ position:fixed; inset:0; background:#0007; display:none; align-items:center; justify-content:center; z-index:100; }
   #overlay.show{ display:flex; }
-  #overlay .box{ background:var(--bg); border-radius:14px; padding:22px; max-width:320px; text-align:center; }
+  #overlay .box{ background:var(--bg); border-radius:14px; padding:22px; max-width:320px; text-align:center;
+                 font-family:var(--font-round); }
   #overlay .box h2{ font-size:18px; margin-bottom:10px; }
   #overlay .box p{ font-size:14px; margin-bottom:14px; }
   #overlay .box button{ border:0; border-radius:8px; background:#8f7a66; color:#fff; font-weight:700;
@@ -165,11 +108,24 @@
 </head>
 <body>
 <div id="app">
-  <div id="garden-wrap">
-    <div id="garden"></div>
-    <div id="water"></div>
-    <div id="bank"></div>
-    <div id="zone-dots"></div>
+  <div id="tree-wrap" class="sky0">
+    <svg id="tree-svg" viewBox="0 0 100 108" preserveAspectRatio="xMidYMax meet">
+      <defs>
+        <linearGradient id="barkgrad" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stop-color="#7d5a3c"/><stop offset=".55" stop-color="#9c7550"/><stop offset="1" stop-color="#6e4c31"/>
+        </linearGradient>
+        <radialGradient id="leafgrad" cx=".4" cy=".35" r=".8">
+          <stop offset="0" stop-color="#a5d97e"/><stop offset="1" stop-color="#5f9e43"/>
+        </radialGradient>
+      </defs>
+      <ellipse cx="50" cy="106" rx="70" ry="9" fill="#00000014"/>
+      <ellipse cx="50" cy="104" rx="46" ry="6" fill="#7aa855"/>
+      <g id="tree-g"></g>
+    </svg>
+    <div id="flash"></div>
+    <span class="chip" id="energy-chip">🌱<span class="bar"><i id="energy-bar"></i></span><span class="cnt" id="energy-cnt"></span></span>
+    <span class="chip" id="level-chip"></span>
+    <span class="chip" id="legend-chip"></span>
   </div>
   <div id="hud">
     <h1>Bahçe Suika</h1>
@@ -184,9 +140,9 @@
 <div id="overlay"><div class="box"><h2 id="ov-title"></h2><p id="ov-text"></p><button id="ov-btn">Devam</button></div></div>
 <script>
 /* CORE-START */
-// --- Fizik dünyası ---
-const W = 100, H = 130;            // dünya birimleri
-const DANGER_Y = 20;               // tehlike çizgisi
+// --- Fizik dünyası (değişmedi) ---
+const W = 100, H = 130;
+const DANGER_Y = 20;
 const TIERS = 11;
 const GRAV = 320, DAMP = 0.35, FRICTION = 0.985, REST = 0.2;
 const radius = t => 4.5 + t * 2.2;
@@ -203,8 +159,6 @@ function addFruit(w, tier, x, y) {
   return f;
 }
 
-// Sabit dt ile bir fizik adımı; rastgelelik yok (deterministik testler için).
-// Aynı kademe teması birleşme üretir: a büyür, b silinir; merges: [{tier, x, y}]
 function stepWorld(w, dt) {
   const merges = [];
   for (const f of w.fruits) {
@@ -232,13 +186,13 @@ function stepWorld(w, dt) {
       if (a.tier === b.tier && a.tier < TIERS - 1) {
         const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
         a.tier++; a.x = mx; a.y = my;
-        a.vx = (a.vx + b.vx) / 2; a.vy = -40;      // birleşme zıplaması
+        a.vx = (a.vx + b.vx) / 2; a.vy = -40;
         dead.add(b.id);
         merges.push({ tier: a.tier, x: mx, y: my });
         continue;
       }
       const nx = dx / d, ny = dy / d, overlap = min - d;
-      const ma = ra * ra, mb = rb * rb, tm = ma + mb;   // kütle ∝ r²
+      const ma = ra * ra, mb = rb * rb, tm = ma + mb;
       a.x -= nx * overlap * (mb / tm); a.y -= ny * overlap * (mb / tm);
       b.x += nx * overlap * (ma / tm); b.y += ny * overlap * (ma / tm);
       const vn = (b.vx - a.vx) * nx + (b.vy - a.vy) * ny;
@@ -253,160 +207,86 @@ function stepWorld(w, dt) {
   return { merges };
 }
 
-// Neredeyse durağan bir öğenin üstü çizginin üstündeyse taşıyor demektir
 function overflowing(w) {
   return w.fruits.some(f =>
     f.y - radius(f.tier) < DANGER_Y && Math.abs(f.vy) < 8 && Math.abs(f.vx) < 8);
 }
 
-// Bırakılabilir kademeler 0-4, ağırlıklar %30/25/20/15/10
 function randTier(rnd) {
   const r = rnd() * 100;
   return r < 30 ? 0 : r < 55 ? 1 : r < 75 ? 2 : r < 90 ? 3 : 4;
 }
 
-// Birleşme sonucu kademe ≥ 4 bahçeye kaynak üretir
-const EMIT_FOR_TIER = { 4: 'tohum_tozu', 5: 'cicek_ozu', 6: 'meyve', 7: 'nadir_tohum', 8: 'agac_fidani', 9: 'efsanevi', 10: 'efsanevi' };
+// --- Dünya Ağacı: enerji ekonomisi ---
+const MAX_LEVEL = 12;
+const levelCost = l => Math.round(10 * Math.pow(1.5, l));
+const energyFor = tier => Math.pow(2, Math.max(0, tier - 1));
 
-// --- Bahçe (bahce-2048'den değişmeden) ---
-const sl = (type, x, y) => ({ type, x, y });
-const ZONES = [
-  { id: 'cayir', name: 'Çayır', slots: [
-    sl('cicek',10,72), sl('cicek',22,80), sl('cicek',34,70), sl('cicek',46,82), sl('cicek',58,72),
-    sl('cicek',70,80), sl('cicek',82,70), sl('cicek',16,58), sl('cicek',64,58),
-    sl('cali',30,52), sl('cali',78,54), sl('cali',48,60),
-  ]},
-  { id: 'koru', name: 'Koru', slots: [
-    sl('cali',15,70), sl('cali',35,60), sl('cali',55,72), sl('cali',75,62),
-    sl('cicek',25,82), sl('cicek',45,80), sl('cicek',65,84), sl('cicek',85,78),
-    sl('nadir',50,50), sl('nadir',20,50),
-  ]},
-  { id: 'golet', name: 'Gölet', slots: [
-    sl('cicek',12,78), sl('cicek',30,84), sl('cicek',70,84), sl('cicek',88,78),
-    sl('cali',18,60), sl('cali',82,62), sl('cali',50,88),
-    sl('nadir',35,55), sl('nadir',65,55),
-    sl('peyzaj',50,42),
-  ]},
-  { id: 'anit', name: 'Anıt Bahçesi', slots: [
-    sl('nadir',25,75), sl('nadir',75,75),
-    sl('peyzaj',15,55), sl('peyzaj',85,55),
-    sl('prestij',50,62), sl('prestij',50,35),
-  ]},
-];
-const SLOT_FOR = { tohum_tozu: 'cicek', meyve: 'cali', nadir_tohum: 'nadir', agac_fidani: 'peyzaj', efsanevi: 'prestij' };
-const MAX_ANIMALS = 3, MAX_STAGE = 3;
+function newTree(seed) { return { level: 0, energy: 0, seed: seed >>> 0, legend: 0 }; }
 
-function newGarden() { return { unlocked: 1, plots: {}, variants: {}, animals: ZONES.map(() => 0), bank: {}, water: 0 }; }
-
-function zoneComplete(g, z) { return ZONES[z].slots.every((_, i) => g.plots[z + ':' + i]); }
-
-function activeZone(g) {
-  for (let z = 0; z < g.unlocked; z++) if (!zoneComplete(g, z)) return z;
-  return g.unlocked - 1;
-}
-
-// g'yi mutasyona uğratır; olay listesi döndürür:
-// {kind:'plant',zone,slot,type} | {kind:'variant',key} | {kind:'animal',zone} | {kind:'bank',type} | {kind:'unlock',zone}
-function applyResource(g, type, rnd) {
+// Enerji ekler; her seviye atlayışı için {kind:'levelup', level} olayı döndürür.
+// MAX seviyeden sonra taşan enerji legend sayacına akar.
+function addEnergy(t, pts) {
   const events = [];
-  if (type === 'cicek_ozu') {
-    const filled = [];
-    for (let z = 0; z < g.unlocked; z++)
-      ZONES[z].slots.forEach((s, i) => { if (s.type === 'cicek' && g.plots[z + ':' + i]) filled.push(z + ':' + i); });
-    if (!filled.length) { g.bank[type] = (g.bank[type] || 0) + 1; return [{ kind: 'bank', type }]; }
-    const key = filled[Math.floor(rnd() * filled.length)];
-    g.variants[key] = (g.variants[key] || 0) + 1;
-    return [{ kind: 'variant', key }];
+  t.energy += pts;
+  while (t.level < MAX_LEVEL && t.energy >= levelCost(t.level)) {
+    t.energy -= levelCost(t.level);
+    t.level++;
+    events.push({ kind: 'levelup', level: t.level });
   }
-  const want = SLOT_FOR[type];
-  const z = activeZone(g);
-  const idx = ZONES[z].slots.findIndex((s, i) => s.type === want && !g.plots[z + ':' + i]);
-  if (idx >= 0) {
-    g.plots[z + ':' + idx] = { stage: 1 };
-    events.push({ kind: 'plant', zone: z, slot: idx, type });
-    if (zoneComplete(g, z) && g.unlocked < ZONES.length) {
-      g.unlocked++;
-      events.push({ kind: 'unlock', zone: g.unlocked - 1 });
-      events.push(...drainBank(g, rnd));
-    }
-    if (ZONES[z].slots[idx].type === 'cicek') {
-      while ((g.bank.cicek_ozu || 0) > 0) {
-        g.bank.cicek_ozu--;
-        const evs = applyResource(g, 'cicek_ozu', rnd);
-        if (evs.some(e => e.kind === 'bank')) break;
-        events.push(...evs);
-      }
-    }
-    return events;
-  }
-  if (type === 'meyve' && g.animals[z] < MAX_ANIMALS) {
-    g.animals[z]++;
-    return [{ kind: 'animal', zone: z }];
-  }
-  g.bank[type] = (g.bank[type] || 0) + 1;
-  return [{ kind: 'bank', type }];
-}
-
-// Kilit açıldığında bankadakileri yeni bölgeye ekmeyi dener
-function drainBank(g, rnd) {
-  const events = [];
-  for (const type of Object.keys(g.bank)) {
-    while (g.bank[type] > 0) {
-      g.bank[type]--;
-      const evs = applyResource(g, type, rnd);
-      if (evs.some(e => e.kind === 'bank')) break;
-      events.push(...evs);
-    }
-  }
+  if (t.level >= MAX_LEVEL && t.energy > 0) { t.legend += t.energy; t.energy = 0; }
   return events;
 }
 
-// Küçük birleşmelerin (kademe 1-3) yukarı akışı: her damla sayaç doldurur,
-// 8 damlada bir rastgele olgunlaşmamış bitki bir evre büyür.
-// Sulanacak bitki yoksa damla tohum_tozu'na dönüşür — kaynak asla boşa gitmez.
-const WATER_PER_GROW = 8;
-function applyWater(g, rnd) {
-  g.water = (g.water || 0) + 1;
-  if (g.water < WATER_PER_GROW) return [];
-  g.water = 0;
-  const candidates = [];
-  for (let z = 0; z < g.unlocked; z++)
-    ZONES[z].slots.forEach((s, i) => {
-      const p = g.plots[z + ':' + i];
-      if (p && p.stage < MAX_STAGE) candidates.push(z + ':' + i);
-    });
-  if (candidates.length) {
-    const key = candidates[Math.floor(rnd() * candidates.length)];
-    g.plots[key].stage++;
-    return [{ kind: 'grow', key }];
-  }
-  return applyResource(g, 'tohum_tozu', rnd);
+const IDLE_RATE_PER_H = 6, IDLE_CAP = 60;
+function idleEnergy(elapsedMs) {
+  return Math.max(0, Math.min(IDLE_CAP, Math.floor(elapsedMs / 3600000) * IDLE_RATE_PER_H));
 }
 
-const IDLE_STEP_MS = 4 * 3600 * 1000;
-
-function idleGrowth(g, elapsedMs) {
-  const steps = Math.max(0, Math.min(2, Math.floor(elapsedMs / IDLE_STEP_MS)));
-  let grown = 0;
-  if (steps > 0) for (const k in g.plots) {
-    const p = g.plots[k];
-    const ns = Math.min(MAX_STAGE, p.stage + steps);
-    if (ns > p.stage) { p.stage = ns; grown++; }
-  }
-  return { steps, grown };
+// --- Ağaç topolojisi: tohumdan deterministik dal iskeleti ---
+function mulberry32(a) {
+  return function() {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
 }
+
+// Dallar: {x1,y1,x2,y2,w,depth} — koordinatlar 100x108 viewBox, kök (50,104)'ten yukarı
+function treeTopology(seed, maxDepth = 7) {
+  const rnd = mulberry32(seed >>> 0);
+  const branches = [];
+  const grow = (x, y, ang, len, w, d) => {
+    const x2 = x + Math.cos(ang) * len, y2 = y - Math.sin(ang) * len;
+    branches.push({ x1: x, y1: y, x2, y2, w, depth: d });
+    if (d >= maxDepth) return;
+    const n = d === 0 ? 3 : (rnd() < 0.8 ? 2 : 3);
+    for (let i = 0; i < n; i++) {
+      const spread = 0.5 + rnd() * 0.35;
+      const na = ang + (i - (n - 1) / 2) * spread + (rnd() - 0.5) * 0.22;
+      grow(x2, y2, na, len * (0.66 + rnd() * 0.12), Math.max(0.5, w * 0.6), d + 1);
+    }
+  };
+  grow(50, 104, Math.PI / 2, 24, 6.5, 0);
+  return branches;
+}
+
+// Seviye → görünür dal derinliği (çift seviyeler yeni kohort açar)
+const visibleDepth = level => 1 + Math.floor(level / 2);
 
 // --- Persistence ---
-const STATE_KEY = 'bahce-suika-v1';
+const STATE_KEY = 'bahce-suika-v2';
 
 function defaultState() {
-  return { fruits: [], queue: [0, 1], score: 0, best: 0, garden: newGarden(), lastSeen: 0, muted: false, runEmissions: 0 };
+  return { fruits: [], queue: [0, 1], score: 0, best: 0, tree: newTree(123456789),
+           lastSeen: 0, muted: false, runEnergy: 0 };
 }
 function serialize(st) { return JSON.stringify(st); }
 function deserialize(json) {
   try {
     const o = JSON.parse(json);
-    if (!o || typeof o !== 'object' || Array.isArray(o) || !o.garden) return defaultState();
+    if (!o || typeof o !== 'object' || Array.isArray(o)) return defaultState();
     const st = Object.assign(defaultState(), o);
     const okFruit = f => f && typeof f === 'object' &&
       Number.isInteger(f.tier) && f.tier >= 0 && f.tier < TIERS &&
@@ -415,30 +295,30 @@ function deserialize(json) {
     else st.fruits = st.fruits.map(f => ({ tier: f.tier, x: f.x, y: f.y }));
     if (!Array.isArray(st.queue) || st.queue.length !== 2 ||
         !st.queue.every(t => Number.isInteger(t) && t >= 0 && t <= 4)) st.queue = [0, 1];
-    st.garden = Object.assign(newGarden(), o.garden);
-    const g = st.garden, fresh = newGarden();
-    if (!g.plots || typeof g.plots !== 'object' || Array.isArray(g.plots)) g.plots = fresh.plots;
-    if (!g.variants || typeof g.variants !== 'object' || Array.isArray(g.variants)) g.variants = fresh.variants;
-    if (!g.bank || typeof g.bank !== 'object' || Array.isArray(g.bank)) g.bank = fresh.bank;
-    if (!Array.isArray(g.animals) || !g.animals.every(n => Number.isInteger(n) && n >= 0)) g.animals = fresh.animals;
-    if (!Number.isInteger(g.unlocked) || g.unlocked < 1 || g.unlocked > ZONES.length) g.unlocked = 1;
-    if (!Number.isInteger(g.water) || g.water < 0 || g.water >= WATER_PER_GROW) g.water = 0;
+    st.tree = Object.assign(newTree(123456789), o.tree);
+    const t = st.tree;
+    if (!Number.isInteger(t.level) || t.level < 0 || t.level > MAX_LEVEL) t.level = 0;
+    if (!Number.isInteger(t.energy) || t.energy < 0) t.energy = 0;
+    if (!Number.isInteger(t.legend) || t.legend < 0) t.legend = 0;
+    if (!Number.isInteger(t.seed)) t.seed = 123456789;
     return st;
   } catch { return defaultState(); }
 }
 
-const CORE = { W, H, DANGER_Y, TIERS, radius, newWorld, addFruit, stepWorld, overflowing, randTier, EMIT_FOR_TIER,
-               ZONES, SLOT_FOR, MAX_ANIMALS, MAX_STAGE, newGarden, zoneComplete, activeZone, applyResource,
-               applyWater, WATER_PER_GROW,
-               idleGrowth, IDLE_STEP_MS, STATE_KEY, defaultState, serialize, deserialize };
+const CORE = { W, H, DANGER_Y, TIERS, radius, newWorld, addFruit, stepWorld, overflowing, randTier,
+               MAX_LEVEL, levelCost, energyFor, newTree, addEnergy, idleEnergy, IDLE_RATE_PER_H, IDLE_CAP,
+               mulberry32, treeTopology, visibleDepth,
+               STATE_KEY, defaultState, serialize, deserialize };
 /* CORE-END */
 window.CORE = CORE;
 </script>
 <script>
 const C = window.CORE;
 const $ = s => document.querySelector(s);
+const SVGNS = 'http://www.w3.org/2000/svg';
 
 let state = C.deserialize(localStorage.getItem(C.STATE_KEY));
+if (!localStorage.getItem(C.STATE_KEY)) state.tree.seed = (Math.random() * 4294967296) >>> 0;
 let world = C.newWorld();
 for (const f of state.fruits) C.addFruit(world, f.tier, f.x, f.y);
 
@@ -446,13 +326,15 @@ function save() {
   state.fruits = world.fruits.map(f => ({ tier: f.tier, x: f.x, y: f.y }));
   localStorage.setItem(C.STATE_KEY, C.serialize(state));
 }
+// anime.js yoksa zarif düşüş: uç değerleri animasyonsuz uygula
+const hasAnime = () => typeof window.anime === 'function';
 
 // --- Kap render ---
 const FRUIT_ART = ['🟤','🌱','🌿','🌷','🌸','🌺','🍎','🪴','🌳','🪷','⛲'];
 const fruitBg = t => `radial-gradient(circle at 35% 30%, hsl(${100 - t * 9}, ${45 + t * 4}%, ${90 - t * 3}%), hsl(${100 - t * 9}, ${40 + t * 4}%, ${74 - t * 2}%))`;
 const cup = $('#cup');
-let fruitEls = new Map();   // id -> element
-let px = 1;                 // dünya birimi → piksel ölçeği
+let fruitEls = new Map();
+let px = 1;
 
 function layoutCup() {
   px = cup.clientWidth / C.W;
@@ -481,7 +363,7 @@ function updateFruitEls() {
       cup.appendChild(el);
       fruitEls.set(f.id, el);
     }
-    if (+el.dataset.tier !== f.tier) {   // birleşip büyüdü
+    if (+el.dataset.tier !== f.tier) {
       styleFruit(el, f.tier);
       el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop');
     }
@@ -506,7 +388,6 @@ function updateAim() {
   setNx('#nx-cur', cur); setNx('#nx-next', nxt);
   positionHeld();
 }
-// her frame: heldX aimX'i üstel yumuşatmayla izler (bkz. frame)
 function positionHeld() {
   const r = C.radius(state.queue[0]);
   const x = Math.max(r, Math.min(C.W - r, heldX));
@@ -518,7 +399,7 @@ function drop() {
   if (!canDrop || gameOverShown) return;
   const tier = state.queue.shift();
   state.queue.push(C.randTier(Math.random));
-  C.addFruit(world, tier, heldX);   // görünen (yumuşatılmış) konumdan bırak
+  C.addFruit(world, tier, heldX);
   canDrop = false;
   setTimeout(() => { canDrop = true; updateAim(); }, 400);
   save();
@@ -533,14 +414,12 @@ function frame(ts) {
   const t = ts / 1000;
   const fdt = Math.min(0.05, t - (last || t)); last = t;
   acc += fdt;
-  // nişancı yumuşak takibi (kare hızından bağımsız üstel yaklaşma)
   heldX += (aimX - heldX) * (1 - Math.exp(-16 * fdt));
   positionHeld();
   const merges = [];
   while (acc >= DT) { merges.push(...C.stepWorld(world, DT).merges); acc -= DT; }
   if (merges.length) handleMerges(merges);
   updateFruitEls();
-  // taşma kontrolü: 2 sn kesintisiz
   if (!gameOverShown && C.overflowing(world)) {
     if (dangerSince === null) dangerSince = t;
     cup.classList.add('danger');
@@ -550,23 +429,17 @@ function frame(ts) {
 }
 
 function handleMerges(merges) {
-  const emitted = [];
   for (const m of merges) {
     state.score += m.tier * (m.tier + 1);
     state.best = Math.max(state.best, state.score);
-    const type = C.EMIT_FOR_TIER[m.tier];
-    if (type) {
-      state.runEmissions++;
-      emitted.push({ em: { type, x: m.x, y: m.y }, events: C.applyResource(state.garden, type, Math.random) });
-    } else if (m.tier >= 1) {
-      // küçük birleşmeler de yukarı akar: su damlası
-      flyWater(m, C.applyWater(state.garden, Math.random));
-    }
+    const pts = C.energyFor(m.tier);
+    state.runEnergy += pts;
+    const events = C.addEnergy(state.tree, pts);
+    flyMote(m, pts, events);
     playChime2(m.tier);
   }
   updateHud();
   touchLastSeen();
-  onEmissions(emitted);
 }
 function updateHud() { $('#score').textContent = state.score; $('#best').textContent = state.best; }
 
@@ -576,7 +449,7 @@ function startRun() {
   fruitEls.clear();
   state.queue = [C.randTier(Math.random), C.randTier(Math.random)];
   state.score = 0;
-  state.runEmissions = 0;
+  state.runEnergy = 0;
   gameOverShown = false;
   dangerSince = null;
   cup.classList.remove('danger');
@@ -589,117 +462,194 @@ function showGameOver() {
   gameOverShown = true;
   showOverlay(
     'Kap taştı 🌾',
-    `Skor: ${state.score}. Bu koşuda bahçene ${state.runEmissions} kaynak kattın — bahçen kalıcı, hiçbir şey kaybolmadı.`,
+    `Skor: ${state.score}. Bu koşuda ağacına ${state.runEnergy} enerji akıttın — ağacın kalıcı, hiçbir şey kaybolmadı.`,
     'Yeni koşu',
     startRun
   );
 }
 
-// --- Emisyon partikülleri ---
-const EMIT_ICON = { tohum_tozu:'✨', cicek_ozu:'💧', meyve:'🍎', nadir_tohum:'🎁', agac_fidani:'🌱', efsanevi:'🏆' };
+// --- Dünya Ağacı render ---
+const LEVEL_NAMES = ['Tohum','Filiz','Fidan','Körpe Ağaç','Genç Ağaç','Çiçekli Ağaç','Serpilen Ağaç',
+                     'Meyveli Ağaç','Gür Ağaç','Yaşlı Bilge','Ulu Ağaç','Kadim Ağaç','Dünya Ağacı'];
+const INHABITANTS = [[2,'🦋','flutter'],[4,'🐦',''],[6,'🐿️',''],[8,'🐝','flutter'],[10,'🍄',''],[12,'🏠','']];
+let topoCache = null, topoSeed = null;
+function topology() {
+  if (topoSeed !== state.tree.seed) { topoCache = C.treeTopology(state.tree.seed); topoSeed = state.tree.seed; }
+  return topoCache;
+}
+const treeScale = level => 0.55 + level * 0.0375;
 
-function onEmissions(emitted) {
-  if (!emitted.length) return;
-  const blooms = new Set();
-  let unlockedZone = null;
-  for (const { events } of emitted)
-    for (const e of events) {
-      if (e.kind === 'plant') blooms.add(e.zone + ':' + e.slot);
-      if (e.kind === 'unlock') unlockedZone = e.zone;
+function renderTree(animDepth) {
+  const g = $('#tree-g');
+  g.innerHTML = '';
+  const lvl = state.tree.level;
+  const vd = C.visibleDepth(lvl);
+  const sc = treeScale(lvl);
+  g.setAttribute('transform', `translate(${50 * (1 - sc)} ${104 * (1 - sc)}) scale(${sc})`);
+  const topo = topology();
+  const vis = topo.filter(b => b.depth <= vd);
+  const newOnes = [];
+  // dallar
+  for (const b of vis) {
+    const ln = document.createElementNS(SVGNS, 'line');
+    ln.setAttribute('x1', b.x1); ln.setAttribute('y1', b.y1);
+    ln.setAttribute('x2', b.x2); ln.setAttribute('y2', b.y2);
+    ln.setAttribute('stroke', 'url(#barkgrad)');
+    ln.setAttribute('stroke-width', b.w);
+    ln.setAttribute('stroke-linecap', 'round');
+    g.appendChild(ln);
+    if (animDepth !== undefined && b.depth === animDepth) {
+      const len = Math.hypot(b.x2 - b.x1, b.y2 - b.y1);
+      ln.setAttribute('stroke-dasharray', len);
+      ln.setAttribute('stroke-dashoffset', len);
+      newOnes.push([ln, len]);
     }
-  renderGarden(blooms);
-  if (unlockedZone !== null) scrollToZone(unlockedZone);
-  for (const { em, events } of emitted) flyParticle(em, events);
+  }
+  // yaprak kümeleri: en derin görünür iki kademenin uçları
+  const rnd = C.mulberry32(state.tree.seed ^ 0x9e3779b9);
+  const tips = topo.filter(b => b.depth === vd || (vd > 1 && b.depth === vd - 1 && lvl >= 3));
+  const leafR = 3 + lvl * 0.45;
+  for (const b of tips) {
+    for (let i = 0; i < 3; i++) {
+      const c = document.createElementNS(SVGNS, 'circle');
+      c.setAttribute('cx', b.x2 + (rnd() - 0.5) * leafR * 1.6);
+      c.setAttribute('cy', b.y2 + (rnd() - 0.5) * leafR * 1.2);
+      c.setAttribute('r', leafR * (0.55 + rnd() * 0.5) * (b.depth === vd ? 1 : 0.7));
+      c.setAttribute('fill', 'url(#leafgrad)');
+      c.setAttribute('opacity', 0.9);
+      c.classList.add('leaf');
+      g.appendChild(c);
+    }
+    // çiçekler / meyveler
+    if (lvl >= 5 && rnd() < 0.5) {
+      const f = document.createElementNS(SVGNS, 'circle');
+      f.setAttribute('cx', b.x2 + (rnd() - 0.5) * leafR);
+      f.setAttribute('cy', b.y2 + (rnd() - 0.5) * leafR);
+      f.setAttribute('r', lvl >= 7 && rnd() < 0.5 ? 1.3 : 0.9);
+      f.setAttribute('fill', lvl >= 7 && rnd() < 0.5 ? '#e25545' : '#f8a8c8');
+      g.appendChild(f);
+    }
+  }
+  // yeni dalların çizilerek belirmesi
+  if (newOnes.length && hasAnime()) {
+    anime({ targets: newOnes.map(n => n[0]), strokeDashoffset: [anime.setDashoffset, 0],
+            duration: 800, delay: anime.stagger(60), easing: 'easeOutCubic' });
+  } else for (const [ln] of newOnes) ln.removeAttribute('stroke-dashoffset');
+  renderInhabitants(vd);
+  renderChips();
+  renderAmbient(lvl);
 }
 
-function flyParticle(em, events) {
-  const cr = cup.getBoundingClientRect();
-  const sx = cr.left + em.x / C.W * cr.width;
-  const sy = cr.top + em.y / C.H * cr.height;
-  const plant = events.find(e => e.kind === 'plant');
-  let target;
-  if (plant) target = document.querySelector(`.slot[data-key="${plant.zone}:${plant.slot}"]`);
-  if (!target && events.some(e => e.kind === 'bank')) target = $('#bank');
-  if (!target) target = $('#garden-wrap');
-  const tr = target.getBoundingClientRect();
-  const tx = tr.left + tr.width / 2, ty = tr.top + tr.height / 2;
-  const icon = EMIT_ICON[em.type] || '✨';
+function renderInhabitants(vd) {
+  document.querySelectorAll('.inhab').forEach(e => e.remove());
+  const wrap = $('#tree-wrap');
+  const topo = topology();
+  const tips = topo.filter(b => b.depth === Math.max(1, vd - 1));
+  const sc = treeScale(state.tree.level);
+  const rnd = C.mulberry32(state.tree.seed ^ 0x51ab3e);
+  let ti = 0;
+  for (const [minLvl, glyph, cls] of INHABITANTS) {
+    if (state.tree.level < minLvl) continue;
+    const b = tips[Math.floor(rnd() * tips.length)] || topo[0];
+    const el = document.createElement('div');
+    el.className = 'inhab ' + cls;
+    el.textContent = glyph;
+    el.style.fontSize = (13 + ti) + 'px';
+    // svg koordinatı → yüzde (viewBox 100x108, xMidYMax)
+    el.style.left = (50 + (b.x2 * sc + 50 * (1 - sc) - 50)) + '%';
+    el.style.top = ((b.y2 * sc + 104 * (1 - sc)) / 108 * 100) + '%';
+    wrap.appendChild(el);
+    ti++;
+  }
+}
 
-  // 1) birleşme noktasında patlama halkası: "buradan bir şey fırladı"
+function renderChips() {
+  const t = state.tree;
+  const cost = C.levelCost(t.level);
+  const maxed = t.level >= C.MAX_LEVEL;
+  $('#energy-bar').style.width = maxed ? '100%' : Math.min(100, Math.round(t.energy / cost * 100)) + '%';
+  $('#energy-cnt').textContent = maxed ? 'MAX' : `${t.energy}/${cost}`;
+  $('#level-chip').textContent = `Sv.${t.level} · ${LEVEL_NAMES[t.level]}`;
+  const lg = $('#legend-chip');
+  if (t.legend > 0) { lg.style.display = 'flex'; lg.textContent = `⭐ ${t.legend}`; }
+}
+
+function renderAmbient(lvl) {
+  const wrap = $('#tree-wrap');
+  wrap.className = 'sky' + Math.min(3, Math.floor(lvl / 4));
+  wrap.querySelectorAll('.sun,.cloud,.firefly').forEach(e => e.remove());
+  const add = (cls, style) => { const d = document.createElement('div'); d.className = cls; Object.assign(d.style, style); wrap.appendChild(d); };
+  add('sun');
+  add('cloud', { top: '16px', animationDuration: '40s' });
+  add('cloud', { top: '38px', animationDuration: '58s', animationDelay: '-24s', opacity: .7, scale: '.75' });
+  if (lvl >= 9) for (let i = 0; i < 5; i++)
+    add('firefly', { left: (15 + i * 17) + '%', top: (35 + (i % 3) * 14) + '%', animationDelay: (i * 1.4) + 's' });
+}
+
+// --- Enerji zerresi + kutlama ---
+function flyMote(m, pts, events) {
+  const cr = cup.getBoundingClientRect();
+  const sx = cr.left + m.x / C.W * cr.width, sy = cr.top + m.y / C.H * cr.height;
+  const big = pts >= 8;
   const burst = document.createElement('div');
   burst.className = 'mergeburst';
   burst.style.left = sx + 'px'; burst.style.top = sy + 'px';
   document.body.appendChild(burst);
   setTimeout(() => burst.remove(), 500);
-
-  // 2) ana parçacık + gecikmeli iki kuyruk hayaleti: göz yolu takip edebilsin
-  const launch = (cls, delay) => {
-    const el = document.createElement('div');
-    el.className = cls;
-    el.textContent = icon;
-    el.style.left = sx + 'px'; el.style.top = sy + 'px';
-    document.body.appendChild(el);
-    setTimeout(() => requestAnimationFrame(() => requestAnimationFrame(() => {
-      el.style.left = tx + 'px'; el.style.top = ty + 'px';
-      if (cls === 'ptrail') el.style.opacity = 0;
-    })), delay);
-    return el;
-  };
-  const p = launch('particle', 0);
-  const g1 = launch('ptrail', 80), g2 = launch('ptrail', 160);
-  setTimeout(() => { g1.remove(); g2.remove(); }, 1400);
-
-  // 3) varış: bloom + "+1" rozeti
-  let finished = false;
-  const finish = () => {
-    if (finished) return;
-    finished = true;
-    p.remove();
-    if (plant) {
-      const slotEl = document.querySelector(`.slot[data-key="${plant.zone}:${plant.slot}"]`);
-      if (slotEl) { slotEl.classList.remove('bloom'); void slotEl.offsetWidth; slotEl.classList.add('bloom'); }
-    }
-    const a = document.createElement('div');
-    a.className = 'arrive';
-    a.textContent = '+1 ' + icon;
-    a.style.left = (tx - 14) + 'px'; a.style.top = (ty - 10) + 'px';
-    document.body.appendChild(a);
-    setTimeout(() => a.remove(), 900);
-  };
-  p.addEventListener('transitionend', finish, { once: true });
-  setTimeout(finish, 1000);
-}
-
-// Küçük birleşme damlası: birleşme noktasından su sayacına uçar;
-// sayaç dolduysa (events) bir bitki büyür ya da tohuma dönüşür
-function flyWater(m, events) {
-  const cr = cup.getBoundingClientRect();
-  const sx = cr.left + m.x / C.W * cr.width, sy = cr.top + m.y / C.H * cr.height;
-  const wm = $('#water').getBoundingClientRect();
+  const target = $('#energy-chip').getBoundingClientRect();
   const p = document.createElement('div');
-  p.className = 'wdrop';
-  p.textContent = '💧';
+  p.className = 'mote' + (big ? ' big' : '');
+  p.textContent = big ? '✨' : '·✦';
   p.style.left = sx + 'px'; p.style.top = sy + 'px';
   document.body.appendChild(p);
   requestAnimationFrame(() => requestAnimationFrame(() => {
-    p.style.left = (wm.left + wm.width / 2) + 'px';
-    p.style.top = (wm.top + wm.height / 2) + 'px';
+    p.style.left = (target.left + target.width / 2) + 'px';
+    p.style.top = (target.top + target.height / 2) + 'px';
   }));
   let done = false;
   const fin = () => {
     if (done) return;
     done = true;
     p.remove();
-    if (!events.length) { updateWaterMeter(); return; }
-    const blooms = new Set();
-    for (const e of events) {
-      if (e.kind === 'grow') blooms.add(e.key);
-      if (e.kind === 'plant') blooms.add(e.zone + ':' + e.slot);
-    }
-    renderGarden(blooms);
+    renderChips();
+    const ups = events.filter(e => e.kind === 'levelup');
+    if (ups.length) celebrate(ups[ups.length - 1].level);
   };
   p.addEventListener('transitionend', fin, { once: true });
-  setTimeout(fin, 650);
+  setTimeout(fin, 900);
+}
+
+function celebrate(newLevel) {
+  const vd = C.visibleDepth(newLevel), pvd = C.visibleDepth(newLevel - 1);
+  renderTree(vd > pvd ? vd : undefined);
+  playFanfare();
+  const wrap = $('#tree-wrap');
+  if (hasAnime()) {
+    anime({ targets: '#flash', opacity: [0.85, 0], duration: 900, easing: 'easeOutQuad' });
+    anime({ targets: '#tree-g', scale: [1, 1.05, 1], duration: 700, easing: 'easeInOutSine' });
+    anime({ targets: '#level-chip', scale: [1, 1.25, 1], duration: 600, easing: 'easeOutBack' });
+  }
+  // emniyet: animasyon motoru ilerleyemese bile flaş asılı kalmasın
+  setTimeout(() => { $('#flash').style.opacity = 0; }, 1100);
+  // yıldız saçılımı
+  const r = wrap.getBoundingClientRect();
+  for (let i = 0; i < 12; i++) {
+    const s = document.createElement('div');
+    s.className = 'spark';
+    s.textContent = ['✨','⭐','🌟'][i % 3];
+    s.style.left = '50%'; s.style.top = '60%';
+    wrap.appendChild(s);
+    const ang = (i / 12) * Math.PI * 2;
+    if (hasAnime()) {
+      anime({ targets: s,
+        translateX: Math.cos(ang) * (r.width * 0.32) * (0.6 + Math.random() * 0.5),
+        translateY: Math.sin(ang) * (r.height * 0.4) * (0.6 + Math.random() * 0.5),
+        opacity: [1, 0], scale: [1.2, 0.4],
+        duration: 900 + Math.random() * 400, easing: 'easeOutCubic',
+        complete: () => s.remove() });
+    }
+    setTimeout(() => s.remove(), 1600);   // emniyet: her koşulda temizlik
+  }
 }
 
 // --- Ses ---
@@ -715,15 +665,14 @@ function audioCtx() {
 }
 const SCALE = [523.25, 587.33, 659.25, 783.99, 880, 1046.5];
 
-// Birleşme kademesine göre tizleşen chime; 9+ mini fanfar
 function playChime2(tier) {
   if (state.muted) return;
   const ctx = audioCtx();
   if (!ctx) return;
   const t = ctx.currentTime;
   const idx = Math.min(5, Math.max(0, tier - 4));
-  const notes = tier >= 9 ? [SCALE[2], SCALE[3], SCALE[5]] : [SCALE[idx]];
-  const vol = tier >= 4 ? 0.18 : 0.07;   // küçük birleşmeler kısık tık sesi
+  const notes = [SCALE[idx]];
+  const vol = tier >= 4 ? 0.18 : 0.07;
   notes.forEach((f, i) => {
     const o = ctx.createOscillator(), g = ctx.createGain();
     o.type = 'sine'; o.frequency.value = f;
@@ -732,6 +681,21 @@ function playChime2(tier) {
     g.gain.exponentialRampToValueAtTime(0.0001, t + i * 0.12 + 0.45);
     o.connect(g).connect(ctx.destination);
     o.start(t + i * 0.12); o.stop(t + i * 0.12 + 0.5);
+  });
+}
+function playFanfare() {
+  if (state.muted) return;
+  const ctx = audioCtx();
+  if (!ctx) return;
+  const t = ctx.currentTime;
+  [SCALE[2], SCALE[3], SCALE[5]].forEach((f, i) => {
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = 'triangle'; o.frequency.value = f;
+    g.gain.setValueAtTime(0.0001, t + i * 0.11);
+    g.gain.exponentialRampToValueAtTime(0.2, t + i * 0.11 + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + i * 0.11 + 0.6);
+    o.connect(g).connect(ctx.destination);
+    o.start(t + i * 0.11); o.stop(t + i * 0.11 + 0.65);
   });
 }
 
@@ -767,149 +731,6 @@ function scheduleChirp() {
   }, 2500 + Math.random() * 6000);
 }
 
-// --- Bahçe render (bahce-2048 C stili, değişmeden) ---
-const SLOT_ART = {
-  cicek:  ['🌱', '🌿', '🌸'],
-  cali:   ['🌱', '🪴', '🌳'],
-  nadir:  ['🌱', '🌿', '🪷'],
-  peyzaj: ['🌱', '🌲', '🌳'],
-  prestij:['🪨', '🗿', '⛲'],
-};
-const VARIANT_ART = ['🌸', '🌺', '🌼', '🌷', '💐'];
-const ANIMALS = ['🦋', '🐝', '🐞'];
-const BANK_ICON = { tohum_tozu:'✨', cicek_ozu:'💧', meyve:'🍎', nadir_tohum:'🎁', agac_fidani:'🌱', efsanevi:'🏆' };
-const ZONE_EMOJI = { cayir: '🌼', koru: '🌲', golet: '💧', anit: '🏛️' };
-const BG_SPOTS = [
-  [[22, 52], [52, 44], [80, 52]],
-  [[14, 50], [38, 42], [64, 50], [86, 44], [28, 62], [74, 62]],
-  [[14, 46], [86, 46], [26, 64], [74, 64], [50, 30], [50, 67]],
-  [[28, 50], [72, 50], [14, 42], [86, 42]],
-];
-
-function slotArt(zone, i) {
-  const key = zone + ':' + i;
-  const slot = C.ZONES[zone].slots[i];
-  const plot = state.garden.plots[key];
-  if (!plot) return null;
-  if (slot.type === 'cicek' && plot.stage === C.MAX_STAGE && state.garden.variants[key])
-    return VARIANT_ART[state.garden.variants[key] % VARIANT_ART.length];
-  return SLOT_ART[slot.type][plot.stage - 1];
-}
-
-function zoneLayout(z) {
-  const zone = C.ZONES[z];
-  const pathType = zone.slots.some(s => s.type === 'cicek') ? 'cicek' : 'nadir';
-  const small = [], big = [];
-  zone.slots.forEach((s, i) => (s.type === pathType ? small : big).push(i));
-  const pos = {};
-  small.forEach((idx, k) => { pos[idx] = { path: true, x: (k + 0.5) * (100 / small.length) }; });
-  big.forEach((idx, k) => {
-    const p = BG_SPOTS[z][k % BG_SPOTS[z].length];
-    pos[idx] = { path: false, x: p[0], y: p[1] };
-  });
-  return pos;
-}
-
-const HILLS = {
-  cayir: ['#bade91', '#a2cf74'],
-  koru:  ['#82b062', '#628f49'],
-  golet: ['#a4d5c6', '#82c0b1'],
-  anit:  ['#dcc492', '#c6aa76'],
-};
-const TUFT = { cayir: '🌾', koru: '🌿', golet: '🌾', anit: '🌿' };
-function zoneDecor(el, id) {
-  const add = (cls, style) => { const d = document.createElement('div'); d.className = cls; Object.assign(d.style, style); el.appendChild(d); return d; };
-  // katmanlı tepeler: uzak (açık) + yakın (koyu) — derinlik hissi
-  add('hillband', { bottom: '26%', height: '42%', background: HILLS[id][0], opacity: .85 });
-  add('hillband', { bottom: '14%', height: '44%', background: HILLS[id][1] });
-  // patika kenarına ot öbekleri: boş sahne bile "bir yer" gibi dursun
-  for (const [x, y, s] of [[7, 62, 13], [21, 58, 11], [38, 63, 14], [55, 59, 11], [71, 63, 13], [88, 58, 12]]) {
-    const d = add('bgdeco', { left: x + '%', top: y + '%', fontSize: s + 'px', opacity: .5 });
-    d.textContent = TUFT[id];
-  }
-  if (id === 'cayir' || id === 'golet') add('sun');
-  if (id === 'cayir') {
-    add('cloud', { top: '18px', animationDuration: '38s' });
-    add('cloud', { top: '38px', animationDuration: '57s', animationDelay: '-22s', opacity: .7, scale: '.75' });
-  }
-  if (id === 'golet') add('cloud', { top: '22px', animationDuration: '48s', animationDelay: '-12s', opacity: .8 });
-  if (id === 'koru') for (const [x, y] of [[10, 30], [32, 25], [58, 27], [84, 30]]) {
-    const d = add('bgdeco', { left: x + '%', top: y + '%', fontSize: '28px', opacity: .55 }); d.textContent = '🌲';
-  }
-  if (id === 'golet') { const p = document.createElement('div'); p.className = 'pond'; el.appendChild(p); }
-  if (id === 'anit') { const d = add('bgdeco', { left: '50%', top: '26%', fontSize: '38px', opacity: .35 }); d.textContent = '🏛️'; }
-}
-
-function renderGarden(bloomKeys) {
-  const garden = $('#garden');
-  garden.innerHTML = '';
-  const nextLockedName = state.garden.unlocked < C.ZONES.length ? C.ZONES[state.garden.unlocked].name : null;
-  C.ZONES.forEach((zone, z) => {
-    const el = document.createElement('div');
-    el.className = 'zone z-' + zone.id + (z >= state.garden.unlocked ? ' locked' : '');
-    el.dataset.zone = z;
-    if (z >= state.garden.unlocked) {
-      el.innerHTML = `<div class="lockmsg">🔒<b>${zone.name}</b><small>${C.ZONES[z - 1].name} bölgesini tamamla</small></div>`;
-      garden.appendChild(el); return;
-    }
-    zoneDecor(el, zone.id);
-    const total = zone.slots.length;
-    const filled = zone.slots.filter((_, i) => state.garden.plots[z + ':' + i]).length;
-    const done = filled === total;
-    const head = document.createElement('div');
-    head.className = 'zone-head';
-    head.innerHTML =
-      `<span class="zh-chip"><span class="zn">${ZONE_EMOJI[zone.id]} ${zone.name}</span>` +
-      `<span class="bar"><i style="width:${Math.round(filled / total * 100)}%"></i></span>` +
-      `<span class="cnt">${filled}/${total}${done ? ' ✓' : ''}</span></span>` +
-      (!done && nextLockedName && z === C.activeZone(state.garden)
-        ? `<span class="zh-next">Sıradaki: ${nextLockedName} 🔒</span>` : '');
-    el.appendChild(head);
-    const path = document.createElement('div'); path.className = 'path'; el.appendChild(path);
-    const layout = zoneLayout(z);
-    zone.slots.forEach((slot, i) => {
-      const key = z + ':' + i;
-      const art = slotArt(z, i);
-      const plot = state.garden.plots[key];
-      const blooming = bloomKeys && bloomKeys.has(key);
-      const L = layout[i];
-      const s = document.createElement('div');
-      s.dataset.key = key;
-      const base = L.path ? 'slot pslot' : 'slot bgslot';
-      s.className = base + (art ? '' : ' empty') + (blooming ? ' bloom' : '')
-        + (art && plot && plot.stage >= 2 && !blooming ? ' sway' : '');
-      if (L.path) { s.style.left = L.x + '%'; path.appendChild(s); }
-      else { s.style.left = L.x + '%'; s.style.top = L.y + '%'; el.appendChild(s); }
-      if (art) {
-        s.textContent = art;
-        if (!blooming) s.style.animationDelay = ((i % 5) * 0.55) + 's';
-      }
-    });
-    for (let a = 0; a < state.garden.animals[z]; a++) {
-      const an = document.createElement('div');
-      an.className = 'animal';
-      an.textContent = ANIMALS[a % ANIMALS.length];
-      an.style.left = (16 + a * 26) + '%'; an.style.top = (26 + (a % 2) * 12) + '%';
-      an.style.animationDelay = (a * 1.3) + 's';
-      el.appendChild(an);
-    }
-    garden.appendChild(el);
-  });
-  $('#bank').innerHTML = Object.entries(state.garden.bank)
-    .filter(([t, n]) => BANK_ICON[t] && n > 0)
-    .map(([t, n]) => `<span>${BANK_ICON[t]}×${n}</span>`).join('');
-  $('#zone-dots').innerHTML = C.ZONES.map((_, z) => `<i${z === C.activeZone(state.garden) ? ' class="on"' : ''}></i>`).join('');
-  updateWaterMeter();
-}
-function updateWaterMeter() {
-  $('#water').textContent = '💧 ' + (state.garden.water || 0) + '/' + C.WATER_PER_GROW;
-}
-
-function scrollToZone(z, smooth = true) {
-  const el = $('#garden').children[z];
-  if (el) el.scrollIntoView({ behavior: smooth ? 'smooth' : 'instant', inline: 'start', block: 'nearest' });
-}
-
 // --- Overlay + Idle ---
 function showOverlay(title, text, btnLabel, onClose) {
   $('#ov-title').textContent = title;
@@ -920,11 +741,16 @@ function showOverlay(title, text, btnLabel, onClose) {
 }
 function checkIdle() {
   if (!state.lastSeen) return;
-  const r = C.idleGrowth(state.garden, Date.now() - state.lastSeen);
-  if (r.grown > 0) {
+  const pts = C.idleEnergy(Date.now() - state.lastSeen);
+  if (pts > 0) {
+    const events = C.addEnergy(state.tree, pts);
     save();
-    renderGarden();
-    showOverlay('🌙 Sen yokken...', `Bahçen kendi kendine büyüdü: ${r.grown} bitki olgunlaştı.`, 'Bahçeme dön');
+    renderTree();
+    const ups = events.filter(e => e.kind === 'levelup');
+    showOverlay('🌙 Sen yokken...',
+      `Ağacın kendi kendine ${pts} enerji topladı` + (ups.length ? ` ve ${ups.length} seviye atladı!` : '.'),
+      'Ağacıma dön',
+      ups.length ? () => celebrate(ups[ups.length - 1].level) : null);
   }
 }
 let wiping = false;
@@ -939,19 +765,18 @@ document.addEventListener('visibilitychange', () => {
 function aimFromEvent(e) {
   const r = cup.getBoundingClientRect();
   aimX = (e.clientX - r.left) / r.width * C.W;
-  updateAim();
 }
 const cupWrap = $('#cup-wrap');
 cupWrap.addEventListener('pointerdown', e => { if (e.isPrimary) aimFromEvent(e); });
 cupWrap.addEventListener('pointermove', e => { if (e.isPrimary) aimFromEvent(e); });
 cupWrap.addEventListener('pointerup', e => { if (e.isPrimary) { aimFromEvent(e); drop(); } });
 addEventListener('keydown', e => {
-  if (e.key === 'ArrowLeft') { aimX = Math.max(0, aimX - 4); updateAim(); e.preventDefault(); }
-  if (e.key === 'ArrowRight') { aimX = Math.min(C.W, aimX + 4); updateAim(); e.preventDefault(); }
+  if (e.key === 'ArrowLeft') { aimX = Math.max(0, aimX - 4); e.preventDefault(); }
+  if (e.key === 'ArrowRight') { aimX = Math.min(C.W, aimX + 4); e.preventDefault(); }
   if (e.key === ' ' || e.key === 'ArrowDown') { drop(); e.preventDefault(); }
 });
 
-$('#new-game').addEventListener('click', startRun);   // yalnız kap sıfırlanır; bahçe kalıcı
+$('#new-game').addEventListener('click', startRun);   // yalnız kap sıfırlanır; ağaç kalıcı
 
 $('#mute').addEventListener('click', () => {
   state.muted = !state.muted;
@@ -967,45 +792,33 @@ addEventListener('keydown', () => audioCtx(), { once: true });
 layoutCup();
 updateHud();
 updateAim();
-renderGarden();
-scrollToZone(C.activeZone(state.garden), false);
+renderTree();
 checkIdle();
 touchLastSeen();
 requestAnimationFrame(frame);
-// Bahçeye ambiyans: aktif bölgeye ara ara süzülen taç yaprağı/yaprak
-const PETAL_GLYPH = { cayir: '🌸', koru: '🍃', golet: '🍃', anit: '✨' };
-setInterval(() => {
-  if (document.hidden) return;
-  const z = C.activeZone(state.garden);
-  const zoneEl = $('#garden').children[z];
-  if (!zoneEl || zoneEl.classList.contains('locked')) return;
-  const p = document.createElement('div');
-  p.className = 'petal';
-  p.textContent = PETAL_GLYPH[C.ZONES[z].id];
-  p.style.left = (5 + Math.random() * 88) + '%';
-  p.style.animationDuration = (4 + Math.random() * 3) + 's';
-  zoneEl.appendChild(p);
-  setTimeout(() => p.remove(), 7600);
-}, 2600);
-// rAF çalıştırmayan gömülü görünümler için yedek sürücü
 setTimeout(() => {
   if (!rafSeen) setInterval(() => {
-    // gerçek rAF devreye girerse (rafSeen true kalır) interval kendini pasifleştirir
-    if (!rafSeen) { frame(performance.now()); rafSeen = false; }
+    if (!rafSeen) {
+      frame(performance.now()); rafSeen = false;
+      // anime motorunu da elle tick'le (rAF'siz ortamda tween'ler ilerlesin)
+      if (window.anime) anime.running.slice().forEach(a => { try { a.tick(performance.now()); } catch {} });
+    }
   }, 33);
 }, 700);
 
-// ?debug=1: kaynak enjeksiyonu + sıfırlama
+// ?debug=1: enerji enjeksiyonu + sıfırlama
 if (new URLSearchParams(location.search).get('debug') === '1') {
   const bar = document.createElement('div');
   bar.id = 'debug';
-  for (const t of Object.keys(BANK_ICON)) {
+  for (const pts of [1, 10, 100]) {
     const b = document.createElement('button');
-    b.textContent = t;
+    b.textContent = '+' + pts + ' enerji';
     b.onclick = () => {
-      const events = C.applyResource(state.garden, t, Math.random);
+      const events = C.addEnergy(state.tree, pts);
       save();
-      onEmissions([{ em: { type: t, x: 50, y: 30 }, events }]);
+      renderChips();
+      const ups = events.filter(e => e.kind === 'levelup');
+      if (ups.length) celebrate(ups[ups.length - 1].level);
     };
     bar.appendChild(b);
   }
