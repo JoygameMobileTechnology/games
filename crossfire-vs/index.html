@@ -191,6 +191,17 @@ const inB=(c,r)=>c>=0&&c<N&&r>=0&&r<N;
 const inArena=(c,r)=>c>=shrink&&c<N-shrink&&r>=shrink&&r<N-shrink;
 const isOb=(c,r)=>obstacles.has(K(c,r));
 const cc=(c,r)=>({x:(c+.5)*CELL, y:(r+.5)*CELL});
+// point-with-thickness obstacle test: seals the zero-width gap between
+// diagonally touching obstacles that a pure point sample slips through
+function hitObAt(x,y){
+  const e=Math.max(2,CELL*.05);
+  const c0=Math.floor((x-e)/CELL), c1=Math.floor((x+e)/CELL);
+  const r0=Math.floor((y-e)/CELL), r1=Math.floor((y+e)/CELL);
+  for(let c=c0;c<=c1;c++)
+    for(let r=r0;r<=r1;r++)
+      if(isOb(c,r)) return K(c,r);
+  return null;
+}
 
 /* ---------- grid algorithms ---------- */
 function reachable(from,blocked){
@@ -239,7 +250,7 @@ function los(a,b){
   const steps=Math.ceil(len/3);
   for(let i=1;i<steps;i++){
     const x=a.x+dx*i/steps, y=a.y+dy*i/steps;
-    if(isOb(Math.floor(x/CELL),Math.floor(y/CELL))) return false;
+    if(hitObAt(x,y)) return false;
   }
   return true;
 }
@@ -250,7 +261,7 @@ function rayMinDist(from,ang,targetC){
   for(let i=0;i<900;i++){
     x+=dx; y+=dy;
     if(x<lo||x>hi||y<lo||y>hi) break;
-    if(isOb(Math.floor(x/CELL),Math.floor(y/CELL))) break;
+    if(hitObAt(x,y)) break;
     const dd=Math.hypot(x-targetC.x,y-targetC.y);
     if(dd<min) min=dd;
   }
@@ -263,7 +274,7 @@ function rayEnd(x,y,ang,pierce){
   for(let i=0;i<900;i++){
     const nx=px+dx, ny=py+dy;
     if(nx<lo||nx>hi||ny<lo||ny>hi) return {x:px,y:py};
-    if(!pierce&&isOb(Math.floor(nx/CELL),Math.floor(ny/CELL))) return {x:px,y:py};
+    if(!pierce&&hitObAt(nx,ny)) return {x:px,y:py};
     px=nx; py=ny;
   }
   return {x:px,y:py};
@@ -739,18 +750,17 @@ function updateBullets(dt){
     const b=bullets[i];
     b.x+=b.vx*dt; b.y+=b.vy*dt;
     if(b.x<lo-8||b.x>hi+8||b.y<lo-8||b.y>hi+8){bullets.splice(i,1); continue;}
-    const bc=Math.floor(b.x/CELL), br=Math.floor(b.y/CELL);
-    if(!b.sniper&&isOb(bc,br)){
-      const k=K(bc,br);
+    const hk=b.sniper?null:hitObAt(b.x,b.y);
+    if(hk){
       if(mode===2){
-        const hp=(obHp.get(k)??3)-1;
+        const hp=(obHp.get(hk)??3)-1;
         if(hp<=0){
-          obstacles.delete(k); obHp.delete(k);
-          const c=cc(bc,br);
+          obstacles.delete(hk); obHp.delete(hk);
+          const q=hk.split(','), c=cc(+q[0],+q[1]);
           for(let j=0;j<12;j++)
             parts.push({x:c.x,y:c.y,vx:(Math.random()-.5)*320,vy:(Math.random()-.5)*320,
               life:.4,max:.4,col:'#9aa7b5',r:3});
-        }else obHp.set(k,hp);
+        }else obHp.set(hk,hp);
         paintStatic();
       }
       for(let j=0;j<5;j++)
@@ -938,6 +948,20 @@ if(TESTQ==='aim'){
   }
 }
 if(TESTQ==='shrinkwarn'){mode=2; $('menu').hidden=true; newMatch(); turn=3; startTurn();}
+if(TESTQ==='corner'){
+  $('menu').hidden=true;
+  obstacles=new Set([K(3,3),K(4,2)]);
+  obHp=new Map();
+  paintStatic();
+  startTurn();
+  selPath=astar({c:P.c,r:P.r},{c:2,r:4},new Set([K(A.c,A.r)]));
+  if(selPath){
+    for(const p of selPath) cellEl(p.c,p.r).classList.add('sel');
+    enterAim();
+    aimAngle=Math.atan2(3*CELL-4.5*CELL,4*CELL-2.5*CELL);
+    if(ghost) setGun(ghost,aimAngle);
+  }
+}
 if(TESTQ==='plus'){
   mode=1; plus=true; $('menu').hidden=true; newMatch();
   outer: for(let r=0;r<N;r++)for(let c=0;c<N;c++){
