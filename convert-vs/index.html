@@ -1,0 +1,1548 @@
+<title>Convert VS</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>
+  :root {
+    --bg: #EDF0F6;
+    --well: #D7DDE9;
+    --cellbg: #C6CEDE;
+    --chip: #FFFFFF;
+    --ink: #1D2740;
+    --muted: #65718C;
+    --gold: #EFAD12;
+    --gold-ink: #3A2B00;
+    --danger: #D64545;
+    --blue: #3D77C2;
+    --shadow: 0 1px 3px rgba(29, 39, 64, .12);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0F1522;
+      --well: #1A2434;
+      --cellbg: #27324A;
+      --chip: #1B2536;
+      --ink: #EDF2FA;
+      --muted: #8B99B5;
+      --gold: #F7BE2A;
+      --gold-ink: #3A2B00;
+      --danger: #F0605C;
+      --blue: #4E8AD6;
+      --shadow: 0 1px 3px rgba(0, 0, 0, .35);
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #EDF0F6;
+    --well: #D7DDE9;
+    --cellbg: #C6CEDE;
+    --chip: #FFFFFF;
+    --ink: #1D2740;
+    --muted: #65718C;
+    --gold: #EFAD12;
+    --gold-ink: #3A2B00;
+    --danger: #D64545;
+    --blue: #3D77C2;
+    --shadow: 0 1px 3px rgba(29, 39, 64, .12);
+  }
+  :root[data-theme="dark"] {
+    --bg: #0F1522;
+    --well: #1A2434;
+    --cellbg: #27324A;
+    --chip: #1B2536;
+    --ink: #EDF2FA;
+    --muted: #8B99B5;
+    --gold: #F7BE2A;
+    --gold-ink: #3A2B00;
+    --danger: #F0605C;
+    --blue: #4E8AD6;
+    --shadow: 0 1px 3px rgba(0, 0, 0, .35);
+  }
+
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    min-height: 100dvh;
+    display: flex;
+    justify-content: center;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Avenir Next", "Segoe UI Variable Display", system-ui, -apple-system, "Segoe UI", sans-serif;
+    touch-action: manipulation;
+    overscroll-behavior: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .wrap {
+    --gameh: clamp(440px, 92svh, 820px);
+    --gamew: min(96vw, calc(var(--gameh) * .58), 490px);
+    width: var(--gamew);
+    padding: clamp(6px, 1.2vh, 14px) 0 10px;
+    display: flex;
+    flex-direction: column;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .game {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    height: var(--gameh);
+  }
+
+  .field {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    background: var(--well);
+    border-radius: 12px;
+    overflow: hidden;
+    touch-action: none;
+    -webkit-touch-callout: none;
+    cursor: none;
+  }
+  .base {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 46px;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    font-size: 12px;
+    font-weight: 900;
+    letter-spacing: .12em;
+    pointer-events: none;
+  }
+  .base.ai {
+    top: 0;
+    justify-content: flex-end;
+    background: linear-gradient(180deg, color-mix(in srgb, var(--danger) 26%, transparent), transparent);
+    color: var(--danger);
+  }
+  .base.me {
+    bottom: 0;
+    background: linear-gradient(0deg, color-mix(in srgb, var(--gold) 30%, transparent), transparent);
+    color: var(--gold);
+  }
+  .crew {
+    display: flex;
+    gap: 2px;
+    margin-left: 10px;
+    flex: 1;
+    overflow: hidden;
+    align-items: center;
+  }
+  .crew .ci { width: 16px; height: 16px; flex-shrink: 0; }
+  .crew .ci svg { display: block; width: 100%; height: 100%; }
+  .crew .tc { fill: var(--gold); }
+  .hudchip {
+    position: absolute;
+    top: 6px;
+    left: 50%;
+    translate: -50%;
+    z-index: 7;
+    background: color-mix(in srgb, var(--bg) 62%, transparent);
+    padding: 3px 14px;
+    border-radius: 999px;
+    pointer-events: none;
+    font-size: 15px;
+    font-weight: 900;
+    font-variant-numeric: tabular-nums;
+  }
+  .hudchip.urgent {
+    color: var(--danger);
+    animation: pulse 1s ease-in-out infinite;
+  }
+  @keyframes pulse { 50% { opacity: .45; } }
+
+  /* soldiers on the board */
+  .sol {
+    position: absolute;
+    left: 0;
+    top: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    pointer-events: none;
+    will-change: transform;
+    z-index: 3;
+  }
+  .sol .pbar {
+    width: 28px;
+    height: 5px;
+    border-radius: 3px;
+    background: var(--danger);
+    overflow: hidden;
+    margin-bottom: 2px;
+  }
+  .sol .pbar i {
+    display: block;
+    height: 100%;
+    background: var(--blue);
+  }
+  .sol.hpmode .pbar { background: rgba(0, 0, 0, .35); }
+  .sol.runme .pbar i { background: var(--gold); }
+  .sol.hpmode.mine .pbar i { background: var(--gold); }
+  .sol.hpmode.theirs .pbar i { background: var(--danger); }
+  .sol .g {
+    line-height: 1;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .35));
+  }
+  .g svg { display: block; width: 100%; height: 100%; }
+  .sol .tc { fill: var(--ownc, #A9B4C8); }
+  .sol.runme .tc, .sol.hpmode.mine .tc { fill: var(--gold); }
+  .sol.runai .tc, .sol.hpmode.theirs .tc { fill: var(--danger); }
+  .sol.hitflash .g { animation: hurtf .12s; }
+  @keyframes hurtf { 50% { filter: brightness(2.1); } }
+  .sol.leave { animation: solleave .3s ease forwards; }
+  @keyframes solleave { to { scale: .2; opacity: 0; } }
+  .sol.dizzy .g { animation: dizzy .5s ease; }
+  @keyframes dizzy {
+    25% { transform: rotate(-12deg); }
+    50% { transform: rotate(10deg); }
+    75% { transform: rotate(-5deg); }
+  }
+  .beam {
+    position: absolute;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    z-index: 6;
+    pointer-events: none;
+    translate: -50% -50%;
+  }
+  .trail {
+    position: absolute;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    translate: -50% -50%;
+    z-index: 2;
+    pointer-events: none;
+    animation: trailfade .5s ease-out forwards;
+  }
+  @keyframes trailfade { to { opacity: 0; scale: .3; } }
+
+  .cursor {
+    position: absolute;
+    z-index: 8;
+    width: 34px;
+    height: 34px;
+    translate: -50% -50%;
+    pointer-events: none;
+  }
+  .cursor::before {
+    content: "";
+    position: absolute;
+    inset: 6px;
+    border: 2.5px solid var(--gold);
+    border-radius: 50%;
+  }
+  .cursor::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 5px;
+    height: 5px;
+    translate: -50% -50%;
+    border-radius: 50%;
+    background: var(--gold);
+  }
+  .cursor.ai::before { border-color: var(--danger); }
+  .cursor.ai::after { background: var(--danger); }
+
+  .shot {
+    position: absolute;
+    z-index: 6;
+    width: 14px;
+    height: 14px;
+    translate: -50% -50%;
+    border-radius: 50%;
+    border: 2.5px solid var(--gold);
+    pointer-events: none;
+    animation: shotfx .18s ease-out forwards;
+  }
+  .shot.ai { border-color: var(--danger); }
+  @keyframes shotfx {
+    0% { scale: 1.4; opacity: .95; }
+    100% { scale: .4; opacity: 0; }
+  }
+
+  .capf {
+    position: absolute;
+    z-index: 9;
+    font-weight: 900;
+    font-size: 14px;
+    pointer-events: none;
+    translate: -50%;
+    animation: rise .7s ease-out forwards;
+  }
+  @keyframes rise {
+    to { transform: translateY(-26px); opacity: 0; }
+  }
+
+  .splat {
+    position: absolute;
+    z-index: 2;
+    pointer-events: none;
+    translate: -50% -50%;
+    background:
+      radial-gradient(circle at 30% 40%, rgba(178, 34, 52, .85) 0 28%, transparent 30%),
+      radial-gradient(circle at 65% 30%, rgba(178, 34, 52, .75) 0 18%, transparent 20%),
+      radial-gradient(circle at 55% 65%, rgba(150, 24, 40, .8) 0 32%, transparent 34%),
+      radial-gradient(circle at 20% 75%, rgba(178, 34, 52, .6) 0 12%, transparent 14%),
+      radial-gradient(circle at 82% 62%, rgba(150, 24, 40, .55) 0 10%, transparent 12%);
+    animation: splatfade 2s ease-out forwards;
+  }
+  @keyframes splatfade {
+    0% { scale: .3; opacity: 0; }
+    12% { scale: 1; opacity: 1; }
+    55% { opacity: .85; }
+    100% { opacity: 0; }
+  }
+  .proj {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: #DCE8FF;
+    box-shadow: 0 0 5px rgba(120, 150, 255, .9);
+    z-index: 5;
+    pointer-events: none;
+  }
+  .proj.magic {
+    width: 7px;
+    height: 7px;
+    background: #E9C8FF;
+    box-shadow: 0 0 7px rgba(169, 69, 196, .95);
+  }
+  .proj.arrow {
+    width: 12px;
+    height: 2.5px;
+    border-radius: 2px;
+    background: linear-gradient(90deg, #8B6844 62%, #D7DDE9 62%);
+    box-shadow: none;
+  }
+
+  /* ---------- Fight view (arena) ---------- */
+  .fview {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    min-height: 0;
+  }
+  .avbox { display: flex; align-items: center; gap: 8px; }
+  .avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--chip);
+    box-shadow: var(--shadow);
+    display: grid;
+    place-items: center;
+    font-size: 20px;
+    border: 2px solid transparent;
+  }
+  .avbox.me .avatar { border-color: var(--gold); }
+  .avname {
+    font-size: 11px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    font-weight: 700;
+    color: var(--muted);
+  }
+  .lane {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    width: min(calc(var(--gamew) * .62), 330px);
+    background: var(--well);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .hud { text-align: center; line-height: 1; }
+  .timer {
+    font-size: clamp(22px, 4svh, 30px);
+    font-weight: 900;
+    font-variant-numeric: tabular-nums;
+  }
+  .timer.urgent {
+    color: var(--danger);
+    animation: pulse 1s ease-in-out infinite;
+  }
+
+  .unit {
+    position: absolute;
+    left: 0;
+    top: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    pointer-events: none;
+    will-change: transform;
+    z-index: 2;
+  }
+  .unit.born { animation: spawn .18s cubic-bezier(.3, 1.4, .5, 1) backwards; }
+  .unit .g { line-height: 1; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .35)); }
+  .unit.me .tc { fill: var(--gold); }
+  .unit.ai .tc { fill: var(--danger); }
+  .unit .uhp {
+    width: 16px;
+    height: 3px;
+    border-radius: 2px;
+    background: rgba(0, 0, 0, .3);
+    margin-top: 1px;
+    overflow: hidden;
+  }
+  .unit .uhp i { display: block; height: 100%; width: 100%; }
+  .unit.me .uhp i { background: var(--gold); }
+  .unit.ai .uhp i { background: var(--danger); }
+  .unit.hurt .g { animation: hurtf .15s; }
+  .wpn, .orb { transform-box: fill-box; transform-origin: 50% 85%; }
+  .k8 .wpn, .k16 .wpn, .k128 .wpn, .orb { transform-origin: 50% 50%; }
+  .atk.k2 .wpn { animation: swing .32s ease; }
+  .atk.k4 .wpn { animation: swing .3s ease; }
+  .atk.k64 .wpn { animation: swingbig .3s ease-in; }
+  .atk.k8 .wpn { animation: bowkick .25s ease; }
+  .atk.k16 .wpn { animation: bash .3s ease; }
+  .atk.k32 .wpn { animation: cast .35s ease; }
+  .atk.k32 .orb { animation: orbpulse .35s ease; }
+  .atk.k128 .wpn { animation: slam .35s ease; }
+  @keyframes swing { 40% { transform: rotate(-55deg); } }
+  @keyframes swingbig { 35% { transform: rotate(-80deg); } }
+  @keyframes bowkick { 30% { transform: translateX(2px) scaleX(.94); } }
+  @keyframes bash { 35% { transform: translateX(-3.5px); } }
+  @keyframes cast { 40% { transform: rotate(-14deg); } }
+  @keyframes orbpulse { 40% { transform: scale(1.5); } }
+  @keyframes slam { 35% { transform: translateY(3.5px); } }
+
+  .fight-splash {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    z-index: 65;
+    pointer-events: none;
+  }
+  .fight-splash span {
+    font-size: clamp(40px, 10vw, 72px);
+    font-weight: 900;
+    color: var(--gold);
+    letter-spacing: .06em;
+    text-shadow: 0 2px 18px rgba(247, 190, 42, .5);
+    animation: fsplash .9s cubic-bezier(.3, 1.4, .5, 1) forwards;
+  }
+  @keyframes fsplash {
+    0% { scale: .2; opacity: 0; }
+    25% { scale: 1.1; opacity: 1; }
+    75% { scale: 1; opacity: 1; }
+    100% { scale: 1.15; opacity: 0; }
+  }
+  @keyframes spawn { from { scale: 0; opacity: 0; } }
+
+  /* ---------- Overlay ---------- */
+  .overlay {
+    position: absolute;
+    inset: -6px;
+    display: grid;
+    place-items: center;
+    background: color-mix(in srgb, var(--bg) 74%, transparent);
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+    border-radius: 14px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .25s;
+    z-index: 70;
+  }
+  .overlay.show { opacity: 1; pointer-events: auto; }
+  .panel {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    gap: 13px;
+    align-items: center;
+    padding: 16px;
+    max-width: 340px;
+  }
+  .panel-title { font-size: 26px; font-weight: 900; margin: 0; text-wrap: balance; }
+  .panel-title .vs { color: var(--gold); }
+  .panel-sub { color: var(--muted); font-size: 13.5px; margin: 0; line-height: 1.5; text-wrap: balance; }
+  .tally {
+    color: var(--muted);
+    font-size: 12.5px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  .count { font-size: 80px; font-weight: 900; margin: 0; font-variant-numeric: tabular-nums; }
+  .ov-actions { display: flex; gap: 8px; }
+  .btn {
+    border: 0;
+    cursor: pointer;
+    border-radius: 10px;
+    padding: 10px 16px;
+    font: 600 14px inherit;
+    font-family: inherit;
+    background: var(--chip);
+    color: var(--ink);
+    box-shadow: var(--shadow);
+  }
+  .btn.primary { background: var(--gold); color: var(--gold-ink); font-weight: 800; }
+  .btn.big { padding: 12px 34px; font-size: 16px; }
+  .btn:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+  .seg {
+    display: flex;
+    background: var(--chip);
+    border-radius: 10px;
+    padding: 4px;
+    gap: 4px;
+    box-shadow: var(--shadow);
+  }
+  .seg button {
+    border: 0;
+    background: transparent;
+    padding: 8px 16px;
+    border-radius: 7px;
+    font: 600 14px inherit;
+    font-family: inherit;
+    color: var(--muted);
+    cursor: pointer;
+  }
+  .seg button.on { background: var(--gold); color: var(--gold-ink); font-weight: 800; }
+  .hint {
+    margin: 6px 0 0;
+    text-align: center;
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1.5;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .hudchip.urgent, .timer.urgent, .shot, .capf, .splat, .sol.hitflash .g,
+    .sol.leave, .unit.born, .unit.hurt .g, .fight-splash span { animation: none; }
+    .atk .wpn, .atk .orb { animation: none; }
+    .overlay { transition: none; }
+  }
+</style>
+
+<div class="wrap">
+  <div class="game" id="game">
+    <div class="field" id="field">
+      <div class="base ai">RAKİP <span id="aiCap" style="margin-left:6px">0</span></div>
+      <div class="base me">SEN <span id="meCap" style="margin-left:6px">0</span><div class="crew" id="meCrew"></div></div>
+      <div class="hudchip" id="hudchip">0:45</div>
+      <div class="cursor" id="meCursor"></div>
+      <div class="cursor ai" id="aiCursor"></div>
+    </div>
+
+    <div class="fview" id="fightView" hidden>
+      <div class="hud"><span class="timer" id="timer">0:45</span></div>
+      <div class="avbox opp"><div class="avatar">🤖</div><span class="avname">Rakip · <span id="diffLabel"></span></span></div>
+      <div class="lane" id="lane"></div>
+      <div class="avbox me"><div class="avatar">😎</div><span class="avname">Sen</span></div>
+    </div>
+
+    <div class="overlay show" id="overlay">
+      <div class="panel" id="startPanel">
+        <p class="panel-title">CONVERT <span class="vs">VS</span></p>
+        <p class="panel-sub">Boardda 20 asker dolaşıyor. İmlecini üstünde tut — atışların ikna barını maviye çeker; %100 mavi olan asker SENİN base'ine koşar. Rakip barı geri çevirip koşuyu kesebilir! 45 saniyede en çok askeri topla; süre biterken iki tarafın da koşanı varsa board üstünde dövüşürler. Sonra ordular arenada!</p>
+        <div class="seg" id="diffSeg" role="group" aria-label="Zorluk">
+          <button data-d="easy">Kolay</button>
+          <button data-d="mid">Orta</button>
+          <button data-d="hard">Zor</button>
+        </div>
+        <button class="btn primary big" id="startBtn">Başla</button>
+        <div class="tally" id="tallyStart"></div>
+      </div>
+      <div class="panel" id="endPanel" hidden>
+        <p class="panel-title" id="endTitle"></p>
+        <p class="panel-sub" id="endSub"></p>
+        <div class="ov-actions">
+          <button class="btn" id="chgBtn">Zorluk Değiştir</button>
+          <button class="btn primary" id="againBtn">Tekrar Oyna</button>
+        </div>
+        <div class="tally" id="tallyEnd"></div>
+      </div>
+    </div>
+  </div>
+
+  <p class="hint">İmleci askerin üstünde tut → ikna et · Koşanı korumayı unutma</p>
+</div>
+
+<script>
+  const GATHER_MS = 45000;
+  const BATTLE_MS = 45000;
+  const FIRE_CD = 0.16;      // s per shot, both sides
+  const HIT_PCT = 5;         // persuasion per hit (roaming soldiers)
+  const RUN_DEF = 6;         // owner reinforcing their own runner
+  const RUN_ATK = 4;         // trying to flip an enemy runner
+  const HIT_R = 30;          // shot hit radius around cursor
+  const DECAY_DELAY = 3;     // s without hits before the bar drifts back
+  const DECAY_RATE = 5;      // %/s drift toward 50
+  const CIRCLE_R = 55;       // roam territory radius
+  const BASE_H = 46;
+  const RUN_MULT = 1.5;      // run-to-base speed multiplier
+  const SPRINT_MULT = 2.4;   // post-skirmish sprint multiplier
+
+  const UNITS = {
+    2:   { name: 'Çaylak',    conv: 8, hp: 3,  dmg: 1,  per: 1.25, speed: 45, range: 16, size: 15, px: 22 },
+    4:   { name: 'Asker',     conv: 5, hp: 7,  dmg: 2,  per: 1.0,  speed: 45, range: 16, size: 17, px: 25 },
+    8:   { name: 'Okçu',      conv: 5, hp: 7,  dmg: 1,  per: 1.0,  speed: 45, range: 75, size: 17, px: 25, ranged: true, proj: 'arrow', shy: true },
+    16:  { name: 'Şövalye',   conv: 3, hp: 32, dmg: 6,  per: 1.25, speed: 30, range: 16, size: 19, px: 28 },
+    32:  { name: 'Büyücü',    conv: 4, hp: 16, dmg: 5,  per: 1.7,  speed: 30, range: 75, size: 19, px: 29, ranged: true, splash: 26, proj: 'magic' },
+    64:  { name: 'Berserker', conv: 4, hp: 50, dmg: 14, per: 0.85, speed: 68, range: 16, size: 19, px: 28 },
+    128: { name: 'Dev',       conv: 2, hp: 90, dmg: 18, per: 2.0,  speed: 22, range: 18, size: 25, px: 40 }
+  };
+  const VALS = Object.keys(UNITS).map(Number);
+  // fixed rarity bag: 20 soldiers per match
+  const BAG = [2,2,2,2,2,2,2, 4,4,4,4,4, 8,8,8, 16,16, 32, 64, 128];
+
+  const SPRITES = {
+    2: `<svg viewBox="0 0 32 32">
+      <g class="wpn"><rect x="21.5" y="9" width="3" height="13" rx="1.5" fill="#8B6844" transform="rotate(18 23 15)"/></g>
+      <circle cx="15" cy="9" r="5.2" fill="#E8B88A"/>
+      <rect x="9.8" y="5.4" width="10.4" height="2.6" rx="1.3" class="tc"/>
+      <rect x="9.5" y="14.5" width="11" height="10.5" rx="3" fill="#7A8699"/>
+      <rect x="12" y="25" width="2.6" height="5.5" rx="1" fill="#5A4634"/>
+      <rect x="15.6" y="25" width="2.6" height="5.5" rx="1" fill="#5A4634"/>
+    </svg>`,
+    4: `<svg viewBox="0 0 32 32">
+      <g class="wpn"><rect x="23" y="6" width="2.6" height="14" rx="1" fill="#D7DDE9"/>
+      <rect x="20.8" y="19" width="7" height="2.4" rx="1" fill="#8B6844"/></g>
+      <circle cx="14.5" cy="9.5" r="5" fill="#E8B88A"/>
+      <path d="M9.5 9 a5 5 0 0 1 10 0 z" fill="#9AA7BE"/>
+      <rect x="13" y="2" width="3" height="3.6" rx="1.4" class="tc"/>
+      <rect x="9.3" y="14.8" width="10.4" height="10" rx="3" fill="#9AA7BE"/>
+      <rect x="9.3" y="17.6" width="10.4" height="2" class="tc"/>
+      <rect x="11.5" y="25" width="2.6" height="5.5" rx="1" fill="#39445C"/>
+      <rect x="15.2" y="25" width="2.6" height="5.5" rx="1" fill="#39445C"/>
+    </svg>`,
+    8: `<svg viewBox="0 0 32 32">
+      <g class="wpn"><path d="M24 5 a11 11 0 0 1 0 22" fill="none" stroke="#8B6844" stroke-width="2.2" stroke-linecap="round"/>
+      <line x1="24" y1="5" x2="24" y2="27" stroke="#D7DDE9" stroke-width="1"/></g>
+      <circle cx="14" cy="10" r="4.8" fill="#E8B88A"/>
+      <path d="M8.6 10 L14 2.2 L19.4 10 z" class="tc"/>
+      <path d="M9 15 h10 l-1.2 10 h-7.6 z" fill="#4C7A5E"/>
+      <rect x="11.2" y="25" width="2.6" height="5.5" rx="1" fill="#39445C"/>
+      <rect x="14.9" y="25" width="2.6" height="5.5" rx="1" fill="#39445C"/>
+    </svg>`,
+    16: `<svg viewBox="0 0 32 32">
+      <circle cx="16" cy="8.5" r="5" fill="#9AA7BE"/>
+      <rect x="11.8" y="7.2" width="8.4" height="2" rx="1" fill="#39445C"/>
+      <rect x="12.5" y="1.6" width="7" height="2.4" rx="1.2" class="tc"/>
+      <rect x="10" y="13.8" width="12" height="11" rx="3" fill="#7A8699"/>
+      <rect x="12.2" y="25" width="2.8" height="5.5" rx="1" fill="#39445C"/>
+      <rect x="17" y="25" width="2.8" height="5.5" rx="1" fill="#39445C"/>
+      <g class="wpn"><path d="M5.5 13 h9 v9 q0 4 -4.5 5.5 q-4.5 -1.5 -4.5 -5.5 z" fill="#D7DDE9"/>
+      <rect x="9.1" y="14.6" width="1.8" height="7.2" rx=".9" class="tc"/>
+      <rect x="6.9" y="16.8" width="6.2" height="1.8" rx=".9" class="tc"/></g>
+    </svg>`,
+    32: `<svg viewBox="0 0 32 32">
+      <g class="wpn"><rect x="23.4" y="6" width="2.4" height="20" rx="1.2" fill="#8B6844"/>
+      <g class="orb"><circle cx="24.6" cy="5.4" r="4.4" fill="#F7BE2A" opacity=".3"/>
+      <circle cx="24.6" cy="5.4" r="2.8" fill="#F7BE2A"/></g></g>
+      <circle cx="14" cy="11" r="4.6" fill="#E8B88A"/>
+      <path d="M7.5 11.5 L14 1.5 L20.5 11.5 z" class="tc"/>
+      <path d="M11.8 13.5 h4.4 v3.2 q-2.2 2.2 -4.4 0 z" fill="#E8EDF5"/>
+      <path d="M9 16 h10 l1.6 9.5 h-13.2 z" fill="#5B63D3"/>
+    </svg>`,
+    64: `<svg viewBox="0 0 32 32">
+      <g class="wpn"><rect x="22.6" y="5" width="2.6" height="18" rx="1.3" fill="#8B6844" transform="rotate(14 24 14)"/>
+      <path d="M20 4.5 q6 1.5 6 7 l-4 0 q0 -4 -2 -7 z" fill="#B9C4D6"/></g>
+      <circle cx="14" cy="9.5" r="5" fill="#E8B88A"/>
+      <path d="M8.6 7 q-2.4 -4 1 -5.6 q1 2.6 2.4 3.4 z" fill="#D9CDBB"/>
+      <path d="M19.4 7 q2.4 -4 -1 -5.6 q-1 2.6 -2.4 3.4 z" fill="#D9CDBB"/>
+      <rect x="10.4" y="6.6" width="7.2" height="1.8" rx=".9" class="tc"/>
+      <rect x="9.3" y="14.5" width="9.4" height="10.3" rx="3" fill="#C98B5F"/>
+      <rect x="9.3" y="20.6" width="9.4" height="2" class="tc"/>
+      <rect x="11.4" y="25" width="2.7" height="5.5" rx="1" fill="#5A4634"/>
+      <rect x="15" y="25" width="2.7" height="5.5" rx="1" fill="#5A4634"/>
+    </svg>`,
+    128: `<svg viewBox="0 0 32 32">
+      <rect x="6" y="10" width="20" height="16" rx="6" fill="#7C87A2"/>
+      <rect x="10.5" y="3.5" width="11" height="8" rx="3.5" fill="#8D97B0"/>
+      <rect x="12.6" y="6.4" width="2.4" height="1.8" rx=".9" fill="#2A3348"/>
+      <rect x="17" y="6.4" width="2.4" height="1.8" rx=".9" fill="#2A3348"/>
+      <g class="wpn"><circle cx="5.4" cy="18" r="4.2" fill="#8D97B0"/>
+      <circle cx="26.6" cy="18" r="4.2" fill="#8D97B0"/></g>
+      <path d="M12 14 l3 3 m5 1 l-2.6 2.6" stroke="#5A6579" stroke-width="1.4" fill="none" stroke-linecap="round"/>
+      <rect x="9" y="24.4" width="14" height="2.2" rx="1.1" class="tc"/>
+      <rect x="10.5" y="26.6" width="4.4" height="4.6" rx="1.4" fill="#5A6579"/>
+      <rect x="17.1" y="26.6" width="4.4" height="4.6" rx="1.4" fill="#5A6579"/>
+    </svg>`
+  };
+
+  const $ = id => document.getElementById(id);
+  const fieldEl = $('field');
+  const laneEl = $('lane');
+  const storage = {
+    get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+    set(k, v) { try { localStorage.setItem(k, v); } catch { /* sandboxed */ } }
+  };
+
+  const W = () => fieldEl.clientWidth;
+  const H = () => fieldEl.clientHeight;
+
+  /* ---------- Soldiers on the board ---------- */
+
+  let sols = [];
+  const bank = { me: {}, ai: {} };
+  const caps = { me: 0, ai: 0 };
+
+  function resetBanks() {
+    for (const side of ['me', 'ai'])
+      for (const v of VALS) bank[side][v] = 0;
+    caps.me = 0;
+    caps.ai = 0;
+    $('meCap').textContent = '0';
+    $('aiCap').textContent = '0';
+    $('meCrew').innerHTML = '';
+  }
+
+  function makeSol(val, x, y) {
+    const spec = UNITS[val];
+    const el = document.createElement('div');
+    el.className = 'sol k' + val;
+    el.innerHTML = `<div class="pbar"><i style="width:50%"></i></div><span class="g" style="width:${spec.px}px;height:${spec.px}px">${SPRITES[val]}</span>`;
+    fieldEl.appendChild(el);
+    const s = {
+      val, spec, el,
+      barEl: el.querySelector('.pbar i'),
+      x, y,
+      home: { x, y },
+      tx: x, ty: y,
+      idle: Math.random(),
+      b: 50,
+      lastHit: -99,
+      state: 'roam', // roam | runme | runai | fight | sprint
+      hp: 0, cd: 0, sprintTo: null,
+      dead: false
+    };
+    sols.push(s);
+    renderSol(s);
+  }
+
+  function spawnSoldiers() {
+    // the golem holds the exact center of the map
+    makeSol(128, W() / 2, H() / 2);
+
+    // split the rest into two halves with as-equal-as-possible total power:
+    // sort by value desc, greedily assign to the lighter group
+    const rest = BAG.filter(v => v !== 128).sort((a, b) => b - a);
+    const groups = [{ sum: 0, vals: [] }, { sum: 0, vals: [] }];
+    for (const v of rest) {
+      const g = groups[0].sum <= groups[1].sum ? groups[0] : groups[1];
+      g.vals.push(v);
+      g.sum += v;
+    }
+    const flip = Math.random() < 0.5;
+    const topVals = flip ? groups[0].vals : groups[1].vals;
+    const botVals = flip ? groups[1].vals : groups[0].vals;
+
+    const midY = H() / 2;
+    for (const v of topVals) {
+      makeSol(v, 30 + Math.random() * (W() - 60), BASE_H + 40 + Math.random() * (midY - BASE_H - 70));
+    }
+    for (const v of botVals) {
+      makeSol(v, 30 + Math.random() * (W() - 60), midY + 30 + Math.random() * (H() - BASE_H - 70 - midY));
+    }
+  }
+
+  function renderSol(s) {
+    s.el.style.transform = `translate(${s.x - 16}px, ${s.y - 18}px)`;
+  }
+
+  const TINT_BASE = [169, 180, 200], TINT_GOLD = [239, 173, 18], TINT_RED = [214, 69, 69];
+
+  function renderBar(s) {
+    s.barEl.style.width = s.b + '%';
+    // ownership tint: the sprite drifts toward gold/red as the bar leaves 50
+    const t = Math.min(1, Math.abs(s.b - 50) / 50);
+    const to = s.b > 50 ? TINT_GOLD : TINT_RED;
+    const c = TINT_BASE.map((v, i) => Math.round(v + (to[i] - v) * t));
+    s.el.style.setProperty('--ownc', `rgb(${c[0]},${c[1]},${c[2]})`);
+  }
+
+  function setSolState(s, st) {
+    s.state = st;
+    s.el.classList.toggle('runme', st === 'runme');
+    s.el.classList.toggle('runai', st === 'runai');
+  }
+
+  function pickRoamTarget(s) {
+    const a = Math.random() * Math.PI * 2;
+    const r = Math.random() * CIRCLE_R;
+    s.tx = Math.min(W() - 20, Math.max(20, s.home.x + Math.cos(a) * r));
+    s.ty = Math.min(H() - BASE_H - 24, Math.max(BASE_H + 24, s.home.y + Math.sin(a) * r));
+  }
+
+  function capture(s, side) {
+    s.dead = true;
+    bank[side][s.val]++;
+    caps[side]++;
+    $(side === 'me' ? 'meCap' : 'aiCap').textContent = caps[side];
+    if (side === 'me') {
+      const ci = document.createElement('span');
+      ci.className = 'ci';
+      ci.innerHTML = SPRITES[s.val];
+      $('meCrew').appendChild(ci);
+    }
+    const f = document.createElement('div');
+    f.className = 'capf';
+    f.textContent = '+' + s.spec.name;
+    f.style.left = s.x + 'px';
+    f.style.top = (s.y - 20) + 'px';
+    f.style.color = side === 'me' ? 'var(--gold)' : 'var(--danger)';
+    fieldEl.appendChild(f);
+    f.addEventListener('animationend', () => f.remove());
+    s.el.classList.add('leave');
+    setTimeout(() => s.el.remove(), 320);
+  }
+
+  function textFx(x, y, text, color) {
+    const f = document.createElement('div');
+    f.className = 'capf';
+    f.textContent = text;
+    f.style.left = x + 'px';
+    f.style.top = y + 'px';
+    f.style.color = color;
+    fieldEl.appendChild(f);
+    f.addEventListener('animationend', () => f.remove());
+  }
+
+  function breakFx(s, color) {
+    for (let i = 0; i < 6; i++) {
+      const p = document.createElement('div');
+      p.className = 'beam';
+      p.style.background = color;
+      p.style.left = s.x + 'px';
+      p.style.top = (s.y - 12) + 'px';
+      fieldEl.appendChild(p);
+      const a = Math.random() * Math.PI * 2;
+      const d = 18 + Math.random() * 16;
+      p.animate(
+        [{ transform: 'translate(0,0)', opacity: 1 }, { transform: `translate(${Math.cos(a) * d}px, ${Math.sin(a) * d}px)`, opacity: 0 }],
+        { duration: 320, easing: 'ease-out', fill: 'forwards' }
+      );
+      setTimeout(() => p.remove(), 340);
+    }
+    s.stunT = 0.5;
+    s.el.classList.remove('dizzy');
+    void s.el.offsetWidth;
+    s.el.classList.add('dizzy');
+  }
+
+  function hitSoldier(s, side, now) {
+    if (s.state !== 'roam' && s.state !== 'runme' && s.state !== 'runai') return;
+    // runners: the owner reinforces harder (6) than the thief chips (4), so a
+    // defended runner can never be flipped — stealing needs an absent owner
+    let amount = s.spec.conv;
+    if (s.state === 'runme') amount = side === 'me' ? RUN_DEF : RUN_ATK;
+    else if (s.state === 'runai') amount = side === 'ai' ? RUN_DEF : RUN_ATK;
+    s.b = Math.min(100, Math.max(0, s.b + (side === 'me' ? amount : -amount)));
+    s.lastHit = now;
+    renderBar(s);
+    s.el.classList.remove('hitflash');
+    void s.el.offsetWidth;
+    s.el.classList.add('hitflash');
+    if (s.state === 'roam') {
+      if (s.b >= 100) {
+        setSolState(s, 'runme');
+        textFx(s.x, s.y - 24, 'İKNA!', 'var(--gold)');
+      } else if (s.b <= 0) {
+        setSolState(s, 'runai');
+        textFx(s.x, s.y - 24, 'İKNA!', 'var(--danger)');
+      }
+    } else if (s.state === 'runme' && s.b < 50) {
+      s.home = { x: s.x, y: s.y };
+      setSolState(s, 'roam');
+      pickRoamTarget(s);
+      breakFx(s, 'var(--gold)');
+    } else if (s.state === 'runai' && s.b > 50) {
+      s.home = { x: s.x, y: s.y };
+      setSolState(s, 'roam');
+      pickRoamTarget(s);
+      breakFx(s, 'var(--danger)');
+    }
+  }
+
+  function stepSoldiers(dt, now) {
+    for (const s of sols) {
+      if (s.dead) continue;
+      if (s.stunT > 0) {
+        s.stunT -= dt;
+        continue;
+      }
+      if (s.state === 'roam') {
+        // bar drifts back toward neutral after 3 quiet seconds
+        if (s.b !== 50 && now - s.lastHit > DECAY_DELAY) {
+          s.b += Math.sign(50 - s.b) * Math.min(Math.abs(50 - s.b), DECAY_RATE * dt);
+          renderBar(s);
+        }
+        // shy units bolt to the far edge of their circle when a cursor closes in
+        if (s.spec.shy && state === 'play') {
+          let threat = null, td = 70 * 70;
+          for (const c of [effCur, aiCur]) {
+            const d = (c.x - s.x) ** 2 + (c.y - s.y) ** 2;
+            if (d < td) { td = d; threat = c; }
+          }
+          if (threat) {
+            const a = Math.atan2(s.y - threat.y, s.x - threat.x);
+            s.tx = Math.min(W() - 20, Math.max(20, s.home.x + Math.cos(a) * CIRCLE_R));
+            s.ty = Math.min(H() - BASE_H - 24, Math.max(BASE_H + 24, s.home.y + Math.sin(a) * CIRCLE_R));
+            s.idle = 0;
+          }
+        }
+        if (s.idle > 0) {
+          s.idle -= dt;
+        } else {
+          const dx = s.tx - s.x, dy = s.ty - s.y;
+          const d = Math.hypot(dx, dy);
+          if (d < 3) {
+            s.idle = 0.4 + Math.random() * 1.2;
+            pickRoamTarget(s);
+          } else {
+            const sp = s.spec.speed * 0.55 * dt;
+            s.x += dx / d * Math.min(d, sp);
+            s.y += dy / d * Math.min(d, sp);
+          }
+        }
+      } else if (s.state === 'runme' || s.state === 'runai') {
+        const ty = s.state === 'runme' ? H() - BASE_H + 14 : BASE_H - 14;
+        const dy = ty - s.y;
+        const sp = s.spec.speed * RUN_MULT * dt;
+        s.y += Math.sign(dy) * Math.min(Math.abs(dy), sp);
+        s.trailCd = (s.trailCd || 0) - dt;
+        if (s.trailCd <= 0) {
+          s.trailCd = 0.09;
+          const tr = document.createElement('div');
+          tr.className = 'trail';
+          tr.style.background = s.state === 'runme' ? 'var(--gold)' : 'var(--danger)';
+          tr.style.left = s.x + 'px';
+          tr.style.top = (s.y + 6) + 'px';
+          fieldEl.appendChild(tr);
+          tr.addEventListener('animationend', () => tr.remove());
+        }
+        if (Math.abs(dy) < 6) {
+          capture(s, s.state === 'runme' ? 'me' : 'ai');
+          continue;
+        }
+      } else if (s.state === 'sprint') {
+        const ty = s.sprintTo === 'me' ? H() - BASE_H + 14 : BASE_H - 14;
+        const dy = ty - s.y;
+        const sp = s.spec.speed * SPRINT_MULT * dt;
+        s.y += Math.sign(dy) * Math.min(Math.abs(dy), sp);
+        if (Math.abs(dy) < 6) {
+          capture(s, s.sprintTo);
+          continue;
+        }
+      }
+      renderSol(s);
+    }
+    sols = sols.filter(s => !s.dead);
+  }
+
+  /* ---------- Shooting: camera-fire at the cursor ---------- */
+
+  const cur = { x: 0, y: 0 };      // raw pointer position
+  const effCur = { x: 0, y: 0 };   // magnetized aim point (soft-snaps to nearby soldiers)
+  const aiCur = { x: 0, y: 0 };
+  let meFireCd = 0, aiFireCd = 0;
+  const MAG_R = 28;
+
+  function updateMagnet() {
+    effCur.x = cur.x;
+    effCur.y = cur.y;
+    let mag = null, md = MAG_R * MAG_R;
+    for (const s of sols) {
+      if (s.dead) continue;
+      const d = (s.x - cur.x) ** 2 + (s.y - cur.y) ** 2;
+      if (d < md) { md = d; mag = s; }
+    }
+    if (mag) {
+      effCur.x = cur.x + (mag.x - cur.x) * 0.75;
+      effCur.y = cur.y + (mag.y - cur.y) * 0.75;
+    }
+    $('meCursor').style.left = effCur.x + 'px';
+    $('meCursor').style.top = effCur.y + 'px';
+  }
+
+  function beamFx(from, to, side) {
+    for (let i = 0; i < 2; i++) {
+      const p = document.createElement('div');
+      p.className = 'beam';
+      p.style.background = side === 'me' ? 'var(--gold)' : 'var(--danger)';
+      p.style.left = from.x + 'px';
+      p.style.top = from.y + 'px';
+      fieldEl.appendChild(p);
+      const ox = (Math.random() * 10 - 5), oy = (Math.random() * 10 - 5);
+      p.animate(
+        [{ transform: 'translate(0,0)', opacity: .9 }, { transform: `translate(${to.x - from.x + ox}px, ${to.y - from.y + oy}px)`, opacity: .2 }],
+        { duration: 120 + i * 40, easing: 'ease-in', fill: 'forwards' }
+      );
+      setTimeout(() => p.remove(), 180 + i * 40);
+    }
+  }
+
+  function shotFx(x, y, ai) {
+    const el = document.createElement('div');
+    el.className = 'shot' + (ai ? ' ai' : '');
+    el.style.left = x + 'px';
+    el.style.top = y + 'px';
+    fieldEl.appendChild(el);
+    el.addEventListener('animationend', () => el.remove());
+  }
+
+  function fireAt(c, side, now) {
+    const jx = c.x + (Math.random() * 8 - 4);
+    const jy = c.y + (Math.random() * 8 - 4);
+    shotFx(jx, jy, side === 'ai');
+    let best = null, bd = HIT_R * HIT_R;
+    for (const s of sols) {
+      if (s.dead) continue;
+      const dx = s.x - jx, dy = s.y - jy;
+      const d = dx * dx + dy * dy;
+      if (d < bd) { bd = d; best = s; }
+    }
+    if (best) {
+      beamFx(c, best, side);
+      hitSoldier(best, side, now);
+    }
+  }
+
+  /* ---------- AI cursor ---------- */
+
+  /* All difficulties run the same cost/benefit analysis; they differ only in
+     cursor speed, reaction time and how much noise blurs their judgement. */
+  const DIFFS = {
+    easy: { label: 'Kolay', speed: 230, retarget: .6, noise: 8 },
+    mid:  { label: 'Orta',  speed: 320, retarget: .45, noise: 4 },
+    hard: { label: 'Zor',   speed: 420, retarget: .3, noise: 1 }
+  };
+  let aiTarget = null, aiRetarget = 0;
+
+  function aiThink(dt) {
+    aiRetarget -= dt;
+    if (aiRetarget > 0 && aiTarget && !aiTarget.dead) return;
+    const cfg = DIFFS[diffKey];
+    aiRetarget = cfg.retarget;
+    const alive = sols.filter(s => !s.dead && (s.state === 'roam' || s.state === 'runme' || s.state === 'runai'));
+    if (!alive.length) { aiTarget = null; return; }
+
+    const myBaseY = H() - BASE_H;
+    const aiBaseY = BASE_H;
+    let best = null, bs = -Infinity;
+
+    for (const s of alive) {
+      const rank = VALS.indexOf(s.val);
+      const value = 4 + rank * 5;
+      const travel = Math.hypot(s.x - aiCur.x, s.y - aiCur.y) / cfg.speed;
+      let score;
+
+      if (s.state === 'roam') {
+        // value per second: convert cost + how long the exposed run home will be
+        const hits = Math.ceil(Math.max(1, s.b) / s.spec.conv);
+        const convertTime = travel + hits * FIRE_CD;
+        const runTime = Math.max(0, s.y - aiBaseY) / (s.spec.speed * RUN_MULT);
+        score = value / (0.6 + convertTime + runTime * 0.45);
+        // the player's cursor is parked here → contested, expect resistance
+        if (Math.hypot(s.x - effCur.x, s.y - effCur.y) < 70) score *= 0.6;
+      } else if (s.state === 'runme') {
+        // my runner: can it still be flipped before it reaches my base?
+        const capTime = Math.max(0.05, myBaseY - s.y) / (s.spec.speed * RUN_MULT);
+        const hits = Math.ceil((s.b - 49) / RUN_ATK);
+        const flipTime = travel + hits * FIRE_CD;
+        const escorted = Math.hypot(s.x - effCur.x, s.y - effCur.y) < 80; // owner defending → 6 beats 4, unwinnable
+        score = escorted || flipTime > capTime * 0.95
+          ? -50                                   // hopeless chase — let it go
+          : (value * 1.6) / (0.4 + flipTime) + 6; // steal-back denies me AND feeds it
+      } else {
+        // its own runner: escort only when the player is actually threatening it
+        const inDanger = s.b > 25 && Math.hypot(s.x - effCur.x, s.y - effCur.y) < 80;
+        score = inDanger ? (value * 1.3) / (0.4 + travel) : -30;
+      }
+
+      score += (Math.random() * 2 - 1) * cfg.noise;
+      if (score > bs) { bs = score; best = s; }
+    }
+    aiTarget = best;
+  }
+
+  function stepAiCursor(dt) {
+    if (!aiTarget || aiTarget.dead) return;
+    const cfg = DIFFS[diffKey];
+    const dx = aiTarget.x - aiCur.x, dy = aiTarget.y - aiCur.y;
+    const d = Math.hypot(dx, dy);
+    if (d > 2) {
+      const sp = cfg.speed * dt;
+      aiCur.x += dx / d * Math.min(d, sp);
+      aiCur.y += dy / d * Math.min(d, sp);
+    }
+    $('aiCursor').style.left = aiCur.x + 'px';
+    $('aiCursor').style.top = aiCur.y + 'px';
+  }
+
+  /* ---------- Endphase: runners skirmish on the board ---------- */
+
+  function beginEndphase() {
+    state = 'endphase';
+    $('meCursor').hidden = true;
+    $('aiCursor').hidden = true;
+    const mine = sols.filter(s => !s.dead && s.state === 'runme');
+    const theirs = sols.filter(s => !s.dead && s.state === 'runai');
+    // roaming soldiers were never won over — they leave
+    for (const s of sols) {
+      if (!s.dead && s.state === 'roam') {
+        s.dead = true;
+        s.el.classList.add('leave');
+        setTimeout(() => s.el.remove(), 320);
+      }
+    }
+    sols = sols.filter(s => !s.dead);
+    if (mine.length && theirs.length) {
+      for (const s of [...mine, ...theirs]) {
+        s.stateSide = s.state === 'runme' ? 'me' : 'ai';
+        setSolState(s, 'fight');
+        s.hp = s.spec.hp;
+        s.cd = 0.3;
+        s.el.classList.add('hpmode', s.stateSide === 'me' ? 'mine' : 'theirs');
+        s.barEl.style.width = '100%';
+      }
+    } else {
+      for (const s of [...mine, ...theirs]) {
+        s.sprintTo = s.state === 'runme' ? 'me' : 'ai';
+        setSolState(s, 'sprint');
+      }
+    }
+  }
+
+  function hurtSol(s, dmg) {
+    s.hp -= dmg;
+    s.el.classList.remove('hitflash');
+    void s.el.offsetWidth;
+    s.el.classList.add('hitflash');
+    s.barEl.style.width = Math.max(0, s.hp / s.spec.hp * 100) + '%';
+    if (s.hp <= 0) {
+      s.dead = true;
+      const sp = document.createElement('div');
+      sp.className = 'splat';
+      const d = Math.round(s.spec.size * 1.5);
+      sp.style.width = d + 'px';
+      sp.style.height = d + 'px';
+      sp.style.left = s.x + 'px';
+      sp.style.top = s.y + 'px';
+      sp.style.rotate = ((Math.random() * 360) | 0) + 'deg';
+      fieldEl.appendChild(sp);
+      setTimeout(() => sp.remove(), 2100);
+      s.el.remove();
+    }
+  }
+
+  function fieldProj(x0, y0, x1, y1, type) {
+    const p = document.createElement('div');
+    p.className = 'proj' + (type ? ' ' + type : '');
+    fieldEl.appendChild(p);
+    const rot = type === 'arrow' ? ` rotate(${(Math.atan2(y1 - y0, x1 - x0) * 180 / Math.PI).toFixed(1)}deg)` : '';
+    p.style.transform = `translate(${x0}px, ${y0}px)` + rot;
+    p.animate(
+      [{ transform: `translate(${x0}px, ${y0}px)` + rot }, { transform: `translate(${x1}px, ${y1}px)` + rot }],
+      { duration: 130, easing: 'linear', fill: 'forwards' }
+    );
+    setTimeout(() => p.remove(), 170);
+  }
+
+  function stepSkirmish(dt) {
+    const fighters = sols.filter(s => !s.dead && s.state === 'fight');
+    for (const s of fighters) {
+      s.cd -= dt;
+      let nearest = null, nd = Infinity;
+      for (const v of fighters) {
+        if (v.dead || v.stateSide === s.stateSide) continue;
+        const d = Math.hypot(v.x - s.x, v.y - s.y);
+        if (d < nd) { nd = d; nearest = v; }
+      }
+      if (!nearest) continue;
+      const eff = s.spec.range + (s.spec.size + nearest.spec.size) / 4;
+      if (nd <= eff) {
+        if (s.cd <= 0) {
+          s.cd = s.spec.per;
+          s.el.classList.remove('atk');
+          void s.el.offsetWidth;
+          s.el.classList.add('atk');
+          if (s.spec.ranged) fieldProj(s.x, s.y, nearest.x, nearest.y, s.spec.proj);
+          if (s.spec.splash) {
+            for (const v of fighters) {
+              if (v.dead || v.stateSide === s.stateSide) continue;
+              if (Math.hypot(v.x - nearest.x, v.y - nearest.y) <= s.spec.splash) hurtSol(v, s.spec.dmg);
+            }
+          } else {
+            hurtSol(nearest, s.spec.dmg);
+          }
+        }
+      } else {
+        const sp = s.spec.speed * dt / nd;
+        s.x += (nearest.x - s.x) * sp;
+        s.y += (nearest.y - s.y) * sp;
+      }
+      renderSol(s);
+    }
+    sols = sols.filter(s => !s.dead);
+
+    const mAlive = sols.some(s => s.state === 'fight' && s.stateSide === 'me');
+    const aAlive = sols.some(s => s.state === 'fight' && s.stateSide === 'ai');
+    if (!mAlive || !aAlive) {
+      for (const s of sols) {
+        if (s.state === 'fight') {
+          s.sprintTo = s.stateSide;
+          setSolState(s, 'sprint');
+        }
+      }
+    }
+  }
+
+  /* ---------- Arena battle (shared engine) ---------- */
+
+  let units = [];
+
+  function spawnUnit(side, value, x, y) {
+    const spec = UNITS[value];
+    const el = document.createElement('div');
+    el.className = 'unit born ' + side + ' k' + value;
+    el.innerHTML = `<span class="g" style="width:${spec.px}px;height:${spec.px}px">${SPRITES[value]}</span><div class="uhp"><i></i></div>`;
+    el.addEventListener('animationend', e => {
+      if (e.animationName === 'spawn') el.classList.remove('born');
+      else if (e.animationName === 'hurtf') el.classList.remove('hurt');
+    });
+    laneEl.appendChild(el);
+    const u = { side, spec, hp: spec.hp, x, y, cd: 0.4, dead: false, el, hpEl: el.querySelector('.uhp i') };
+    el.style.transform = `translate(${x}px, ${y}px) translate(-50%, -50%)`;
+    units.push(u);
+  }
+
+  function laneSplat(x, y, size) {
+    const s = document.createElement('div');
+    s.className = 'splat';
+    const d = Math.round(size * 1.5);
+    s.style.width = d + 'px';
+    s.style.height = d + 'px';
+    s.style.left = x + 'px';
+    s.style.top = y + 'px';
+    s.style.rotate = ((Math.random() * 360) | 0) + 'deg';
+    laneEl.appendChild(s);
+    setTimeout(() => s.remove(), 2100);
+  }
+
+  function killUnit(u) {
+    u.dead = true;
+    laneSplat(u.x, u.y, u.spec.size);
+    u.el.remove();
+  }
+
+  function hurtUnit(u, dmg) {
+    u.hp -= dmg;
+    u.el.classList.remove('hurt');
+    void u.el.offsetWidth;
+    u.el.classList.add('hurt');
+    u.hpEl.style.width = Math.max(0, u.hp / u.spec.hp * 100) + '%';
+    if (u.hp <= 0) killUnit(u);
+  }
+
+  function laneProj(x0, y0, x1, y1, type) {
+    const p = document.createElement('div');
+    p.className = 'proj' + (type ? ' ' + type : '');
+    laneEl.appendChild(p);
+    const rot = type === 'arrow' ? ` rotate(${(Math.atan2(y1 - y0, x1 - x0) * 180 / Math.PI).toFixed(1)}deg)` : '';
+    p.style.transform = `translate(${x0}px, ${y0}px)` + rot;
+    p.animate(
+      [{ transform: `translate(${x0}px, ${y0}px)` + rot }, { transform: `translate(${x1}px, ${y1}px)` + rot }],
+      { duration: 130, easing: 'linear', fill: 'forwards' }
+    );
+    setTimeout(() => p.remove(), 170);
+  }
+
+  function attack(u, target) {
+    u.el.classList.remove('atk');
+    void u.el.offsetWidth;
+    u.el.classList.add('atk');
+    if (u.spec.ranged) laneProj(u.x, u.y, target.x, target.y, u.spec.proj);
+    if (u.spec.splash) {
+      for (const v of units) {
+        if (v.dead || v.side === u.side) continue;
+        if (Math.hypot(v.x - target.x, v.y - target.y) <= u.spec.splash) hurtUnit(v, u.spec.dmg);
+      }
+    } else {
+      hurtUnit(target, u.spec.dmg);
+    }
+  }
+
+  function simulate(dt) {
+    const laneW = laneEl.clientWidth, laneH = laneEl.clientHeight;
+    for (const u of units) {
+      if (u.dead) continue;
+      u.cd -= dt;
+      let nearest = null, nd = Infinity;
+      for (const v of units) {
+        if (v.dead || v.side === u.side) continue;
+        const d = Math.hypot(v.x - u.x, v.y - u.y);
+        if (d < nd) { nd = d; nearest = v; }
+      }
+      if (nearest) {
+        const eff = u.spec.range + (u.spec.size + nearest.spec.size) / 4;
+        if (nd <= eff) {
+          if (u.cd <= 0) { u.cd = u.spec.per; attack(u, nearest); }
+        } else {
+          const s = u.spec.speed * dt / nd;
+          u.x += (nearest.x - u.x) * s;
+          u.y += (nearest.y - u.y) * s;
+        }
+      }
+    }
+    for (let i = 0; i < units.length; i++) {
+      const a = units[i];
+      if (a.dead) continue;
+      for (let j = i + 1; j < units.length; j++) {
+        const b = units[j];
+        if (b.dead || b.side !== a.side) continue;
+        const dx = b.x - a.x, dy = b.y - a.y;
+        const d = Math.hypot(dx, dy);
+        const min = (a.spec.size + b.spec.size) / 2;
+        if (d > 0 && d < min) {
+          const push = (min - d) / 2;
+          a.x -= dx / d * push; a.y -= dy / d * push;
+          b.x += dx / d * push; b.y += dy / d * push;
+        }
+      }
+    }
+    for (const u of units) {
+      if (u.dead) continue;
+      u.x = Math.min(laneW - 8, Math.max(8, u.x));
+      u.y = Math.min(laneH - 8, Math.max(8, u.y));
+      u.el.style.transform = `translate(${u.x}px, ${u.y}px) translate(-50%, -50%)`;
+    }
+    units = units.filter(u => !u.dead);
+
+    const m = units.some(u => u.side === 'me');
+    const a = units.some(u => u.side === 'ai');
+    if (!m || !a) finish('army');
+  }
+
+  function clearUnits() {
+    for (const u of units) u.el.remove();
+    units = [];
+  }
+
+  function livingUnitHp(side) {
+    return units.reduce((s, u) => s + (u.side === side && !u.dead ? u.hp : 0), 0);
+  }
+  function livingUnitCount(side) {
+    return units.filter(u => u.side === side && !u.dead).length;
+  }
+
+  /* ---------- Main loop ---------- */
+
+  let lastTick = 0;
+
+  function loop(ts) {
+    if (state !== 'play' && state !== 'endphase' && state !== 'fight') return;
+    const dt = Math.min(0.05, (ts - lastTick) / 1000 || 0.016);
+    lastTick = ts;
+    const now = ts / 1000;
+
+    if (state === 'play') {
+      const rem = endAt - performance.now();
+      renderClock(Math.max(0, rem));
+      if (rem <= 0) {
+        beginEndphase();
+      } else {
+        stepSoldiers(dt, now);
+        updateMagnet();
+        aiThink(dt);
+        stepAiCursor(dt);
+        meFireCd -= dt;
+        if (meFireCd <= 0) { fireAt(effCur, 'me', now); meFireCd = FIRE_CD; }
+        aiFireCd -= dt;
+        if (aiFireCd <= 0) { fireAt(aiCur, 'ai', now); aiFireCd = FIRE_CD; }
+      }
+    } else if (state === 'endphase') {
+      stepSkirmish(dt);
+      stepSoldiers(dt, now); // sprinters keep moving & get captured
+      if (!sols.length) {
+        beginFightSplash();
+        return;
+      }
+    } else {
+      const rem = endAt - performance.now();
+      renderTimer(Math.max(0, rem));
+      if (rem <= 0) { finish('ftime'); return; }
+      simulate(dt);
+    }
+    requestAnimationFrame(loop);
+  }
+
+  /* ---------- Match controller ---------- */
+
+  let state = 'idle'; // idle | play | endphase | fightsplash | fight | ended
+  let diffKey = storage.get('convertvs_diff') || 'mid';
+  if (!DIFFS[diffKey]) diffKey = 'mid';
+  let endAt = 0;
+
+  const overlay = $('overlay');
+  const startPanel = $('startPanel');
+  const endPanel = $('endPanel');
+
+  function renderClock(ms) {
+    const sec = Math.ceil(ms / 1000);
+    const c = $('hudchip');
+    c.textContent = Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0');
+    c.classList.toggle('urgent', state === 'play' && sec <= 10);
+  }
+
+  function renderTimer(ms) {
+    const sec = Math.ceil(ms / 1000);
+    const t = $('timer');
+    t.textContent = Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0');
+    t.classList.toggle('urgent', state === 'fight' && sec <= 10);
+  }
+
+  function showPanel(panel) {
+    for (const p of [startPanel, endPanel]) p.hidden = p !== panel;
+    overlay.classList.toggle('show', !!panel);
+  }
+
+  function loadTally() {
+    try { return JSON.parse(storage.get('convertvs_tally')) || { w: 0, l: 0, d: 0 }; }
+    catch { return { w: 0, l: 0, d: 0 }; }
+  }
+  function renderTally() {
+    const t = loadTally();
+    const text = `Seri: ${t.w}G · ${t.l}M · ${t.d}B`;
+    $('tallyStart').textContent = text;
+    $('tallyEnd').textContent = text;
+  }
+  function addTally(result) {
+    const t = loadTally();
+    t[result]++;
+    storage.set('convertvs_tally', JSON.stringify(t));
+    renderTally();
+  }
+
+  function setDiff(k) {
+    diffKey = k;
+    storage.set('convertvs_diff', k);
+    $('diffLabel').textContent = DIFFS[k].label;
+    for (const b of $('diffSeg').children) b.classList.toggle('on', b.dataset.d === k);
+  }
+
+  function clearField() {
+    for (const s of sols) s.el.remove();
+    sols = [];
+  }
+
+  function startMatch() {
+    clearField();
+    clearUnits();
+    resetBanks();
+    fieldEl.hidden = false;
+    $('fightView').hidden = true;
+    spawnSoldiers();
+    cur.x = W() / 2;
+    cur.y = H() * 0.6;
+    aiCur.x = W() / 2;
+    aiCur.y = H() * 0.25;
+    $('meCursor').hidden = false;
+    $('aiCursor').hidden = false;
+    $('meCursor').style.left = cur.x + 'px';
+    $('meCursor').style.top = cur.y + 'px';
+    $('aiCursor').style.left = aiCur.x + 'px';
+    $('aiCursor').style.top = aiCur.y + 'px';
+    meFireCd = 0.3;
+    aiFireCd = 0.4;
+    aiTarget = null;
+    aiRetarget = 0;
+    state = 'play';
+    showPanel(null);
+    endAt = performance.now() + GATHER_MS;
+    renderClock(GATHER_MS);
+    lastTick = performance.now();
+    requestAnimationFrame(loop);
+  }
+
+  function beginFightSplash() {
+    state = 'fightsplash';
+    const sp = document.createElement('div');
+    sp.className = 'fight-splash';
+    sp.innerHTML = '<span>FIGHT!</span>';
+    $('game').appendChild(sp);
+    setTimeout(() => sp.remove(), 950);
+    setTimeout(startFight, 900);
+  }
+
+  function startFight() {
+    fieldEl.hidden = true;
+    $('fightView').hidden = false;
+    state = 'fight';
+    const laneW = laneEl.clientWidth, laneH = laneEl.clientHeight;
+    const zone = Math.min(70, laneH * .2);
+    for (const side of ['me', 'ai']) {
+      for (const [v, count] of Object.entries(bank[side])) {
+        for (let i = 0; i < count; i++) {
+          const x = 12 + Math.random() * (laneW - 24);
+          const y = side === 'me'
+            ? laneH - 14 - Math.random() * zone
+            : 14 + Math.random() * zone;
+          spawnUnit(side, +v, x, y);
+        }
+      }
+    }
+    endAt = performance.now() + BATTLE_MS;
+    renderTimer(BATTLE_MS);
+    lastTick = performance.now();
+    requestAnimationFrame(loop);
+  }
+
+  function finish(kind) {
+    if (state !== 'fight') return;
+    state = 'ended';
+    const m = livingUnitHp('me'), a = livingUnitHp('ai');
+    const result = m > a ? 'w' : m < a ? 'l' : 'd';
+    $('endTitle').textContent = result === 'w' ? 'Kazandın!' : result === 'l' ? 'Kaybettin' : 'Berabere';
+    $('endSub').textContent = `Toplanan: Sen ${caps.me} · Rakip ${caps.ai} — Kalan birim: Sen ${livingUnitCount('me')} · Rakip ${livingUnitCount('ai')}`;
+    addTally(result);
+    showPanel(endPanel);
+  }
+
+  /* ---------- Input ---------- */
+
+  function moveCursor(e) {
+    const rect = fieldEl.getBoundingClientRect();
+    cur.x = Math.min(W() - 4, Math.max(4, e.clientX - rect.left));
+    cur.y = Math.min(H() - 4, Math.max(4, e.clientY - rect.top));
+    $('meCursor').style.left = cur.x + 'px';
+    $('meCursor').style.top = cur.y + 'px';
+  }
+  fieldEl.addEventListener('pointermove', moveCursor);
+  fieldEl.addEventListener('pointerdown', moveCursor);
+  window.addEventListener('touchmove', e => {
+    if (state !== 'idle' && state !== 'ended') e.preventDefault();
+  }, { passive: false });
+
+  $('diffSeg').addEventListener('click', e => {
+    const b = e.target.closest('button');
+    if (b) setDiff(b.dataset.d);
+  });
+  $('startBtn').addEventListener('click', startMatch);
+  $('againBtn').addEventListener('click', startMatch);
+  $('chgBtn').addEventListener('click', () => {
+    state = 'idle';
+    showPanel(startPanel);
+  });
+
+  setDiff(diffKey);
+  renderTally();
+  showPanel(startPanel);
+</script>

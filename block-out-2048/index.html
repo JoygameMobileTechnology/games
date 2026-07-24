@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Block Out 2048</title>
+<style>
+  :root{
+    --frame:#4d3f9e;
+    --frame-dark:#3a2f7c;
+    --board:#241d54;
+    --gate:#c8ecff;
+    --gate-text:#1c5a8a;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%}
+  body{
+    font-family:"Arial Rounded MT Bold","Segoe UI",system-ui,sans-serif;
+    background:radial-gradient(120% 100% at 50% 0%, #322a6e 0%, #1a1440 55%, #120e30 100%);
+    color:#fff;
+    display:flex;flex-direction:column;align-items:center;
+    min-height:100%;
+    overflow-x:hidden;
+    user-select:none;-webkit-user-select:none;
+  }
+  h1{
+    margin-top:14px;
+    font-size:clamp(22px,6vw,34px);
+    letter-spacing:2px;
+    background:linear-gradient(#ffe95c,#ffab2e);
+    -webkit-background-clip:text;background-clip:text;
+    -webkit-text-fill-color:transparent;
+    filter:drop-shadow(0 2px 0 rgba(0,0,0,.45));
+  }
+  .hud{
+    display:flex;align-items:center;gap:10px;
+    margin:10px 0 6px;
+  }
+  .hud .pill{
+    background:rgba(255,255,255,.10);
+    border:2px solid rgba(255,255,255,.15);
+    border-radius:12px;
+    padding:6px 14px;
+    font-size:15px;font-weight:bold;
+    min-width:86px;text-align:center;
+  }
+  .hud button{
+    background:linear-gradient(#ff7b64,#e8402e);
+    border:none;border-radius:12px;
+    box-shadow:0 3px 0 #9c2317;
+    color:#fff;font-size:18px;font-weight:bold;
+    width:44px;height:40px;cursor:pointer;
+  }
+  .hud button:active{transform:translateY(2px);box-shadow:0 1px 0 #9c2317}
+  .hud button:disabled{filter:grayscale(.8);opacity:.5;cursor:default}
+  .levels{
+    display:flex;gap:6px;margin:4px 0 10px;flex-wrap:wrap;justify-content:center;
+    max-width:420px;
+  }
+  .levels button{
+    width:34px;height:34px;border:none;border-radius:10px;cursor:pointer;
+    font-weight:bold;font-size:14px;color:#fff;
+    background:rgba(255,255,255,.12);
+    border:2px solid rgba(255,255,255,.15);
+  }
+  .levels button.current{background:linear-gradient(#ffd94d,#ff9d00);color:#5a3600;border-color:#ffe98c}
+  .levels button.done{background:linear-gradient(#7ddb5e,#3da32c);border-color:#a9f08f}
+  .levels button:disabled{opacity:.35;cursor:default}
+
+  #stage{position:relative;margin-bottom:8px}
+  #frame{
+    position:relative;
+    background:linear-gradient(#5a4bb5,var(--frame) 40%,var(--frame-dark));
+    border-radius:18px;
+    box-shadow:0 6px 0 #241b5e, 0 14px 30px rgba(0,0,0,.5), inset 0 2px 0 rgba(255,255,255,.25);
+    touch-action:none;
+  }
+  #board{
+    position:relative;
+    background:var(--board);
+    border-radius:8px;
+    box-shadow:inset 0 4px 10px rgba(0,0,0,.55);
+    touch-action:none;
+  }
+  .wall{
+    position:absolute;
+    background:linear-gradient(#5a4bb5,var(--frame) 60%,var(--frame-dark));
+    border-radius:6px;
+    box-shadow:inset 0 2px 0 rgba(255,255,255,.22), 0 2px 4px rgba(0,0,0,.4);
+  }
+  .gate{
+    position:absolute;
+    background:linear-gradient(#eaf8ff,var(--gate));
+    display:flex;align-items:center;justify-content:center;
+    color:var(--gate-text);
+    font-weight:bold;
+    box-shadow:inset 0 0 0 2px rgba(28,90,138,.25), inset 0 2px 3px rgba(255,255,255,.9);
+    z-index:1;
+  }
+  .gate .num{position:relative;z-index:2;text-shadow:0 1px 0 #fff}
+  .gate .arr{position:absolute;opacity:.4;font-size:.8em}
+
+  .block{
+    position:absolute;
+    transition:transform .18s cubic-bezier(.25,.9,.35,1.15), opacity .18s ease;
+    will-change:transform;
+    z-index:3;
+    pointer-events:none;
+  }
+  .block .tile{
+    position:absolute;
+    border-radius:6px;
+    overflow:hidden;
+    pointer-events:auto;
+    cursor:grab;
+    box-shadow:inset 0 3px 0 rgba(255,255,255,.35), inset 0 -4px 0 rgba(0,0,0,.28);
+  }
+  .block .tface{position:absolute;inset:0}
+  .block .tstuds{
+    position:absolute;inset:0;
+    background-image:radial-gradient(circle at 50% 44%, rgba(255,255,255,.30) 0 24%, rgba(0,0,0,.10) 26% 30%, transparent 32%);
+  }
+  .block .v{
+    position:absolute;z-index:2;
+    transform:translate(-50%,-50%);
+    color:#fff;font-weight:bold;
+    background:rgba(0,0,0,.28);
+    border-radius:999px;
+    padding:.1em .5em;
+    text-shadow:0 2px 2px rgba(0,0,0,.5);
+    box-shadow:inset 0 2px 3px rgba(0,0,0,.35), 0 1px 0 rgba(255,255,255,.25);
+    pointer-events:none;
+    white-space:nowrap;
+  }
+  .block.pop{animation:mergePop .2s ease-out}
+  @keyframes mergePop{
+    0%{scale:1.04;filter:brightness(1.9)}
+    60%{scale:1.02;filter:brightness(1.3)}
+    100%{scale:1;filter:brightness(1)}
+  }
+  .block.shake-h{animation:shakeH .25s ease}
+  .block.shake-v{animation:shakeV .25s ease}
+  @keyframes shakeH{0%,100%{margin-left:0}30%{margin-left:-5px}65%{margin-left:5px}}
+  @keyframes shakeV{0%,100%{margin-top:0}30%{margin-top:-5px}65%{margin-top:5px}}
+
+  #overlay{
+    position:absolute;inset:0;z-index:10;
+    display:none;align-items:center;justify-content:center;
+    background:rgba(15,10,40,.72);
+    border-radius:18px;
+  }
+  #overlay.show{display:flex}
+  #overlay .card{
+    background:linear-gradient(#3d3387,#2b2264);
+    border:3px solid #7a6ad6;
+    border-radius:18px;
+    padding:26px 34px;
+    text-align:center;
+    box-shadow:0 10px 30px rgba(0,0,0,.6);
+    animation:pop .3s cubic-bezier(.3,1.5,.5,1);
+  }
+  @keyframes pop{from{scale:.6;opacity:0}to{scale:1;opacity:1}}
+  #overlay h2{color:#ffe45c;font-size:26px;margin-bottom:6px;text-shadow:0 2px 0 rgba(0,0,0,.4)}
+  #overlay p{opacity:.85;margin-bottom:16px;font-size:14px}
+  #overlay button{
+    background:linear-gradient(#8ae06a,#43a832);
+    border:none;border-radius:12px;
+    box-shadow:0 4px 0 #256b18;
+    color:#fff;font-size:18px;font-weight:bold;
+    padding:10px 26px;cursor:pointer;
+  }
+  #overlay button:active{transform:translateY(2px);box-shadow:0 2px 0 #256b18}
+
+  .hint{
+    max-width:380px;text-align:center;
+    font-size:13px;line-height:1.5;
+    opacity:.65;margin-bottom:20px;padding:0 12px;
+  }
+</style>
+</head>
+<body>
+<h1>BLOCK OUT 2048</h1>
+<div class="hud">
+  <button id="btnUndo" title="Undo">↩</button>
+  <div class="pill" id="lvlLabel">Level 1</div>
+  <div class="pill" id="movesLabel">Moves: 0</div>
+  <button id="btnRestart" title="Restart">⟳</button>
+</div>
+<div class="levels" id="levelBtns"></div>
+<div id="stage">
+  <div id="frame">
+    <div id="board"></div>
+    <div id="overlay">
+      <div class="card">
+        <h2 id="ovTitle">Level Complete!</h2>
+        <p id="ovSub"></p>
+        <button id="btnNext">Next ▶</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="hint">
+  <b>Swipe a block</b> to slide it until it hits something.
+  Blocks merge only when they have the <b>same shape AND the same number</b> — the number doubles.
+  A block escapes through a gate showing its <b>exact number</b> that spans its full width.
+</div>
+
+<script>
+'use strict';
+
+/* ---------- Shapes (cell offsets from bounding-box top-left) ---------- */
+const SHAPES = {
+  P1: [[0,0]],
+  D2H:[[0,0],[1,0]],
+  D2V:[[0,0],[0,1]],
+  O4: [[0,0],[1,0],[0,1],[1,1]],
+  I4H:[[0,0],[1,0],[2,0],[3,0]],
+  I4V:[[0,0],[0,1],[0,2],[0,3]],
+  T4: [[0,0],[1,0],[2,0],[1,1]],
+  L4: [[0,0],[0,1],[0,2],[1,2]],
+  J4: [[1,0],[1,1],[1,2],[0,2]],
+  S4: [[1,0],[2,0],[0,1],[1,1]],
+  Z4: [[0,0],[1,0],[1,1],[2,1]]
+};
+
+/* ---------- Levels ---------- */
+// gates: side top/bottom -> pos = start column; left/right -> pos = start row
+// Merge rule (all levels): same shape + same number only.
+const LEVELS = [
+  { // 1 — tutorial: 2+2=4, out
+    w:5,h:5,walls:[],
+    gates:[{side:'right',pos:2,len:1,v:4}],
+    blocks:[{x:1,y:2,sh:'P1',v:2},{x:3,y:2,sh:'P1',v:2}]
+  },
+  { // 2 — chain to 8
+    w:6,h:6,walls:[],
+    gates:[{side:'left',pos:3,len:1,v:8}],
+    blocks:[{x:0,y:0,sh:'P1',v:2},{x:0,y:3,sh:'P1',v:2},{x:3,y:3,sh:'P1',v:4}]
+  },
+  { // 3 — dominoes need double-wide gates
+    w:6,h:6,walls:[],
+    gates:[{side:'right',pos:1,len:2,v:4},{side:'right',pos:4,len:1,v:4}],
+    blocks:[
+      {x:1,y:1,sh:'D2V',v:2},{x:4,y:1,sh:'D2V',v:2},
+      {x:2,y:4,sh:'P1',v:2},{x:4,y:4,sh:'P1',v:2}
+    ]
+  },
+  { // 4 — O-square giants, reuse the space they free up
+    w:8,h:8,walls:[[7,3]],
+    gates:[{side:'right',pos:1,len:2,v:8},{side:'bottom',pos:7,len:1,v:4}],
+    blocks:[
+      {x:1,y:1,sh:'O4',v:4},{x:5,y:1,sh:'O4',v:4},
+      {x:0,y:7,sh:'P1',v:2},{x:7,y:7,sh:'P1',v:2}
+    ]
+  },
+  { // 5 — move the blocker first, order matters
+    w:6,h:6,walls:[],
+    gates:[{side:'right',pos:5,len:1,v:8}],
+    blocks:[
+      {x:0,y:2,sh:'P1',v:2},{x:5,y:2,sh:'P1',v:2},{x:3,y:2,sh:'P1',v:4}
+    ]
+  },
+  { // 6 — two shape families, two gates: shapes never cross-merge
+    w:7,h:7,walls:[],
+    gates:[{side:'bottom',pos:1,len:1,v:4},{side:'right',pos:4,len:2,v:4}],
+    blocks:[
+      {x:1,y:1,sh:'P1',v:2},{x:1,y:5,sh:'P1',v:2},
+      {x:4,y:1,sh:'D2V',v:2},{x:4,y:4,sh:'D2V',v:2}
+    ]
+  },
+  { // 7 — parking lane: the 4 blocks the chain, park it and bring it back
+    w:7,h:7,walls:[],
+    gates:[{side:'right',pos:6,len:1,v:16}],
+    blocks:[
+      {x:0,y:6,sh:'P1',v:2},{x:2,y:6,sh:'P1',v:4},
+      {x:4,y:6,sh:'P1',v:2},{x:6,y:6,sh:'P1',v:8}
+    ]
+  },
+  { // 8 — T-tetrominoes: the stem finds the socket
+    w:8,h:8,walls:[],
+    gates:[{side:'bottom',pos:1,len:3,v:8},{side:'right',pos:7,len:1,v:4}],
+    blocks:[
+      {x:1,y:1,sh:'T4',v:4},{x:1,y:5,sh:'T4',v:4},
+      {x:6,y:0,sh:'P1',v:2},{x:6,y:7,sh:'P1',v:2}
+    ]
+  },
+  { // 9 — L vs J: same number, different shape — no cross-merge!
+    w:8,h:8,walls:[],
+    gates:[
+      {side:'bottom',pos:0,len:2,v:4},
+      {side:'bottom',pos:6,len:2,v:4},
+      {side:'right',pos:7,len:1,v:4}
+    ],
+    blocks:[
+      {x:0,y:0,sh:'L4',v:2},{x:0,y:4,sh:'L4',v:2},
+      {x:6,y:0,sh:'J4',v:2},{x:6,y:4,sh:'J4',v:2},
+      {x:2,y:7,sh:'P1',v:2},{x:5,y:7,sh:'P1',v:2}
+    ]
+  },
+  { // 10 — S vs Z twins across the divider
+    w:8,h:8,walls:[[4,3],[4,4]],
+    gates:[{side:'bottom',pos:0,len:3,v:4},{side:'bottom',pos:5,len:3,v:4}],
+    blocks:[
+      {x:0,y:0,sh:'S4',v:2},{x:0,y:5,sh:'S4',v:2},
+      {x:5,y:0,sh:'Z4',v:2},{x:5,y:5,sh:'Z4',v:2}
+    ]
+  },
+  { // 11 — I-beams: horizontal and vertical never mix
+    w:9,h:9,walls:[],
+    gates:[{side:'bottom',pos:1,len:4,v:4},{side:'right',pos:5,len:4,v:4}],
+    blocks:[
+      {x:1,y:0,sh:'I4H',v:2},{x:1,y:7,sh:'I4H',v:2},
+      {x:7,y:0,sh:'I4V',v:2},{x:7,y:5,sh:'I4V',v:2}
+    ]
+  },
+  { // 12 — scrambled lane, build 32 across the whole board
+    w:8,h:8,walls:[[4,4]],
+    gates:[{side:'left',pos:4,len:1,v:32}],
+    blocks:[
+      {x:1,y:0,sh:'P1',v:8},{x:3,y:0,sh:'P1',v:2},{x:5,y:0,sh:'P1',v:2},
+      {x:7,y:0,sh:'P1',v:4},{x:0,y:4,sh:'P1',v:16}
+    ]
+  },
+  { // 13 — four corners, pick your pairs
+    w:7,h:7,walls:[[3,1],[3,5]],
+    gates:[{side:'top',pos:1,len:1,v:4},{side:'right',pos:3,len:1,v:8}],
+    blocks:[
+      {x:1,y:1,sh:'P1',v:2},{x:5,y:1,sh:'P1',v:2},
+      {x:1,y:5,sh:'P1',v:2},{x:5,y:5,sh:'P1',v:2},
+      {x:3,y:3,sh:'P1',v:4}
+    ]
+  },
+  { // 14 — three shape families, three gates
+    w:8,h:8,walls:[],
+    gates:[
+      {side:'right',pos:1,len:2,v:4},
+      {side:'bottom',pos:2,len:2,v:4},
+      {side:'right',pos:7,len:1,v:8}
+    ],
+    blocks:[
+      {x:1,y:1,sh:'D2V',v:2},{x:6,y:1,sh:'D2V',v:2},
+      {x:2,y:4,sh:'D2H',v:2},{x:2,y:6,sh:'D2H',v:2},
+      {x:7,y:0,sh:'P1',v:2},{x:7,y:7,sh:'P1',v:2},{x:0,y:7,sh:'P1',v:4}
+    ]
+  },
+  { // 15 — the funnel: one wall stop serves two gates
+    w:9,h:9,walls:[[4,3]],
+    gates:[{side:'left',pos:4,len:1,v:8},{side:'right',pos:2,len:1,v:8}],
+    blocks:[
+      {x:0,y:0,sh:'P1',v:2},{x:0,y:8,sh:'P1',v:2},{x:4,y:8,sh:'P1',v:4},
+      {x:8,y:0,sh:'P1',v:2},{x:8,y:8,sh:'P1',v:2},{x:4,y:0,sh:'P1',v:4}
+    ]
+  },
+  { // 16 — finale: the tetromino zoo
+    w:9,h:9,walls:[],
+    gates:[
+      {side:'bottom',pos:0,len:3,v:8},
+      {side:'right',pos:0,len:2,v:8},
+      {side:'bottom',pos:7,len:1,v:16}
+    ],
+    blocks:[
+      {x:0,y:0,sh:'T4',v:4},{x:0,y:6,sh:'T4',v:4},
+      {x:4,y:0,sh:'O4',v:4},{x:7,y:0,sh:'O4',v:4},
+      {x:3,y:8,sh:'P1',v:2},{x:5,y:8,sh:'P1',v:2},
+      {x:7,y:8,sh:'P1',v:4},{x:4,y:4,sh:'P1',v:8}
+    ]
+  }
+];
+
+const COLORS = {
+  2:['#8ce06a','#3da22c'], 4:['#ffc253','#f28500'], 8:['#ff8a70','#e33b25'],
+  16:['#6ec4ff','#1d7ad6'], 32:['#c58cff','#7c2fd6'], 64:['#ffe45c','#e0a800'],
+  128:['#66e6d9','#0d9e8f'], 256:['#ff9ecb','#e0387f'], 512:['#b9c4ff','#4a5ce0']
+};
+
+const DIRS = {left:[-1,0], right:[1,0], up:[0,-1], down:[0,1]};
+const SIDE_OF = {left:'left', right:'right', up:'top', down:'bottom'};
+
+/* ---------- State ---------- */
+const boardEl = document.getElementById('board');
+const frameEl = document.getElementById('frame');
+const overlayEl = document.getElementById('overlay');
+let levelIndex = 0, level = null, blocks = [], moves = 0, undoStack = [];
+let cell = 48, frameW = 22;
+let unlocked = parseInt(localStorage.getItem('bo2048_unlocked_v2') || '0', 10);
+
+/* ---------- Audio ---------- */
+let AC = null;
+function beep(freq, dur, type, vol, delay){
+  if(!AC) return;
+  const t = AC.currentTime + (delay||0);
+  const o = AC.createOscillator(), g = AC.createGain();
+  o.type = type||'sine'; o.frequency.value = freq;
+  g.gain.setValueAtTime(vol||0.12, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t+dur);
+  o.connect(g).connect(AC.destination);
+  o.start(t); o.stop(t+dur);
+}
+function sndMove(){ beep(220,0.07,'triangle',0.08); }
+function sndMerge(){ beep(330,0.09,'square',0.06); beep(494,0.12,'square',0.06,0.06); }
+function sndExit(){ beep(523,0.1,'sine',0.14); beep(784,0.14,'sine',0.14,0.08); beep(1047,0.2,'sine',0.12,0.16); }
+function sndWin(){ [523,659,784,1047].forEach((f,i)=>beep(f,0.22,'sine',0.13,i*0.11)); }
+function sndBump(){ beep(110,0.08,'sawtooth',0.05); }
+function initAudio(){
+  if(!AC){ try{ AC = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} }
+  if(AC && AC.state === 'suspended') AC.resume();
+}
+window.addEventListener('pointerdown', initAudio, {once:false});
+
+/* ---------- Helpers ---------- */
+function hydrate(b){
+  let bw=0, bh=0;
+  for(const [cx,cy] of SHAPES[b.sh]){ bw=Math.max(bw,cx+1); bh=Math.max(bh,cy+1); }
+  return {...b, bw, bh};
+}
+
+function anchorCell(sh){
+  const s = SHAPES[sh];
+  let sx=0, sy=0;
+  for(const [cx,cy] of s){ sx+=cx; sy+=cy; }
+  const mx=sx/s.length, my=sy/s.length;
+  let best=s[0], bd=1e9;
+  for(const c of s){
+    const d=(c[0]-mx)**2+(c[1]-my)**2;
+    if(d<bd){ bd=d; best=c; }
+  }
+  return best;
+}
+
+/* ---------- Layout ---------- */
+function computeSizes(){
+  const availW = Math.min(window.innerWidth * 0.94, 560);
+  const availH = window.innerHeight * 0.56;
+  cell = Math.floor(Math.min(
+    (availW) / (level.w + 1),
+    (availH) / (level.h + 1)
+  ));
+  cell = Math.max(28, Math.min(cell, 64));
+  frameW = Math.round(cell * 0.5);
+}
+
+function buildLevel(){
+  computeSizes();
+  boardEl.style.width  = level.w * cell + 'px';
+  boardEl.style.height = level.h * cell + 'px';
+  frameEl.style.padding = frameW + 'px';
+  boardEl.querySelectorAll('.wall,.gate,.block').forEach(e => e.remove());
+
+  for(const [wx,wy] of level.walls){
+    const d = document.createElement('div');
+    d.className = 'wall';
+    d.style.cssText = `left:${wx*cell+1}px;top:${wy*cell+1}px;width:${cell-2}px;height:${cell-2}px;`;
+    boardEl.appendChild(d);
+  }
+
+  for(const g of level.gates){
+    const d = document.createElement('div');
+    d.className = 'gate';
+    let x,y,w,h,arrow;
+    if(g.side==='right'){ x=level.w*cell; y=g.pos*cell; w=frameW; h=g.len*cell; arrow='▶'; }
+    else if(g.side==='left'){ x=-frameW; y=g.pos*cell; w=frameW; h=g.len*cell; arrow='◀'; }
+    else if(g.side==='top'){ x=g.pos*cell; y=-frameW; w=g.len*cell; h=frameW; arrow='▲'; }
+    else { x=g.pos*cell; y=level.h*cell; w=g.len*cell; h=frameW; arrow='▼'; }
+    d.style.cssText = `left:${x}px;top:${y}px;width:${w}px;height:${h}px;font-size:${Math.max(12,frameW*0.62)}px;`;
+    d.innerHTML = `<span class="arr">${arrow}</span><span class="num">${g.v}</span>`;
+    boardEl.appendChild(d);
+  }
+
+  for(const b of blocks) makeBlockEl(b);
+  updateHud();
+}
+
+function makeBlockEl(b){
+  const d = document.createElement('div');
+  d.className = 'block';
+  d.style.width  = b.bw*cell + 'px';
+  d.style.height = b.bh*cell + 'px';
+  paintBlock(d, b);
+  positionBlock(d, b);
+  d.addEventListener('pointerdown', ev => onPointerDown(ev, b));
+  boardEl.appendChild(d);
+  b.el = d;
+}
+
+function paintBlock(el, b){
+  const c = COLORS[b.v] || ['#dddddd','#888888'];
+  const stud = Math.round(cell/2);
+  let html = '';
+  for(const [cx,cy] of SHAPES[b.sh]){
+    html += `<div class="tile" style="left:${cx*cell+2}px;top:${cy*cell+2}px;width:${cell-4}px;height:${cell-4}px;">` +
+              `<div class="tface" style="background:linear-gradient(${c[0]},${c[1]})"></div>` +
+              `<div class="tstuds" style="background-size:${stud}px ${stud}px"></div>` +
+            `</div>`;
+  }
+  const [ax,ay] = anchorCell(b.sh);
+  html += `<span class="v" style="left:${(ax+0.5)*cell}px;top:${(ay+0.5)*cell}px;font-size:${Math.max(13,Math.round(cell*0.34))}px">${b.v}</span>`;
+  el.innerHTML = html;
+}
+
+function positionBlock(el, b, extra){
+  const [ex,ey] = extra || [0,0];
+  el.style.transform = `translate(${b.x*cell+ex}px, ${b.y*cell+ey}px)`;
+}
+
+/* ---------- Game logic ---------- */
+function cellsOf(b){
+  return SHAPES[b.sh].map(([cx,cy]) => [b.x+cx, b.y+cy]);
+}
+
+function occupantAt(x,y,except){
+  for(const b of blocks){
+    if(b === except) continue;
+    for(const [cx,cy] of SHAPES[b.sh]){
+      if(b.x+cx === x && b.y+cy === y) return b;
+    }
+  }
+  return null;
+}
+
+function isWall(x,y){
+  return level.walls.some(w => w[0]===x && w[1]===y);
+}
+
+function canMerge(a,b){
+  return a.v === b.v && a.sh === b.sh;
+}
+
+// Returns {dist, type:'border'|'wall'|'block', blockers:Set}
+function scan(b, dx, dy){
+  const cs = cellsOf(b);
+  let d = 0;
+  for(;;){
+    const s = d+1;
+    let border=false, wall=false;
+    const hit = new Set();
+    for(const [cx,cy] of cs){
+      const nx = cx+dx*s, ny = cy+dy*s;
+      if(nx<0||ny<0||nx>=level.w||ny>=level.h){ border=true; continue; }
+      if(isWall(nx,ny)){ wall=true; continue; }
+      const o = occupantAt(nx,ny,b);
+      if(o) hit.add(o);
+    }
+    if(border || wall || hit.size){
+      const type = wall ? 'wall' : (hit.size ? (border?'wall':'block') : 'border');
+      return {dist:d, type, blockers:hit};
+    }
+    d++;
+  }
+}
+
+function gateFor(b, side){
+  // the block's full silhouette must fit inside one gate span; value must match
+  for(const g of level.gates){
+    if(g.side !== side || g.v !== b.v) continue;
+    if(side==='left'||side==='right'){
+      if(b.y >= g.pos && b.y + b.bh <= g.pos + g.len) return g;
+    }else{
+      if(b.x >= g.pos && b.x + b.bw <= g.pos + g.len) return g;
+    }
+  }
+  return null;
+}
+
+function snapshot(){
+  return { moves, blocks: blocks.map(b => ({x:b.x, y:b.y, sh:b.sh, v:b.v})) };
+}
+
+function tryMove(b, dirName){
+  if(b.dead) return;
+  const [dx,dy] = DIRS[dirName];
+  const res = scan(b, dx, dy);
+  let exitGate = null;
+  if(res.type === 'border') exitGate = gateFor(b, SIDE_OF[dirName]);
+  let mergeTarget = null;
+  if(res.type === 'block' && res.blockers.size === 1){
+    const t = [...res.blockers][0];
+    if(canMerge(b, t)) mergeTarget = t;
+  }
+
+  if(res.dist === 0 && !exitGate && !mergeTarget){
+    b.el.classList.remove('shake-h','shake-v');
+    void b.el.offsetWidth;
+    b.el.classList.add(dx ? 'shake-h' : 'shake-v');
+    sndBump();
+    return;
+  }
+
+  undoStack.push(snapshot());
+  moves++;
+  updateHud();
+
+  // fast, snappy slide — game state settles immediately, visuals catch up
+  const dur = Math.max(50, Math.min(45 + res.dist * 20, 150));
+  b.el.style.transitionDuration = dur + 'ms';
+
+  if(exitGate){
+    const span = (dx ? b.bw : b.bh);
+    const fly = (res.dist + span + 1.4) * cell;
+    b.dead = true;
+    blocks = blocks.filter(k => k !== b);
+    b.el.style.transitionDuration = (dur + 110) + 'ms';
+    positionBlock(b.el, b, [dx*fly, dy*fly]);
+    b.el.style.opacity = '0';
+    sndExit();
+    const gone = b;
+    setTimeout(() => { gone.el.remove(); checkWin(); }, dur + 130);
+    return;
+  }
+
+  b.x += dx*res.dist; b.y += dy*res.dist;
+  positionBlock(b.el, b);
+
+  if(mergeTarget){
+    const t = mergeTarget, mv = b;
+    mv.dead = true;
+    blocks = blocks.filter(k => k !== mv);
+    t.v *= 2;
+    setTimeout(() => {
+      mv.el.remove();
+      if(!t.el.isConnected) return;   // level was reset/undone mid-flight
+      paintBlock(t.el, t);
+      t.el.classList.remove('pop');
+      void t.el.offsetWidth;
+      t.el.classList.add('pop');
+      sndMerge();
+    }, Math.max(30, dur - 30));
+  }else{
+    sndMove();
+  }
+}
+
+function checkWin(){
+  if(blocks.length) return;
+  sndWin();
+  if(levelIndex >= unlocked && levelIndex < LEVELS.length - 1){
+    unlocked = levelIndex + 1;
+    localStorage.setItem('bo2048_unlocked_v2', String(unlocked));
+  }
+  const last = levelIndex === LEVELS.length - 1;
+  document.getElementById('ovTitle').textContent = last ? 'All Levels Cleared! 🏆' : 'Level Complete! ⭐';
+  document.getElementById('ovSub').textContent = `Solved in ${moves} moves`;
+  document.getElementById('btnNext').textContent = last ? 'Play Again ⟳' : 'Next ▶';
+  overlayEl.classList.add('show');
+  renderLevelBtns();
+}
+
+/* ---------- Input ---------- */
+let drag = null;
+function onPointerDown(ev, b){
+  if(b.dead || overlayEl.classList.contains('show')) return;
+  ev.preventDefault();
+  drag = {b, sx:ev.clientX, sy:ev.clientY, fired:false};
+}
+window.addEventListener('pointermove', ev => {
+  if(!drag || drag.fired) return;
+  const dx = ev.clientX - drag.sx, dy = ev.clientY - drag.sy;
+  if(Math.max(Math.abs(dx), Math.abs(dy)) < 24) return;
+  drag.fired = true;
+  const dir = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right':'left') : (dy > 0 ? 'down':'up');
+  tryMove(drag.b, dir);
+});
+window.addEventListener('pointerup', () => { drag = null; });
+window.addEventListener('pointercancel', () => { drag = null; });
+
+/* ---------- HUD / flow ---------- */
+function updateHud(){
+  document.getElementById('lvlLabel').textContent = 'Level ' + (levelIndex+1);
+  document.getElementById('movesLabel').textContent = 'Moves: ' + moves;
+  document.getElementById('btnUndo').disabled = !undoStack.length;
+}
+
+function renderLevelBtns(){
+  const wrap = document.getElementById('levelBtns');
+  wrap.innerHTML = '';
+  LEVELS.forEach((_, i) => {
+    const btn = document.createElement('button');
+    btn.textContent = i+1;
+    if(i === levelIndex) btn.classList.add('current');
+    else if(i < unlocked) btn.classList.add('done');
+    btn.disabled = i > unlocked;
+    btn.addEventListener('click', () => { if(i <= unlocked) loadLevel(i); });
+    wrap.appendChild(btn);
+  });
+}
+
+function loadLevel(i){
+  levelIndex = i;
+  level = LEVELS[i];
+  blocks = level.blocks.map(hydrate);
+  moves = 0; undoStack = [];
+  overlayEl.classList.remove('show');
+  buildLevel();
+  renderLevelBtns();
+}
+
+function restoreSnapshot(s){
+  moves = s.moves;
+  blocks = s.blocks.map(hydrate);
+  buildLevel();
+}
+
+document.getElementById('btnRestart').addEventListener('click', () => loadLevel(levelIndex));
+document.getElementById('btnUndo').addEventListener('click', () => {
+  if(!undoStack.length) return;
+  restoreSnapshot(undoStack.pop());
+  updateHud();
+});
+document.getElementById('btnNext').addEventListener('click', () => {
+  const last = levelIndex === LEVELS.length - 1;
+  loadLevel(last ? 0 : levelIndex + 1);
+});
+
+window.addEventListener('resize', () => { if(level) buildLevel(); });
+
+loadLevel(Math.min(unlocked, LEVELS.length - 1));
+</script>
+</body>
+</html>

@@ -118,6 +118,26 @@ footer{flex:none;text-align:center;font-size:13px;font-weight:700;opacity:.55;pa
   transition:transform .08s, box-shadow .08s;
 }
 .btn:active{transform:translateY(4px);box-shadow:0 1px 0 #3b6fc4}
+.mode-btn{
+  display:block;width:100%;margin-top:12px;text-align:left;
+  padding:13px 16px;border-radius:16px;border:none;cursor:pointer;
+  font-family:var(--font);color:#fff;font-size:17px;font-weight:800;
+  transition:transform .08s, box-shadow .08s;
+}
+.mode-btn small{display:block;font-weight:600;font-size:12.5px;opacity:.9;margin-top:2px;line-height:1.35}
+.mode-btn.m1{background:linear-gradient(135deg,#4d9df6,#7c6cf6);box-shadow:0 4px 0 #3b6fc4}
+.mode-btn.m2{background:linear-gradient(135deg,#18b0a4,#0f8ca0);box-shadow:0 4px 0 #0d7280}
+.mode-btn:active{transform:translateY(3px);box-shadow:none}
+#btn-home{cursor:pointer;padding:4px 11px}
+#paint-wrap.off{display:none}
+#paint-wrap.desen{background:#eef1f8;box-shadow:inset 0 0 0 3px rgba(255,255,255,.8), 0 4px 14px rgba(43,51,80,.10)}
+#paint-wrap.desen #canvas, #paint-wrap.desen #target-card{display:none}
+#dtarget{display:none;position:absolute;inset:26px 8px 8px;width:calc(100% - 16px);height:calc(100% - 34px)}
+#paint-wrap.desen #dtarget{display:block}
+#dlbl{display:none;position:absolute;top:7px;left:0;right:0;text-align:center;
+  font-size:11px;font-weight:800;letter-spacing:1px;opacity:.5}
+#paint-wrap.desen #dlbl{display:block}
+#ov-win.bottom{align-items:flex-end;padding-bottom:34px;background:rgba(43,51,80,.10);backdrop-filter:none}
 .mini-demo{display:flex;align-items:center;justify-content:center;gap:8px;margin:6px 0}
 .confetti{
   position:absolute;top:-16px;z-index:60;pointer-events:none;
@@ -130,7 +150,10 @@ footer{flex:none;text-align:center;font-size:13px;font-weight:700;opacity:.55;pa
 <body>
 <div id="app">
   <header>
-    <span class="chip" id="lvl-chip">Bölüm 1</span>
+    <div style="display:flex;gap:8px;align-items:center">
+      <span class="chip" id="btn-home" title="Mod seç">☰</span>
+      <span class="chip" id="lvl-chip">Bölüm 1</span>
+    </div>
     <span id="hearts"></span>
   </header>
 
@@ -140,21 +163,46 @@ footer{flex:none;text-align:center;font-size:13px;font-weight:700;opacity:.55;pa
       <div class="lbl">HEDEF</div>
       <svg id="target" viewBox="0 0 100 100"></svg>
     </div>
+    <div id="dlbl">HEDEF DESEN</div>
+    <svg id="dtarget" preserveAspectRatio="xMidYMid meet"></svg>
     <div id="toast">Katman sırası yanlış!</div>
   </div>
 
   <div id="board-wrap"><svg id="board"></svg></div>
 
-  <footer>Hedefe bak: altta kalan renk önce boyanır! 🎨</footer>
+  <footer id="foot">Hedefe bak: altta kalan renk önce boyanır! 🎨</footer>
 
-  <!-- Intro -->
-  <div class="overlay" id="ov-intro">
+  <!-- Mod seçimi -->
+  <div class="overlay" id="ov-menu">
     <div class="card">
       <h1>🎨 Arrow Paint</h1>
+      <p>Okları serbest bırak, boya! Modunu seç:</p>
+      <button class="mode-btn m1" id="btn-mode-resim">🖼️ Resim Modu
+        <small>Hedef resmi katman sırasına göre boya — yanlış sıra ❤️ götürür!</small></button>
+      <button class="mode-btn m2" id="btn-mode-desen">🌀 Desen Modu
+        <small>Her oka her an basabilirsin — çıkan ok geçtiği her yeri boyar. Hedef deseni doğru sırayla yakala!</small></button>
+    </div>
+  </div>
+
+  <!-- Resim intro -->
+  <div class="overlay hidden" id="ov-intro">
+    <div class="card">
+      <h1>🖼️ Resim Modu</h1>
       <p>Her ok bir boya rulosu: tahtadan çıkınca resimdeki <b>kendi renkli parçasını</b> boyar.</p>
       <p>Okun <b>ucunun baktığı yol</b> boşsa çıkar, doluysa toslar.</p>
       <p>⚠️ <b>Sıra önemli:</b> Hedef resimde <b>altta kalan</b> parçalar önce boyanmalı. Yanlış üst üste bindirirsen ❤️ kaybedersin!</p>
       <button class="btn" id="btn-start">Başla</button>
+    </div>
+  </div>
+
+  <!-- Desen intro -->
+  <div class="overlay hidden" id="ov-intro-desen">
+    <div class="card">
+      <h1>🌀 Desen Modu</h1>
+      <p>Bu modda <b>her oka her an basabilirsin</b> — engel yok!</p>
+      <p>Çıkan ok, gövdesi ve geçtiği yol boyunca <b>her yeri kendi rengine</b> boyar; önceki boyaların üstünü kapatır.</p>
+      <p>⚠️ Hedef desendeki <b>sırayı</b> bul — yanlış sırada boyarsan ❤️ kaybedersin!</p>
+      <button class="btn" id="btn-start-desen">Başla</button>
     </div>
   </div>
 
@@ -243,11 +291,27 @@ const DIRS = [[0,-1],[1,0],[0,1],[-1,0]];
 const CELL = 12;                    // svg birimi / hücre
 const NS = 'http://www.w3.org/2000/svg';
 
+/* ===== Desen modu: paletler ve büyüyen tahtalar ===== */
+const DPALETTES = [
+  { name:'Okyanus',   colors:['#0e3d4d','#15697c','#2aa7bd','#69cede','#b7e9f2'] },
+  { name:'Günbatımı', colors:['#4b2a70','#c0395b','#ef6a3a','#f6a428','#ffd166'] },
+  { name:'Orman',     colors:['#1b4332','#2d6a4f','#40916c','#74c69d','#b7e4c7'] },
+  { name:'Şeker',     colors:['#c9366e','#ff5d8f','#ff9fb8','#9d4edd','#5fb8ff'] },
+  { name:'Gece',      colors:['#22223b','#4a4e69','#9a8c98','#c9ada7','#f2e9e4'] },
+];
+// [C, R, ok sayısı, kalın (2 birim) ok sayısı] — basitten zora
+const DSIZES = [[5,6,3,0],[6,7,4,0],[6,8,4,1],[7,8,5,1],[7,9,6,1],[8,10,6,2],[8,11,7,2],[9,12,8,3]];
+
 /* ================= Durum ================= */
-let lvl = +(localStorage.getItem('ap2_lvl') || 0);
+let mode = null;                 // 'resim' | 'desen'
+let lvl  = +(localStorage.getItem('ap2_lvl')  || 0);
+let dlvl = +(localStorage.getItem('ap2_dlvl') || 0);
+let curPal = DPALETTES[0];
 let L = null, C = 0, R = 0;
 let snakes = [];        // {cells:[[x,y]..], shape, exited, els:{}}
 let painted = [];       // boyanmış shape indexleri (boyama sırasıyla)
+let ownerOf = [];       // desen: her hücrenin son (doğru) rengini bırakan ok
+let cellCovers = [];    // desen: her hücreden geçen okların listesi
 let hearts = 3;
 let locked = true;      // overlay / ceza animasyonu sırasında input kilidi
 
@@ -299,6 +363,68 @@ function rayCells(cells, C, R){
   x += d[0]; y += d[1];
   while (x >= 0 && x < C && y >= 0 && y < R){ out.push([x, y]); x += d[0]; y += d[1]; }
   return out;
+}
+
+/* Kalın (2 hücre genişliğinde) yılan: 2x2 blokların yürüyüşü.
+   Ardışık bloklar 2 hücre paylaşır; yeni hücreler başka oka veya
+   kendi eski gövdesine değemez. */
+function thickWalk(occ, C, R, targetLen){
+  const block = (x, y) => [[x,y],[x+1,y],[x,y+1],[x+1,y+1]];
+  const starts = [];
+  for (let y = 0; y < R - 1; y++)
+    for (let x = 0; x < C - 1; x++)
+      if (block(x, y).every(([cx, cy]) => occ[cy * C + cx] < 0)) starts.push([x, y]);
+  if (!starts.length) return null;
+  let cur = starts[(Math.random() * starts.length) | 0];
+  const anchors = [cur];
+  const own = new Set(block(cur[0], cur[1]).map(([x, y]) => y * C + x));
+  let lastDir = -1;
+  while (anchors.length < targetLen){
+    const [ax, ay] = anchors[anchors.length - 1];
+    const opts = [];
+    for (let d = 0; d < 4; d++){
+      const nx = ax + DIRS[d][0], ny = ay + DIRS[d][1];
+      if (nx < 0 || nx > C - 2 || ny < 0 || ny > R - 2) continue;
+      const fresh = block(nx, ny).filter(([cx, cy]) =>
+        !block(ax, ay).some(([bx, by]) => bx === cx && by === cy));
+      if (!fresh.every(([cx, cy]) => occ[cy * C + cx] < 0 && !own.has(cy * C + cx))) continue;
+      opts.push(d);
+      if (d === lastDir) opts.push(d, d);
+    }
+    if (!opts.length) break;
+    const d = opts[(Math.random() * opts.length) | 0];
+    const nxt = [anchors[anchors.length - 1][0] + DIRS[d][0], anchors[anchors.length - 1][1] + DIRS[d][1]];
+    anchors.push(nxt);
+    for (const [cx, cy] of block(nxt[0], nxt[1])) own.add(cy * C + cx);
+    lastDir = d;
+  }
+  if (anchors.length < 3) return null;
+  return { anchors, cells: [...own].map(i => [i % C, (i / C) | 0]) };
+}
+
+/* Desen tahtası: engel olmadığından soyma testi gerekmez;
+   önce kalın, sonra ince oklar yerleştirilir. */
+function genBoardDesen(C, R, N, TH){
+  for (let attempt = 0; attempt < 400; attempt++){
+    const occ = new Array(C * R).fill(-1);
+    const list = [];
+    let ok = true;
+    for (let s = 0; s < N; s++){
+      const thick = s < TH;
+      let w = null;
+      for (let t = 0; t < 80 && !w; t++){
+        w = thick ? thickWalk(occ, C, R, 3 + ((Math.random() * 3) | 0))
+                  : randomWalk(occ, C, R, 5 + ((Math.random() * 6) | 0));
+      }
+      if (!w){ ok = false; break; }
+      const cells = thick ? w.cells : w;
+      for (const [x, y] of cells) occ[y * C + x] = s;
+      list.push(thick ? { cells: w.cells, anchors: w.anchors, width: 2 }
+                      : { cells: w, width: 1 });
+    }
+    if (ok) return { list };
+  }
+  return null;
 }
 
 function genBoard(C, R, N){
@@ -360,7 +486,9 @@ const sndFail  = () => [330, 262, 208].forEach((f, i) => tone(f, .3, 'sine', .25
 
 /* ================= HUD ================= */
 function updateHud(){
-  $('lvl-chip').textContent = 'Bölüm ' + (lvl + 1) + ' — ' + L.name;
+  $('lvl-chip').textContent = mode === 'desen'
+    ? 'Desen ' + (dlvl + 1) + ' — ' + curPal.name
+    : 'Bölüm ' + (lvl + 1) + ' — ' + L.name;
   $('hearts').innerHTML = [0,1,2].map(i =>
     `<span class="${i < hearts ? '' : 'off'}">❤️</span>`).join('');
 }
@@ -418,6 +546,8 @@ function el(tag, attrs, parent){
   return e;
 }
 
+let paintG = null;   // desen modunda boya izleri bu katmana çizilir
+
 function renderBoard(){
   boardSvg.innerHTML = '';
   boardSvg.setAttribute('viewBox', `0 0 ${C * CELL} ${R * CELL}`);
@@ -426,28 +556,30 @@ function renderBoard(){
   for (let y = 0; y < R; y++)
     for (let x = 0; x < C; x++)
       el('circle', { cx: x * CELL + CELL/2, cy: y * CELL + CELL/2, r: 1.3, fill: 'var(--dot)' }, dots);
+  paintG = el('g', {}, boardSvg);   // izler: noktaların üstünde, okların altında
 
   snakes.forEach((s, i) => {
-    const color = L.shapes[s.shape].color;
-    const pts = s.cells.map(cellCenter);
+    const color = mode === 'desen' ? s.color : L.shapes[s.shape].color;
+    const wExtra = ((s.width || 1) - 1) * CELL;   // kalın ok: +1 hücre kalınlık
+    const pts = s.pathPts;
     const g = el('g', { class: 'snake', 'data-i': i }, boardSvg);
     if (s.exited) g.style.display = 'none';
     const d = 'M' + pts.map(p => p.join(' ')).join(' L');
-    const under = el('path', { d, fill:'none', stroke: shade(color, .62), 'stroke-width': 4.6,
+    const under = el('path', { d, fill:'none', stroke: shade(color, .62), 'stroke-width': 4.6 + wExtra,
       'stroke-linecap':'round', 'stroke-linejoin':'round' }, g);
-    const main = el('path', { d, fill:'none', stroke: color, 'stroke-width': 3.4,
+    const main = el('path', { d, fill:'none', stroke: color, 'stroke-width': 3.4 + wExtra,
       'stroke-linecap':'round', 'stroke-linejoin':'round' }, g);
     // ok başı
-    const hd = headDir(s.cells);
     const [hx, hy] = pts[pts.length - 1];
     const head = el('polygon', {
       points: '0,-3.4 6,0 0,3.4',
       fill: color, stroke: shade(color, .62), 'stroke-width': 1.1, 'stroke-linejoin':'round',
-      transform: `translate(${hx} ${hy}) rotate(${[270,0,90,180][hd]})`,
+      transform: `translate(${hx} ${hy}) rotate(${[270,0,90,180][s.hd]})` +
+        (s.width === 2 ? ' scale(1.9)' : ''),
     }, g);
     // geniş görünmez dokunma alanı
     const hit = el('path', { d, fill:'none', stroke:'#000', 'stroke-opacity':0,
-      'stroke-width': 10, 'stroke-linecap':'round', 'stroke-linejoin':'round' }, g);
+      'stroke-width': 10 + wExtra, 'stroke-linecap':'round', 'stroke-linejoin':'round' }, g);
     s.els = { g, under, main, head, hit };
     g.addEventListener('pointerdown', ev => { ev.stopPropagation(); tapSnake(i); });
   });
@@ -500,14 +632,45 @@ function violationFlash(shapeIdx, dirVec, done){
 
 /* ================= Ok hareketi ================= */
 function routeFor(s){
-  const pts = s.cells.map(cellCenter);
-  const hd = DIRS[headDir(s.cells)];
-  const ray = rayCells(s.cells, C, R).map(cellCenter);
-  const last = ray.length ? ray[ray.length - 1] : pts[pts.length - 1];
-  const beyond = [ last[0] + hd[0] * CELL * 3.2, last[1] + hd[1] * CELL * 3.2 ];
-  const route = pts.concat(ray, [beyond]);
+  const pts = s.pathPts, hd = DIRS[s.hd];
+  const ex = s.exitPts || [];
+  const last = ex.length ? ex[ex.length - 1] : pts[pts.length - 1];
+  const off = CELL * (3.2 + (s.width || 1));
+  const beyond = [ last[0] + hd[0] * off, last[1] + hd[1] * off ];
+  const route = pts.concat(ex, [beyond]);
   const cum = segLengths(route);
-  return { route, cum, B: (s.cells.length - 1) * CELL, T: cum[cum.length - 1], hd };
+  return { route, cum, B: (pts.length - 1) * CELL, T: cum[cum.length - 1], hd };
+}
+
+/* Baş yönü ve merkez hattı çıkışı: ince ok hücre yolunu, kalın ok
+   2x2 blok çapalarını izler. */
+function prepSnakeGeometry(s){
+  const path = s.width === 2 ? s.anchors : s.cells;
+  s.hd = headDir(path);
+  s.pathPts = s.width === 2
+    ? s.anchors.map(a => [(a[0] + 1) * CELL, (a[1] + 1) * CELL])
+    : s.cells.map(cellCenter);
+  if (s.width === 2){
+    const d = DIRS[s.hd];
+    const block = (x, y) => [[x,y],[x+1,y],[x,y+1],[x+1,y+1]];
+    let [ax, ay] = s.anchors[s.anchors.length - 1];
+    const seen = new Set(s.cells.map(([x, y]) => y * C + x));
+    s.sweepXY = []; s.exitPts = [];
+    while (true){
+      ax += d[0]; ay += d[1];
+      const inb = block(ax, ay).filter(([x, y]) => x >= 0 && x < C && y >= 0 && y < R);
+      if (!inb.length) break;
+      s.exitPts.push([(ax + 1) * CELL, (ay + 1) * CELL]);
+      for (const [x, y] of inb){
+        const idx = y * C + x;
+        if (!seen.has(idx)){ seen.add(idx); s.sweepXY.push([x, y]); }
+      }
+    }
+  } else {
+    s.sweepXY = rayCells(s.cells, C, R);
+    s.exitPts = s.sweepXY.map(cellCenter);
+  }
+  s.trailPts = s.pathPts.concat(s.exitPts);
 }
 
 function animateSnake(s, from, to, dur, ease, onDone){
@@ -525,12 +688,30 @@ function animateSnake(s, from, to, dur, ease, onDone){
     const shift = from + (to - from) * p;
     for (const k of ['under', 'main', 'hit'])
       s.els[k].setAttribute('stroke-dashoffset', -shift);
+    if (s._trail){ // desen: okun boşalttığı yol kuyruktan başa doğru boyanır
+      const vis = Math.max(0, Math.min(shift, s._trailLen));
+      s._trail.setAttribute('stroke-dasharray', `${vis} ${s._trailLen + 10}`);
+    }
     const headD = Math.min(B + shift, T - .01);
     const { p: hp, a } = pointAt(route, cum, headD);
-    s.els.head.setAttribute('transform', `translate(${hp[0]} ${hp[1]}) rotate(${a})`);
+    s.els.head.setAttribute('transform',
+      `translate(${hp[0]} ${hp[1]}) rotate(${a})` + (s.width === 2 ? ' scale(1.9)' : ''));
     if (p < 1) requestAnimationFrame(step);
     else onDone && onDone();
   })(t0);
+}
+
+function resetSnakeVisual(s){ // oku tahtadaki normal hâline döndür
+  const pts = s.pathPts;
+  const d = 'M' + pts.map(p => p.join(' ')).join(' L');
+  for (const k of ['under', 'main', 'hit']){
+    s.els[k].setAttribute('d', d);
+    s.els[k].removeAttribute('stroke-dasharray');
+    s.els[k].removeAttribute('stroke-dashoffset');
+  }
+  const [hx, hy] = pts[pts.length - 1];
+  s.els.head.setAttribute('transform',
+    `translate(${hx} ${hy}) rotate(${[270,0,90,180][s.hd]})` + (s.width === 2 ? ' scale(1.9)' : ''));
 }
 
 function tapSnake(i){
@@ -538,13 +719,16 @@ function tapSnake(i){
   const s = snakes[i];
   if (s.exited || s.animating) return;
 
-  // engel kontrolü: uçtan kenara düz ışın
-  const blockers = [];
-  for (const [x, y] of rayCells(s.cells, C, R)){
-    const o = snakes.findIndex((t, j) => j !== i && !t.exited && t.cells.some(c => c[0] === x && c[1] === y));
-    if (o >= 0 && !blockers.includes(o)) blockers.push(o);
-  }
   s._route = routeFor(s);
+
+  // engel kontrolü sadece resim modunda: uçtan kenara düz ışın
+  const blockers = [];
+  if (mode !== 'desen'){
+    for (const [x, y] of rayCells(s.cells, C, R)){
+      const o = snakes.findIndex((t, j) => j !== i && !t.exited && t.cells.some(c => c[0] === x && c[1] === y));
+      if (o >= 0 && !blockers.includes(o)) blockers.push(o);
+    }
+  }
 
   if (blockers.length){ // ---- toslama ----
     sndThud();
@@ -563,6 +747,14 @@ function tapSnake(i){
 
   // ---- kayarak çıkış ----
   s.exited = true; s.animating = true;
+  if (mode === 'desen'){ // iz: gövde + geçtiği yol, öncekilerin üstünü örter
+    boardSvg.appendChild(s.els.g);   // diğer okların üstünden geçsin
+    s._trailLen = (s.trailPts.length - 1) * CELL;
+    s._trail = el('path', { d: 'M' + s.trailPts.map(p => p.join(' ')).join(' L'), fill:'none',
+      stroke: s.color, 'stroke-width': 5.6 + (s.width - 1) * CELL,
+      'stroke-linecap':'round', 'stroke-linejoin':'round',
+      'stroke-dasharray': `0 ${s._trailLen + 10}` }, paintG);
+  }
   sndSlide();
   navigator.vibrate && navigator.vibrate(12);
   const dur = Math.max(380, s._route.T / (CELL * 15) * 1000);
@@ -575,8 +767,52 @@ function tapSnake(i){
 
 function onExited(i){
   const s = snakes[i];
+
+  if (mode === 'desen'){ // ---- iz tamamlandı: sıra doğru muydu? ----
+    if (s._trail) s._trail.setAttribute('stroke-dasharray', `${s._trailLen} ${s._trailLen + 10}`);
+    // yanlış: (a) sahibi çıkmış bir hücrenin üstünü boyadık, ya da
+    //         (b) sahibi olduğumuz bir hücrede altımız daha tamamlanmadı
+    const bad = s.cover.some(cc => {
+      const o = ownerOf[cc];
+      if (o !== i) return snakes[o].exited;
+      return cellCovers[cc].some(j => j !== i && !snakes[j].exited);
+    });
+    if (bad){
+      locked = true;
+      sndWrong();
+      navigator.vibrate && navigator.vibrate([60, 50, 60]);
+      hearts--;
+      updateHud();
+      toast('Sıra yanlış! Hedefteki katman sırasına bak.');
+      const flash = el('path', { d: s._trail.getAttribute('d'), fill:'none', stroke:'#ff5d6c',
+        'stroke-opacity':.7, 'stroke-width': 5.6 + (s.width - 1) * CELL,
+        'stroke-linecap':'round', 'stroke-linejoin':'round' }, paintG);
+      setTimeout(() => {
+        flash.remove();
+        s._trail.remove(); s._trail = null;
+        s.els.g.style.display = '';
+        animateSnake(s, s._route.T, 0, 500, p => 1 - Math.pow(1 - p, 2), () => {
+          s.exited = false;
+          resetSnakeVisual(s);
+          if (hearts <= 0){
+            setTimeout(() => { sndFail(); $('ov-fail').classList.remove('hidden'); }, 350);
+          } else locked = false;
+        });
+      }, 900);
+      return;
+    }
+    s._trail = null;   // iz kalıcı; sonraki animasyonlar dokunmasın
+    sndPaint();
+    updateHud();
+    if (snakes.every(t => t.exited)){
+      locked = true;
+      setTimeout(win, 700);
+    }
+    return;
+  }
+
   const shapeIdx = s.shape;
-  const dirVec = DIRS[headDir(s.cells)];
+  const dirVec = DIRS[s.hd];
   // bu parçanın ALTINDA kalması gereken bir parça henüz boyanmadıysa hata
   const wrongOver = L.under.find(([a, b]) => b === shapeIdx && !painted.includes(a));
 
@@ -612,19 +848,83 @@ function onExited(i){
 }
 
 /* ================= Akış ================= */
-function loadLevel(){
+function loadLevel(){ mode === 'desen' ? loadDesen() : loadResim(); }
+
+function loadResim(){
   L = LEVELS[lvl % LEVELS.length];
   C = L.C; R = L.R;
   const N = L.shapes.length;
   const gb = genBoard(C, R, N);
-  snakes = gb.list.map(cells => ({ cells, shape: -1, exited: false, animating: false }));
+  snakes = gb.list.map(cells => ({ cells, width: 1, shape: -1, exited: false, animating: false }));
   gb.order.forEach((si, k) => { snakes[si].shape = k; });
+  snakes.forEach(prepSnakeGeometry);
   painted = [];
   hearts = 3;
+  $('paint-wrap').classList.remove('off', 'desen');
+  $('foot').textContent = 'Hedefe bak: altta kalan renk önce boyanır! 🎨';
   renderBoard();
   renderTarget();
   clearCanvas();
   updateHud();
+}
+
+function loadDesen(){
+  const [c, r, n, th] = DSIZES[Math.min(dlvl, DSIZES.length - 1)];
+  C = c; R = r;
+  curPal = DPALETTES[dlvl % DPALETTES.length];
+  let gb = null, thTry = th, nTry = n;
+  while (!gb){ // olağanüstü sıkışıklıkta önce kalınları, sonra ok sayısını azalt
+    gb = genBoardDesen(C, R, nTry, thTry);
+    if (!gb){ if (thTry > 0) thTry--; else nTry--; }
+  }
+  snakes = gb.list.map(o => ({ cells: o.cells, anchors: o.anchors, width: o.width,
+    shape: 0, ord: 0, color: '', exited: false, animating: false }));
+  // çözüm sırası: rastgele — hedef desendeki katmanlaşmayı bu sıra belirler
+  const order = snakes.map((_, i) => i);
+  for (let i = order.length - 1; i > 0; i--){
+    const j = (Math.random() * (i + 1)) | 0;
+    [order[i], order[j]] = [order[j], order[i]];
+  }
+  order.forEach((si, k) => {
+    snakes[si].ord = k;
+    snakes[si].color = curPal.colors[k % curPal.colors.length];
+  });
+  // kapsama: gövde + çıkış süpürmesi; hücrenin sahibi = en son boyayan
+  ownerOf = new Array(C * R).fill(-1);
+  cellCovers = Array.from({ length: C * R }, () => []);
+  for (const i of snakes.map((_, idx) => idx).sort((a, b) => snakes[a].ord - snakes[b].ord)){
+    const s = snakes[i];
+    prepSnakeGeometry(s);
+    s.cover = s.cells.concat(s.sweepXY).map(([x, y]) => y * C + x);
+    for (const cc of s.cover){
+      ownerOf[cc] = i;
+      if (!cellCovers[cc].includes(i)) cellCovers[cc].push(i);
+    }
+  }
+  painted = [];
+  hearts = 3;
+  $('paint-wrap').classList.remove('off');
+  $('paint-wrap').classList.add('desen');
+  $('foot').textContent = 'Hedef desene bak: hangi renk hangisinin üstünde? 🌀';
+  renderBoard();
+  renderDTarget();
+  updateHud();
+}
+
+function renderDTarget(){
+  const dt = $('dtarget');
+  dt.setAttribute('viewBox', `0 0 ${C * CELL} ${R * CELL}`);
+  dt.innerHTML = '';
+  for (let y = 0; y < R; y++)
+    for (let x = 0; x < C; x++)
+      el('circle', { cx: x * CELL + CELL/2, cy: y * CELL + CELL/2, r: 1.1, fill: 'var(--dot)' }, dt);
+  // izler çözüm sırasıyla: sonra gelen üsttekini örter (hedefteki katmanlaşma)
+  for (const i of snakes.map((_, idx) => idx).sort((a, b) => snakes[a].ord - snakes[b].ord)){
+    const s = snakes[i];
+    el('path', { d: 'M' + s.trailPts.map(p => p.join(' ')).join(' L'), fill:'none',
+      stroke: s.color, 'stroke-width': 5.6 + (s.width - 1) * CELL,
+      'stroke-linecap':'round', 'stroke-linejoin':'round' }, dt);
+  }
 }
 
 function confetti(){
@@ -644,19 +944,51 @@ function win(){
   sndWin();
   confetti();
   navigator.vibrate && navigator.vibrate([30, 40, 30]);
-  $('win-stars').textContent = '⭐'.repeat(Math.max(1, hearts)) + '·'.repeat(0);
-  $('win-title').textContent = L.name + ' tamam!';
-  $('win-sub').textContent = hearts === 3 ? 'Hiç hata yapmadan boyadın!' : 'Resmi tamamladın!';
-  $('ov-win').classList.remove('hidden');
+  const ov = $('ov-win');
+  if (mode === 'desen'){
+    ov.classList.add('bottom');   // kart alta: desen görünür kalsın
+    $('win-stars').textContent = '⭐'.repeat(Math.max(1, hearts));
+    $('win-title').textContent = curPal.name + ' deseni tamam!';
+    $('win-sub').textContent = hearts === 3 ? 'Hiç hata yapmadan boyadın!' : 'Deseni tamamladın!';
+  } else {
+    ov.classList.remove('bottom');
+    $('win-stars').textContent = '⭐'.repeat(Math.max(1, hearts));
+    $('win-title').textContent = L.name + ' tamam!';
+    $('win-sub').textContent = hearts === 3 ? 'Hiç hata yapmadan boyadın!' : 'Resmi tamamladın!';
+  }
+  ov.classList.remove('hidden');
 }
-$('btn-start').addEventListener('click', () => {
+
+/* ---- menü & butonlar ---- */
+function startMode(m){
   ac();
+  mode = m;
+  $('ov-menu').classList.add('hidden');
+  loadLevel();
+  const seenKey = 'ap2_seen_' + m;
+  if (!localStorage.getItem(seenKey)){
+    localStorage.setItem(seenKey, 1);
+    $(m === 'desen' ? 'ov-intro-desen' : 'ov-intro').classList.remove('hidden');
+    locked = true;
+  } else locked = false;
+}
+$('btn-mode-resim').addEventListener('click', () => startMode('resim'));
+$('btn-mode-desen').addEventListener('click', () => startMode('desen'));
+$('btn-home').addEventListener('click', () => {
+  locked = true;
+  $('ov-menu').classList.remove('hidden');
+});
+$('btn-start').addEventListener('click', () => {
   $('ov-intro').classList.add('hidden');
   locked = false;
 });
+$('btn-start-desen').addEventListener('click', () => {
+  $('ov-intro-desen').classList.add('hidden');
+  locked = false;
+});
 $('btn-next').addEventListener('click', () => {
-  lvl++;
-  localStorage.setItem('ap2_lvl', lvl);
+  if (mode === 'desen'){ dlvl++; localStorage.setItem('ap2_dlvl', dlvl); }
+  else { lvl++; localStorage.setItem('ap2_lvl', lvl); }
   $('ov-win').classList.add('hidden');
   loadLevel();
   locked = false;
@@ -667,7 +999,10 @@ $('btn-retry').addEventListener('click', () => {
   locked = false;
 });
 
+// açılış: mod menüsü açık, arkada resim modu tahtası hazır dursun
+mode = 'resim';
 loadLevel();
+mode = null;
 </script>
 </body>
 </html>

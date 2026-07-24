@@ -1,0 +1,1791 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Liquid Color Sort</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{width:100%;height:100%;overflow:hidden;background:#0f0a1a;font-family:'Segoe UI',system-ui,sans-serif;touch-action:none;user-select:none;}
+canvas{display:block;width:100%;height:100%;cursor:pointer;}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+// ===================================================================
+//  LIQUID COLOR SORT — Jewel Coloring-inspired cup sorting puzzle
+// ===================================================================
+
+// ========== CONFIGURATION ==========
+const GW = 480, GH = 880;
+const TOTAL_JARS = 24;
+const JAR_COLS = 8;
+const JAR_ROWS = 3;
+const E = -1; // empty cell marker
+
+const COLORS = [
+    '#E74C3C','#3498DB','#2ECC71','#F1C40F','#9B59B6',
+    '#E67E22','#E91E63','#00BCD4','#8D6E63','#8BC34A',
+    '#5C6BC0','#FF7043'
+];
+const COLOR_DARK = [
+    '#C0392B','#2980B9','#27AE60','#D4AC0D','#7D3C98',
+    '#CA6F1E','#C2185B','#00838F','#6D4C41','#689F38',
+    '#3F51B5','#E64A19'
+];
+const COLOR_LIGHT = [
+    '#F1948A','#85C1E9','#82E0AA','#F9E154','#C39BD3',
+    '#F0B27A','#F48FB1','#4DD0E1','#A1887F','#AED581',
+    '#9FA8DA','#FFAB91'
+];
+
+// ========== SEEDED RANDOM ==========
+class Rand{
+    constructor(s){this.s=s%2147483647;if(this.s<=0)this.s+=2147483646;}
+    next(){this.s=(this.s*16807)%2147483647;return(this.s-1)/2147483646;}
+    int(n){return Math.floor(this.next()*n);}
+    pick(a){return a[this.int(a.length)];}
+    shuffle(a){for(let i=a.length-1;i>0;i--){const j=this.int(i+1);[a[i],a[j]]=[a[j],a[i]];}return a;}
+}
+
+// ========== AUDIO ==========
+class Audio_{
+    constructor(){this.ctx=null;this.muted=false;}
+    init(){if(!this.ctx)try{this.ctx=new(window.AudioContext||window.webkitAudioContext)()}catch(e){}}
+    resume(){if(this.ctx&&this.ctx.state==='suspended')this.ctx.resume();}
+    _osc(f,d,type='sine',v=0.1){
+        if(!this.ctx||this.muted)return;const o=this.ctx.createOscillator(),g=this.ctx.createGain();
+        o.type=type;o.frequency.value=f;g.gain.setValueAtTime(v,this.ctx.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.001,this.ctx.currentTime+d);
+        o.connect(g);g.connect(this.ctx.destination);o.start();o.stop(this.ctx.currentTime+d);
+    }
+    playClick(){this._osc(440,0.05,'sine',0.08);}
+    playPickup(){
+        if(!this.ctx||this.muted)return;const t=this.ctx.currentTime;
+        [400,500,600,700].forEach((f,i)=>{
+            const o=this.ctx.createOscillator(),g=this.ctx.createGain();
+            o.type='sine';o.frequency.value=f;g.gain.setValueAtTime(0.06,t+i*0.05);
+            g.gain.exponentialRampToValueAtTime(0.001,t+i*0.05+0.1);
+            o.connect(g);g.connect(this.ctx.destination);o.start(t+i*0.05);o.stop(t+i*0.05+0.1);
+        });
+    }
+    playPlace(){
+        if(!this.ctx||this.muted)return;const t=this.ctx.currentTime;
+        [600,500,350].forEach((f,i)=>{
+            const o=this.ctx.createOscillator(),g=this.ctx.createGain();
+            o.type='sine';o.frequency.value=f;g.gain.setValueAtTime(0.05,t+i*0.04);
+            g.gain.exponentialRampToValueAtTime(0.001,t+i*0.04+0.12);
+            o.connect(g);g.connect(this.ctx.destination);o.start(t+i*0.04);o.stop(t+i*0.04+0.12);
+        });
+    }
+    playColorComplete(){
+        [523,659,784,1047].forEach((f,i)=>setTimeout(()=>this._osc(f,0.25,'sine',0.1),i*90));
+    }
+    playLevelWin(){
+        [523,587,659,784,880,1047].forEach((f,i)=>setTimeout(()=>this._osc(f,0.3,'triangle',0.1),i*100));
+    }
+    playError(){this._osc(180,0.2,'square',0.06);}
+    playUnlock(){
+        if(!this.ctx||this.muted)return;const t=this.ctx.currentTime;
+        [300,400,500].forEach((f,i)=>{
+            const o=this.ctx.createOscillator(),g=this.ctx.createGain();
+            o.type='triangle';o.frequency.value=f;g.gain.setValueAtTime(0.06,t+i*0.08);
+            g.gain.exponentialRampToValueAtTime(0.001,t+i*0.08+0.2);
+            o.connect(g);g.connect(this.ctx.destination);o.start(t+i*0.08);o.stop(t+i*0.08+0.2);
+        });
+    }
+}
+
+// ========== PIXEL ART DATA ==========
+// 6x6 grids (3-4 colors)
+const ART6={
+3:[
+{name:'Heart',grid:[
+[E,0,0,0,0,E],
+[0,1,1,1,1,0],
+[0,1,2,2,1,0],
+[0,1,1,1,1,0],
+[E,0,1,1,0,E],
+[E,E,0,0,E,E]]},
+{name:'Star',grid:[
+[E,E,0,E,E,E],
+[E,1,0,1,E,E],
+[0,0,2,0,0,E],
+[E,1,2,1,E,E],
+[E,0,1,0,E,E],
+[0,E,E,E,0,E]]},
+{name:'Smile',grid:[
+[E,0,0,0,0,E],
+[0,1,1,1,1,0],
+[0,1,2,2,1,0],
+[0,1,1,1,1,0],
+[0,1,2,2,1,0],
+[E,0,0,0,0,E]]},
+{name:'Shield',grid:[
+[0,0,0,0,0,0],
+[0,1,1,1,1,0],
+[0,1,2,2,1,0],
+[0,1,2,2,1,0],
+[E,0,1,1,0,E],
+[E,E,0,0,E,E]]},
+{name:'Arrow',grid:[
+[E,E,0,0,E,E],
+[E,0,1,1,0,E],
+[0,1,1,1,1,0],
+[E,E,1,1,E,E],
+[E,E,2,2,E,E],
+[E,E,2,2,E,E]]},
+{name:'Bell',grid:[
+[E,E,0,0,E,E],
+[E,0,1,1,0,E],
+[0,1,1,1,1,0],
+[0,1,1,1,1,0],
+[0,0,2,2,0,0],
+[E,E,2,2,E,E]]}
+],
+4:[
+{name:'Cat',grid:[
+[0,E,E,E,E,0],
+[0,1,1,1,1,0],
+[0,1,2,2,1,0],
+[0,1,1,1,1,0],
+[0,1,3,3,1,0],
+[E,0,0,0,0,E]]},
+{name:'Flower',grid:[
+[E,E,1,1,E,E],
+[E,1,2,2,1,E],
+[E,E,1,1,E,E],
+[E,E,0,0,E,E],
+[E,3,0,0,3,E],
+[3,3,0,0,3,3]]},
+{name:'Fish',grid:[
+[E,E,0,0,E,E],
+[E,0,1,1,0,3],
+[0,1,2,1,1,3],
+[0,1,1,1,1,3],
+[E,0,1,1,0,3],
+[E,E,0,0,E,E]]},
+{name:'Turtle',grid:[
+[E,E,0,0,E,E],
+[E,0,1,1,0,E],
+[0,1,2,2,1,0],
+[0,1,1,1,1,0],
+[E,3,0,0,3,E],
+[E,3,E,E,3,E]]},
+{name:'Crown',grid:[
+[0,E,0,E,E,0],
+[0,0,0,0,0,0],
+[1,1,1,1,1,1],
+[2,2,2,2,2,2],
+[E,3,3,3,3,E],
+[E,E,3,3,E,E]]},
+{name:'Gem',grid:[
+[E,0,0,0,0,E],
+[0,1,1,1,1,0],
+[0,1,2,2,1,0],
+[E,3,2,2,3,E],
+[E,E,3,3,E,E],
+[E,E,3,3,E,E]]}
+]};
+
+// 8x8 grids (5-6 colors)
+const ART8={
+5:[
+{name:'Butterfly',grid:[
+[E,1,E,E,E,E,1,E],
+[1,3,1,E,E,1,3,1],
+[1,1,1,0,0,1,1,1],
+[2,2,2,0,0,2,2,2],
+[2,3,2,0,0,2,3,2],
+[E,2,4,0,0,4,2,E],
+[E,E,E,0,0,E,E,E],
+[E,E,4,E,E,4,E,E]]},
+{name:'Mushroom',grid:[
+[E,E,0,0,0,0,E,E],
+[E,0,1,1,1,1,0,E],
+[0,1,0,1,1,0,1,0],
+[0,1,1,1,1,1,1,0],
+[E,E,2,2,2,2,E,E],
+[E,E,2,3,3,2,E,E],
+[E,2,2,4,4,2,2,E],
+[E,2,4,4,4,4,2,E]]},
+{name:'Tree',grid:[
+[E,E,E,0,0,E,E,E],
+[E,E,0,1,1,0,E,E],
+[E,0,1,1,1,1,0,E],
+[0,1,2,1,1,2,1,0],
+[0,1,1,1,1,1,1,0],
+[E,E,3,3,3,3,E,E],
+[4,4,3,4,4,3,4,4],
+[E,4,4,4,4,4,4,E]]},
+{name:'Cactus',grid:[
+[E,E,E,0,0,E,E,E],
+[E,E,E,0,0,E,E,E],
+[E,1,1,0,0,E,E,E],
+[E,1,E,0,0,E,1,E],
+[E,E,E,0,0,1,1,E],
+[E,E,2,2,2,2,E,E],
+[E,3,3,3,3,3,3,E],
+[4,4,4,4,4,4,4,4]]},
+{name:'Owl',grid:[
+[E,E,0,0,0,0,E,E],
+[E,0,1,1,1,1,0,E],
+[0,1,2,1,1,2,1,0],
+[0,1,1,3,3,1,1,0],
+[E,0,1,3,3,1,0,E],
+[E,E,0,1,1,0,E,E],
+[E,4,4,0,0,4,4,E],
+[E,E,4,E,E,4,E,E]]},
+{name:'Penguin',grid:[
+[E,E,0,0,0,0,E,E],
+[E,0,0,1,1,0,0,E],
+[E,0,1,1,1,1,0,E],
+[0,0,1,2,2,1,0,0],
+[0,0,1,1,1,1,0,0],
+[E,0,3,3,3,3,0,E],
+[E,E,3,4,4,3,E,E],
+[E,E,E,4,4,E,E,E]]}
+],
+6:[
+{name:'House',grid:[
+[E,E,E,4,4,E,E,E],
+[E,E,0,0,0,0,E,E],
+[E,0,0,0,0,0,0,E],
+[0,0,0,0,0,0,0,0],
+[1,1,1,1,1,1,1,1],
+[1,3,3,1,1,3,3,1],
+[1,3,3,1,1,3,3,1],
+[5,5,1,2,2,1,5,5]]},
+{name:'Boat',grid:[
+[E,E,E,E,3,E,E,E],
+[E,E,E,E,1,3,E,E],
+[E,E,E,E,1,2,2,E],
+[E,E,E,E,1,2,E,E],
+[E,0,0,0,1,0,0,E],
+[4,0,0,0,0,0,0,4],
+[E,4,0,0,0,0,4,E],
+[5,5,5,5,5,5,5,5]]},
+{name:'Robot',grid:[
+[E,E,3,3,3,3,E,E],
+[E,0,0,0,0,0,0,E],
+[E,0,2,0,0,2,0,E],
+[E,0,0,5,5,0,0,E],
+[4,1,1,1,1,1,1,4],
+[E,1,3,3,3,3,1,E],
+[E,E,1,1,1,1,E,E],
+[E,E,4,E,E,4,E,E]]},
+{name:'Car',grid:[
+[E,E,E,0,0,E,E,E],
+[E,E,0,1,1,0,E,E],
+[E,0,1,1,1,1,0,E],
+[2,2,2,2,2,2,2,2],
+[2,3,3,2,2,3,3,2],
+[2,2,2,2,2,2,2,2],
+[E,4,4,E,E,5,5,E],
+[E,4,4,E,E,5,5,E]]},
+{name:'Rocket',grid:[
+[E,E,E,0,0,E,E,E],
+[E,E,0,1,1,0,E,E],
+[E,E,0,1,1,0,E,E],
+[E,2,2,2,2,2,2,E],
+[E,2,3,3,3,3,2,E],
+[4,4,2,2,2,2,4,4],
+[E,E,E,5,5,E,E,E],
+[E,E,5,5,5,5,E,E]]},
+{name:'Panda',grid:[
+[E,0,0,E,E,0,0,E],
+[0,0,1,1,1,1,0,0],
+[E,1,2,1,1,2,1,E],
+[E,1,1,3,3,1,1,E],
+[E,1,1,3,3,1,1,E],
+[4,4,1,1,1,1,4,4],
+[E,4,5,5,5,5,4,E],
+[E,E,5,5,5,5,E,E]]}
+]};
+
+// 10x10 grids (7+ colors) — reuse from existing
+const ART10={
+7:[
+{name:'Ship',grid:[
+[5,5,5,5,5,5,6,6,5,5],
+[5,5,5,3,3,5,6,6,5,5],
+[5,5,5,3,2,2,5,5,5,5],
+[5,5,5,1,2,2,2,5,5,5],
+[5,5,5,1,2,2,5,5,5,5],
+[5,5,5,1,2,2,5,5,5,5],
+[E,0,0,1,0,0,0,0,E,E],
+[E,E,0,0,0,0,0,E,E,E],
+[4,4,4,0,0,0,4,4,4,4],
+[4,4,4,4,4,4,4,4,4,4]]},
+{name:'Rocket',grid:[
+[E,E,E,E,0,0,E,E,E,E],
+[E,E,E,0,1,1,0,E,E,E],
+[E,E,E,0,1,1,0,E,E,E],
+[E,E,0,2,2,2,2,0,E,E],
+[E,E,0,2,3,3,2,0,E,E],
+[E,4,0,2,2,2,2,0,4,E],
+[E,4,0,2,2,2,2,0,4,E],
+[4,4,0,5,0,0,5,0,4,4],
+[E,E,E,6,E,E,6,E,E,E],
+[E,E,6,6,E,E,6,6,E,E]]},
+{name:'Lighthouse',grid:[
+[E,E,E,E,0,0,E,E,E,E],
+[E,E,E,0,1,1,0,E,E,E],
+[E,E,E,0,1,1,0,E,E,E],
+[E,E,2,2,2,2,2,2,E,E],
+[E,E,2,3,3,3,3,2,E,E],
+[E,E,2,2,2,2,2,2,E,E],
+[E,E,E,4,4,4,4,E,E,E],
+[E,E,E,4,4,4,4,E,E,E],
+[5,5,5,5,5,5,5,5,5,5],
+[6,6,6,6,6,6,6,6,6,6]]}
+],
+8:[
+{name:'Robot',grid:[
+[E,E,E,3,3,3,3,E,E,E],
+[E,E,0,0,0,0,0,0,E,E],
+[E,E,0,2,0,0,2,0,E,E],
+[E,E,0,0,7,7,0,0,E,E],
+[E,4,1,1,1,1,1,1,4,E],
+[E,4,1,5,6,6,5,1,4,E],
+[E,4,1,5,7,7,5,1,4,E],
+[E,E,1,1,1,1,1,1,E,E],
+[E,E,E,3,3,3,3,E,E,E],
+[E,E,3,3,E,E,3,3,E,E]]},
+{name:'Castle',grid:[
+[0,E,0,E,0,0,E,0,E,0],
+[0,E,0,E,1,1,E,0,E,0],
+[2,2,2,2,1,1,2,2,2,2],
+[E,3,3,2,1,1,2,3,3,E],
+[E,3,3,2,4,4,2,3,3,E],
+[E,2,2,2,4,4,2,2,2,E],
+[E,2,5,5,2,2,5,5,2,E],
+[E,2,5,5,2,2,5,5,2,E],
+[6,2,2,2,7,7,2,2,2,6],
+[6,6,6,6,7,7,6,6,6,6]]},
+{name:'Tower',grid:[
+[E,E,E,0,0,0,0,E,E,E],
+[E,E,0,1,1,1,1,0,E,E],
+[E,E,0,1,2,2,1,0,E,E],
+[E,E,0,1,2,2,1,0,E,E],
+[E,3,3,3,3,3,3,3,3,E],
+[E,3,4,4,3,3,4,4,3,E],
+[E,3,3,3,5,5,3,3,3,E],
+[6,6,6,6,6,6,6,6,6,6],
+[E,7,7,E,E,E,E,7,7,E],
+[E,7,7,E,E,E,E,7,7,E]]},
+{name:'Anchor',grid:[
+[E,E,E,E,0,0,E,E,E,E],
+[E,E,E,0,1,1,0,E,E,E],
+[E,E,E,E,0,0,E,E,E,E],
+[E,E,E,E,2,2,E,E,E,E],
+[E,E,E,E,2,2,E,E,E,E],
+[E,3,E,E,2,2,E,E,3,E],
+[3,4,3,E,2,2,E,3,4,3],
+[E,3,4,5,5,5,5,4,3,E],
+[E,E,6,6,7,7,6,6,E,E],
+[E,E,E,7,7,7,7,E,E,E]]}
+],
+9:[
+{name:'Dragon',grid:[
+[E,E,E,E,0,0,E,E,E,E],
+[E,E,E,0,1,1,0,E,E,E],
+[8,8,0,1,2,2,1,0,E,E],
+[E,0,1,1,3,3,1,1,0,E],
+[E,0,4,1,1,1,1,1,0,E],
+[0,4,4,5,5,5,5,E,E,E],
+[E,E,5,5,6,5,5,E,E,E],
+[E,E,E,5,5,5,E,E,E,E],
+[E,E,7,7,E,7,7,E,E,E],
+[E,E,7,E,E,E,7,E,E,E]]},
+{name:'Phoenix',grid:[
+[E,E,E,E,0,0,E,E,E,E],
+[E,E,E,0,1,1,0,E,E,E],
+[8,E,0,1,2,2,1,0,E,8],
+[E,0,3,1,1,1,1,3,0,E],
+[E,0,3,3,4,4,3,3,0,E],
+[0,3,3,5,5,5,5,3,3,0],
+[E,E,5,5,6,6,5,5,E,E],
+[E,E,E,7,7,7,E,E,E,E],
+[E,E,7,7,E,7,7,E,E,E],
+[E,8,8,E,E,E,8,8,E,E]]},
+{name:'Unicorn',grid:[
+[E,E,E,E,0,E,E,E,E,E],
+[E,E,E,0,1,0,E,E,E,E],
+[E,E,0,1,1,1,0,E,E,E],
+[E,2,1,1,3,1,1,E,E,E],
+[E,2,2,1,1,1,1,4,E,E],
+[E,E,2,5,5,5,4,4,E,E],
+[E,E,E,5,6,5,E,E,E,E],
+[E,E,7,7,5,7,7,E,E,E],
+[E,E,7,E,E,E,7,E,E,E],
+[E,8,8,E,E,E,8,8,E,E]]}
+],
+10:[
+{name:'Kingdom',grid:[
+[0,E,1,1,E,E,1,1,E,0],
+[0,E,1,1,E,E,1,1,E,0],
+[2,2,2,2,2,2,2,2,2,2],
+[E,3,3,2,4,4,2,3,3,E],
+[E,3,3,2,4,4,2,3,3,E],
+[E,2,2,2,5,5,2,2,2,E],
+[6,2,7,7,2,2,7,7,2,6],
+[6,2,7,7,2,2,7,7,2,6],
+[8,2,2,2,9,9,2,2,2,8],
+[8,8,8,8,9,9,8,8,8,8]]},
+{name:'Wizard',grid:[
+[E,E,E,0,0,0,E,E,E,E],
+[E,E,0,0,1,0,0,E,E,E],
+[E,E,E,2,2,2,E,E,E,E],
+[E,E,2,3,3,3,2,E,E,E],
+[E,4,4,3,3,3,4,4,E,E],
+[E,4,5,5,5,5,5,4,E,E],
+[E,E,6,6,6,6,6,E,E,E],
+[E,7,7,E,8,E,7,7,E,E],
+[E,E,E,E,8,E,E,E,E,E],
+[E,E,9,9,E,9,9,E,E,E]]}
+]};
+
+function getArtForLevel(numColors,seed){
+    const r=new Rand(seed);
+    let bank;
+    if(numColors<=4) bank=ART6[numColors]||ART6[3];
+    else if(numColors<=6) bank=ART8[numColors]||ART8[5];
+    else bank=ART10[numColors]||ART10[7];
+    if(!bank){
+        const src=numColors<=4?ART6:numColors<=6?ART8:ART10;
+        const keys=Object.keys(src).map(Number).filter(k=>k<=numColors).sort((a,b)=>b-a);
+        bank=src[keys[0]]||ART6[3];
+    }
+    return bank[r.int(bank.length)];
+}
+
+// ========== LEVEL GENERATION ==========
+function getLevelConfig(lvl){
+    let nc;
+    if(lvl<=5) nc=3;
+    else if(lvl<=12) nc=3+Math.floor((lvl-5)/4);
+    else if(lvl<=25) nc=5+Math.floor((lvl-12)/7);
+    else if(lvl<=50) nc=7+Math.floor((lvl-25)/13);
+    else if(lvl<=100) nc=Math.min(9,8+Math.floor((lvl-50)/25));
+    else nc=Math.min(10,9+Math.floor((lvl-100)/50));
+    nc=Math.min(nc,10);
+    // Shuffle percent
+    let sp;
+    if(lvl<=8) sp=0.35+lvl*0.02;
+    else if(lvl<=25) sp=0.5+(lvl-8)*0.015;
+    else if(lvl<=60) sp=0.75+(lvl-25)*0.004;
+    else sp=Math.min(0.95,0.89+(lvl-60)*0.001);
+    return{numColors:nc,shufflePct:sp};
+}
+
+function generateLevel(lvl){
+    const cfg=getLevelConfig(lvl);
+    const nc=cfg.numColors;
+    const art=getArtForLevel(nc,lvl*99991+7919);
+    const grid=art.grid;
+    const rows=grid.length,cols=grid[0].length;
+    const r=new Rand(lvl*7919+13);
+
+    // Build cup list: {row, col, target, current}
+    const cups=[];
+    const colorCounts=new Array(nc).fill(0);
+    for(let row=0;row<rows;row++){
+        for(let col=0;col<cols;col++){
+            const t=grid[row][col];
+            if(t!==E && t<nc){
+                cups.push({row,col,target:t,current:t});
+                colorCounts[t]++;
+            }
+        }
+    }
+
+    // Determine max wrong per color (= jar capacity)
+    const maxWrong=Math.floor(TOTAL_JARS/nc);
+
+    // Build grid map for adjacency lookups
+    const gridMap={};
+    for(let i=0;i<cups.length;i++) gridMap[cups[i].row+','+cups[i].col]=i;
+
+    // Group cup indices by target color
+    const colorIndices=[];
+    for(let c=0;c<nc;c++){
+        const idxs=[];
+        for(let i=0;i<cups.length;i++) if(cups[i].target===c) idxs.push(i);
+        colorIndices.push(idxs);
+    }
+
+    // Calculate how many to shuffle per color
+    const wrongPerColor=[];
+    for(let c=0;c<nc;c++){
+        wrongPerColor.push(Math.min(Math.floor(colorCounts[c]*cfg.shufflePct),maxWrong));
+    }
+
+    // Grow a connected blob via randomized BFS
+    function growBlob(seedIdx,targetColor,maxSize){
+        const visited=new Set([seedIdx]);
+        const blob=[seedIdx];
+        const frontier=[seedIdx];
+        while(blob.length<maxSize&&frontier.length>0){
+            const fi=r.int(frontier.length);
+            const idx=frontier[fi];
+            frontier[fi]=frontier[frontier.length-1];frontier.pop();
+            const cr=cups[idx].row,cc=cups[idx].col;
+            const nbrs=[];
+            for(const[dr,dc]of[[0,1],[0,-1],[1,0],[-1,0]]){
+                const ni=gridMap[(cr+dr)+','+(cc+dc)];
+                if(ni!==undefined&&!visited.has(ni)&&cups[ni].target===targetColor) nbrs.push(ni);
+            }
+            r.shuffle(nbrs);
+            for(const ni of nbrs){
+                if(blob.length>=maxSize)break;
+                visited.add(ni);blob.push(ni);frontier.push(ni);
+            }
+        }
+        return blob;
+    }
+
+    // Pair up colors randomly and swap blobs between each pair
+    const alreadySwapped=new Set();
+    const colorOrder=[...Array(nc).keys()];
+    r.shuffle(colorOrder);
+
+    for(let i=0;i<colorOrder.length-1;i+=2){
+        const cA=colorOrder[i],cB=colorOrder[i+1];
+        const swapSize=Math.min(wrongPerColor[cA],wrongPerColor[cB]);
+        if(swapSize<=0)continue;
+        const availA=colorIndices[cA].filter(x=>!alreadySwapped.has(x));
+        const availB=colorIndices[cB].filter(x=>!alreadySwapped.has(x));
+        if(availA.length===0||availB.length===0)continue;
+        const blobA=growBlob(r.pick(availA),cA,swapSize);
+        const blobB=growBlob(r.pick(availB),cB,swapSize);
+        const actual=Math.min(blobA.length,blobB.length);
+        for(let k=0;k<actual;k++){
+            const tmp=cups[blobA[k]].current;
+            cups[blobA[k]].current=cups[blobB[k]].current;
+            cups[blobB[k]].current=tmp;
+            alreadySwapped.add(blobA[k]);alreadySwapped.add(blobB[k]);
+        }
+        wrongPerColor[cA]-=actual;wrongPerColor[cB]-=actual;
+    }
+    // Handle odd color or remaining budget
+    if(colorOrder.length%2===1){
+        const lastC=colorOrder[colorOrder.length-1];
+        const partner=colorOrder[r.int(colorOrder.length-1)];
+        const swapSize=Math.min(wrongPerColor[lastC],wrongPerColor[partner]);
+        if(swapSize>0){
+            const availL=colorIndices[lastC].filter(x=>!alreadySwapped.has(x));
+            const availP=colorIndices[partner].filter(x=>!alreadySwapped.has(x));
+            if(availL.length>0&&availP.length>0){
+                const blobL=growBlob(r.pick(availL),lastC,swapSize);
+                const blobP=growBlob(r.pick(availP),partner,swapSize);
+                const actual=Math.min(blobL.length,blobP.length);
+                for(let k=0;k<actual;k++){
+                    const tmp=cups[blobL[k]].current;
+                    cups[blobL[k]].current=cups[blobP[k]].current;
+                    cups[blobP[k]].current=tmp;
+                    alreadySwapped.add(blobL[k]);alreadySwapped.add(blobP[k]);
+                }
+                wrongPerColor[lastC]-=actual;wrongPerColor[partner]-=actual;
+            }
+        }
+    }
+    // Second pass: any color still has remaining budget, find a partner
+    for(let c=0;c<nc;c++){
+        if(wrongPerColor[c]<=0)continue;
+        for(let p=0;p<nc;p++){
+            if(p===c||wrongPerColor[p]<=0)continue;
+            const swapSize=Math.min(wrongPerColor[c],wrongPerColor[p]);
+            const availC=colorIndices[c].filter(x=>!alreadySwapped.has(x));
+            const availP=colorIndices[p].filter(x=>!alreadySwapped.has(x));
+            if(availC.length===0||availP.length===0)continue;
+            const blobC=growBlob(r.pick(availC),c,swapSize);
+            const blobP=growBlob(r.pick(availP),p,swapSize);
+            const actual=Math.min(blobC.length,blobP.length);
+            for(let k=0;k<actual;k++){
+                const tmp=cups[blobC[k]].current;
+                cups[blobC[k]].current=cups[blobP[k]].current;
+                cups[blobP[k]].current=tmp;
+                alreadySwapped.add(blobC[k]);alreadySwapped.add(blobP[k]);
+            }
+            wrongPerColor[c]-=actual;wrongPerColor[p]-=actual;
+            if(wrongPerColor[c]<=0)break;
+        }
+    }
+    // Safety: fix any swapped cup that accidentally stayed correct
+    const swappedArr=[...alreadySwapped];
+    for(const idx of swappedArr){
+        if(cups[idx].current===cups[idx].target){
+            for(const idx2 of swappedArr){
+                if(idx2!==idx&&cups[idx2].target!==cups[idx].target){
+                    const tmp=cups[idx].current;
+                    cups[idx].current=cups[idx2].current;
+                    cups[idx2].current=tmp;
+                    break;
+                }
+            }
+        }
+    }
+
+    return{cups,art,numColors:nc,rows,cols};
+}
+
+// ========== GAME STATE ==========
+function cloneState(cups,jars){
+    return{cups:cups.map(c=>({...c})),jars:[...jars]};
+}
+
+function getAvailableJars(numColors,completedCount){
+    const base=12;
+    const unlockPerColor=Math.max(1,Math.floor(12/numColors));
+    return Math.min(TOTAL_JARS,base+unlockPerColor*completedCount);
+}
+
+function countWrong(cups,color){
+    let n=0;
+    for(const c of cups) if(c.current===color && c.current!==c.target) n++;
+    return n;
+}
+
+function isColorComplete(cups,color){
+    for(const c of cups){
+        if(c.target===color && c.current!==color) return false;
+    }
+    // Also check no cups hold this color wrongly
+    for(const c of cups){
+        if(c.current===color && c.target!==color) return false;
+    }
+    return true;
+}
+
+// ========== BACKGROUND BUBBLES ==========
+class Bubbles{
+    constructor(){
+        this.ps=[];
+        for(let i=0;i<20;i++){
+            this.ps.push({x:Math.random()*GW,y:Math.random()*GH,r:2+Math.random()*4,
+                vy:-0.15-Math.random()*0.4,vx:(Math.random()-0.5)*0.2,a:0.04+Math.random()*0.08});
+        }
+    }
+    update(){for(const p of this.ps){p.y+=p.vy;p.x+=p.vx;if(p.y<-10){p.y=GH+10;p.x=Math.random()*GW;}}}
+    draw(ctx){
+        for(const p of this.ps){
+            ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
+            ctx.fillStyle=`rgba(120,180,255,${p.a})`;ctx.fill();
+        }
+    }
+}
+
+// ========== CONFETTI ==========
+let confetti=[];
+function spawnConfetti(){
+    confetti=[];
+    for(let i=0;i<80;i++){
+        confetti.push({x:GW/2,y:GH*0.4,vx:(Math.random()-0.5)*12,vy:-3-Math.random()*8,
+            r:3+Math.random()*4,color:COLORS[Math.floor(Math.random()*COLORS.length)],
+            rot:Math.random()*Math.PI*2,rv:(Math.random()-0.5)*0.2,life:2+Math.random()*2});
+    }
+}
+function updateConfetti(dt){
+    for(const c of confetti){c.x+=c.vx*dt*60;c.y+=c.vy*dt*60;c.vy+=0.15;c.rot+=c.rv;c.life-=dt;}
+    confetti=confetti.filter(c=>c.life>0);
+}
+function drawConfetti(ctx){
+    for(const c of confetti){
+        ctx.save();ctx.translate(c.x,c.y);ctx.rotate(c.rot);
+        ctx.fillStyle=c.color;ctx.globalAlpha=Math.min(1,c.life);
+        ctx.fillRect(-c.r,-c.r/2,c.r*2,c.r);ctx.restore();
+    }
+    ctx.globalAlpha=1;
+}
+
+// ========== CANVAS SETUP ==========
+const canvas=document.getElementById('c');
+const ctx=canvas.getContext('2d');
+const audio=new Audio_();
+const bubbles=new Bubbles();
+
+let W,H,scale,ox,oy;
+function resize(){
+    W=window.innerWidth;H=window.innerHeight;
+    canvas.width=W;canvas.height=H;
+    scale=Math.min(W/GW,H/GH);
+    ox=(W-GW*scale)/2;oy=(H-GH*scale)/2;
+}
+resize();
+window.addEventListener('resize',resize);
+function toGame(cx,cy){return[(cx-ox)/scale,(cy-oy)/scale];}
+
+// ========== DRAW HELPERS ==========
+function roundRect(ctx,x,y,w,h,r){
+    ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);
+    ctx.quadraticCurveTo(x+w,y,x+w,y+r);ctx.lineTo(x+w,y+h-r);
+    ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);ctx.lineTo(x+r,y+h);
+    ctx.quadraticCurveTo(x,y+h,x,y+h-r);ctx.lineTo(x,y+r);
+    ctx.quadraticCurveTo(x,y,x+r,y);ctx.closePath();
+}
+function drawBtn(ctx,text,x,y,w,h,hl,col){
+    roundRect(ctx,x,y,w,h,h/2);
+    ctx.fillStyle=hl?(col||'rgba(100,150,230,0.9)'):(col||'rgba(70,110,190,0.75)');
+    ctx.fill();ctx.strokeStyle='rgba(255,255,255,0.15)';ctx.lineWidth=1;ctx.stroke();
+    if(hl){ctx.shadowColor='rgba(100,150,230,0.4)';ctx.shadowBlur=8;}
+    ctx.fillStyle='#fff';ctx.font=`bold ${Math.min(h*0.42,17)}px sans-serif`;
+    ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(text,x+w/2,y+h/2);
+    ctx.shadowBlur=0;
+}
+
+// ========== GAME GLOBALS ==========
+let screen='menu';
+let currentLevel=1, maxUnlocked=1;
+let levelData=null, cups=null, jars=null;
+let completedColors=null, lockedColors=null;
+let moveCount=0, history=[];
+let buttons=[], hoverBtn=-1;
+
+// Animation & holding state
+let anim=null; // {phase, t, ...} for pickup/place animations
+let held=null; // {color, totalUnits, srcCupIdxs, srcJarIdxs, blobX, blobY} — waiting for 2nd tap
+let jarUnlockAnim=null; // {t, duration, from, to}
+let shakeTimer=0, errorColor=-1;
+let completedArtScale=0;
+let levelScroll=0;
+let confirmReset=false;
+let touchStartY=0,touchMoved=false;
+
+// Grid layout
+let gridOX=0,gridOY=0,cellSize=0,cupR=0;
+// Jar layout
+let jarOX=0,jarOY=0,jarCellW=0,jarCellH=0,jarR=0;
+
+function saveProgress(){try{localStorage.setItem('lcs2_max',maxUnlocked.toString());}catch(e){}}
+function loadProgress(){try{const v=localStorage.getItem('lcs2_max');if(v)maxUnlocked=Math.max(1,parseInt(v)||1);}catch(e){}}
+loadProgress();
+
+// ========== LAYOUT CALCULATION ==========
+function calcLayout(){
+    if(!levelData)return;
+    const{rows,cols}=levelData;
+    const maxGridW=GW-40;
+    const maxGridH=340;
+    cellSize=Math.min(Math.floor(maxGridW/cols),Math.floor(maxGridH/rows));
+    cellSize=Math.min(cellSize,65);
+    cupR=Math.floor(cellSize*0.38);
+    gridOX=(GW-cols*cellSize)/2;
+    gridOY=55;
+
+    // Jars below grid
+    const gridBottom=gridOY+rows*cellSize;
+    jarCellW=Math.floor((GW-30)/JAR_COLS);
+    jarCellH=Math.min(jarCellW,42);
+    jarR=Math.floor(Math.min(jarCellW,jarCellH)*0.35);
+    jarOX=(GW-JAR_COLS*jarCellW)/2;
+    jarOY=gridBottom+30;
+}
+
+// ========== CUP RENDERING ==========
+function drawCup(cx,cy,r,targetCol,currentCol,correct,locked,empty,glow){
+    // Target color ring (always visible)
+    ctx.beginPath();ctx.arc(cx,cy,r+4,0,Math.PI*2);
+    if(locked){
+        ctx.strokeStyle=COLORS[targetCol];ctx.lineWidth=3.5;ctx.globalAlpha=0.95;
+        ctx.shadowColor=COLORS[targetCol];ctx.shadowBlur=10;
+    } else if(correct){
+        ctx.strokeStyle=COLORS[targetCol];ctx.lineWidth=3.5;ctx.globalAlpha=0.85;
+    } else {
+        ctx.strokeStyle=COLORS[targetCol];ctx.lineWidth=3;ctx.globalAlpha=0.45;
+    }
+    ctx.stroke();ctx.globalAlpha=1;ctx.shadowBlur=0;
+
+    // Cup base (bowl shape)
+    ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);
+    if(empty || currentCol===E){
+        // Empty cup interior
+        ctx.fillStyle='rgba(30,30,50,0.4)';ctx.fill();
+        ctx.strokeStyle='rgba(150,170,200,0.12)';ctx.lineWidth=1;ctx.stroke();
+    } else {
+        // Liquid fill with gradient
+        const ci=currentCol;
+        const grad=ctx.createRadialGradient(cx-r*0.25,cy-r*0.25,r*0.1,cx,cy,r);
+        grad.addColorStop(0,COLOR_LIGHT[ci]);
+        grad.addColorStop(0.45,COLORS[ci]);
+        grad.addColorStop(1,COLOR_DARK[ci]);
+        ctx.fillStyle=grad;ctx.fill();
+
+        // Liquid highlight
+        ctx.beginPath();ctx.arc(cx-r*0.25,cy-r*0.3,r*0.3,0,Math.PI*2);
+        ctx.fillStyle='rgba(255,255,255,0.2)';ctx.fill();
+
+        // Cup rim
+        ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);
+        ctx.strokeStyle='rgba(255,255,255,0.1)';ctx.lineWidth=1;ctx.stroke();
+    }
+
+    // Glow effect for completed
+    if(glow){
+        ctx.beginPath();ctx.arc(cx,cy,r+6,0,Math.PI*2);
+        ctx.strokeStyle=COLORS[targetCol];ctx.lineWidth=2;
+        ctx.globalAlpha=0.3+0.15*Math.sin(performance.now()/300);
+        ctx.stroke();ctx.globalAlpha=1;
+    }
+}
+
+// ========== JAR RENDERING ==========
+function drawJar(cx,cy,r,color,locked,available){
+    const jw=r*1.4,jh=r*1.8;
+    // Jar body
+    roundRect(ctx,cx-jw/2,cy-jh/2,jw,jh,4);
+    if(locked){
+        ctx.fillStyle='rgba(20,20,35,0.5)';ctx.fill();
+        ctx.strokeStyle='rgba(60,60,80,0.3)';ctx.lineWidth=1;ctx.stroke();
+        // Lock mark
+        ctx.fillStyle='rgba(80,80,100,0.4)';ctx.font=`${r*0.7}px sans-serif`;
+        ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('×',cx,cy);
+    } else if(color===E){
+        // Empty available jar
+        ctx.fillStyle='rgba(40,50,70,0.25)';ctx.fill();
+        ctx.strokeStyle='rgba(150,180,220,0.2)';ctx.lineWidth=1;ctx.stroke();
+        // Glass highlight
+        ctx.beginPath();ctx.rect(cx-jw/2+2,cy-jh/2+3,2,jh-6);
+        ctx.fillStyle='rgba(255,255,255,0.06)';ctx.fill();
+    } else {
+        // Filled jar
+        ctx.fillStyle='rgba(40,50,70,0.3)';ctx.fill();
+        // Liquid inside
+        const lpad=3;
+        roundRect(ctx,cx-jw/2+lpad,cy-jh/2+lpad,jw-lpad*2,jh-lpad*2,2);
+        const grad=ctx.createLinearGradient(cx-jw/2,cy,cx+jw/2,cy);
+        grad.addColorStop(0,COLOR_DARK[color]);grad.addColorStop(0.3,COLORS[color]);
+        grad.addColorStop(0.7,COLORS[color]);grad.addColorStop(1,COLOR_DARK[color]);
+        ctx.fillStyle=grad;ctx.fill();
+        // Jar glass outline
+        roundRect(ctx,cx-jw/2,cy-jh/2,jw,jh,4);
+        ctx.strokeStyle='rgba(180,210,255,0.25)';ctx.lineWidth=1;ctx.stroke();
+        // Highlight
+        ctx.beginPath();ctx.rect(cx-jw/2+2,cy-jh/2+3,2,jh-6);
+        ctx.fillStyle='rgba(255,255,255,0.12)';ctx.fill();
+    }
+}
+
+// ========== BLOB RENDERING ==========
+function drawBlob(cx,cy,color,size,t){
+    const wobble=Math.sin(t*8)*0.08;
+    const r=size*(1+wobble);
+    // Main blob
+    const grad=ctx.createRadialGradient(cx-r*0.2,cy-r*0.2,r*0.1,cx,cy,r);
+    grad.addColorStop(0,COLOR_LIGHT[color]);
+    grad.addColorStop(0.4,COLORS[color]);
+    grad.addColorStop(1,COLOR_DARK[color]);
+    ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);
+    ctx.fillStyle=grad;ctx.fill();
+    // Glow
+    ctx.shadowColor=COLORS[color];ctx.shadowBlur=15;
+    ctx.beginPath();ctx.arc(cx,cy,r*0.8,0,Math.PI*2);
+    ctx.fillStyle=COLORS[color];ctx.globalAlpha=0.3;ctx.fill();
+    ctx.globalAlpha=1;ctx.shadowBlur=0;
+    // Satellite droplets
+    for(let i=0;i<4;i++){
+        const angle=t*2+i*Math.PI/2;
+        const dist=r*1.3+Math.sin(t*5+i)*r*0.2;
+        const sx=cx+Math.cos(angle)*dist;
+        const sy=cy+Math.sin(angle)*dist;
+        const sr=r*0.2;
+        ctx.beginPath();ctx.arc(sx,sy,sr,0,Math.PI*2);
+        ctx.fillStyle=COLORS[color];ctx.globalAlpha=0.5;ctx.fill();
+        ctx.globalAlpha=1;
+    }
+    // Top highlight
+    ctx.beginPath();ctx.arc(cx-r*0.2,cy-r*0.3,r*0.35,0,Math.PI*2);
+    ctx.fillStyle='rgba(255,255,255,0.2)';ctx.fill();
+}
+
+function drawSmallBlob(cx,cy,color,size){
+    const grad=ctx.createRadialGradient(cx-size*0.15,cy-size*0.15,1,cx,cy,size);
+    grad.addColorStop(0,COLOR_LIGHT[color]);grad.addColorStop(0.5,COLORS[color]);grad.addColorStop(1,COLOR_DARK[color]);
+    ctx.beginPath();ctx.arc(cx,cy,size,0,Math.PI*2);ctx.fillStyle=grad;ctx.fill();
+}
+
+// ========== ANIMATION SYSTEM ==========
+function getCupCenter(cup){
+    return{x:gridOX+cup.col*cellSize+cellSize/2,y:gridOY+cup.row*cellSize+cellSize/2};
+}
+function getJarCenter(idx){
+    const col=idx%JAR_COLS,row=Math.floor(idx/JAR_COLS);
+    return{x:jarOX+col*jarCellW+jarCellW/2,y:jarOY+row*jarCellH+jarCellH/2};
+}
+
+// ---- Flood-fill: find connected same-color group from a starting cup ----
+function floodFillCups(startIdx,color){
+    // Don't pick up cups already in the correct position
+    if(cups[startIdx].current===cups[startIdx].target)return[];
+    const gridMap={};
+    for(let i=0;i<cups.length;i++) gridMap[cups[i].row+','+cups[i].col]=i;
+    const visited=new Set([startIdx]);
+    const result=[];
+    const stack=[startIdx];
+    while(stack.length>0){
+        const idx=stack.pop();
+        if(cups[idx].current!==color)continue;
+        if(cups[idx].current===cups[idx].target)continue; // skip correct cups
+        result.push(idx);
+        const r=cups[idx].row,c=cups[idx].col;
+        for(const[dr,dc]of[[0,1],[0,-1],[1,0],[-1,0]]){
+            const key=(r+dr)+','+(c+dc);
+            const ni=gridMap[key];
+            if(ni!==undefined&&!visited.has(ni)&&cups[ni].current===color){
+                visited.add(ni);stack.push(ni);
+            }
+        }
+    }
+    return result;
+}
+
+// ---- Flood-fill: find connected same-color group from a starting jar ----
+function floodFillJars(startIdx,color){
+    const visited=new Set([startIdx]);
+    const result=[];
+    const stack=[startIdx];
+    while(stack.length>0){
+        const idx=stack.pop();
+        if(jars[idx]!==color)continue;
+        result.push(idx);
+        const col=idx%JAR_COLS,row=Math.floor(idx/JAR_COLS);
+        for(const[dr,dc]of[[0,1],[0,-1],[1,0],[-1,0]]){
+            const nr=row+dr,nc=col+dc;
+            if(nr>=0&&nr<JAR_ROWS&&nc>=0&&nc<JAR_COLS){
+                const ni=nr*JAR_COLS+nc;
+                if(!visited.has(ni)&&jars[ni]===color){
+                    visited.add(ni);stack.push(ni);
+                }
+            }
+        }
+    }
+    return result;
+}
+
+// ---- Tap 1: Pick up connected group of a color into a floating blob ----
+function pickupColor(color,tapCupIdx,tapJarIdx){
+    const srcCupIdxs=tapCupIdx>=0?floodFillCups(tapCupIdx,color):[];
+    const srcJarIdxs=tapJarIdx>=0?floodFillJars(tapJarIdx,color):[];
+    const totalUnits=srcCupIdxs.length+srcJarIdxs.length;
+    if(totalUnits===0)return false;
+
+    // Save state for undo
+    history.push(cloneState(cups,jars));
+
+    // Build source positions for animation
+    const srcPositions=[];
+    for(const i of srcCupIdxs) srcPositions.push(getCupCenter(cups[i]));
+    for(const i of srcJarIdxs) srcPositions.push(getJarCenter(i));
+
+    // Convergence point (above grid center)
+    let cx=0,cy=0;
+    for(const p of srcPositions){cx+=p.x;cy+=p.y;}
+    cx/=srcPositions.length;cy/=srcPositions.length;
+    cy=Math.min(cy-30,gridOY-25);
+
+    // Remove liquid from grid and jars
+    for(const i of srcCupIdxs) cups[i].current=E;
+    for(const i of srcJarIdxs) jars[i]=E;
+
+    // Start pickup animation → transitions to held (waiting) state
+    anim={
+        phase:'pickup',t:0,color,
+        srcPositions,blobX:cx,blobY:cy,totalUnits,
+        srcCupIdxs,srcJarIdxs,
+        pickupDur:0.35,
+    };
+    audio.playPickup();
+    return true;
+}
+
+// ---- Flood-fill empty target cups from a grid position ----
+function floodFillEmptyTargets(startIdx,color){
+    const gridMap={};
+    for(let i=0;i<cups.length;i++) gridMap[cups[i].row+','+cups[i].col]=i;
+    const visited=new Set([startIdx]);
+    const result=[];
+    const stack=[startIdx];
+    while(stack.length>0){
+        const idx=stack.pop();
+        const c=cups[idx];
+        if(c.target!==color||c.current!==E)continue; // only empty cups targeting this color
+        result.push(idx);
+        const r=c.row,col=c.col;
+        for(const[dr,dc]of[[0,1],[0,-1],[1,0],[-1,0]]){
+            const key=(r+dr)+','+(col+dc);
+            const ni=gridMap[key];
+            if(ni!==undefined&&!visited.has(ni)&&cups[ni].target===color&&cups[ni].current===E){
+                visited.add(ni);stack.push(ni);
+            }
+        }
+    }
+    return result;
+}
+
+// ---- Find nearest empty target cup to a tap position ----
+function findNearestEmptyTarget(gx,gy,color){
+    let bestIdx=-1,bestDist=Infinity;
+    for(let i=0;i<cups.length;i++){
+        const c=cups[i];
+        if(c.target!==color||c.current!==E)continue;
+        const cx=gridOX+c.col*cellSize+cellSize/2;
+        const cy=gridOY+c.row*cellSize+cellSize/2;
+        const d=(gx-cx)*(gx-cx)+(gy-cy)*(gy-cy);
+        if(d<bestDist){bestDist=d;bestIdx=i;}
+    }
+    return bestIdx;
+}
+
+// ---- Tap 2a: Place held blob onto connected empty target cups near tap ----
+function placeOnGrid(gx,gy){
+    if(!held)return false;
+    const color=held.color;
+    // Find nearest empty target cup to where the player tapped
+    const nearestIdx=findNearestEmptyTarget(gx,gy,color);
+    if(nearestIdx<0)return false;
+
+    // Flood-fill from that cup to find connected empty targets
+    const targetIdxs=floodFillEmptyTargets(nearestIdx,color);
+    if(targetIdxs.length===0)return false;
+
+    // Place as many as fit (up to totalUnits or available connected targets)
+    const placeCount=Math.min(held.totalUnits,targetIdxs.length);
+    const placedIdxs=targetIdxs.slice(0,placeCount);
+    const tgtPositions=placedIdxs.map(i=>getCupCenter(cups[i]));
+
+    // Remaining units go back to their original source positions
+    const returnCount=held.totalUnits-placeCount;
+
+    moveCount++;
+    // Start place animation
+    anim={
+        phase:'place',t:0,color:held.color,
+        blobX:held.blobX,blobY:held.blobY,
+        tgtPositions,placedCupIdxs:placedIdxs,placedJarIdxs:[],
+        returnCount,returnSrcCups:held.srcCupIdxs,returnSrcJars:held.srcJarIdxs,
+        totalPlaced:placeCount,
+        placeDur:0.4,
+    };
+    held=null;
+    audio.playPlace();
+    return true;
+}
+
+// ---- Tap 2b: Place held blob into jar slots (auto-sorted by color) ----
+function placeInJars(){
+    if(!held)return false;
+    const color=held.color;
+    const availJars=getAvailableJars(levelData.numColors,lockedColors.size);
+    const needed=held.totalUnits;
+
+    // Find empty slots adjacent to existing same-color jars
+    function findAdjacentEmpties(){
+        const sameColor=[];
+        for(let i=0;i<availJars;i++) if(jars[i]===color) sameColor.push(i);
+        if(sameColor.length===0)return[];
+        const adj=new Set();
+        for(const idx of sameColor){
+            const c=idx%JAR_COLS,r=Math.floor(idx/JAR_COLS);
+            for(const[dr,dc]of[[0,1],[0,-1],[1,0],[-1,0]]){
+                const nr=r+dr,nc=c+dc;
+                if(nr>=0&&nr<JAR_ROWS&&nc>=0&&nc<JAR_COLS){
+                    const ni=nr*JAR_COLS+nc;
+                    if(ni<availJars&&jars[ni]===E) adj.add(ni);
+                }
+            }
+        }
+        // BFS expand from adjacent empties if need more
+        const result=[...adj];
+        if(result.length<needed){
+            const frontier=[...result];
+            const visited=new Set(adj);
+            while(result.length<needed&&frontier.length>0){
+                const idx=frontier.shift();
+                const c=idx%JAR_COLS,r=Math.floor(idx/JAR_COLS);
+                for(const[dr,dc]of[[0,1],[0,-1],[1,0],[-1,0]]){
+                    const nr=r+dr,nc=c+dc;
+                    if(nr>=0&&nr<JAR_ROWS&&nc>=0&&nc<JAR_COLS){
+                        const ni=nr*JAR_COLS+nc;
+                        if(ni<availJars&&jars[ni]===E&&!visited.has(ni)){
+                            visited.add(ni);result.push(ni);frontier.push(ni);
+                        }
+                    }
+                }
+            }
+        }
+        return result;
+    }
+
+    // Find contiguous empty block (when no same-color jars exist yet)
+    function findEmptyBlock(){
+        const visited=new Set();
+        let best=[];
+        for(let i=0;i<availJars;i++){
+            if(jars[i]!==E||visited.has(i))continue;
+            const group=[];
+            const stack=[i];visited.add(i);
+            while(stack.length>0){
+                const idx=stack.pop();group.push(idx);
+                const c=idx%JAR_COLS,r=Math.floor(idx/JAR_COLS);
+                for(const[dr,dc]of[[0,1],[0,-1],[1,0],[-1,0]]){
+                    const nr=r+dr,nc=c+dc;
+                    if(nr>=0&&nr<JAR_ROWS&&nc>=0&&nc<JAR_COLS){
+                        const ni=nr*JAR_COLS+nc;
+                        if(ni<availJars&&jars[ni]===E&&!visited.has(ni)){
+                            visited.add(ni);stack.push(ni);
+                        }
+                    }
+                }
+            }
+            if(group.length>=needed)return group.slice(0,needed);
+            if(group.length>best.length)best=group;
+        }
+        return best;
+    }
+
+    // Check if same-color jars exist
+    let hasSameColor=false;
+    for(let i=0;i<availJars;i++){if(jars[i]===color){hasSameColor=true;break;}}
+
+    let targetSlots;
+    if(hasSameColor){
+        targetSlots=findAdjacentEmpties();
+    } else {
+        targetSlots=findEmptyBlock();
+    }
+
+    // Fallback: grab any remaining empty slots
+    if(targetSlots.length<needed){
+        const used=new Set(targetSlots);
+        for(let i=0;i<availJars&&targetSlots.length<needed;i++){
+            if(jars[i]===E&&!used.has(i)) targetSlots.push(i);
+        }
+    }
+
+    if(targetSlots.length===0)return false;
+
+    const placeCount=Math.min(needed,targetSlots.length);
+    const placedIdxs=targetSlots.slice(0,placeCount);
+    const tgtPositions=placedIdxs.map(i=>getJarCenter(i));
+
+    const returnCount=needed-placeCount;
+
+    moveCount++;
+    anim={
+        phase:'place',t:0,color:held.color,
+        blobX:held.blobX,blobY:held.blobY,
+        tgtPositions,placedCupIdxs:[],placedJarIdxs:placedIdxs,
+        returnCount,returnSrcCups:held.srcCupIdxs,returnSrcJars:held.srcJarIdxs,
+        totalPlaced:placeCount,
+        placeDur:0.4,
+    };
+    held=null;
+    audio.playPlace();
+    return true;
+}
+
+// ---- Cancel: return held blob to original positions ----
+function cancelHeld(){
+    if(!held)return;
+    const color=held.color;
+    // Put liquid back where it came from
+    for(const i of held.srcCupIdxs) cups[i].current=color;
+    for(const i of held.srcJarIdxs) jars[i]=color;
+    // Remove the undo snapshot we saved on pickup
+    if(history.length>0) history.pop();
+    held=null;anim=null;
+    audio._osc(300,0.08,'sine',0.06);
+}
+
+// ---- Finish placement animation: apply state + return excess ----
+function finishPlacement(){
+    if(!anim||anim.phase!=='place')return;
+    const color=anim.color;
+    // Place liquid in targets
+    for(const i of anim.placedCupIdxs) cups[i].current=color;
+    for(const i of anim.placedJarIdxs) jars[i]=color;
+
+    // Return excess to original sources (first cups, then jars)
+    let remaining=anim.returnCount;
+    if(remaining>0){
+        for(const i of anim.returnSrcCups){
+            if(remaining<=0)break;
+            if(cups[i].current===E){cups[i].current=color;remaining--;}
+        }
+        for(const i of anim.returnSrcJars){
+            if(remaining<=0)break;
+            if(jars[i]===E){jars[i]=color;remaining--;}
+        }
+    }
+
+    // Check ALL colors for completion (not just the placed one)
+    for(let c=0;c<levelData.numColors;c++){
+        if(lockedColors.has(c))continue;
+        if(isColorComplete(cups,c)){
+            lockedColors.add(c);completedColors.add(c);
+            audio.playColorComplete();
+            const oldAvail=getAvailableJars(levelData.numColors,lockedColors.size-1);
+            const newAvail=getAvailableJars(levelData.numColors,lockedColors.size);
+            if(newAvail>oldAvail){
+                jarUnlockAnim={t:0,duration:0.5,from:oldAvail,to:newAvail};
+                audio.playUnlock();
+            }
+        }
+    }
+    // Fallback: if every cup is correct, force-complete all colors
+    if(lockedColors.size<levelData.numColors && cups.every(c=>c.current===c.target)){
+        for(let c=0;c<levelData.numColors;c++){lockedColors.add(c);completedColors.add(c);}
+    }
+    if(lockedColors.size===levelData.numColors){
+        setTimeout(()=>{
+            if(screen==='complete')return; // already transitioned by safety check
+            screen='complete';completedArtScale=0;
+            if(currentLevel>=maxUnlocked){maxUnlocked=currentLevel+1;saveProgress();}
+            spawnConfetti();audio.playLevelWin();
+        },600);
+    }
+    anim=null;
+}
+
+// ---- Animation update ----
+function updateAnim(dt){
+    if(!anim)return;
+    if(anim.phase==='pickup'){
+        anim.t+=dt/anim.pickupDur;
+        if(anim.t>=1){
+            // Transition to held (waiting) state
+            held={
+                color:anim.color,totalUnits:anim.totalUnits,
+                srcCupIdxs:anim.srcCupIdxs,srcJarIdxs:anim.srcJarIdxs,
+                blobX:anim.blobX,blobY:anim.blobY,
+            };
+            anim=null;
+        }
+    } else if(anim.phase==='place'){
+        anim.t+=dt/anim.placeDur;
+        if(anim.t>=1) finishPlacement();
+    }
+}
+
+// ---- Animation + held blob drawing ----
+function drawAnim(ctx){
+    const now=performance.now()/1000;
+
+    // Draw pickup animation
+    if(anim&&anim.phase==='pickup'){
+        const{t,color,srcPositions,blobX,blobY}=anim;
+        for(let i=0;i<srcPositions.length;i++){
+            const s=srcPositions[i];
+            const delay=Math.min(i*0.015,0.3);
+            const lt=Math.max(0,Math.min(1,(t-delay)/(1-delay)));
+            const ex=lt*lt;
+            const px=s.x+(blobX-s.x)*ex;
+            const py=s.y+(blobY-s.y)*ex;
+            const sz=cupR*(1-ex*0.3);
+            drawSmallBlob(px,py,color,sz);
+        }
+    }
+
+    // Draw held blob (waiting for 2nd tap)
+    if(held){
+        const blobSize=cupR*1.2+Math.min(held.totalUnits*0.5,15);
+        drawBlob(held.blobX,held.blobY,held.color,blobSize,now);
+        // Hint text
+        ctx.fillStyle='rgba(255,255,255,0.6)';ctx.font='bold 12px sans-serif';
+        ctx.textAlign='center';ctx.textBaseline='middle';
+        ctx.fillText('Tap image or jars to place',held.blobX,held.blobY+blobSize+18);
+        ctx.fillText(`(${held.totalUnits} units)`,held.blobX,held.blobY+blobSize+32);
+    }
+
+    // Draw place animation
+    if(anim&&anim.phase==='place'){
+        const{t,color,blobX,blobY,tgtPositions}=anim;
+        // Shrinking blob at center
+        if(t<0.3){
+            const blobSize=(cupR*1.2+8)*(1-t*3);
+            if(blobSize>1) drawBlob(blobX,blobY,color,blobSize,now);
+        }
+        // Blobs moving to targets
+        for(let i=0;i<tgtPositions.length;i++){
+            const tgt=tgtPositions[i];
+            const delay=Math.min(i*0.02,0.2);
+            const lt=Math.max(0,Math.min(1,(t-delay)/(1-delay*Math.min(tgtPositions.length,10))));
+            const ex=lt*lt*(3-2*lt);
+            const px=blobX+(tgt.x-blobX)*ex;
+            const py=blobY+(tgt.y-blobY)*ex;
+            const sz=cupR*Math.max(0.2,ex);
+            if(sz>1) drawSmallBlob(px,py,color,sz);
+        }
+    }
+}
+
+// ========== LEVEL START ==========
+function startLevel(lvl){
+    currentLevel=lvl;
+    levelData=generateLevel(lvl);
+    cups=levelData.cups;
+    jars=new Array(TOTAL_JARS).fill(E);
+    completedColors=new Set();
+    lockedColors=new Set();
+    moveCount=0;history=[];
+    anim=null;held=null;jarUnlockAnim=null;
+    shakeTimer=0;errorColor=-1;
+    confetti=[];completedArtScale=0;
+    screen='game';
+    calcLayout();
+
+    // Check if any colors are already complete (shouldn't happen but safety)
+    for(let c=0;c<levelData.numColors;c++){
+        if(isColorComplete(cups,c)){lockedColors.add(c);completedColors.add(c);}
+    }
+}
+
+// ========== SCREEN: MENU ==========
+function drawMenu(){
+    ctx.fillStyle='#fff';ctx.font='bold 40px sans-serif';ctx.textAlign='center';
+    ctx.fillText('Liquid Color',GW/2,170);
+    ctx.fillText('Sort',GW/2,218);
+    ctx.font='15px sans-serif';ctx.fillStyle='rgba(180,200,240,0.5)';
+    ctx.fillText('Tap colors to sort them into the image',GW/2,258);
+
+    // Demo cups
+    const demoColors=[0,1,2,0,1,2,0,1,2];
+    const demoTargets=[0,0,0,1,1,1,2,2,2];
+    const dw=38,gap=6,total=3*dw+2*gap;
+    const sx=(GW-total*3-gap*2*3)/2+20;
+    for(let r=0;r<3;r++){
+        for(let c=0;c<3;c++){
+            const i=r*3+c;
+            const dx=GW/2-total/2+c*(dw+gap)+dw/2;
+            const dy=320+r*(dw+gap)+dw/2;
+            drawCup(dx,dy,14,demoTargets[i],demoColors[i],demoColors[i]===demoTargets[i],false,false,false);
+        }
+    }
+
+    buttons=[];
+    const bw=200,bh=50,bx=(GW-bw)/2;
+    buttons.push({x:bx,y:510,w:bw,h:bh,text:'PLAY',action:'play'});
+    drawBtn(ctx,'PLAY',bx,510,bw,bh,hoverBtn===0);
+    if(maxUnlocked>1){
+        buttons.push({x:bx,y:575,w:bw,h:bh,text:'LEVELS',action:'levels'});
+        drawBtn(ctx,'LEVELS',bx,575,bw,bh,hoverBtn===1,'rgba(60,90,140,0.7)');
+    }
+    const ubw=150,ubh=38,ubx=(GW-ubw)/2;
+    buttons.push({x:ubx,y:650,w:ubw,h:ubh,text:'Unlock All',action:'unlock_all'});
+    drawBtn(ctx,'Unlock All',ubx,650,ubw,ubh,false,'rgba(80,60,120,0.6)');
+    const rbw=120,rbh=32,rbx=(GW-rbw)/2;
+    buttons.push({x:rbx,y:700,w:rbw,h:rbh,text:'Reset Data',action:'reset_ask'});
+    drawBtn(ctx,'Reset Data',rbx,700,rbw,rbh,false,'rgba(140,50,50,0.5)');
+
+    // Confirmation overlay
+    if(confirmReset){
+        ctx.fillStyle='rgba(0,0,0,0.7)';ctx.fillRect(0,0,GW,GH);
+        ctx.fillStyle='#fff';ctx.font='bold 22px sans-serif';ctx.textAlign='center';
+        ctx.fillText('Reset all progress?',GW/2,380);
+        ctx.fillStyle='rgba(200,200,220,0.6)';ctx.font='15px sans-serif';
+        ctx.fillText('This cannot be undone.',GW/2,410);
+        buttons=[];
+        const cbw=120,cbh=44;
+        buttons.push({x:GW/2-cbw-10,y:450,w:cbw,h:cbh,text:'Yes',action:'reset_yes'});
+        drawBtn(ctx,'Yes',GW/2-cbw-10,450,cbw,cbh,false,'rgba(180,50,50,0.8)');
+        buttons.push({x:GW/2+10,y:450,w:cbw,h:cbh,text:'No',action:'reset_no'});
+        drawBtn(ctx,'No',GW/2+10,450,cbw,cbh,false,'rgba(60,90,140,0.8)');
+    }
+    // Mute
+    buttons.push({x:GW-55,y:15,w:40,h:40,text:'m',action:'mute'});
+    ctx.fillStyle='rgba(255,255,255,0.5)';ctx.font='22px sans-serif';
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(audio.muted?'\u{1F507}':'\u{1F50A}',GW-35,35);
+}
+
+// ========== SCREEN: LEVEL SELECT ==========
+function drawLevelSelect(){
+    ctx.fillStyle='#fff';ctx.font='bold 26px sans-serif';ctx.textAlign='center';
+    ctx.fillText('Select Level',GW/2,45);
+    buttons=[];
+    const cols=5,cellSz=58,gap=10;
+    const tw=cols*cellSz+(cols-1)*gap;
+    const sx=(GW-tw)/2,sy=80-levelScroll;
+    const maxLvl=Math.max(maxUnlocked+5,30);
+
+    for(let i=0;i<maxLvl;i++){
+        const lvl=i+1;
+        const c=i%cols,r=Math.floor(i/cols);
+        const x=sx+c*(cellSz+gap),y=sy+r*(cellSz+gap);
+        if(y<35||y>GH-55)continue;
+        const unlocked=lvl<=maxUnlocked,done=lvl<maxUnlocked;
+        buttons.push({x,y,w:cellSz,h:cellSz,text:lvl+'',action:'level_'+lvl,lvl});
+        roundRect(ctx,x,y,cellSz,cellSz,12);
+        ctx.fillStyle=done?'rgba(46,204,113,0.25)':unlocked?'rgba(80,120,200,0.35)':'rgba(40,40,60,0.35)';
+        ctx.fill();ctx.strokeStyle=unlocked?'rgba(180,200,240,0.3)':'rgba(80,80,100,0.15)';
+        ctx.lineWidth=1;ctx.stroke();
+        ctx.fillStyle=unlocked?'#fff':'rgba(100,100,120,0.4)';
+        ctx.font='bold 19px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+        ctx.fillText(lvl+'',x+cellSz/2,y+cellSz/2);
+        if(done){ctx.fillStyle='rgba(46,204,113,0.7)';ctx.font='13px sans-serif';ctx.fillText('\u2713',x+cellSz-11,y+11);}
+    }
+    const bw=110,bh=42,bx=(GW-bw)/2,by=GH-55;
+    buttons.push({x:bx,y:by,w:bw,h:bh,text:'BACK',action:'back'});
+    drawBtn(ctx,'BACK',bx,by,bw,bh,false,'rgba(100,60,60,0.7)');
+}
+
+// ========== SCREEN: GAME ==========
+function drawGame(){
+    if(!levelData)return;
+    // Header
+    ctx.fillStyle='rgba(180,200,240,0.5)';ctx.font='15px sans-serif';
+    ctx.textAlign='left';ctx.fillText(`Level ${currentLevel}`,15,28);
+    ctx.textAlign='right';ctx.fillText(`Moves: ${moveCount}`,GW-15,28);
+    // Completed colors indicator
+    ctx.textAlign='center';
+    const nc=levelData.numColors;
+    const indW=nc*18;
+    for(let i=0;i<nc;i++){
+        const ix=GW/2-indW/2+i*18+9;
+        ctx.beginPath();ctx.arc(ix,42,6,0,Math.PI*2);
+        if(lockedColors.has(i)){
+            ctx.fillStyle=COLORS[i];ctx.fill();
+        } else {
+            ctx.strokeStyle=COLORS[i];ctx.lineWidth=1.5;ctx.globalAlpha=0.4;ctx.stroke();ctx.globalAlpha=1;
+        }
+    }
+
+    // Draw cups
+    const animColor=anim?anim.color:-1;
+    for(let i=0;i<cups.length;i++){
+        const c=cups[i];
+        const cx=gridOX+c.col*cellSize+cellSize/2;
+        const cy=gridOY+c.row*cellSize+cellSize/2;
+        const correct=c.current===c.target && c.current!==E;
+        const locked=lockedColors.has(c.target)&&correct;
+        const isEmpty=c.current===E;
+        // Shake wrong cups of error color
+        let shx=0;
+        if(shakeTimer>0 && c.current===errorColor){
+            shx=Math.sin(shakeTimer*40)*3*(shakeTimer/0.3);
+        }
+        ctx.save();ctx.translate(shx,0);
+        drawCup(cx,cy,cupR,c.target,c.current,correct,locked,isEmpty,locked);
+        ctx.restore();
+    }
+
+    // Draw jar area label
+    const availJars=getAvailableJars(nc,lockedColors.size);
+    const usedJars=jars.filter(j=>j!==E).length;
+    ctx.fillStyle='rgba(180,200,240,0.3)';ctx.font='11px sans-serif';ctx.textAlign='center';
+    ctx.fillText(`Jars: ${usedJars}/${availJars} used`,GW/2,jarOY-10);
+
+    // Draw jars
+    for(let i=0;i<TOTAL_JARS;i++){
+        const col=i%JAR_COLS,row=Math.floor(i/JAR_COLS);
+        const jx=jarOX+col*jarCellW+jarCellW/2;
+        const jy=jarOY+row*jarCellH+jarCellH/2;
+        const isLocked=i>=availJars && !(jarUnlockAnim && i<jarUnlockAnim.to);
+        const isUnlocking=jarUnlockAnim && i>=jarUnlockAnim.from && i<jarUnlockAnim.to;
+        if(isUnlocking){
+            const progress=jarUnlockAnim.t;
+            ctx.globalAlpha=progress;
+            drawJar(jx,jy,jarR,jars[i],false,true);
+            ctx.globalAlpha=1;
+        } else {
+            drawJar(jx,jy,jarR,jars[i],isLocked,!isLocked);
+        }
+    }
+
+    // Animations
+    drawAnim(ctx);
+    drawConfetti(ctx);
+
+    // Buttons
+    buttons=[];
+    const btnY=jarOY+JAR_ROWS*jarCellH+18;
+    const btnW=85,btnH=36,btnGap=12;
+    const totalBW=3*btnW+2*btnGap;
+    const btnSX=(GW-totalBW)/2;
+    [{t:'Undo',a:'undo',c:'rgba(70,110,170,0.6)'},{t:'Restart',a:'restart',c:'rgba(170,110,50,0.6)'},{t:'Menu',a:'menu_btn',c:'rgba(120,55,75,0.6)'}]
+    .forEach((b,i)=>{
+        const bx=btnSX+i*(btnW+btnGap);
+        buttons.push({x:bx,y:btnY,w:btnW,h:btnH,text:b.t,action:b.a});
+        drawBtn(ctx,b.t,bx,btnY,btnW,btnH,false,b.c);
+    });
+    // Mute
+    buttons.push({x:GW-50,y:8,w:35,h:35,text:'m',action:'mute'});
+    ctx.fillStyle='rgba(255,255,255,0.45)';ctx.font='17px sans-serif';
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(audio.muted?'\u{1F507}':'\u{1F50A}',GW-32,25);
+}
+
+// ========== SCREEN: COMPLETE ==========
+function drawComplete(){
+    ctx.fillStyle='rgba(0,0,0,0.55)';ctx.fillRect(0,0,GW,GH);
+    ctx.fillStyle='#F1C40F';ctx.font='bold 34px sans-serif';ctx.textAlign='center';
+    ctx.fillText('Level Complete!',GW/2,100);
+    ctx.fillStyle='rgba(180,200,240,0.6)';ctx.font='17px sans-serif';
+    ctx.fillText(`Level ${currentLevel} \u2014 ${moveCount} moves`,GW/2,140);
+
+    // Show completed image (cups all correct, no rings, just colors)
+    if(levelData){
+        const t=Math.min(1,completedArtScale);
+        const ease=1-(1-t)**3;
+        const cs=Math.floor(30*ease);
+        if(cs>2){
+            const{rows,cols}=levelData;
+            const tw=cols*cs,th=rows*cs;
+            const ax=(GW-tw)/2,ay=180;
+            // Background
+            roundRect(ctx,ax-5,ay-5,tw+10,th+10,8);
+            ctx.fillStyle='rgba(0,0,0,0.3)';ctx.fill();
+            ctx.strokeStyle='rgba(180,200,240,0.15)';ctx.lineWidth=1;ctx.stroke();
+            for(const c of cups){
+                if(c.target===E)continue;
+                const px=ax+c.col*cs,py=ay+c.row*cs;
+                ctx.beginPath();ctx.arc(px+cs/2,py+cs/2,cs/2-1,0,Math.PI*2);
+                const grad=ctx.createRadialGradient(px+cs/2-2,py+cs/2-2,1,px+cs/2,py+cs/2,Math.max(1,cs/2-1));
+                grad.addColorStop(0,COLOR_LIGHT[c.target]);
+                grad.addColorStop(0.5,COLORS[c.target]);
+                grad.addColorStop(1,COLOR_DARK[c.target]);
+                ctx.fillStyle=grad;ctx.fill();
+            }
+            // Art name
+            ctx.fillStyle='rgba(255,255,255,0.7)';ctx.font='bold 17px sans-serif';
+            ctx.textAlign='center';ctx.fillText(`"${levelData.art.name}"`,GW/2,ay+th+25);
+        }
+    }
+
+    drawConfetti(ctx);
+
+    buttons=[];
+    const bw=180,bh=48;
+    buttons.push({x:(GW-bw)/2,y:620,w:bw,h:bh,text:'Next Level',action:'next'});
+    drawBtn(ctx,'Next Level',(GW-bw)/2,620,bw,bh,hoverBtn===0);
+    buttons.push({x:(GW-bw)/2,y:680,w:bw,h:bh,text:'Level Select',action:'levels'});
+    drawBtn(ctx,'Level Select',(GW-bw)/2,680,bw,bh,false,'rgba(60,90,140,0.7)');
+}
+
+// ========== INPUT ==========
+function hitButton(gx,gy){
+    for(let i=0;i<buttons.length;i++){
+        const b=buttons[i];
+        if(gx>=b.x&&gx<=b.x+b.w&&gy>=b.y&&gy<=b.y+b.h)return i;
+    }
+    return -1;
+}
+
+function hitCup(gx,gy){
+    if(!cups)return -1;
+    for(let i=0;i<cups.length;i++){
+        const c=cups[i];
+        const cx=gridOX+c.col*cellSize+cellSize/2;
+        const cy=gridOY+c.row*cellSize+cellSize/2;
+        const dx=gx-cx,dy=gy-cy;
+        if(dx*dx+dy*dy<=(cupR+5)*(cupR+5)) return i;
+    }
+    return -1;
+}
+
+function hitJar(gx,gy){
+    for(let i=0;i<TOTAL_JARS;i++){
+        const col=i%JAR_COLS,row=Math.floor(i/JAR_COLS);
+        const jx=jarOX+col*jarCellW+jarCellW/2;
+        const jy=jarOY+row*jarCellH+jarCellH/2;
+        const dx=gx-jx,dy=gy-jy;
+        if(Math.abs(dx)<jarCellW/2 && Math.abs(dy)<jarCellH/2) return i;
+    }
+    return -1;
+}
+
+function handleClick(gx,gy){
+    audio.init();audio.resume();
+
+    if(screen==='menu'){
+        const bi=hitButton(gx,gy);
+        if(bi<0)return;
+        const act=buttons[bi].action;
+        audio.playClick();
+        if(act==='play'&&!confirmReset) startLevel(maxUnlocked);
+        else if(act==='levels'&&!confirmReset){screen='levels';levelScroll=0;}
+        else if(act==='unlock_all'&&!confirmReset){maxUnlocked=200;saveProgress();}
+        else if(act==='reset_ask') confirmReset=true;
+        else if(act==='reset_yes'){confirmReset=false;maxUnlocked=1;try{localStorage.removeItem('lcs2_max');}catch(e){}}
+        else if(act==='reset_no') confirmReset=false;
+        else if(act==='mute') audio.muted=!audio.muted;
+    }
+    else if(screen==='levels'){
+        const bi=hitButton(gx,gy);
+        if(bi<0)return;
+        const act=buttons[bi].action;
+        audio.playClick();
+        if(act==='back') screen='menu';
+        else if(act.startsWith('level_')){
+            const lvl=parseInt(act.split('_')[1]);
+            if(lvl<=maxUnlocked) startLevel(lvl);
+        }
+    }
+    else if(screen==='game'){
+        if(anim)return; // busy animating
+
+        // ---- Button handling ----
+        const bi=hitButton(gx,gy);
+        if(bi>=0){
+            const act=buttons[bi].action;
+            audio.playClick();
+            // Mute toggle doesn't affect held state
+            if(act==='mute'){ audio.muted=!audio.muted; return; }
+            // Undo: if holding, cancel held (acts as undo of the pickup)
+            if(act==='undo'){
+                if(held){ cancelHeld(); }
+                else if(history.length>0){
+                    const prev=history.pop();
+                    cups.forEach((c,i)=>{c.current=prev.cups[i].current;});
+                    jars=prev.jars;
+                    moveCount=Math.max(0,moveCount-1);
+                    lockedColors.clear();completedColors.clear();
+                    for(let c=0;c<levelData.numColors;c++){
+                        if(isColorComplete(cups,c)){lockedColors.add(c);completedColors.add(c);}
+                    }
+                    anim=null;jarUnlockAnim=null;
+                }
+                return;
+            }
+            // Restart / Menu: cancel held first, then act
+            if(held) cancelHeld();
+            if(act==='restart') startLevel(currentLevel);
+            else if(act==='menu_btn') screen='menu';
+            return;
+        }
+
+        // ---- TWO-TAP SYSTEM ----
+        if(!held){
+            // STATE 1: No blob held — first tap picks up a color
+            const ci=hitCup(gx,gy);
+            if(ci>=0){
+                const color=cups[ci].current;
+                if(color===E||lockedColors.has(color))return;
+                if(!pickupColor(color,ci,-1)){
+                    audio.playError();shakeTimer=0.35;errorColor=color;
+                }
+                return;
+            }
+            const ji=hitJar(gx,gy);
+            if(ji>=0){
+                const color=jars[ji];
+                if(color===E||lockedColors.has(color))return;
+                if(!pickupColor(color,-1,ji)){
+                    audio.playError();shakeTimer=0.35;errorColor=color;
+                }
+                return;
+            }
+        } else {
+            // STATE 2: Blob held — second tap places it
+            const inGrid=levelData && gx>=gridOX && gx<=gridOX+levelData.cols*cellSize
+                && gy>=gridOY && gy<=gridOY+levelData.rows*cellSize;
+            const inJars=gx>=jarOX && gx<=jarOX+JAR_COLS*jarCellW
+                && gy>=jarOY && gy<=jarOY+JAR_ROWS*jarCellH;
+
+            if(inGrid){
+                if(!placeOnGrid(gx,gy)){
+                    audio.playError();shakeTimer=0.35;errorColor=held.color;
+                }
+            } else if(inJars){
+                if(!placeInJars()){
+                    audio.playError();shakeTimer=0.35;errorColor=held.color;
+                }
+            } else {
+                cancelHeld();
+            }
+        }
+    }
+    else if(screen==='complete'){
+        const bi=hitButton(gx,gy);
+        if(bi<0)return;
+        const act=buttons[bi].action;
+        audio.playClick();
+        if(act==='next') startLevel(currentLevel+1);
+        else if(act==='levels'){screen='levels';levelScroll=0;}
+    }
+}
+
+// ========== EVENT LISTENERS ==========
+canvas.addEventListener('click',e=>{
+    const[gx,gy]=toGame(e.clientX,e.clientY);handleClick(gx,gy);
+});
+canvas.addEventListener('mousemove',e=>{
+    const[gx,gy]=toGame(e.clientX,e.clientY);hoverBtn=hitButton(gx,gy);
+});
+let touchStartY2=0;touchMoved=false;
+canvas.addEventListener('touchstart',e=>{
+    e.preventDefault();touchStartY2=e.touches[0].clientY;touchMoved=false;
+},{passive:false});
+canvas.addEventListener('touchmove',e=>{
+    e.preventDefault();
+    if(Math.abs(e.touches[0].clientY-touchStartY2)>8)touchMoved=true;
+    if(screen==='levels'){
+        const dy=touchStartY2-e.touches[0].clientY;
+        levelScroll=Math.max(0,levelScroll+dy/scale);
+        touchStartY2=e.touches[0].clientY;
+    }
+},{passive:false});
+canvas.addEventListener('touchend',e=>{
+    e.preventDefault();
+    if(!touchMoved&&e.changedTouches.length>0){
+        const[gx,gy]=toGame(e.changedTouches[0].clientX,e.changedTouches[0].clientY);
+        handleClick(gx,gy);
+    }
+},{passive:false});
+canvas.addEventListener('wheel',e=>{
+    if(screen==='levels'){levelScroll=Math.max(0,levelScroll+e.deltaY*0.5);}
+});
+
+// ========== MAIN LOOP ==========
+let lastTime=performance.now();
+
+function update(dt){
+    bubbles.update();
+    if(shakeTimer>0) shakeTimer=Math.max(0,shakeTimer-dt);
+    if(anim) updateAnim(dt);
+    if(jarUnlockAnim){
+        jarUnlockAnim.t+=dt/jarUnlockAnim.duration;
+        if(jarUnlockAnim.t>=1) jarUnlockAnim=null;
+    }
+    if(screen==='complete'){
+        completedArtScale+=dt*1.5;
+        updateConfetti(dt);
+    }
+    if(screen==='game'){
+        updateConfetti(dt);
+        // Safety: detect win even if finishPlacement missed it
+        if(!anim&&!held&&levelData&&cups&&cups.every(c=>c.current===c.target)){
+            for(let c=0;c<levelData.numColors;c++){lockedColors.add(c);completedColors.add(c);}
+            screen='complete';completedArtScale=0;
+            if(currentLevel>=maxUnlocked){maxUnlocked=currentLevel+1;saveProgress();}
+            spawnConfetti();audio.playLevelWin();
+        }
+    }
+}
+
+function draw(){
+    ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,W,H);
+    const bg=ctx.createLinearGradient(0,0,0,H);
+    bg.addColorStop(0,'#0f0a1a');bg.addColorStop(0.5,'#16213e');bg.addColorStop(1,'#0a0a1a');
+    ctx.fillStyle=bg;ctx.fillRect(0,0,W,H);
+    ctx.translate(ox,oy);ctx.scale(scale,scale);
+    bubbles.draw(ctx);
+    if(screen==='menu') drawMenu();
+    else if(screen==='levels') drawLevelSelect();
+    else if(screen==='game') drawGame();
+    else if(screen==='complete') drawComplete();
+    ctx.restore();
+}
+
+function loop(){
+    const now=performance.now();
+    const dt=Math.min((now-lastTime)/1000,0.05);
+    lastTime=now;
+    update(dt);draw();
+    requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

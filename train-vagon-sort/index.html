@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Tokyo Metro 3D - Hybridcasual</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@800;900&display=swap');
+  
+  body { margin: 0; padding: 0; overflow: hidden; background: #87CEEB; font-family: 'M PLUS Rounded 1c', sans-serif; touch-action: none; }
+  #game-canvas { display: block; width: 100vw; height: 100vh; }
+  
+  /* UI Elements */
+  #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; display: flex; flex-direction: column; justify-content: space-between; padding: 20px; box-sizing: border-box; }
+  
+  .header { display: flex; justify-content: space-between; align-items: flex-start; pointer-events: auto; }
+  .level-box { background: white; padding: 10px 20px; border-radius: 15px; box-shadow: 0 5px 0 #ccc; text-align: center; font-size: 24px; font-weight: 900; color: #333; }
+  
+  .btn-reset { background: #ff4757; color: white; border: none; padding: 15px; border-radius: 15px; font-size: 20px; font-weight: 900; box-shadow: 0 5px 0 #c0392b; cursor: pointer; pointer-events: auto; }
+  .btn-reset:active { transform: translateY(5px); box-shadow: 0 0 0; }
+
+  /* Overlay */
+  .overlay { position: absolute; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 100; pointer-events: auto; transition: opacity 0.3s; }
+  .hidden { opacity: 0; pointer-events: none; }
+  .modal { background: white; padding: 40px; border-radius: 30px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.5); transform: scale(1); transition: transform 0.3s; }
+  .hidden .modal { transform: scale(0.8); }
+  .modal h1 { margin: 0 0 10px 0; font-size: 40px; color: #2ed573; }
+  .btn-next { background: #2ed573; color: white; border: none; padding: 15px 30px; border-radius: 15px; font-size: 20px; font-weight: 900; margin-top: 20px; box-shadow: 0 5px 0 #218c53; cursor: pointer; }
+  .btn-next:active { transform: translateY(5px); box-shadow: 0 0 0; }
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+</head>
+<body>
+
+<div id="ui-layer">
+  <div class="header">
+    <div class="level-box">LEVEL <span id="lvl-text">1</span></div>
+    <button class="btn-reset" onclick="restartLevel()">↻</button>
+  </div>
+</div>
+
+<div class="overlay hidden" id="win-screen">
+  <div class="modal">
+    <h1>Harika! 🚄</h1>
+    <p>Tren yola çıkıyor...</p>
+    <button class="btn-next" onclick="nextLevel()">SONRAKİ BÖLÜM</button>
+  </div>
+</div>
+
+<canvas id="game-canvas"></canvas>
+
+<script>
+// --- OYUN VERİLERİ (LEVEL TASARIMLARI) ---
+const COLORS = {
+  red: 0xff4757, blue: 0x1e90ff, green: 0x2ed573, 
+  yellow: 0xffa502, purple: 0x9b59b6, orange: 0xff7f50
+};
+
+// cap: Vagonun kaç yolcu alacağı. c1: Başlangıç rengi, c2: Bitiş rengi.
+const LEVELS = [
+  {
+    wagons: [ { c1: 'red', c2: 'blue', cap: 3 } ],
+    pax: [
+      { id: 'p1', l: 'red', r: 'green' },
+      { id: 'p2', l: 'green', r: 'yellow' },
+      { id: 'p3', l: 'yellow', r: 'blue' }
+    ]
+  },
+  {
+    wagons: [ { c1: 'green', c2: 'purple', cap: 4 } ],
+    pax: [
+      { id: 'p1', l: 'green', r: 'yellow' },
+      { id: 'p2', l: 'yellow', r: 'red' },
+      { id: 'p3', l: 'blue', r: 'purple' }, // Şaşırtmaca, sıra dışı
+      { id: 'p4', l: 'red', r: 'blue' }
+    ]
+  },
+  {
+    wagons: [ 
+      { c1: 'red', c2: 'red', cap: 2 },
+      { c1: 'blue', c2: 'yellow', cap: 3 }
+    ],
+    pax: [
+      { id: 'p1', l: 'red', r: 'purple' },
+      { id: 'p2', l: 'purple', r: 'red' },
+      { id: 'p3', l: 'blue', r: 'green' },
+      { id: 'p4', l: 'green', r: 'orange' },
+      { id: 'p5', l: 'orange', r: 'yellow' }
+    ]
+  }
+];
+
+// --- THREE.JS KURULUMU ---
+const canvas = document.getElementById('game-canvas');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+camera.position.set(0, 12, 12);
+camera.lookAt(0, 0, -2);
+
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+scene.add(ambientLight);
+
+const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+dirLight.position.set(5, 10, 5);
+dirLight.castShadow = true;
+dirLight.shadow.mapSize.width = 1024;
+dirLight.shadow.mapSize.height = 1024;
+scene.add(dirLight);
+
+const platGeo = new THREE.BoxGeometry(20, 0.5, 6);
+const platMat = new THREE.MeshLambertMaterial({ color: 0xdcdde1 });
+const platform = new THREE.Mesh(platGeo, platMat);
+platform.position.set(0, -0.25, 2);
+platform.receiveShadow = true;
+scene.add(platform);
+
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+
+// --- OYUN DURUMU (STATE) ---
+let currentLevelIdx = 0;
+let paxObjects = {}; 
+let wagonsData = []; 
+let isAnimating = false;
+
+// --- OYUN MANTIĞI VE 3D MODELLER ---
+
+function initLevel(idx) {
+  if (idx >= LEVELS.length) { alert("Tüm bölümleri bitirdin!"); idx = 0; }
+  currentLevelIdx = idx;
+  document.getElementById('lvl-text').innerText = idx + 1;
+  document.getElementById('win-screen').classList.add('hidden');
+  isAnimating = true;
+
+  for(let id in paxObjects) scene.remove(paxObjects[id].mesh);
+  wagonsData.forEach(w => scene.remove(w.group));
+  paxObjects = {};
+  wagonsData = [];
+
+  const level = LEVELS[idx];
+
+  let startX = -((level.wagons.length - 1) * 6) / 2; 
+  level.wagons.forEach((wData, i) => {
+    const wGroup = createWagonMesh(wData.c1, wData.c2, wData.cap);
+    wGroup.position.set(startX + (i * 6), 0.5, -3); 
+    scene.add(wGroup);
+    
+    wagonsData.push({ group: wGroup, slots: [], cap: wData.cap, c1: wData.c1, c2: wData.c2 });
+    
+    gsap.fromTo(wGroup.position, 
+      { x: wGroup.position.x - 20 }, 
+      { x: wGroup.position.x, duration: 1, ease: "back.out(1)", delay: i * 0.2 }
+    );
+  });
+
+  const cols = Math.ceil(level.pax.length / 2);
+  let pStartX = -((cols - 1) * 1.5) / 2;
+  
+  level.pax.forEach((pData, i) => {
+    const pMesh = createPaxMesh(pData.l, pData.r);
+    
+    let row = i % 2;
+    let col = Math.floor(i / 2);
+    let posX = pStartX + col * 1.5;
+    let posZ = 1.5 + row * 1.5;
+
+    pMesh.position.set(posX, 0.5, posZ);
+    scene.add(pMesh);
+
+    gsap.from(pMesh.position, { y: 5, duration: 0.5, ease: "bounce.out", delay: 0.5 + (i * 0.1) });
+
+    paxObjects[pData.id] = {
+      id: pData.id, mesh: pMesh, data: pData,
+      originPos: new THREE.Vector3(posX, 0.5, posZ),
+      state: 'platform', wIdx: -1
+    };
+  });
+
+  setTimeout(() => { isAnimating = false; }, 1500);
+}
+
+function createWagonMesh(c1, c2, cap) {
+  const group = new THREE.Group();
+  const length = cap * 1.2 + 0.5;
+  
+  const baseGeo = new THREE.BoxGeometry(length, 0.6, 1.8);
+  const baseMat = new THREE.MeshLambertMaterial({ color: 0xffffff });
+  const base = new THREE.Mesh(baseGeo, baseMat);
+  base.receiveShadow = true; base.castShadow = true;
+  group.add(base);
+
+  const leftGeo = new THREE.BoxGeometry(0.3, 0.8, 1.9);
+  const leftMat = new THREE.MeshLambertMaterial({ color: COLORS[c1] });
+  const leftBorder = new THREE.Mesh(leftGeo, leftMat);
+  leftBorder.position.set(-length/2 + 0.15, 0.1, 0);
+  group.add(leftBorder);
+
+  const rightMat = new THREE.MeshLambertMaterial({ color: COLORS[c2] });
+  const rightBorder = new THREE.Mesh(leftGeo, rightMat);
+  rightBorder.position.set(length/2 - 0.15, 0.1, 0);
+  group.add(rightBorder);
+
+  return group;
+}
+
+function createPaxMesh(lColor, rColor) {
+  const group = new THREE.Group();
+  
+  const halfGeo = new THREE.BoxGeometry(0.4, 0.8, 0.4);
+  const matL = new THREE.MeshLambertMaterial({ color: COLORS[lColor] });
+  const meshL = new THREE.Mesh(halfGeo, matL);
+  meshL.position.x = -0.2; meshL.castShadow = true;
+  
+  const matR = new THREE.MeshLambertMaterial({ color: COLORS[rColor] });
+  const meshR = new THREE.Mesh(halfGeo, matR);
+  meshR.position.x = 0.2; meshR.castShadow = true;
+
+  const headGeo = new THREE.SphereGeometry(0.25, 16, 16);
+  const headMat = new THREE.MeshLambertMaterial({ color: 0xffdbac });
+  const head = new THREE.Mesh(headGeo, headMat);
+  head.position.y = 0.6; head.castShadow = true;
+
+  group.add(meshL, meshR, head);
+  
+  const hitboxGeo = new THREE.BoxGeometry(0.9, 1.2, 0.5);
+  const hitboxMat = new THREE.MeshBasicMaterial({visible: false});
+  const hitbox = new THREE.Mesh(hitboxGeo, hitboxMat);
+  hitbox.position.y = 0.2;
+  hitbox.userData.isHitbox = true; 
+  group.add(hitbox);
+
+  return group;
+}
+
+window.addEventListener('pointerdown', (e) => {
+  if(isAnimating) return;
+  
+  mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+
+  raycaster.setFromCamera(mouse, camera);
+  
+  let hitboxes = [];
+  for(let id in paxObjects) hitboxes.push(paxObjects[id].mesh.children[3]);
+
+  const intersects = raycaster.intersectObjects(hitboxes);
+  if (intersects.length > 0) {
+    const hitMesh = intersects[0].object.parent;
+    let clickedPax = null;
+    for(let id in paxObjects) {
+      if(paxObjects[id].mesh === hitMesh) clickedPax = paxObjects[id];
+    }
+
+    if(clickedPax) {
+      if (clickedPax.state === 'platform') tryBoardPassenger(clickedPax);
+      else if (clickedPax.state === 'wagon') unboardPassenger(clickedPax);
+    }
+  }
+});
+
+function tryBoardPassenger(pax) {
+  for(let i=0; i < wagonsData.length; i++) {
+    let w = wagonsData[i];
+    if (w.slots.length >= w.cap) continue; 
+
+    let isValid = false;
+    if (w.slots.length === 0) {
+      if (pax.data.l === w.c1) isValid = true;
+    } else {
+      let prevPaxId = w.slots[w.slots.length - 1];
+      let prevPax = paxObjects[prevPaxId];
+      if (pax.data.l === prevPax.data.r) isValid = true;
+    }
+
+    if (isValid && w.slots.length === w.cap - 1) {
+      if (pax.data.r !== w.c2) isValid = false;
+    }
+
+    if (isValid) {
+      w.slots.push(pax.id);
+      pax.state = 'wagon';
+      pax.wIdx = i;
+      
+      let slotIndex = w.slots.length - 1;
+      let totalWidth = w.cap * 1.0;
+      let startX = w.group.position.x - totalWidth/2 + 0.5;
+      let targetX = startX + (slotIndex * 1.0);
+      let targetZ = w.group.position.z;
+      
+      // KRİTİK EKLENTİ: Animasyon bittiğinde yolcuyu vagon grubuna 'attach' ile bağlıyoruz.
+      animateMove(pax.mesh, targetX, 0.5, targetZ, () => {
+        w.group.attach(pax.mesh); // Fiziksel olarak vagonun çocuğu yap
+        checkWinCondition();
+      });
+      return;
+    }
+  }
+
+  shakeMesh(pax.mesh);
+}
+
+function unboardPassenger(pax) {
+  let w = wagonsData[pax.wIdx];
+  if (w.slots[w.slots.length - 1] === pax.id) {
+    // KRİTİK EKLENTİ: İnecek yolcuyu önce sahne (dünya) koordinatlarına geri alıyoruz.
+    scene.attach(pax.mesh);
+    
+    w.slots.pop();
+    pax.state = 'platform';
+    pax.wIdx = -1;
+    animateMove(pax.mesh, pax.originPos.x, 0.5, pax.originPos.z);
+  } else {
+    shakeMesh(pax.mesh);
+  }
+}
+
+// --- ANİMASYONLAR ---
+
+function animateMove(mesh, tx, ty, tz, onComplete = null) {
+  isAnimating = true;
+  gsap.to(mesh.position, { x: tx, z: tz, duration: 0.4, ease: "power1.inOut" });
+  gsap.to(mesh.position, { 
+    y: ty + 2, duration: 0.2, ease: "power1.out", yoyo: true, repeat: 1, 
+    onComplete: () => { isAnimating = false; if(onComplete) onComplete(); }
+  });
+}
+
+function shakeMesh(mesh) {
+  isAnimating = true;
+  gsap.to(mesh.position, {
+    x: mesh.position.x + 0.2, duration: 0.05, yoyo: true, repeat: 3, ease: "linear",
+    onComplete: () => { gsap.to(mesh.position, {x: mesh.position.x, duration: 0.05}); isAnimating = false; }
+  });
+}
+
+function checkWinCondition() {
+  let allFull = wagonsData.every(w => w.slots.length === w.cap);
+  if (allFull) {
+    isAnimating = true;
+    
+    // YENİ EKLENTİ: Gereksiz loop'lar silindi, çünkü yolcular artık vagonun fiziksel çocuğu!
+    wagonsData.forEach((w, i) => {
+      gsap.to(w.group.position, {
+        x: w.group.position.x + 25, duration: 1.5, ease: "power2.in", delay: 0.5 + (i * 0.1),
+        onComplete: () => {
+          if(i === wagonsData.length - 1) {
+            document.getElementById('win-screen').classList.remove('hidden');
+          }
+        }
+      });
+    });
+  }
+}
+
+function restartLevel() { initLevel(currentLevelIdx); }
+function nextLevel() { initLevel(currentLevelIdx + 1); }
+
+function animate() {
+  requestAnimationFrame(animate);
+  renderer.render(scene, camera);
+}
+
+initLevel(0);
+animate();
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+</script>
+</body>
+</html>

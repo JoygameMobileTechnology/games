@@ -1,0 +1,1521 @@
+<title>Bubble VS</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>
+  :root {
+    --bg: #EDF0F6;
+    --well: #D7DDE9;
+    --cellbg: #C6CEDE;
+    --chip: #FFFFFF;
+    --ink: #1D2740;
+    --muted: #65718C;
+    --gold: #EFAD12;
+    --gold-ink: #3A2B00;
+    --danger: #D64545;
+    --shadow: 0 1px 3px rgba(29, 39, 64, .12);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0F1522;
+      --well: #1A2434;
+      --cellbg: #27324A;
+      --chip: #1B2536;
+      --ink: #EDF2FA;
+      --muted: #8B99B5;
+      --gold: #F7BE2A;
+      --gold-ink: #3A2B00;
+      --danger: #F0605C;
+      --shadow: 0 1px 3px rgba(0, 0, 0, .35);
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #EDF0F6;
+    --well: #D7DDE9;
+    --cellbg: #C6CEDE;
+    --chip: #FFFFFF;
+    --ink: #1D2740;
+    --muted: #65718C;
+    --gold: #EFAD12;
+    --gold-ink: #3A2B00;
+    --danger: #D64545;
+    --shadow: 0 1px 3px rgba(29, 39, 64, .12);
+  }
+  :root[data-theme="dark"] {
+    --bg: #0F1522;
+    --well: #1A2434;
+    --cellbg: #27324A;
+    --chip: #1B2536;
+    --ink: #EDF2FA;
+    --muted: #8B99B5;
+    --gold: #F7BE2A;
+    --gold-ink: #3A2B00;
+    --danger: #F0605C;
+    --shadow: 0 1px 3px rgba(0, 0, 0, .35);
+  }
+
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    min-height: 100dvh;
+    display: flex;
+    justify-content: center;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Avenir Next", "Segoe UI Variable Display", system-ui, -apple-system, "Segoe UI", sans-serif;
+    touch-action: manipulation;
+    overscroll-behavior: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .wrap {
+    /* portrait phone mockup: width is derived from height at a ~9:19 aspect,
+       so desktop windows render a phone-shaped column instead of going wide */
+    --gameh: clamp(440px, 92svh, 820px);
+    --gamew: min(96vw, calc(var(--gameh) * .48), 430px);
+    width: var(--gamew);
+    padding: clamp(6px, 1.2vh, 14px) 0 10px;
+    display: flex;
+    flex-direction: column;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .game {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    height: var(--gameh);
+  }
+
+  .hud { text-align: center; line-height: 1; }
+  .timer {
+    font-size: clamp(22px, 4svh, 30px);
+    font-weight: 900;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: .02em;
+  }
+  .timer.urgent {
+    color: var(--danger);
+    animation: pulse 1s ease-in-out infinite;
+  }
+  @keyframes pulse { 50% { opacity: .45; } }
+
+  /* ---------- Gather view: shared field, side score panels ---------- */
+  .gview {
+    flex: 1;
+    display: flex;
+    gap: 5px;
+    min-height: 0;
+  }
+  .side {
+    width: 44px;
+    height: 50%;
+    align-self: flex-end;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    background: var(--chip);
+    border-radius: 10px;
+    box-shadow: var(--shadow);
+    opacity: .5;
+    transition: opacity .2s;
+  }
+  .side.on { opacity: 1; }
+  .srow {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+  }
+  .srow .ic {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    box-shadow: inset -2px -3px 5px rgba(0, 0, 0, .25);
+  }
+  .srow .ic svg { width: 72%; height: 72%; }
+  .srow .ic .tc { fill: rgba(255, 255, 255, .85); }
+  .cnt {
+    font-size: 12px;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.1;
+  }
+  .cnt.ai { color: var(--danger); }
+  .cnt.me { color: var(--gold); }
+  .cnt.zero { opacity: .3; }
+  .cnt.bump { animation: pop .18s ease; }
+  .fieldtimer {
+    position: absolute;
+    top: 6px;
+    left: 50%;
+    translate: -50%;
+    z-index: 7;
+    background: color-mix(in srgb, var(--bg) 62%, transparent);
+    padding: 2px 12px;
+    border-radius: 999px;
+    pointer-events: none;
+  }
+  .turnlab {
+    position: absolute;
+    left: 10px;
+    bottom: 12px;
+    z-index: 7;
+    font-size: 12px;
+    font-weight: 900;
+    letter-spacing: .14em;
+    pointer-events: none;
+  }
+
+  .field {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    background: var(--well);
+    border-radius: 12px;
+    overflow: hidden;
+    touch-action: none;
+    -webkit-touch-callout: none;
+  }
+  .bubble {
+    position: absolute;
+    left: 0;
+    top: 0;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    box-shadow: inset -4px -6px 10px rgba(0, 0, 0, .28), inset 3px 4px 8px rgba(255, 255, 255, .28);
+    will-change: transform;
+  }
+  .bubble .ic { width: 62%; height: 62%; pointer-events: none; }
+  #bubbleLayer .bubble { transition: transform .25s ease; }
+  .bubble .tc { fill: rgba(255, 255, 255, .85); }
+  .c2   { background: #43A047; }
+  .c4   { background: #3D77C2; }
+  .c8   { background: #7A4FD6; }
+  .c16  { background: #EE7A28; }
+  .c32  { background: #D9453E; }
+  .c64  { background: #F7B816; }
+  .c128 { background: #E84A8F; }
+  .bubble.popfx { animation: bpop .22s ease-out forwards; }
+  @keyframes bpop {
+    40% { scale: 1.25; opacity: 1; }
+    100% { scale: .2; opacity: 0; }
+  }
+
+  .aimline {
+    position: absolute;
+    height: 2.5px;
+    transform-origin: 0 50%;
+    background: repeating-linear-gradient(90deg, var(--gold) 0 8px, transparent 8px 18px);
+    opacity: .8;
+    z-index: 4;
+    pointer-events: none;
+  }
+  .cannon {
+    position: absolute;
+    z-index: 5;
+    width: 36px;
+    height: 48px;
+    transform-origin: 50% 62%;
+    pointer-events: none;
+  }
+  .gun { position: absolute; inset: 0; }
+  .gun .barrel {
+    position: absolute;
+    left: 50%;
+    translate: -50% 0;
+    top: 2px;
+    width: 10px;
+    height: 24px;
+    border-radius: 3px;
+    background: linear-gradient(90deg, #66718C, #C9D3E6 45%, #525D78);
+  }
+  .gun .barrel::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: -1px;
+    right: -1px;
+    height: 6px;
+    border-radius: 3px;
+    background: #2A344C;
+  }
+  .gun .gbody {
+    position: absolute;
+    left: 50%;
+    translate: -50% 0;
+    bottom: 5px;
+    width: 24px;
+    height: 17px;
+    border-radius: 6px;
+    background: linear-gradient(180deg, #7C87A2, #49536F);
+    border: 2px solid #2A344C;
+  }
+  .gun .gbody::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    translate: -50% -50%;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--gold);
+    box-shadow: 0 0 6px rgba(247, 190, 42, .85);
+  }
+  .gun.recoil { animation: recoil .12s ease-out; }
+  @keyframes recoil { 35% { transform: translateY(5px); } }
+  .nextwrap {
+    position: absolute;
+    right: 10px;
+    bottom: 10px;
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    pointer-events: none;
+  }
+  .nextwrap .bubble { position: static; width: 26px; height: 26px; }
+
+  /* ---------- Fight view ---------- */
+  .fview {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    min-height: 0;
+  }
+  .avbox {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--chip);
+    box-shadow: var(--shadow);
+    display: grid;
+    place-items: center;
+    font-size: 20px;
+    border: 2px solid transparent;
+  }
+  .avbox.me .avatar { border-color: var(--gold); }
+  .avname {
+    font-size: 11px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    font-weight: 700;
+    color: var(--muted);
+  }
+  .lane {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    width: min(calc(var(--gamew) * .62), 330px);
+    background: var(--well);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  .unit {
+    position: absolute;
+    left: 0;
+    top: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    pointer-events: none;
+    will-change: transform;
+    z-index: 2;
+  }
+  .unit.born { animation: spawn .18s cubic-bezier(.3, 1.4, .5, 1) backwards; }
+  .unit .g {
+    line-height: 1;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .35));
+  }
+  .g svg, .ic svg { display: block; width: 100%; height: 100%; }
+  .unit.me .tc { fill: var(--gold); }
+  .unit.ai .tc { fill: var(--danger); }
+  .unit .uhp {
+    width: 16px;
+    height: 3px;
+    border-radius: 2px;
+    background: rgba(0, 0, 0, .3);
+    margin-top: 1px;
+    overflow: hidden;
+  }
+  .unit .uhp i { display: block; height: 100%; width: 100%; }
+  .unit.me .uhp i { background: var(--gold); }
+  .unit.ai .uhp i { background: var(--danger); }
+  .unit.hurt .g { animation: hurtf .15s; }
+  @keyframes hurtf { 50% { filter: brightness(2.1); } }
+  .wpn, .orb { transform-box: fill-box; transform-origin: 50% 85%; }
+  .k8 .wpn, .k16 .wpn, .k128 .wpn, .orb { transform-origin: 50% 50%; }
+  .unit.atk.k2 .wpn { animation: swing .32s ease; }
+  .unit.atk.k4 .wpn { animation: swing .3s ease; }
+  .unit.atk.k64 .wpn { animation: swingbig .3s ease-in; }
+  .unit.atk.k8 .wpn { animation: bowkick .25s ease; }
+  .unit.atk.k16 .wpn { animation: bash .3s ease; }
+  .unit.atk.k32 .wpn { animation: cast .35s ease; }
+  .unit.atk.k32 .orb { animation: orbpulse .35s ease; }
+  .unit.atk.k128 .wpn { animation: slam .35s ease; }
+  @keyframes swing { 40% { transform: rotate(-55deg); } }
+  @keyframes swingbig { 35% { transform: rotate(-80deg); } }
+  @keyframes bowkick { 30% { transform: translateX(2px) scaleX(.94); } }
+  @keyframes bash { 35% { transform: translateX(-3.5px); } }
+  @keyframes cast { 40% { transform: rotate(-14deg); } }
+  @keyframes orbpulse { 40% { transform: scale(1.5); } }
+  @keyframes slam { 35% { transform: translateY(3.5px); } }
+  .splat {
+    position: absolute;
+    z-index: 1;
+    pointer-events: none;
+    translate: -50% -50%;
+    background:
+      radial-gradient(circle at 30% 40%, rgba(178, 34, 52, .85) 0 28%, transparent 30%),
+      radial-gradient(circle at 65% 30%, rgba(178, 34, 52, .75) 0 18%, transparent 20%),
+      radial-gradient(circle at 55% 65%, rgba(150, 24, 40, .8) 0 32%, transparent 34%),
+      radial-gradient(circle at 20% 75%, rgba(178, 34, 52, .6) 0 12%, transparent 14%),
+      radial-gradient(circle at 82% 62%, rgba(150, 24, 40, .55) 0 10%, transparent 12%);
+    animation: splatfade 2s ease-out forwards;
+  }
+  @keyframes splatfade {
+    0% { scale: .3; opacity: 0; }
+    12% { scale: 1; opacity: 1; }
+    55% { opacity: .85; }
+    100% { opacity: 0; }
+  }
+  .proj {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: #DCE8FF;
+    box-shadow: 0 0 5px rgba(120, 150, 255, .9);
+    z-index: 3;
+    pointer-events: none;
+  }
+  .proj.magic {
+    width: 7px;
+    height: 7px;
+    background: #E9C8FF;
+    box-shadow: 0 0 7px rgba(169, 69, 196, .95);
+  }
+  .proj.arrow {
+    width: 12px;
+    height: 2.5px;
+    border-radius: 2px;
+    background: linear-gradient(90deg, #8B6844 62%, #D7DDE9 62%);
+    box-shadow: none;
+  }
+
+  .fight-splash {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    z-index: 65;
+    pointer-events: none;
+  }
+  .fight-splash span {
+    font-size: clamp(40px, 10vw, 72px);
+    font-weight: 900;
+    color: var(--gold);
+    letter-spacing: .06em;
+    text-shadow: 0 2px 18px rgba(247, 190, 42, .5);
+    animation: fsplash .9s cubic-bezier(.3, 1.4, .5, 1) forwards;
+  }
+  @keyframes fsplash {
+    0% { scale: .2; opacity: 0; }
+    25% { scale: 1.1; opacity: 1; }
+    75% { scale: 1; opacity: 1; }
+    100% { scale: 1.15; opacity: 0; }
+  }
+  @keyframes spawn { from { scale: 0; opacity: 0; } }
+  @keyframes pop {
+    0% { scale: 1; }
+    45% { scale: 1.2; }
+    100% { scale: 1; }
+  }
+
+  /* ---------- Overlay ---------- */
+  .overlay {
+    position: absolute;
+    inset: -6px;
+    display: grid;
+    place-items: center;
+    background: color-mix(in srgb, var(--bg) 74%, transparent);
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+    border-radius: 14px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .25s;
+    z-index: 70;
+  }
+  .overlay.show { opacity: 1; pointer-events: auto; }
+  .panel {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    gap: 13px;
+    align-items: center;
+    padding: 16px;
+    max-width: 340px;
+  }
+  .panel-title { font-size: 26px; font-weight: 900; margin: 0; text-wrap: balance; }
+  .panel-title .vs { color: var(--gold); }
+  .panel-sub { color: var(--muted); font-size: 13.5px; margin: 0; line-height: 1.5; text-wrap: balance; }
+  .tally {
+    color: var(--muted);
+    font-size: 12.5px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  .count { font-size: 80px; font-weight: 900; margin: 0; font-variant-numeric: tabular-nums; }
+  .ov-actions { display: flex; gap: 8px; }
+  .btn {
+    border: 0;
+    cursor: pointer;
+    border-radius: 10px;
+    padding: 10px 16px;
+    font: 600 14px inherit;
+    font-family: inherit;
+    background: var(--chip);
+    color: var(--ink);
+    box-shadow: var(--shadow);
+  }
+  .btn.primary { background: var(--gold); color: var(--gold-ink); font-weight: 800; }
+  .btn.big { padding: 12px 34px; font-size: 16px; }
+  .btn:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+  .seg {
+    display: flex;
+    background: var(--chip);
+    border-radius: 10px;
+    padding: 4px;
+    gap: 4px;
+    box-shadow: var(--shadow);
+  }
+  .seg button {
+    border: 0;
+    background: transparent;
+    padding: 8px 16px;
+    border-radius: 7px;
+    font: 600 14px inherit;
+    font-family: inherit;
+    color: var(--muted);
+    cursor: pointer;
+  }
+  .seg button.on { background: var(--gold); color: var(--gold-ink); font-weight: 800; }
+  .roster { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; }
+  .ri {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+    width: 48px;
+    font-size: 9.5px;
+    color: var(--muted);
+  }
+  .ri .ic { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; }
+  .ri .ic svg { width: 72%; height: 72%; }
+  .ri .tc { fill: rgba(255, 255, 255, .85); }
+  .ri b { font-size: 11px; color: var(--ink); }
+  .hint {
+    margin: 6px 0 0;
+    text-align: center;
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1.5;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .timer.urgent, .cnt.bump, .bubble.popfx, .gun.recoil, .unit.born,
+    .unit.hurt .g, .splat, .fight-splash span { animation: none; }
+    .unit.atk .wpn, .unit.atk .orb { animation: none; }
+    .overlay { transition: none; }
+  }
+</style>
+
+<div class="wrap">
+  <div class="game" id="game">
+    <div class="gview" id="gatherView">
+      <div class="side" id="mePanel"></div>
+      <div class="field" id="field">
+        <div class="fieldtimer" id="ghud"><span class="timer" id="timer">1:00</span></div>
+        <div id="bubbleLayer"></div>
+        <div class="cannon" id="cannon"><div class="gun"><div class="barrel"></div><div class="gbody"></div></div></div>
+        <div class="turnlab" id="turnlab">SEN</div>
+        <div class="nextwrap">Sıradaki <span id="nextSlot"></span></div>
+      </div>
+      <div class="side" id="aiPanel"></div>
+    </div>
+
+    <div class="fview" id="fightView" hidden>
+      <div class="hud" id="fhud"></div>
+      <div class="avbox opp"><div class="avatar">🤖</div><span class="avname">Rakip · <span id="diffLabel"></span></span></div>
+      <div class="lane" id="lane"></div>
+      <div class="avbox me"><div class="avatar">😎</div><span class="avname">Sen</span></div>
+    </div>
+
+    <div class="overlay show" id="overlay">
+      <div class="panel" id="startPanel">
+        <p class="panel-title">BUBBLE <span class="vs">VS</span></p>
+        <p class="panel-sub">Aynı tarlada sırayla ateş ediyorsunuz: bir atış senin, bir atış rakibin. Patlattığın veya düşürdüğün her balonun askeri SANA yazar — kapan alır. 1 dakika sonra FIGHT: ordular arenada çarpışır, rakip ordusunu yok eden kazanır.</p>
+        <div class="roster" id="roster"></div>
+        <div class="seg" id="diffSeg" role="group" aria-label="Zorluk">
+          <button data-d="easy">Kolay</button>
+          <button data-d="mid">Orta</button>
+          <button data-d="hard">Zor</button>
+        </div>
+        <button class="btn primary big" id="startBtn">Başla</button>
+        <div class="tally" id="tallyStart"></div>
+      </div>
+      <p class="count" id="countPanel" hidden>3</p>
+      <div class="panel" id="endPanel" hidden>
+        <p class="panel-title" id="endTitle"></p>
+        <p class="panel-sub" id="endSub"></p>
+        <div class="ov-actions">
+          <button class="btn" id="chgBtn">Zorluk Değiştir</button>
+          <button class="btn primary" id="againBtn">Tekrar Oyna</button>
+        </div>
+        <div class="tally" id="tallyEnd"></div>
+      </div>
+    </div>
+  </div>
+
+  <p class="hint">Sıra sende: sürükle-nişan al, bırak-ateşle</p>
+</div>
+
+<script>
+  const GATHER_MS = 60000;
+  const BATTLE_MS = 45000;
+  const COLS = 11;
+  const ROWS_INIT = 9;
+  const ROWS_MAX = 24;
+  const SHOT_SPEED = 1000; // px/s
+
+  const UNITS = {
+    2:   { name: 'Çaylak',    hp: 3,  dmg: 1,  per: 1.25, speed: 45, range: 16, size: 15, px: 22 },
+    4:   { name: 'Asker',     hp: 7,  dmg: 2,  per: 1.0,  speed: 45, range: 16, size: 17, px: 25 },
+    8:   { name: 'Okçu',      hp: 7,  dmg: 1,  per: 1.0,  speed: 45, range: 75, size: 17, px: 25, ranged: true, proj: 'arrow' },
+    16:  { name: 'Şövalye',   hp: 32, dmg: 6,  per: 1.25, speed: 30, range: 16, size: 19, px: 28 },
+    32:  { name: 'Büyücü',    hp: 16, dmg: 5,  per: 1.7,  speed: 30, range: 75, size: 19, px: 29, ranged: true, splash: 26, proj: 'magic' },
+    64:  { name: 'Berserker', hp: 50, dmg: 14, per: 0.85, speed: 68, range: 16, size: 19, px: 28 },
+    128: { name: 'Dev',       hp: 90, dmg: 18, per: 2.0,  speed: 22, range: 18, size: 25, px: 40 }
+  };
+  const VALS = Object.keys(UNITS).map(Number);
+  const WEIGHTS = [[2, 34], [4, 24], [8, 17], [16, 11], [32, 8], [64, 4], [128, 2]];
+
+  const SPRITES = {
+    2: `<svg viewBox="0 0 32 32">
+      <g class="wpn"><rect x="21.5" y="9" width="3" height="13" rx="1.5" fill="#8B6844" transform="rotate(18 23 15)"/></g>
+      <circle cx="15" cy="9" r="5.2" fill="#E8B88A"/>
+      <rect x="9.8" y="5.4" width="10.4" height="2.6" rx="1.3" class="tc"/>
+      <rect x="9.5" y="14.5" width="11" height="10.5" rx="3" fill="#7A8699"/>
+      <rect x="12" y="25" width="2.6" height="5.5" rx="1" fill="#5A4634"/>
+      <rect x="15.6" y="25" width="2.6" height="5.5" rx="1" fill="#5A4634"/>
+    </svg>`,
+    4: `<svg viewBox="0 0 32 32">
+      <g class="wpn"><rect x="23" y="6" width="2.6" height="14" rx="1" fill="#D7DDE9"/>
+      <rect x="20.8" y="19" width="7" height="2.4" rx="1" fill="#8B6844"/></g>
+      <circle cx="14.5" cy="9.5" r="5" fill="#E8B88A"/>
+      <path d="M9.5 9 a5 5 0 0 1 10 0 z" fill="#9AA7BE"/>
+      <rect x="13" y="2" width="3" height="3.6" rx="1.4" class="tc"/>
+      <rect x="9.3" y="14.8" width="10.4" height="10" rx="3" fill="#9AA7BE"/>
+      <rect x="9.3" y="17.6" width="10.4" height="2" class="tc"/>
+      <rect x="11.5" y="25" width="2.6" height="5.5" rx="1" fill="#39445C"/>
+      <rect x="15.2" y="25" width="2.6" height="5.5" rx="1" fill="#39445C"/>
+    </svg>`,
+    8: `<svg viewBox="0 0 32 32">
+      <g class="wpn"><path d="M24 5 a11 11 0 0 1 0 22" fill="none" stroke="#8B6844" stroke-width="2.2" stroke-linecap="round"/>
+      <line x1="24" y1="5" x2="24" y2="27" stroke="#D7DDE9" stroke-width="1"/></g>
+      <circle cx="14" cy="10" r="4.8" fill="#E8B88A"/>
+      <path d="M8.6 10 L14 2.2 L19.4 10 z" class="tc"/>
+      <path d="M9 15 h10 l-1.2 10 h-7.6 z" fill="#4C7A5E"/>
+      <rect x="11.2" y="25" width="2.6" height="5.5" rx="1" fill="#39445C"/>
+      <rect x="14.9" y="25" width="2.6" height="5.5" rx="1" fill="#39445C"/>
+    </svg>`,
+    16: `<svg viewBox="0 0 32 32">
+      <circle cx="16" cy="8.5" r="5" fill="#9AA7BE"/>
+      <rect x="11.8" y="7.2" width="8.4" height="2" rx="1" fill="#39445C"/>
+      <rect x="12.5" y="1.6" width="7" height="2.4" rx="1.2" class="tc"/>
+      <rect x="10" y="13.8" width="12" height="11" rx="3" fill="#7A8699"/>
+      <rect x="12.2" y="25" width="2.8" height="5.5" rx="1" fill="#39445C"/>
+      <rect x="17" y="25" width="2.8" height="5.5" rx="1" fill="#39445C"/>
+      <g class="wpn"><path d="M5.5 13 h9 v9 q0 4 -4.5 5.5 q-4.5 -1.5 -4.5 -5.5 z" fill="#D7DDE9"/>
+      <rect x="9.1" y="14.6" width="1.8" height="7.2" rx=".9" class="tc"/>
+      <rect x="6.9" y="16.8" width="6.2" height="1.8" rx=".9" class="tc"/></g>
+    </svg>`,
+    32: `<svg viewBox="0 0 32 32">
+      <g class="wpn"><rect x="23.4" y="6" width="2.4" height="20" rx="1.2" fill="#8B6844"/>
+      <g class="orb"><circle cx="24.6" cy="5.4" r="4.4" fill="#F7BE2A" opacity=".3"/>
+      <circle cx="24.6" cy="5.4" r="2.8" fill="#F7BE2A"/></g></g>
+      <circle cx="14" cy="11" r="4.6" fill="#E8B88A"/>
+      <path d="M7.5 11.5 L14 1.5 L20.5 11.5 z" class="tc"/>
+      <path d="M11.8 13.5 h4.4 v3.2 q-2.2 2.2 -4.4 0 z" fill="#E8EDF5"/>
+      <path d="M9 16 h10 l1.6 9.5 h-13.2 z" fill="#5B63D3"/>
+    </svg>`,
+    64: `<svg viewBox="0 0 32 32">
+      <g class="wpn"><rect x="22.6" y="5" width="2.6" height="18" rx="1.3" fill="#8B6844" transform="rotate(14 24 14)"/>
+      <path d="M20 4.5 q6 1.5 6 7 l-4 0 q0 -4 -2 -7 z" fill="#B9C4D6"/></g>
+      <circle cx="14" cy="9.5" r="5" fill="#E8B88A"/>
+      <path d="M8.6 7 q-2.4 -4 1 -5.6 q1 2.6 2.4 3.4 z" fill="#D9CDBB"/>
+      <path d="M19.4 7 q2.4 -4 -1 -5.6 q-1 2.6 -2.4 3.4 z" fill="#D9CDBB"/>
+      <rect x="10.4" y="6.6" width="7.2" height="1.8" rx=".9" class="tc"/>
+      <rect x="9.3" y="14.5" width="9.4" height="10.3" rx="3" fill="#C98B5F"/>
+      <rect x="9.3" y="20.6" width="9.4" height="2" class="tc"/>
+      <rect x="11.4" y="25" width="2.7" height="5.5" rx="1" fill="#5A4634"/>
+      <rect x="15" y="25" width="2.7" height="5.5" rx="1" fill="#5A4634"/>
+    </svg>`,
+    128: `<svg viewBox="0 0 32 32">
+      <rect x="6" y="10" width="20" height="16" rx="6" fill="#7C87A2"/>
+      <rect x="10.5" y="3.5" width="11" height="8" rx="3.5" fill="#8D97B0"/>
+      <rect x="12.6" y="6.4" width="2.4" height="1.8" rx=".9" fill="#2A3348"/>
+      <rect x="17" y="6.4" width="2.4" height="1.8" rx=".9" fill="#2A3348"/>
+      <g class="wpn"><circle cx="5.4" cy="18" r="4.2" fill="#8D97B0"/>
+      <circle cx="26.6" cy="18" r="4.2" fill="#8D97B0"/></g>
+      <path d="M12 14 l3 3 m5 1 l-2.6 2.6" stroke="#5A6579" stroke-width="1.4" fill="none" stroke-linecap="round"/>
+      <rect x="9" y="24.4" width="14" height="2.2" rx="1.1" class="tc"/>
+      <rect x="10.5" y="26.6" width="4.4" height="4.6" rx="1.4" fill="#5A6579"/>
+      <rect x="17.1" y="26.6" width="4.4" height="4.6" rx="1.4" fill="#5A6579"/>
+    </svg>`
+  };
+
+  const $ = id => document.getElementById(id);
+  const fieldEl = $('field');
+  const bubbleLayer = $('bubbleLayer');
+  const laneEl = $('lane');
+  const timerEl = $('timer');
+  const storage = {
+    get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+    set(k, v) { try { localStorage.setItem(k, v); } catch { /* sandboxed */ } }
+  };
+
+  function weightedVal() {
+    let roll = Math.random() * 100;
+    for (const [v, w] of WEIGHTS) {
+      roll -= w;
+      if (roll <= 0) return v;
+    }
+    return 2;
+  }
+
+  /* ---------- Bubble grid ---------- */
+
+  let R = 22;
+  let parityBase = 0; // flips on each row insertion so hex offsets stay aligned
+  let grid = new Map(); // "r,c" -> {row,col,val,el}
+  const key = (r, c) => r + ',' + c;
+  const parity = r => (r + parityBase) % 2;
+  const maxCol = r => (parity(r) ? COLS - 2 : COLS - 1);
+  const cellX = (r, c) => c * 2 * R + R + (parity(r) ? R : 0);
+  const cellY = r => r * R * 1.732 + R;
+
+  function layoutBubbles() {
+    for (const b of grid.values())
+      b.el.style.transform = `translate(${cellX(b.row, b.col) - R}px, ${cellY(b.row) - R}px)`;
+  }
+
+  /* After every full round (one shot each side) the whole mass shifts one
+     row down and a fresh row spawns at the ceiling. */
+  function addRow() {
+    let maxY = 0;
+    for (const b of grid.values()) maxY = Math.max(maxY, cellY(b.row));
+    if (maxY > fieldEl.clientHeight - 130) return; // don't crush the cannon
+    parityBase = (parityBase + 1) % 2;
+    const moved = new Map();
+    for (const b of grid.values()) {
+      b.row++;
+      moved.set(key(b.row, b.col), b);
+    }
+    grid = moved;
+    for (let c = 0; c <= maxCol(0); c++) placeBubble(0, c, weightedVal());
+    layoutBubbles();
+  }
+
+  function neighbors(r, c) {
+    const odd = parity(r);
+    return [
+      [r, c - 1], [r, c + 1],
+      [r - 1, odd ? c : c - 1], [r - 1, odd ? c + 1 : c],
+      [r + 1, odd ? c : c - 1], [r + 1, odd ? c + 1 : c]
+    ].filter(([rr, cc]) => rr >= 0 && rr < ROWS_MAX && cc >= 0 && cc <= maxCol(rr));
+  }
+
+  function makeBubbleEl(val, d) {
+    const el = document.createElement('div');
+    el.className = 'bubble c' + val;
+    el.style.width = d + 'px';
+    el.style.height = d + 'px';
+    el.innerHTML = `<span class="ic">${SPRITES[val]}</span>`;
+    return el;
+  }
+
+  function placeBubble(row, col, val) {
+    const el = makeBubbleEl(val, R * 2);
+    el.style.transform = `translate(${cellX(row, col) - R}px, ${cellY(row) - R}px)`;
+    bubbleLayer.appendChild(el);
+    const b = { row, col, val, el };
+    grid.set(key(row, col), b);
+    return b;
+  }
+
+  function initField() {
+    bubbleLayer.innerHTML = '';
+    grid = new Map();
+    parityBase = 0;
+    R = fieldEl.clientWidth / (COLS * 2);
+    for (let r = 0; r < ROWS_INIT; r++)
+      for (let c = 0; c <= maxCol(r); c++)
+        placeBubble(r, c, weightedVal());
+  }
+
+  function fieldColors() {
+    const s = new Set();
+    for (const b of grid.values()) s.add(b.val);
+    return [...s];
+  }
+
+  function pickShotVal() {
+    // shooter queue: only colors on the field, but still rarity-weighted —
+    // a lone 128 cluster shouldn't hand out 128 shots as often as 2s
+    const present = new Set(fieldColors());
+    if (present.size && Math.random() < 0.75) {
+      const cand = WEIGHTS.filter(([v]) => present.has(v));
+      const total = cand.reduce((s, [, w]) => s + w, 0);
+      let roll = Math.random() * total;
+      for (const [v, w] of cand) {
+        roll -= w;
+        if (roll <= 0) return v;
+      }
+      return cand[0][0];
+    }
+    return weightedVal();
+  }
+
+  /* ---------- Meters / roster bank ---------- */
+
+  const bank = { me: {}, ai: {} };
+  const meterCells = { me: {}, ai: {} };
+
+  function buildMeters() {
+    for (const side of ['me', 'ai']) {
+      const panel = $(side === 'me' ? 'mePanel' : 'aiPanel');
+      for (const v of VALS) {
+        const row = document.createElement('div');
+        row.className = 'srow';
+        row.innerHTML = `<span class="ic c${v}">${SPRITES[v]}</span><b class="cnt ${side} zero">0</b>`;
+        panel.appendChild(row);
+        const cell = row.querySelector('.cnt');
+        cell.addEventListener('animationend', () => cell.classList.remove('bump'));
+        meterCells[side][v] = cell;
+      }
+    }
+  }
+
+  function resetBanks() {
+    for (const side of ['me', 'ai'])
+      for (const v of VALS) {
+        bank[side][v] = 0;
+        const c = meterCells[side][v];
+        c.textContent = '0';
+        c.classList.add('zero');
+      }
+  }
+
+  function gatherUnit(side, val) {
+    bank[side][val]++;
+    const c = meterCells[side][val];
+    c.textContent = bank[side][val];
+    c.classList.remove('zero');
+    c.classList.remove('bump');
+    void c.offsetWidth;
+    c.classList.add('bump');
+  }
+
+  /* ---------- Shooter ---------- */
+
+  let curVal = 2, nextVal = 2;
+  let flying = null; // {el, x, y, vx, vy}
+  let aiming = false;
+  let aimAngle = -Math.PI / 2;
+
+  function cannonPos() {
+    return { x: fieldEl.clientWidth / 2, y: fieldEl.clientHeight - 34 };
+  }
+
+  function renderQueue() {
+    const c = cannonPos();
+    let cur = $('curBubble');
+    if (!cur) {
+      cur = makeBubbleEl(curVal, R * 2);
+      cur.id = 'curBubble';
+      fieldEl.appendChild(cur);
+    }
+    cur.className = 'bubble c' + curVal;
+    cur.querySelector('.ic').innerHTML = SPRITES[curVal];
+    cur.style.width = R * 2 + 'px';
+    cur.style.height = R * 2 + 'px';
+    cur.style.zIndex = 6;
+    cur.style.transform = `translate(${c.x - R}px, ${c.y - R}px)`;
+    $('nextSlot').innerHTML = '';
+    const nx = makeBubbleEl(nextVal, 26);
+    $('nextSlot').appendChild(nx);
+  }
+
+  function positionCannon() {
+    const c = cannonPos();
+    const cn = $('cannon');
+    cn.style.left = (c.x - 18) + 'px';
+    cn.style.top = (c.y - 30) + 'px';
+    cn.style.transform = `rotate(${aimAngle * 180 / Math.PI + 90}deg)`;
+  }
+
+  const AIM_SEGS = 3;
+  const aimSegEls = [];
+  function initAimSegs() {
+    for (let i = 0; i < AIM_SEGS; i++) {
+      const d = document.createElement('div');
+      d.className = 'aimline';
+      d.hidden = true;
+      fieldEl.appendChild(d);
+      aimSegEls.push(d);
+    }
+  }
+  function hideAim() {
+    for (const d of aimSegEls) d.hidden = true;
+  }
+
+  function updateAim(px, py) {
+    const c = cannonPos();
+    let a = Math.atan2(py - c.y, px - c.x);
+    const min = -Math.PI + 0.35, max = -0.35;
+    if (a > -0.35 && a < Math.PI / 2) a = max;
+    else if (a >= Math.PI / 2 || a < min) a = min;
+    aimAngle = a;
+    positionCannon();
+
+    // trace the real path: bounce off walls, stop at ceiling or first bubble
+    const W = fieldEl.clientWidth;
+    let maxBubbleY = 0;
+    for (const b of grid.values()) maxBubbleY = Math.max(maxBubbleY, cellY(b.row));
+    const step = 6;
+    let x = c.x, y = c.y;
+    let vx = Math.cos(a) * step, vy = Math.sin(a) * step;
+    const pts = [[x, y]];
+    let guard = 0;
+    outer: while (guard++ < 400) {
+      x += vx; y += vy;
+      if (x < R) { x = R; vx = -vx; pts.push([x, y]); }
+      else if (x > W - R) { x = W - R; vx = -vx; pts.push([x, y]); }
+      if (y <= R) break;
+      if (y <= maxBubbleY + 2 * R) {
+        for (const b of grid.values()) {
+          const dx = x - cellX(b.row, b.col);
+          const dy = y - cellY(b.row);
+          if (dx * dx + dy * dy < (2 * R * 0.86) ** 2) break outer;
+        }
+      }
+    }
+    pts.push([x, y]);
+
+    hideAim();
+    for (let i = 0; i < Math.min(AIM_SEGS, pts.length - 1); i++) {
+      const [x0, y0] = pts[i], [x1, y1] = pts[i + 1];
+      const d = aimSegEls[i];
+      d.hidden = false;
+      d.style.left = x0 + 'px';
+      d.style.top = y0 + 'px';
+      d.style.width = Math.hypot(x1 - x0, y1 - y0) + 'px';
+      d.style.transform = `rotate(${Math.atan2(y1 - y0, x1 - x0) * 180 / Math.PI}deg)`;
+    }
+  }
+
+  function fire() {
+    if (flying || state !== 'gather') return;
+    const c = cannonPos();
+    const el = $('curBubble');
+    el.id = '';
+    flying = {
+      el,
+      val: curVal,
+      x: c.x, y: c.y,
+      vx: Math.cos(aimAngle) * SHOT_SPEED,
+      vy: Math.sin(aimAngle) * SHOT_SPEED
+    };
+    const gun = $('cannon').firstChild;
+    gun.classList.remove('recoil');
+    void gun.offsetWidth;
+    gun.classList.add('recoil');
+    curVal = nextVal;
+    nextVal = pickShotVal();
+    renderQueue();
+  }
+
+  function stepFlight(dt) {
+    if (!flying) return;
+    const W = fieldEl.clientWidth;
+    flying.x += flying.vx * dt;
+    flying.y += flying.vy * dt;
+    if (flying.x < R) { flying.x = R; flying.vx = -flying.vx; }
+    if (flying.x > W - R) { flying.x = W - R; flying.vx = -flying.vx; }
+    let hit = flying.y <= R;
+    if (!hit) {
+      for (const b of grid.values()) {
+        const dx = flying.x - cellX(b.row, b.col);
+        const dy = flying.y - cellY(b.row);
+        if (dx * dx + dy * dy < (2 * R * 0.86) ** 2) { hit = true; break; }
+      }
+    }
+    if (hit) {
+      landShot();
+      return;
+    }
+    flying.el.style.transform = `translate(${flying.x - R}px, ${flying.y - R}px)`;
+  }
+
+  function anchoredEmptyCells() {
+    const out = [];
+    for (let r = 0; r < ROWS_MAX; r++)
+      for (let c = 0; c <= maxCol(r); c++) {
+        if (grid.has(key(r, c))) continue;
+        if (r === 0 || neighbors(r, c).some(([rr, cc]) => grid.has(key(rr, cc)))) out.push([r, c]);
+      }
+    return out;
+  }
+
+  function landShot() {
+    const { x, y, val, el } = flying;
+    flying = null;
+    el.remove();
+    let best = null, bd = Infinity;
+    for (const [r, c] of anchoredEmptyCells()) {
+      const dx = x - cellX(r, c), dy = y - cellY(r);
+      const d = dx * dx + dy * dy;
+      if (d < bd) { bd = d; best = [r, c]; }
+    }
+    if (best) {
+      const b = placeBubble(best[0], best[1], val);
+      resolveMatches(b);
+    }
+    endShotResolve();
+  }
+
+  function resolveMatches(b) {
+    // flood same-color cluster
+    const seen = new Set([key(b.row, b.col)]);
+    const stack = [b];
+    const cluster = [b];
+    while (stack.length) {
+      const cur = stack.pop();
+      for (const [r, c] of neighbors(cur.row, cur.col)) {
+        const k = key(r, c);
+        if (seen.has(k)) continue;
+        const nb = grid.get(k);
+        if (nb && nb.val === b.val) {
+          seen.add(k);
+          stack.push(nb);
+          cluster.push(nb);
+        }
+      }
+    }
+    if (cluster.length < 3) return;
+    for (const cb of cluster) popBubble(cb, false);
+    dropOrphans();
+  }
+
+  function popBubble(b, falling) {
+    grid.delete(key(b.row, b.col));
+    if (falling) {
+      const x = cellX(b.row, b.col) - R, y = cellY(b.row) - R;
+      const fall = fieldEl.clientHeight - y + 40;
+      b.el.animate(
+        [{ transform: `translate(${x}px, ${y}px)`, opacity: 1 },
+         { transform: `translate(${x + (Math.random() * 40 - 20)}px, ${y + fall}px)`, opacity: .3 }],
+        { duration: 480, easing: 'cubic-bezier(.4,0,.9,.6)', fill: 'forwards' }
+      );
+      setTimeout(() => b.el.remove(), 500);
+    } else {
+      b.el.classList.add('popfx');
+      setTimeout(() => b.el.remove(), 240);
+    }
+    if (state === 'gather') gatherUnit(turn, b.val);
+  }
+
+  function dropOrphans() {
+    const anchored = new Set();
+    const stack = [];
+    for (let c = 0; c <= maxCol(0); c++) {
+      const k = key(0, c);
+      if (grid.has(k)) { anchored.add(k); stack.push(grid.get(k)); }
+    }
+    while (stack.length) {
+      const cur = stack.pop();
+      for (const [r, c] of neighbors(cur.row, cur.col)) {
+        const k = key(r, c);
+        if (anchored.has(k)) continue;
+        const nb = grid.get(k);
+        if (nb) { anchored.add(k); stack.push(nb); }
+      }
+    }
+    for (const b of [...grid.values()]) {
+      if (!anchored.has(key(b.row, b.col))) popBubble(b, true);
+    }
+  }
+
+  /* ---------- Turn system: shared field, alternating shots ---------- */
+
+  const DIFFS = {
+    easy: { label: 'Kolay', acc: .3,  think: 1100 },
+    mid:  { label: 'Orta',  acc: .65, think: 800 },
+    hard: { label: 'Zor',   acc: .92, think: 550 }
+  };
+  let aiTimer = null;
+  let turn = 'me';
+  let roundShots = 0;
+
+  function renderTurn() {
+    $('mePanel').classList.toggle('on', turn === 'me');
+    $('aiPanel').classList.toggle('on', turn === 'ai');
+    const lab = $('turnlab');
+    lab.textContent = turn === 'me' ? 'SEN' : 'RAKİP';
+    lab.style.color = turn === 'me' ? 'var(--gold)' : 'var(--danger)';
+    const cur = $('curBubble');
+    if (cur) cur.style.outline = `2.5px solid ${turn === 'me' ? 'var(--gold)' : 'var(--danger)'}`;
+  }
+
+  function endShotResolve() {
+    if (state !== 'gather') return;
+    roundShots++;
+    if (roundShots >= 2) { roundShots = 0; addRow(); }
+    turn = turn === 'me' ? 'ai' : 'me';
+    renderTurn();
+    if (turn === 'ai') aiTimer = setTimeout(aiShoot, DIFFS[diffKey].think);
+  }
+
+  function clusterSizeAt(r0, c0, val) {
+    const seen = new Set([key(r0, c0)]);
+    const stack = [[r0, c0]];
+    let n = 1;
+    while (stack.length) {
+      const [rr, cc] = stack.pop();
+      for (const [nr, nc] of neighbors(rr, cc)) {
+        const k = key(nr, nc);
+        if (seen.has(k)) continue;
+        const nb = grid.get(k);
+        if (nb && nb.val === val) { seen.add(k); n++; stack.push([nr, nc]); }
+      }
+    }
+    return n;
+  }
+
+  function aiChooseAngle() {
+    const cells = anchoredEmptyCells();
+    const c0 = cannonPos();
+    if (!cells.length) return -Math.PI / 2;
+    let target = null;
+    if (Math.random() < DIFFS[diffKey].acc) {
+      let bs = -Infinity;
+      for (const [r, c] of cells) {
+        const n = clusterSizeAt(r, c, curVal);
+        let score = n >= 3 ? n * 10 : n;
+        if (cellY(r) > c0.y - 70) score -= 50; // don't wall in the cannon
+        if (score > bs) { bs = score; target = [r, c]; }
+      }
+    } else {
+      target = cells[(Math.random() * cells.length) | 0];
+    }
+    let a = Math.atan2(cellY(target[0]) - c0.y, cellX(target[0], target[1]) - c0.x);
+    a += (Math.random() - 0.5) * 0.06;
+    return Math.min(-0.35, Math.max(-Math.PI + 0.35, a));
+  }
+
+  function aiShoot() {
+    if (state !== 'gather' || turn !== 'ai') return;
+    aimAngle = aiChooseAngle();
+    positionCannon();
+    setTimeout(() => {
+      if (state === 'gather' && turn === 'ai') fire();
+    }, 260);
+  }
+
+  /* ---------- Arena battle (shared with 2048 VS) ---------- */
+
+  let units = [];
+
+  function spawnUnit(side, value, x, y) {
+    const spec = UNITS[value];
+    const el = document.createElement('div');
+    el.className = 'unit born ' + side + ' k' + value;
+    el.innerHTML = `<span class="g" style="width:${spec.px}px;height:${spec.px}px">${SPRITES[value]}</span><div class="uhp"><i></i></div>`;
+    el.addEventListener('animationend', e => {
+      if (e.animationName === 'spawn') el.classList.remove('born');
+      else if (e.animationName === 'hurtf') el.classList.remove('hurt');
+    });
+    laneEl.appendChild(el);
+    const u = { side, spec, hp: spec.hp, x, y, cd: 0.4, dead: false, el, hpEl: el.querySelector('.uhp i') };
+    el.style.transform = `translate(${x}px, ${y}px) translate(-50%, -50%)`;
+    units.push(u);
+  }
+
+  function bloodSplat(x, y, size) {
+    const s = document.createElement('div');
+    s.className = 'splat';
+    const d = Math.round(size * 1.5);
+    s.style.width = d + 'px';
+    s.style.height = d + 'px';
+    s.style.left = x + 'px';
+    s.style.top = y + 'px';
+    s.style.rotate = ((Math.random() * 360) | 0) + 'deg';
+    laneEl.appendChild(s);
+    setTimeout(() => s.remove(), 2100);
+  }
+
+  function killUnit(u) {
+    u.dead = true;
+    bloodSplat(u.x, u.y, u.spec.size);
+    u.el.remove();
+  }
+
+  function hurtUnit(u, dmg) {
+    u.hp -= dmg;
+    u.el.classList.remove('hurt');
+    void u.el.offsetWidth;
+    u.el.classList.add('hurt');
+    u.hpEl.style.width = Math.max(0, u.hp / u.spec.hp * 100) + '%';
+    if (u.hp <= 0) killUnit(u);
+  }
+
+  function shootProj(x0, y0, x1, y1, type) {
+    const p = document.createElement('div');
+    p.className = 'proj' + (type ? ' ' + type : '');
+    laneEl.appendChild(p);
+    const rot = type === 'arrow' ? ` rotate(${(Math.atan2(y1 - y0, x1 - x0) * 180 / Math.PI).toFixed(1)}deg)` : '';
+    p.style.transform = `translate(${x0}px, ${y0}px)` + rot;
+    p.animate(
+      [{ transform: `translate(${x0}px, ${y0}px)` + rot }, { transform: `translate(${x1}px, ${y1}px)` + rot }],
+      { duration: 130, easing: 'linear', fill: 'forwards' }
+    );
+    setTimeout(() => p.remove(), 170);
+  }
+
+  function atkFx(u) {
+    u.el.classList.remove('atk');
+    void u.el.offsetWidth;
+    u.el.classList.add('atk');
+  }
+
+  function attack(u, target) {
+    atkFx(u);
+    if (u.spec.ranged) shootProj(u.x, u.y, target.x, target.y, u.spec.proj);
+    if (u.spec.splash) {
+      for (const v of units) {
+        if (v.dead || v.side === u.side) continue;
+        if (Math.hypot(v.x - target.x, v.y - target.y) <= u.spec.splash) hurtUnit(v, u.spec.dmg);
+      }
+    } else {
+      hurtUnit(target, u.spec.dmg);
+    }
+  }
+
+  function simulate(dt) {
+    const laneW = laneEl.clientWidth, laneH = laneEl.clientHeight;
+
+    for (const u of units) {
+      if (u.dead) continue;
+      u.cd -= dt;
+      let nearest = null, nd = Infinity;
+      for (const v of units) {
+        if (v.dead || v.side === u.side) continue;
+        const d = Math.hypot(v.x - u.x, v.y - u.y);
+        if (d < nd) { nd = d; nearest = v; }
+      }
+      if (nearest) {
+        const eff = u.spec.range + (u.spec.size + nearest.spec.size) / 4;
+        if (nd <= eff) {
+          if (u.cd <= 0) { u.cd = u.spec.per; attack(u, nearest); }
+        } else {
+          const s = u.spec.speed * dt / nd;
+          u.x += (nearest.x - u.x) * s;
+          u.y += (nearest.y - u.y) * s;
+        }
+      }
+    }
+
+    for (let i = 0; i < units.length; i++) {
+      const a = units[i];
+      if (a.dead) continue;
+      for (let j = i + 1; j < units.length; j++) {
+        const b = units[j];
+        if (b.dead || b.side !== a.side) continue;
+        const dx = b.x - a.x, dy = b.y - a.y;
+        const d = Math.hypot(dx, dy);
+        const min = (a.spec.size + b.spec.size) / 2;
+        if (d > 0 && d < min) {
+          const push = (min - d) / 2;
+          a.x -= dx / d * push; a.y -= dy / d * push;
+          b.x += dx / d * push; b.y += dy / d * push;
+        }
+      }
+    }
+
+    for (const u of units) {
+      if (u.dead) continue;
+      u.x = Math.min(laneW - 8, Math.max(8, u.x));
+      u.y = Math.min(laneH - 8, Math.max(8, u.y));
+      u.el.style.transform = `translate(${u.x}px, ${u.y}px) translate(-50%, -50%)`;
+    }
+
+    units = units.filter(u => !u.dead);
+
+    if (state === 'fight') {
+      const m = units.some(u => u.side === 'me');
+      const a = units.some(u => u.side === 'ai');
+      if (!m || !a) finish('army');
+    }
+  }
+
+  function clearUnits() {
+    for (const u of units) u.el.remove();
+    units = [];
+  }
+
+  function livingUnitHp(side) {
+    return units.reduce((s, u) => s + (u.side === side && !u.dead ? u.hp : 0), 0);
+  }
+  function livingUnitCount(side) {
+    return units.filter(u => u.side === side && !u.dead).length;
+  }
+
+  /* ---------- Main loop ---------- */
+
+  let lastTick = 0;
+  function loop(ts) {
+    if (state !== 'gather' && state !== 'fight') return;
+    const dt = Math.min(0.05, (ts - lastTick) / 1000 || 0.016);
+    lastTick = ts;
+    if (state === 'gather') stepFlight(dt);
+    else simulate(dt);
+    requestAnimationFrame(loop);
+  }
+
+  /* ---------- Match controller ---------- */
+
+  let state = 'idle'; // idle | countdown | gather | fightsplash | fight | ended
+  let diffKey = storage.get('bubblevs_diff') || 'mid';
+  if (!DIFFS[diffKey]) diffKey = 'mid';
+  let clockTimer = null, endAt = 0;
+
+  const overlay = $('overlay');
+  const startPanel = $('startPanel');
+  const countPanel = $('countPanel');
+  const endPanel = $('endPanel');
+
+  function renderTimer(ms) {
+    const sec = Math.ceil(ms / 1000);
+    timerEl.textContent = Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0');
+    const active = state === 'gather' || state === 'fight';
+    timerEl.classList.toggle('urgent', active && sec <= 10);
+  }
+
+  function startClock(ms, onEnd) {
+    clearInterval(clockTimer);
+    endAt = performance.now() + ms;
+    renderTimer(ms);
+    clockTimer = setInterval(() => {
+      const rem = endAt - performance.now();
+      if (rem <= 0) {
+        clearInterval(clockTimer);
+        renderTimer(0);
+        onEnd();
+      } else renderTimer(rem);
+    }, 100);
+  }
+
+  function showPanel(panel) {
+    for (const p of [startPanel, countPanel, endPanel]) p.hidden = p !== panel;
+    overlay.classList.toggle('show', !!panel);
+  }
+
+  function loadTally() {
+    try { return JSON.parse(storage.get('bubblevs_tally')) || { w: 0, l: 0, d: 0 }; }
+    catch { return { w: 0, l: 0, d: 0 }; }
+  }
+  function renderTally() {
+    const t = loadTally();
+    const text = `Seri: ${t.w}G · ${t.l}M · ${t.d}B`;
+    $('tallyStart').textContent = text;
+    $('tallyEnd').textContent = text;
+  }
+  function addTally(result) {
+    const t = loadTally();
+    t[result]++;
+    storage.set('bubblevs_tally', JSON.stringify(t));
+    renderTally();
+  }
+
+  function setDiff(key2) {
+    diffKey = key2;
+    storage.set('bubblevs_diff', key2);
+    $('diffLabel').textContent = DIFFS[key2].label;
+    for (const b of $('diffSeg').children) b.classList.toggle('on', b.dataset.d === key2);
+  }
+
+  function beginCountdown() {
+    state = 'countdown';
+    $('gatherView').hidden = false;
+    $('fightView').hidden = true;
+    $('ghud').append(timerEl);
+    let n = 3;
+    countPanel.textContent = n;
+    showPanel(countPanel);
+    const step = () => {
+      n--;
+      if (n === 0) { showPanel(null); startMatch(); return; }
+      countPanel.textContent = n;
+      setTimeout(step, 650);
+    };
+    setTimeout(step, 650);
+  }
+
+  function startMatch() {
+    clearUnits();
+    resetBanks();
+    roundShots = 0;
+    initField();
+    curVal = pickShotVal();
+    nextVal = pickShotVal();
+    renderQueue();
+    aimAngle = -Math.PI / 2;
+    positionCannon();
+    turn = 'me';
+    state = 'gather';
+    renderTurn();
+    startClock(GATHER_MS, beginFightSplash);
+    lastTick = performance.now();
+    requestAnimationFrame(loop);
+  }
+
+  function beginFightSplash() {
+    state = 'fightsplash';
+    clearTimeout(aiTimer);
+    if (flying) { flying.el.remove(); flying = null; }
+    hideAim();
+    const sp = document.createElement('div');
+    sp.className = 'fight-splash';
+    sp.innerHTML = '<span>FIGHT!</span>';
+    $('game').appendChild(sp);
+    setTimeout(() => sp.remove(), 950);
+    setTimeout(startFight, 900);
+  }
+
+  function startFight() {
+    $('gatherView').hidden = true;
+    $('fightView').hidden = false;
+    $('fhud').append(timerEl);
+    state = 'fight';
+    const laneW = laneEl.clientWidth, laneH = laneEl.clientHeight;
+    const zone = Math.min(70, laneH * .2);
+    for (const side of ['me', 'ai']) {
+      for (const [v, count] of Object.entries(bank[side])) {
+        for (let i = 0; i < count; i++) {
+          const x = 12 + Math.random() * (laneW - 24);
+          const y = side === 'me'
+            ? laneH - 14 - Math.random() * zone
+            : 14 + Math.random() * zone;
+          spawnUnit(side, +v, x, y);
+        }
+      }
+    }
+    startClock(BATTLE_MS, () => finish('ftime'));
+    lastTick = performance.now();
+    requestAnimationFrame(loop);
+  }
+
+  function finish(kind) {
+    if (state !== 'fight') return;
+    state = 'ended';
+    clearInterval(clockTimer);
+    timerEl.classList.remove('urgent');
+
+    const m = livingUnitHp('me'), a = livingUnitHp('ai');
+    const result = m > a ? 'w' : m < a ? 'l' : 'd';
+    $('endTitle').textContent = result === 'w' ? 'Kazandın!' : result === 'l' ? 'Kaybettin' : 'Berabere';
+    $('endSub').textContent = `Kalan birim: Sen ${livingUnitCount('me')} · Rakip ${livingUnitCount('ai')}`;
+    addTally(result);
+    showPanel(endPanel);
+  }
+
+  /* ---------- Input ---------- */
+
+  let aimPtr = null;
+  fieldEl.addEventListener('pointerdown', e => {
+    if (state !== 'gather' || turn !== 'me' || flying || !e.isPrimary) return;
+    aimPtr = e.pointerId;
+    aiming = true;
+    updateAim(e.clientX - fieldEl.getBoundingClientRect().left, e.clientY - fieldEl.getBoundingClientRect().top);
+    try { fieldEl.setPointerCapture(e.pointerId); } catch { /* unsupported */ }
+  });
+  fieldEl.addEventListener('pointermove', e => {
+    if (!aiming || e.pointerId !== aimPtr) return;
+    const rect = fieldEl.getBoundingClientRect();
+    updateAim(e.clientX - rect.left, e.clientY - rect.top);
+  });
+  fieldEl.addEventListener('pointerup', e => {
+    if (!aiming || e.pointerId !== aimPtr) return;
+    aiming = false;
+    aimPtr = null;
+    hideAim();
+    if (turn === 'me') fire();
+  });
+  fieldEl.addEventListener('pointercancel', () => {
+    aiming = false;
+    aimPtr = null;
+    hideAim();
+  });
+  window.addEventListener('touchmove', e => {
+    if (state !== 'idle' && state !== 'ended') e.preventDefault();
+  }, { passive: false });
+
+  /* ---------- Wiring ---------- */
+
+  $('diffSeg').addEventListener('click', e => {
+    const b = e.target.closest('button');
+    if (b) setDiff(b.dataset.d);
+  });
+  $('startBtn').addEventListener('click', beginCountdown);
+  $('againBtn').addEventListener('click', beginCountdown);
+  $('chgBtn').addEventListener('click', () => {
+    state = 'idle';
+    showPanel(startPanel);
+  });
+
+  const rosterEl = $('roster');
+  for (const v of VALS) {
+    const d = document.createElement('div');
+    d.className = 'ri';
+    d.innerHTML = `<span class="ic c${v}">${SPRITES[v]}</span><b>${v}</b><span>${UNITS[v].name}</span>`;
+    rosterEl.appendChild(d);
+  }
+
+  buildMeters();
+  initAimSegs();
+  setDiff(diffKey);
+  renderTally();
+  showPanel(startPanel);
+</script>

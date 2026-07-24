@@ -1,0 +1,6451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Drive Out</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#1a1a2e;display:flex;justify-content:center;align-items:center;min-height:100vh;overflow:hidden;font-family:'Segoe UI',Arial,sans-serif;touch-action:none}
+canvas{max-width:100vw;max-height:100vh;cursor:pointer;border-radius:8px;box-shadow:0 0 40px rgba(0,0,0,.6)}
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<script>
+// ===========================
+// DRIVE OUT - Browser Prototype
+// ===========================
+
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const W = 480, H = 860;
+canvas.width = W; canvas.height = H;
+
+// ============= CONSTANTS =============
+const COLORS = {
+  blue: '#4A90D9', yellow: '#F5C542', green: '#4CAF50', orange: '#FF7043',
+  red: '#E53935', purple: '#AB47BC', pink: '#EC407A', cyan: '#26C6DA'
+};
+const COLOR_DARK = {
+  blue: '#2E6BA6', yellow: '#C99A20', green: '#357A38', orange: '#C4501A',
+  red: '#B71C1C', purple: '#7B1FA2', pink: '#C2185B', cyan: '#00838F'
+};
+const COLOR_LIGHT = {
+  blue: '#7EB6F0', yellow: '#FFE082', green: '#81C784', orange: '#FFAB91',
+  red: '#EF9A9A', purple: '#CE93D8', pink: '#F48FB1', cyan: '#80DEEA'
+};
+const BG_COLOR = '#C8DDF0';
+const PANEL_COLOR = '#3D4F6A';
+const PANEL_LIGHT = '#506888';
+const TRACK_COLOR = '#2A3749';
+const SLOT_COLOR = '#4A5568';
+const BUTTON_COLOR = '#5B8DEF';
+const BUTTON_HOVER = '#7BA5F5';
+const DANGER_COLOR = '#E53935';
+const SUCCESS_COLOR = '#4CAF50';
+const GOLD_COLOR = '#FFD700';
+const HEART_COLOR = '#E53935';
+
+const CONVEYOR_LOOP_TIME = 5; // seconds for full loop
+const TRACK_WIDTH = 28;
+const HONK_COOLDOWN = 15; // seconds before honk meter starts decaying
+const HONK_THRESHOLD = 3; // cars driven out to fill honk
+const HONK_DECAY_RATE = 0.3; // meter units lost per second (slower = more forgiving)
+const WRENCH_THRESHOLD = 3;
+
+// ============= LEVEL DATA =============
+// LANE SYSTEM: Passengers are in vertical lanes (like Pixel Flow).
+// Only the FRONT (top) passenger in each lane is selectable.
+// Up to 5 lanes per level. Player must manage which lane to tap.
+// Every level verified: total passengers across all lanes == total seats.
+
+const LEVELS = [
+  {
+    "id": 1,
+    "label": "Tutorial",
+    "difficulty": "easy",
+    "gridW": 3,
+    "gridH": 3,
+    "convCap": 5,
+    "slotCount": 5,
+    "cars": [
+      {
+        "color": "blue",
+        "dir": "up",
+        "gx": 1,
+        "gy": 1
+      }
+    ],
+    "lanes": [
+      [
+        {
+          "color": "blue"
+        },
+        {
+          "color": "blue"
+        }
+      ]
+    ]
+  },
+  {
+    "id": 2,
+    "label": "First Block",
+    "difficulty": "easy",
+    "gridW": 3,
+    "gridH": 3,
+    "convCap": 5,
+    "slotCount": 5,
+    "cars": [
+      {
+        "color": "red",
+        "dir": "up",
+        "gx": 2,
+        "gy": 0
+      },
+      {
+        "color": "blue",
+        "dir": "right",
+        "gx": 0,
+        "gy": 1
+      }
+    ],
+    "lanes": [
+      [
+        {
+          "color": "red"
+        },
+        {
+          "color": "blue"
+        }
+      ],
+      [
+        {
+          "color": "red"
+        },
+        {
+          "color": "blue"
+        }
+      ]
+    ]
+  },
+  {
+    "id": 3,
+    "label": "Mini-bus",
+    "difficulty": "easy",
+    "gridW": 4,
+    "gridH": 4,
+    "convCap": 5,
+    "slotCount": 5,
+    "cars": [
+      {
+        "color": "green",
+        "dir": "left",
+        "type": "minibus",
+        "gx": 1,
+        "gy": 0
+      },
+      {
+        "color": "orange",
+        "dir": "up",
+        "gx": 1,
+        "gy": 1
+      },
+      {
+        "color": "blue",
+        "dir": "up",
+        "gx": 2,
+        "gy": 1
+      }
+    ],
+    "lanes": [
+      [
+        {
+          "color": "green"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "blue"
+        }
+      ],
+      [
+        {
+          "color": "green"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "blue"
+        }
+      ]
+    ]
+  },
+  {
+    "id": 4,
+    "label": "Bus Ride",
+    "difficulty": "easy",
+    "gridW": 4,
+    "gridH": 5,
+    "convCap": 6,
+    "slotCount": 5,
+    "cars": [
+      {
+        "color": "red",
+        "dir": "right",
+        "type": "bus",
+        "gx": 0,
+        "gy": 0
+      },
+      {
+        "color": "blue",
+        "dir": "up",
+        "gx": 0,
+        "gy": 1
+      },
+      {
+        "color": "yellow",
+        "dir": "up",
+        "gx": 1,
+        "gy": 1
+      },
+      {
+        "color": "green",
+        "dir": "up",
+        "gx": 2,
+        "gy": 1
+      }
+    ],
+    "lanes": [
+      [
+        {
+          "color": "red"
+        },
+        {
+          "color": "blue"
+        },
+        {
+          "color": "red"
+        },
+        {
+          "color": "green"
+        }
+      ],
+      [
+        {
+          "color": "red"
+        },
+        {
+          "color": "yellow"
+        },
+        {
+          "color": "red"
+        },
+        {
+          "color": "blue"
+        }
+      ],
+      [
+        {
+          "color": "yellow"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "red"
+        },
+        {
+          "color": "red"
+        }
+      ]
+    ]
+  },
+  {
+    "id": 5,
+    "label": "Cross Traffic",
+    "difficulty": "medium",
+    "gridW": 5,
+    "gridH": 5,
+    "convCap": 6,
+    "slotCount": 5,
+    "cars": [
+      {
+        "color": "red",
+        "dir": "right",
+        "gx": 4,
+        "gy": 1
+      },
+      {
+        "color": "green",
+        "dir": "up",
+        "gx": 0,
+        "gy": 1
+      },
+      {
+        "color": "cyan",
+        "dir": "down",
+        "gx": 1,
+        "gy": 3,
+        "type": "minibus"
+      },
+      {
+        "color": "yellow",
+        "dir": "right",
+        "gx": 0,
+        "gy": 4
+      },
+      {
+        "color": "red",
+        "dir": "down",
+        "gx": 3,
+        "gy": 0,
+        "type": "minibus"
+      },
+      {
+        "color": "green",
+        "dir": "left",
+        "gx": 1,
+        "gy": 2
+      }
+    ],
+    "lanes": [
+      [
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "red"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "red"
+        }
+      ],
+      [
+        {
+          "color": "red"
+        },
+        {
+          "color": "red"
+        },
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "yellow"
+        },
+        {
+          "color": "green"
+        }
+      ],
+      [
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "yellow"
+        },
+        {
+          "color": "red"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "red"
+        }
+      ]
+    ]
+  },
+  {
+    "id": 6,
+    "label": "Parking Lot",
+    "difficulty": "medium",
+    "gridW": 5,
+    "gridH": 5,
+    "convCap": 7,
+    "slotCount": 5,
+    "cars": [
+      {
+        "color": "purple",
+        "dir": "down",
+        "gx": 4,
+        "gy": 0,
+        "type": "bus"
+      },
+      {
+        "color": "orange",
+        "dir": "down",
+        "gx": 0,
+        "gy": 3
+      },
+      {
+        "color": "yellow",
+        "dir": "down",
+        "gx": 3,
+        "gy": 0
+      },
+      {
+        "color": "red",
+        "dir": "left",
+        "gx": 2,
+        "gy": 2,
+        "type": "minibus"
+      },
+      {
+        "color": "purple",
+        "dir": "right",
+        "gx": 1,
+        "gy": 1
+      },
+      {
+        "color": "orange",
+        "dir": "left",
+        "gx": 0,
+        "gy": 2,
+        "type": "minibus"
+      },
+      {
+        "color": "yellow",
+        "dir": "right",
+        "gx": 2,
+        "gy": 3
+      }
+    ],
+    "lanes": [
+      [
+        {
+          "color": "purple"
+        },
+        {
+          "color": "red"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "red"
+        },
+        {
+          "color": "yellow"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "purple"
+        }
+      ],
+      [
+        {
+          "color": "purple"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "yellow"
+        },
+        {
+          "color": "red"
+        },
+        {
+          "color": "yellow"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "orange"
+        }
+      ],
+      [
+        {
+          "color": "purple"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "red"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "yellow"
+        },
+        {
+          "color": "purple"
+        }
+      ]
+    ]
+  },
+  {
+    "id": 7,
+    "label": "Rush Hour",
+    "difficulty": "medium",
+    "gridW": 6,
+    "gridH": 6,
+    "convCap": 7,
+    "slotCount": 5,
+    "cars": [
+      {
+        "color": "cyan",
+        "dir": "right",
+        "gx": 3,
+        "gy": 3,
+        "type": "bus"
+      },
+      {
+        "color": "orange",
+        "dir": "right",
+        "gx": 4,
+        "gy": 0,
+        "type": "minibus"
+      },
+      {
+        "color": "red",
+        "dir": "right",
+        "gx": 5,
+        "gy": 4
+      },
+      {
+        "color": "pink",
+        "dir": "down",
+        "gx": 0,
+        "gy": 0
+      },
+      {
+        "color": "purple",
+        "dir": "down",
+        "gx": 3,
+        "gy": 4,
+        "type": "minibus"
+      },
+      {
+        "color": "cyan",
+        "dir": "down",
+        "gx": 4,
+        "gy": 1
+      },
+      {
+        "color": "orange",
+        "dir": "left",
+        "gx": 2,
+        "gy": 2,
+        "type": "bus"
+      },
+      {
+        "color": "red",
+        "dir": "up",
+        "gx": 3,
+        "gy": 1
+      },
+      {
+        "color": "pink",
+        "dir": "left",
+        "gx": 4,
+        "gy": 5
+      }
+    ],
+    "lanes": [
+      [
+        {
+          "color": "orange"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "cyan"
+        }
+      ],
+      [
+        {
+          "color": "pink"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "pink"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "pink"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "red"
+        }
+      ],
+      [
+        {
+          "color": "purple"
+        },
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "red"
+        },
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "red"
+        }
+      ],
+      [
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "red"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "pink"
+        }
+      ]
+    ]
+  },
+  {
+    "id": 8,
+    "label": "Gridlock",
+    "difficulty": "hard",
+    "gridW": 6,
+    "gridH": 6,
+    "convCap": 7,
+    "slotCount": 5,
+    "cars": [
+      {
+        "color": "cyan",
+        "dir": "up",
+        "gx": 2,
+        "gy": 2,
+        "type": "bus"
+      },
+      {
+        "color": "red",
+        "dir": "down",
+        "gx": 1,
+        "gy": 3,
+        "type": "minibus"
+      },
+      {
+        "color": "yellow",
+        "dir": "left",
+        "gx": 0,
+        "gy": 4
+      },
+      {
+        "color": "pink",
+        "dir": "left",
+        "gx": 0,
+        "gy": 5
+      },
+      {
+        "color": "purple",
+        "dir": "right",
+        "gx": 3,
+        "gy": 0,
+        "type": "bus"
+      },
+      {
+        "color": "cyan",
+        "dir": "left",
+        "gx": 4,
+        "gy": 4,
+        "type": "minibus"
+      },
+      {
+        "color": "red",
+        "dir": "up",
+        "gx": 1,
+        "gy": 2
+      },
+      {
+        "color": "yellow",
+        "dir": "right",
+        "gx": 3,
+        "gy": 5
+      },
+      {
+        "color": "pink",
+        "dir": "up",
+        "gx": 4,
+        "gy": 2,
+        "type": "minibus"
+      },
+      {
+        "color": "purple",
+        "dir": "left",
+        "gx": 4,
+        "gy": 1
+      }
+    ],
+    "lanes": [
+      [
+        {
+          "color": "yellow"
+        },
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "pink"
+        },
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "red"
+        },
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "red"
+        },
+        {
+          "color": "purple"
+        }
+      ],
+      [
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "pink"
+        }
+      ],
+      [
+        {
+          "color": "red"
+        },
+        {
+          "color": "red"
+        },
+        {
+          "color": "yellow"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "red"
+        },
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "red"
+        },
+        {
+          "color": "pink"
+        }
+      ],
+      [
+        {
+          "color": "yellow"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "pink"
+        },
+        {
+          "color": "pink"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "pink"
+        },
+        {
+          "color": "yellow"
+        }
+      ]
+    ]
+  },
+  {
+    "id": 9,
+    "label": "Fortress",
+    "difficulty": "hard",
+    "gridW": 7,
+    "gridH": 7,
+    "convCap": 8,
+    "slotCount": 5,
+    "cars": [
+      {
+        "color": "cyan",
+        "dir": "down",
+        "gx": 5,
+        "gy": 1,
+        "type": "bus"
+      },
+      {
+        "color": "red",
+        "dir": "right",
+        "gx": 2,
+        "gy": 3,
+        "type": "bus"
+      },
+      {
+        "color": "yellow",
+        "dir": "left",
+        "gx": 0,
+        "gy": 1,
+        "type": "minibus"
+      },
+      {
+        "color": "pink",
+        "dir": "right",
+        "gx": 1,
+        "gy": 5
+      },
+      {
+        "color": "purple",
+        "dir": "right",
+        "gx": 6,
+        "gy": 2
+      },
+      {
+        "color": "orange",
+        "dir": "left",
+        "gx": 5,
+        "gy": 0,
+        "type": "minibus"
+      },
+      {
+        "color": "cyan",
+        "dir": "right",
+        "gx": 3,
+        "gy": 1
+      },
+      {
+        "color": "red",
+        "dir": "right",
+        "gx": 1,
+        "gy": 2,
+        "type": "bus"
+      },
+      {
+        "color": "yellow",
+        "dir": "left",
+        "gx": 6,
+        "gy": 4
+      },
+      {
+        "color": "pink",
+        "dir": "right",
+        "gx": 5,
+        "gy": 6,
+        "type": "minibus"
+      },
+      {
+        "color": "purple",
+        "dir": "right",
+        "gx": 4,
+        "gy": 5
+      },
+      {
+        "color": "orange",
+        "dir": "up",
+        "gx": 2,
+        "gy": 0
+      }
+    ],
+    "lanes": [
+      [
+        {
+          "color": "pink"
+        },
+        {
+          "color": "pink"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "red"
+        },
+        {
+          "color": "red"
+        },
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "pink"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "cyan"
+        }
+      ],
+      [
+        {
+          "color": "yellow"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "yellow"
+        },
+        {
+          "color": "red"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "pink"
+        },
+        {
+          "color": "cyan"
+        }
+      ],
+      [
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "red"
+        },
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "red"
+        },
+        {
+          "color": "red"
+        },
+        {
+          "color": "red"
+        },
+        {
+          "color": "orange"
+        }
+      ],
+      [
+        {
+          "color": "red"
+        },
+        {
+          "color": "yellow"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "yellow"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "red"
+        },
+        {
+          "color": "pink"
+        },
+        {
+          "color": "red"
+        }
+      ],
+      [
+        {
+          "color": "yellow"
+        },
+        {
+          "color": "red"
+        },
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "yellow"
+        },
+        {
+          "color": "red"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "pink"
+        }
+      ]
+    ]
+  },
+  {
+    "id": 10,
+    "label": "Maze",
+    "difficulty": "hard",
+    "gridW": 7,
+    "gridH": 7,
+    "convCap": 8,
+    "slotCount": 5,
+    "cars": [
+      {
+        "color": "orange",
+        "dir": "down",
+        "gx": 0,
+        "gy": 3,
+        "type": "bus"
+      },
+      {
+        "color": "green",
+        "dir": "up",
+        "gx": 1,
+        "gy": 1,
+        "type": "minibus"
+      },
+      {
+        "color": "pink",
+        "dir": "up",
+        "gx": 0,
+        "gy": 0,
+        "type": "minibus"
+      },
+      {
+        "color": "red",
+        "dir": "left",
+        "gx": 4,
+        "gy": 4
+      },
+      {
+        "color": "cyan",
+        "dir": "down",
+        "gx": 6,
+        "gy": 4
+      },
+      {
+        "color": "purple",
+        "dir": "left",
+        "gx": 1,
+        "gy": 6,
+        "type": "bus"
+      },
+      {
+        "color": "yellow",
+        "dir": "down",
+        "gx": 6,
+        "gy": 3
+      },
+      {
+        "color": "orange",
+        "dir": "up",
+        "gx": 3,
+        "gy": 3,
+        "type": "minibus"
+      },
+      {
+        "color": "green",
+        "dir": "down",
+        "gx": 4,
+        "gy": 0
+      },
+      {
+        "color": "pink",
+        "dir": "right",
+        "gx": 6,
+        "gy": 0
+      },
+      {
+        "color": "red",
+        "dir": "up",
+        "gx": 5,
+        "gy": 0,
+        "type": "bus"
+      },
+      {
+        "color": "cyan",
+        "dir": "right",
+        "gx": 2,
+        "gy": 5,
+        "type": "minibus"
+      },
+      {
+        "color": "purple",
+        "dir": "down",
+        "gx": 0,
+        "gy": 6
+      }
+    ],
+    "lanes": [
+      [
+        {
+          "color": "purple"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "pink"
+        },
+        {
+          "color": "pink"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "pink"
+        },
+        {
+          "color": "red"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "purple"
+        }
+      ],
+      [
+        {
+          "color": "green"
+        },
+        {
+          "color": "pink"
+        },
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "yellow"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "red"
+        },
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "green"
+        }
+      ],
+      [
+        {
+          "color": "purple"
+        },
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "pink"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "red"
+        },
+        {
+          "color": "yellow"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "red"
+        }
+      ],
+      [
+        {
+          "color": "purple"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "red"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "red"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "red"
+        },
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "green"
+        }
+      ],
+      [
+        {
+          "color": "purple"
+        },
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "pink"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "red"
+        },
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "purple"
+        }
+      ]
+    ]
+  },
+  {
+    "id": 11,
+    "label": "Bottleneck",
+    "difficulty": "hard",
+    "gridW": 7,
+    "gridH": 7,
+    "convCap": 8,
+    "slotCount": 5,
+    "cars": [
+      {
+        "color": "green",
+        "dir": "right",
+        "gx": 3,
+        "gy": 5,
+        "type": "bus"
+      },
+      {
+        "color": "orange",
+        "dir": "right",
+        "gx": 2,
+        "gy": 3,
+        "type": "bus"
+      },
+      {
+        "color": "yellow",
+        "dir": "up",
+        "gx": 6,
+        "gy": 4,
+        "type": "minibus"
+      },
+      {
+        "color": "pink",
+        "dir": "up",
+        "gx": 0,
+        "gy": 0,
+        "type": "minibus"
+      },
+      {
+        "color": "purple",
+        "dir": "right",
+        "gx": 6,
+        "gy": 1
+      },
+      {
+        "color": "cyan",
+        "dir": "left",
+        "gx": 6,
+        "gy": 2
+      },
+      {
+        "color": "red",
+        "dir": "up",
+        "gx": 2,
+        "gy": 1
+      },
+      {
+        "color": "green",
+        "dir": "right",
+        "gx": 0,
+        "gy": 4,
+        "type": "bus"
+      },
+      {
+        "color": "orange",
+        "dir": "right",
+        "gx": 5,
+        "gy": 3,
+        "type": "minibus"
+      },
+      {
+        "color": "yellow",
+        "dir": "left",
+        "gx": 0,
+        "gy": 5
+      },
+      {
+        "color": "pink",
+        "dir": "left",
+        "gx": 2,
+        "gy": 5
+      },
+      {
+        "color": "purple",
+        "dir": "right",
+        "gx": 4,
+        "gy": 6,
+        "type": "minibus"
+      },
+      {
+        "color": "cyan",
+        "dir": "down",
+        "gx": 1,
+        "gy": 1
+      },
+      {
+        "color": "red",
+        "dir": "left",
+        "gx": 1,
+        "gy": 3
+      }
+    ],
+    "lanes": [
+      [
+        {
+          "color": "pink"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "red"
+        },
+        {
+          "color": "pink"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "pink"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "pink"
+        }
+      ],
+      [
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "yellow"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "pink"
+        },
+        {
+          "color": "yellow"
+        },
+        {
+          "color": "green"
+        }
+      ],
+      [
+        {
+          "color": "orange"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "pink"
+        },
+        {
+          "color": "red"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "yellow"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "green"
+        }
+      ],
+      [
+        {
+          "color": "yellow"
+        },
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "purple"
+        }
+      ],
+      [
+        {
+          "color": "green"
+        },
+        {
+          "color": "yellow"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "red"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "yellow"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "red"
+        }
+      ]
+    ]
+  },
+  {
+    "id": 12,
+    "label": "Knot",
+    "difficulty": "hard",
+    "gridW": 7,
+    "gridH": 7,
+    "convCap": 8,
+    "slotCount": 5,
+    "cars": [
+      {
+        "color": "purple",
+        "dir": "left",
+        "gx": 3,
+        "gy": 0,
+        "type": "bus"
+      },
+      {
+        "color": "orange",
+        "dir": "right",
+        "gx": 0,
+        "gy": 3,
+        "type": "minibus"
+      },
+      {
+        "color": "cyan",
+        "dir": "left",
+        "gx": 5,
+        "gy": 5
+      },
+      {
+        "color": "yellow",
+        "dir": "up",
+        "gx": 6,
+        "gy": 4,
+        "type": "bus"
+      },
+      {
+        "color": "red",
+        "dir": "up",
+        "gx": 5,
+        "gy": 3,
+        "type": "minibus"
+      },
+      {
+        "color": "green",
+        "dir": "right",
+        "gx": 0,
+        "gy": 4
+      },
+      {
+        "color": "pink",
+        "dir": "right",
+        "gx": 4,
+        "gy": 4
+      },
+      {
+        "color": "blue",
+        "dir": "up",
+        "gx": 2,
+        "gy": 0,
+        "type": "minibus"
+      },
+      {
+        "color": "purple",
+        "dir": "right",
+        "gx": 1,
+        "gy": 4,
+        "type": "bus"
+      },
+      {
+        "color": "orange",
+        "dir": "right",
+        "gx": 2,
+        "gy": 6
+      },
+      {
+        "color": "cyan",
+        "dir": "up",
+        "gx": 2,
+        "gy": 3
+      },
+      {
+        "color": "yellow",
+        "dir": "right",
+        "gx": 3,
+        "gy": 6
+      },
+      {
+        "color": "red",
+        "dir": "down",
+        "gx": 0,
+        "gy": 1,
+        "type": "minibus"
+      },
+      {
+        "color": "green",
+        "dir": "left",
+        "gx": 0,
+        "gy": 0
+      },
+      {
+        "color": "pink",
+        "dir": "left",
+        "gx": 0,
+        "gy": 5
+      }
+    ],
+    "lanes": [
+      [
+        {
+          "color": "red"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "pink"
+        },
+        {
+          "color": "yellow"
+        },
+        {
+          "color": "pink"
+        },
+        {
+          "color": "pink"
+        },
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "purple"
+        }
+      ],
+      [
+        {
+          "color": "orange"
+        },
+        {
+          "color": "red"
+        },
+        {
+          "color": "red"
+        },
+        {
+          "color": "blue"
+        },
+        {
+          "color": "yellow"
+        },
+        {
+          "color": "red"
+        },
+        {
+          "color": "blue"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "green"
+        }
+      ],
+      [
+        {
+          "color": "purple"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "red"
+        },
+        {
+          "color": "blue"
+        },
+        {
+          "color": "yellow"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "red"
+        }
+      ],
+      [
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "yellow"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "red"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "yellow"
+        },
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "purple"
+        }
+      ],
+      [
+        {
+          "color": "yellow"
+        },
+        {
+          "color": "pink"
+        },
+        {
+          "color": "yellow"
+        },
+        {
+          "color": "yellow"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "red"
+        },
+        {
+          "color": "blue"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "cyan"
+        }
+      ]
+    ]
+  },
+  {
+    "id": 13,
+    "label": "Criss-Cross",
+    "difficulty": "very_hard",
+    "gridW": 7,
+    "gridH": 7,
+    "convCap": 8,
+    "slotCount": 5,
+    "cars": [
+      {
+        "color": "green",
+        "dir": "down",
+        "gx": 4,
+        "gy": 2,
+        "type": "bus"
+      },
+      {
+        "color": "blue",
+        "dir": "up",
+        "gx": 0,
+        "gy": 4,
+        "type": "bus"
+      },
+      {
+        "color": "cyan",
+        "dir": "up",
+        "gx": 0,
+        "gy": 2,
+        "type": "minibus"
+      },
+      {
+        "color": "yellow",
+        "dir": "up",
+        "gx": 1,
+        "gy": 5,
+        "type": "minibus"
+      },
+      {
+        "color": "purple",
+        "dir": "up",
+        "gx": 3,
+        "gy": 4
+      },
+      {
+        "color": "red",
+        "dir": "right",
+        "gx": 3,
+        "gy": 5
+      },
+      {
+        "color": "orange",
+        "dir": "left",
+        "gx": 1,
+        "gy": 0,
+        "type": "bus"
+      },
+      {
+        "color": "pink",
+        "dir": "up",
+        "gx": 0,
+        "gy": 0,
+        "type": "minibus"
+      },
+      {
+        "color": "green",
+        "dir": "up",
+        "gx": 2,
+        "gy": 4
+      },
+      {
+        "color": "blue",
+        "dir": "down",
+        "gx": 6,
+        "gy": 1
+      },
+      {
+        "color": "cyan",
+        "dir": "up",
+        "gx": 2,
+        "gy": 1
+      },
+      {
+        "color": "yellow",
+        "dir": "down",
+        "gx": 4,
+        "gy": 5,
+        "type": "minibus"
+      },
+      {
+        "color": "purple",
+        "dir": "down",
+        "gx": 5,
+        "gy": 0,
+        "type": "bus"
+      },
+      {
+        "color": "red",
+        "dir": "down",
+        "gx": 6,
+        "gy": 4
+      },
+      {
+        "color": "orange",
+        "dir": "left",
+        "gx": 3,
+        "gy": 1
+      },
+      {
+        "color": "pink",
+        "dir": "up",
+        "gx": 1,
+        "gy": 3
+      }
+    ],
+    "lanes": [
+      [
+        {
+          "color": "orange"
+        },
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "pink"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "blue"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "pink"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "blue"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "yellow"
+        },
+        {
+          "color": "blue"
+        }
+      ],
+      [
+        {
+          "color": "orange"
+        },
+        {
+          "color": "pink"
+        },
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "blue"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "blue"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "pink"
+        }
+      ],
+      [
+        {
+          "color": "red"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "red"
+        },
+        {
+          "color": "yellow"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "yellow"
+        },
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "red"
+        }
+      ],
+      [
+        {
+          "color": "yellow"
+        },
+        {
+          "color": "blue"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "pink"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "pink"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "yellow"
+        }
+      ],
+      [
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "blue"
+        },
+        {
+          "color": "yellow"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "red"
+        },
+        {
+          "color": "yellow"
+        },
+        {
+          "color": "blue"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "yellow"
+        }
+      ]
+    ]
+  },
+  {
+    "id": 14,
+    "label": "Lockdown",
+    "difficulty": "very_hard",
+    "gridW": 7,
+    "gridH": 7,
+    "convCap": 8,
+    "slotCount": 5,
+    "cars": [
+      {
+        "color": "pink",
+        "dir": "up",
+        "gx": 6,
+        "gy": 2,
+        "type": "bus"
+      },
+      {
+        "color": "green",
+        "dir": "right",
+        "gx": 0,
+        "gy": 2,
+        "type": "bus"
+      },
+      {
+        "color": "blue",
+        "dir": "up",
+        "gx": 4,
+        "gy": 0,
+        "type": "minibus",
+        "locked": true,
+        "keys": 3
+      },
+      {
+        "color": "purple",
+        "dir": "left",
+        "gx": 0,
+        "gy": 6
+      },
+      {
+        "color": "red",
+        "dir": "up",
+        "gx": 4,
+        "gy": 5
+      },
+      {
+        "color": "yellow",
+        "dir": "left",
+        "gx": 0,
+        "gy": 1,
+        "type": "minibus"
+      },
+      {
+        "color": "orange",
+        "dir": "right",
+        "gx": 3,
+        "gy": 2
+      },
+      {
+        "color": "cyan",
+        "dir": "right",
+        "gx": 3,
+        "gy": 6,
+        "type": "bus"
+      },
+      {
+        "color": "pink",
+        "dir": "right",
+        "gx": 1,
+        "gy": 3
+      },
+      {
+        "color": "green",
+        "dir": "down",
+        "gx": 5,
+        "gy": 3,
+        "type": "minibus"
+      },
+      {
+        "color": "blue",
+        "dir": "up",
+        "gx": 2,
+        "gy": 4
+      },
+      {
+        "color": "purple",
+        "dir": "right",
+        "gx": 2,
+        "gy": 5
+      },
+      {
+        "color": "red",
+        "dir": "right",
+        "gx": 3,
+        "gy": 4,
+        "type": "minibus"
+      },
+      {
+        "color": "yellow",
+        "dir": "up",
+        "gx": 5,
+        "gy": 0
+      },
+      {
+        "color": "orange",
+        "dir": "right",
+        "gx": 6,
+        "gy": 5
+      },
+      {
+        "color": "cyan",
+        "dir": "down",
+        "gx": 3,
+        "gy": 5
+      }
+    ],
+    "lanes": [
+      [
+        {
+          "color": "yellow"
+        },
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "yellow"
+        },
+        {
+          "color": "red"
+        },
+        {
+          "color": "blue"
+        },
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "pink"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "green"
+        }
+      ],
+      [
+        {
+          "color": "green"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "yellow"
+        },
+        {
+          "color": "yellow"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "blue"
+        },
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "blue"
+        }
+      ],
+      [
+        {
+          "color": "pink"
+        },
+        {
+          "color": "red"
+        },
+        {
+          "color": "blue"
+        },
+        {
+          "color": "red"
+        },
+        {
+          "color": "red"
+        },
+        {
+          "color": "pink"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "pink"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "pink"
+        }
+      ],
+      [
+        {
+          "color": "blue"
+        },
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "pink"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "blue"
+        },
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "cyan"
+        }
+      ],
+      [
+        {
+          "color": "yellow"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "red"
+        },
+        {
+          "color": "pink"
+        },
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "yellow"
+        },
+        {
+          "color": "red"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "pink"
+        }
+      ]
+    ]
+  },
+  {
+    "id": 15,
+    "label": "Gauntlet",
+    "difficulty": "very_hard",
+    "gridW": 7,
+    "gridH": 7,
+    "convCap": 8,
+    "slotCount": 5,
+    "cars": [
+      {
+        "color": "blue",
+        "dir": "left",
+        "gx": 4,
+        "gy": 3,
+        "type": "bus"
+      },
+      {
+        "color": "purple",
+        "dir": "down",
+        "gx": 3,
+        "gy": 3,
+        "type": "minibus"
+      },
+      {
+        "color": "orange",
+        "dir": "down",
+        "gx": 4,
+        "gy": 0,
+        "type": "minibus"
+      },
+      {
+        "color": "pink",
+        "dir": "down",
+        "gx": 1,
+        "gy": 1,
+        "type": "bus"
+      },
+      {
+        "color": "yellow",
+        "dir": "right",
+        "gx": 3,
+        "gy": 6
+      },
+      {
+        "color": "red",
+        "dir": "down",
+        "gx": 0,
+        "gy": 0
+      },
+      {
+        "color": "cyan",
+        "dir": "right",
+        "gx": 4,
+        "gy": 6,
+        "type": "minibus"
+      },
+      {
+        "color": "green",
+        "dir": "right",
+        "gx": 2,
+        "gy": 0
+      },
+      {
+        "color": "blue",
+        "dir": "down",
+        "gx": 6,
+        "gy": 4,
+        "type": "bus"
+      },
+      {
+        "color": "purple",
+        "dir": "down",
+        "gx": 0,
+        "gy": 2
+      },
+      {
+        "color": "orange",
+        "dir": "down",
+        "gx": 2,
+        "gy": 3
+      },
+      {
+        "color": "pink",
+        "dir": "right",
+        "gx": 1,
+        "gy": 6,
+        "type": "minibus"
+      },
+      {
+        "color": "yellow",
+        "dir": "right",
+        "gx": 2,
+        "gy": 4
+      },
+      {
+        "color": "red",
+        "dir": "down",
+        "gx": 1,
+        "gy": 0
+      },
+      {
+        "color": "cyan",
+        "dir": "right",
+        "gx": 3,
+        "gy": 2
+      },
+      {
+        "color": "green",
+        "dir": "up",
+        "gx": 5,
+        "gy": 1,
+        "type": "minibus"
+      },
+      {
+        "color": "blue",
+        "dir": "up",
+        "gx": 5,
+        "gy": 0
+      }
+    ],
+    "lanes": [
+      [
+        {
+          "color": "pink"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "red"
+        },
+        {
+          "color": "blue"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "blue"
+        },
+        {
+          "color": "blue"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "blue"
+        },
+        {
+          "color": "blue"
+        }
+      ],
+      [
+        {
+          "color": "pink"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "pink"
+        },
+        {
+          "color": "blue"
+        },
+        {
+          "color": "blue"
+        },
+        {
+          "color": "pink"
+        },
+        {
+          "color": "pink"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "yellow"
+        },
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "red"
+        }
+      ],
+      [
+        {
+          "color": "orange"
+        },
+        {
+          "color": "yellow"
+        },
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "blue"
+        },
+        {
+          "color": "pink"
+        },
+        {
+          "color": "red"
+        },
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "blue"
+        },
+        {
+          "color": "yellow"
+        }
+      ],
+      [
+        {
+          "color": "green"
+        },
+        {
+          "color": "blue"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "pink"
+        },
+        {
+          "color": "pink"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "pink"
+        },
+        {
+          "color": "pink"
+        },
+        {
+          "color": "blue"
+        },
+        {
+          "color": "purple"
+        }
+      ],
+      [
+        {
+          "color": "purple"
+        },
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "blue"
+        },
+        {
+          "color": "blue"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "red"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "blue"
+        },
+        {
+          "color": "yellow"
+        },
+        {
+          "color": "purple"
+        }
+      ]
+    ]
+  },
+  {
+    "id": 16,
+    "label": "Chaos",
+    "difficulty": "very_hard",
+    "gridW": 7,
+    "gridH": 7,
+    "convCap": 8,
+    "slotCount": 5,
+    "cars": [
+      {
+        "color": "green",
+        "dir": "up",
+        "gx": 6,
+        "gy": 0,
+        "type": "bus"
+      },
+      {
+        "color": "pink",
+        "dir": "down",
+        "gx": 3,
+        "gy": 1,
+        "type": "bus"
+      },
+      {
+        "color": "purple",
+        "dir": "up",
+        "gx": 0,
+        "gy": 5,
+        "type": "minibus"
+      },
+      {
+        "color": "red",
+        "dir": "up",
+        "gx": 1,
+        "gy": 3
+      },
+      {
+        "color": "cyan",
+        "dir": "down",
+        "gx": 5,
+        "gy": 4,
+        "type": "minibus"
+      },
+      {
+        "color": "blue",
+        "dir": "left",
+        "gx": 4,
+        "gy": 3
+      },
+      {
+        "color": "orange",
+        "dir": "up",
+        "gx": 1,
+        "gy": 5
+      },
+      {
+        "color": "yellow",
+        "dir": "left",
+        "gx": 0,
+        "gy": 0,
+        "type": "bus"
+      },
+      {
+        "color": "green",
+        "dir": "down",
+        "gx": 6,
+        "gy": 5,
+        "type": "minibus"
+      },
+      {
+        "color": "pink",
+        "dir": "down",
+        "gx": 3,
+        "gy": 4
+      },
+      {
+        "color": "purple",
+        "dir": "right",
+        "gx": 2,
+        "gy": 2
+      },
+      {
+        "color": "red",
+        "dir": "down",
+        "gx": 2,
+        "gy": 5,
+        "type": "minibus"
+      },
+      {
+        "color": "cyan",
+        "dir": "right",
+        "gx": 4,
+        "gy": 6
+      },
+      {
+        "color": "blue",
+        "dir": "down",
+        "gx": 4,
+        "gy": 2
+      },
+      {
+        "color": "orange",
+        "dir": "left",
+        "gx": 0,
+        "gy": 4,
+        "type": "bus"
+      },
+      {
+        "color": "yellow",
+        "dir": "up",
+        "gx": 0,
+        "gy": 2
+      },
+      {
+        "color": "green",
+        "dir": "down",
+        "gx": 5,
+        "gy": 2
+      },
+      {
+        "color": "pink",
+        "dir": "up",
+        "gx": 0,
+        "gy": 3
+      }
+    ],
+    "lanes": [
+      [
+        {
+          "color": "pink"
+        },
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "blue"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "yellow"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "yellow"
+        },
+        {
+          "color": "pink"
+        },
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "blue"
+        }
+      ],
+      [
+        {
+          "color": "pink"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "yellow"
+        },
+        {
+          "color": "red"
+        },
+        {
+          "color": "red"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "pink"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "pink"
+        },
+        {
+          "color": "yellow"
+        },
+        {
+          "color": "blue"
+        }
+      ],
+      [
+        {
+          "color": "orange"
+        },
+        {
+          "color": "pink"
+        },
+        {
+          "color": "pink"
+        },
+        {
+          "color": "yellow"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "blue"
+        },
+        {
+          "color": "pink"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "red"
+        },
+        {
+          "color": "red"
+        },
+        {
+          "color": "green"
+        }
+      ],
+      [
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "yellow"
+        },
+        {
+          "color": "pink"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "red"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "orange"
+        }
+      ],
+      [
+        {
+          "color": "green"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "pink"
+        },
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "yellow"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "yellow"
+        },
+        {
+          "color": "red"
+        },
+        {
+          "color": "cyan"
+        }
+      ]
+    ]
+  },
+  {
+    "id": 17,
+    "label": "Endurance",
+    "difficulty": "extreme",
+    "gridW": 7,
+    "gridH": 7,
+    "convCap": 8,
+    "slotCount": 5,
+    "cars": [
+      {
+        "color": "purple",
+        "dir": "left",
+        "gx": 2,
+        "gy": 1,
+        "type": "bus"
+      },
+      {
+        "color": "cyan",
+        "dir": "right",
+        "gx": 2,
+        "gy": 5,
+        "type": "bus"
+      },
+      {
+        "color": "blue",
+        "dir": "down",
+        "gx": 6,
+        "gy": 0,
+        "type": "minibus"
+      },
+      {
+        "color": "green",
+        "dir": "left",
+        "gx": 0,
+        "gy": 4,
+        "type": "minibus"
+      },
+      {
+        "color": "red",
+        "dir": "left",
+        "gx": 0,
+        "gy": 2
+      },
+      {
+        "color": "yellow",
+        "dir": "down",
+        "gx": 5,
+        "gy": 0
+      },
+      {
+        "color": "pink",
+        "dir": "right",
+        "gx": 0,
+        "gy": 6,
+        "type": "bus"
+      },
+      {
+        "color": "orange",
+        "dir": "down",
+        "gx": 4,
+        "gy": 2,
+        "type": "minibus"
+      },
+      {
+        "color": "purple",
+        "dir": "left",
+        "gx": 1,
+        "gy": 0
+      },
+      {
+        "color": "cyan",
+        "dir": "up",
+        "gx": 0,
+        "gy": 0
+      },
+      {
+        "color": "blue",
+        "dir": "down",
+        "gx": 4,
+        "gy": 6
+      },
+      {
+        "color": "green",
+        "dir": "down",
+        "gx": 2,
+        "gy": 2,
+        "type": "bus"
+      },
+      {
+        "color": "red",
+        "dir": "up",
+        "gx": 1,
+        "gy": 1,
+        "type": "minibus"
+      },
+      {
+        "color": "yellow",
+        "dir": "left",
+        "gx": 5,
+        "gy": 4
+      },
+      {
+        "color": "pink",
+        "dir": "down",
+        "gx": 5,
+        "gy": 2
+      },
+      {
+        "color": "orange",
+        "dir": "up",
+        "gx": 3,
+        "gy": 2,
+        "type": "minibus"
+      },
+      {
+        "color": "purple",
+        "dir": "left",
+        "gx": 1,
+        "gy": 3
+      },
+      {
+        "color": "cyan",
+        "dir": "left",
+        "gx": 3,
+        "gy": 4
+      },
+      {
+        "color": "blue",
+        "dir": "down",
+        "gx": 4,
+        "gy": 0
+      }
+    ],
+    "lanes": [
+      [
+        {
+          "color": "pink"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "blue"
+        },
+        {
+          "color": "pink"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "pink"
+        },
+        {
+          "color": "blue"
+        },
+        {
+          "color": "blue"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "yellow"
+        },
+        {
+          "color": "blue"
+        },
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "pink"
+        }
+      ],
+      [
+        {
+          "color": "green"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "red"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "yellow"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "pink"
+        }
+      ],
+      [
+        {
+          "color": "purple"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "blue"
+        },
+        {
+          "color": "yellow"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "pink"
+        },
+        {
+          "color": "pink"
+        },
+        {
+          "color": "blue"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "orange"
+        }
+      ],
+      [
+        {
+          "color": "purple"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "red"
+        },
+        {
+          "color": "red"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "yellow"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "blue"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "green"
+        }
+      ],
+      [
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "pink"
+        },
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "red"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "blue"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "red"
+        },
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "red"
+        }
+      ]
+    ]
+  },
+  {
+    "id": 18,
+    "label": "Iron Wall",
+    "difficulty": "extreme",
+    "gridW": 7,
+    "gridH": 7,
+    "convCap": 8,
+    "slotCount": 5,
+    "cars": [
+      {
+        "color": "green",
+        "dir": "down",
+        "gx": 6,
+        "gy": 2,
+        "type": "bus"
+      },
+      {
+        "color": "purple",
+        "dir": "right",
+        "gx": 2,
+        "gy": 1,
+        "type": "bus"
+      },
+      {
+        "color": "red",
+        "dir": "down",
+        "gx": 4,
+        "gy": 2,
+        "type": "minibus"
+      },
+      {
+        "color": "blue",
+        "dir": "left",
+        "gx": 1,
+        "gy": 1,
+        "locked": true,
+        "keys": 4
+      },
+      {
+        "color": "yellow",
+        "dir": "right",
+        "gx": 2,
+        "gy": 2,
+        "type": "minibus"
+      },
+      {
+        "color": "orange",
+        "dir": "left",
+        "gx": 0,
+        "gy": 4
+      },
+      {
+        "color": "pink",
+        "dir": "down",
+        "gx": 4,
+        "gy": 4,
+        "type": "bus"
+      },
+      {
+        "color": "cyan",
+        "dir": "down",
+        "gx": 6,
+        "gy": 1
+      },
+      {
+        "color": "green",
+        "dir": "up",
+        "gx": 1,
+        "gy": 5,
+        "type": "minibus"
+      },
+      {
+        "color": "purple",
+        "dir": "up",
+        "gx": 5,
+        "gy": 4
+      },
+      {
+        "color": "red",
+        "dir": "right",
+        "gx": 6,
+        "gy": 0
+      },
+      {
+        "color": "blue",
+        "dir": "down",
+        "gx": 2,
+        "gy": 4,
+        "type": "bus"
+      },
+      {
+        "color": "yellow",
+        "dir": "down",
+        "gx": 5,
+        "gy": 5,
+        "type": "minibus"
+      },
+      {
+        "color": "orange",
+        "dir": "up",
+        "gx": 2,
+        "gy": 0
+      },
+      {
+        "color": "pink",
+        "dir": "down",
+        "gx": 0,
+        "gy": 3
+      },
+      {
+        "color": "cyan",
+        "dir": "left",
+        "gx": 5,
+        "gy": 0
+      },
+      {
+        "color": "green",
+        "dir": "down",
+        "gx": 2,
+        "gy": 3
+      },
+      {
+        "color": "purple",
+        "dir": "down",
+        "gx": 3,
+        "gy": 4,
+        "type": "minibus"
+      },
+      {
+        "color": "red",
+        "dir": "left",
+        "gx": 5,
+        "gy": 3
+      }
+    ],
+    "lanes": [
+      [
+        {
+          "color": "pink"
+        },
+        {
+          "color": "blue"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "red"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "pink"
+        },
+        {
+          "color": "cyan"
+        }
+      ],
+      [
+        {
+          "color": "yellow"
+        },
+        {
+          "color": "pink"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "blue"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "red"
+        }
+      ],
+      [
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "blue"
+        },
+        {
+          "color": "pink"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "red"
+        },
+        {
+          "color": "pink"
+        },
+        {
+          "color": "yellow"
+        },
+        {
+          "color": "yellow"
+        },
+        {
+          "color": "red"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "red"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "yellow"
+        }
+      ],
+      [
+        {
+          "color": "yellow"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "blue"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "red"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "yellow"
+        },
+        {
+          "color": "blue"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "yellow"
+        },
+        {
+          "color": "orange"
+        }
+      ],
+      [
+        {
+          "color": "blue"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "red"
+        },
+        {
+          "color": "red"
+        },
+        {
+          "color": "pink"
+        },
+        {
+          "color": "pink"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "pink"
+        },
+        {
+          "color": "yellow"
+        },
+        {
+          "color": "blue"
+        },
+        {
+          "color": "blue"
+        }
+      ]
+    ]
+  },
+  {
+    "id": 19,
+    "label": "Showdown",
+    "difficulty": "extreme",
+    "gridW": 7,
+    "gridH": 7,
+    "convCap": 8,
+    "slotCount": 5,
+    "cars": [
+      {
+        "color": "cyan",
+        "dir": "left",
+        "gx": 0,
+        "gy": 6,
+        "type": "bus"
+      },
+      {
+        "color": "green",
+        "dir": "left",
+        "gx": 2,
+        "gy": 0,
+        "type": "bus"
+      },
+      {
+        "color": "blue",
+        "dir": "up",
+        "gx": 5,
+        "gy": 0,
+        "type": "bus"
+      },
+      {
+        "color": "orange",
+        "dir": "up",
+        "gx": 5,
+        "gy": 5,
+        "type": "minibus"
+      },
+      {
+        "color": "yellow",
+        "dir": "up",
+        "gx": 4,
+        "gy": 2,
+        "type": "minibus"
+      },
+      {
+        "color": "pink",
+        "dir": "right",
+        "gx": 6,
+        "gy": 1
+      },
+      {
+        "color": "red",
+        "dir": "down",
+        "gx": 6,
+        "gy": 0
+      },
+      {
+        "color": "purple",
+        "dir": "right",
+        "gx": 3,
+        "gy": 4,
+        "type": "minibus"
+      },
+      {
+        "color": "cyan",
+        "dir": "right",
+        "gx": 4,
+        "gy": 6
+      },
+      {
+        "color": "green",
+        "dir": "down",
+        "gx": 6,
+        "gy": 3,
+        "type": "bus"
+      },
+      {
+        "color": "blue",
+        "dir": "up",
+        "gx": 0,
+        "gy": 1
+      },
+      {
+        "color": "orange",
+        "dir": "down",
+        "gx": 1,
+        "gy": 4
+      },
+      {
+        "color": "yellow",
+        "dir": "down",
+        "gx": 1,
+        "gy": 2,
+        "type": "minibus"
+      },
+      {
+        "color": "pink",
+        "dir": "right",
+        "gx": 2,
+        "gy": 3
+      },
+      {
+        "color": "red",
+        "dir": "right",
+        "gx": 0,
+        "gy": 3
+      },
+      {
+        "color": "purple",
+        "dir": "up",
+        "gx": 2,
+        "gy": 5
+      },
+      {
+        "color": "cyan",
+        "dir": "down",
+        "gx": 3,
+        "gy": 1,
+        "type": "bus"
+      },
+      {
+        "color": "green",
+        "dir": "right",
+        "gx": 3,
+        "gy": 5,
+        "type": "minibus"
+      },
+      {
+        "color": "blue",
+        "dir": "right",
+        "gx": 0,
+        "gy": 5
+      },
+      {
+        "color": "orange",
+        "dir": "left",
+        "gx": 0,
+        "gy": 4
+      }
+    ],
+    "lanes": [
+      [
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "yellow"
+        },
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "blue"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "blue"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "pink"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "yellow"
+        }
+      ],
+      [
+        {
+          "color": "blue"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "blue"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "yellow"
+        },
+        {
+          "color": "yellow"
+        },
+        {
+          "color": "blue"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "blue"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "red"
+        },
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "green"
+        }
+      ],
+      [
+        {
+          "color": "red"
+        },
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "yellow"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "yellow"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "pink"
+        }
+      ],
+      [
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "blue"
+        },
+        {
+          "color": "pink"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "red"
+        },
+        {
+          "color": "red"
+        },
+        {
+          "color": "yellow"
+        },
+        {
+          "color": "orange"
+        }
+      ],
+      [
+        {
+          "color": "yellow"
+        },
+        {
+          "color": "blue"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "blue"
+        },
+        {
+          "color": "pink"
+        },
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "blue"
+        },
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "cyan"
+        }
+      ]
+    ]
+  },
+  {
+    "id": 20,
+    "label": "Final Drive",
+    "difficulty": "extreme",
+    "gridW": 7,
+    "gridH": 7,
+    "convCap": 8,
+    "slotCount": 5,
+    "cars": [
+      {
+        "color": "blue",
+        "dir": "left",
+        "gx": 4,
+        "gy": 2,
+        "type": "bus"
+      },
+      {
+        "color": "green",
+        "dir": "up",
+        "gx": 1,
+        "gy": 1,
+        "type": "bus"
+      },
+      {
+        "color": "pink",
+        "dir": "down",
+        "gx": 0,
+        "gy": 1,
+        "type": "minibus"
+      },
+      {
+        "color": "yellow",
+        "dir": "up",
+        "gx": 3,
+        "gy": 5,
+        "type": "minibus"
+      },
+      {
+        "color": "orange",
+        "dir": "left",
+        "gx": 5,
+        "gy": 4,
+        "locked": true,
+        "keys": 5
+      },
+      {
+        "color": "cyan",
+        "dir": "left",
+        "gx": 2,
+        "gy": 0
+      },
+      {
+        "color": "red",
+        "dir": "up",
+        "gx": 3,
+        "gy": 0,
+        "type": "bus"
+      },
+      {
+        "color": "purple",
+        "dir": "down",
+        "gx": 4,
+        "gy": 4,
+        "type": "minibus"
+      },
+      {
+        "color": "blue",
+        "dir": "up",
+        "gx": 6,
+        "gy": 3
+      },
+      {
+        "color": "green",
+        "dir": "right",
+        "gx": 5,
+        "gy": 5
+      },
+      {
+        "color": "pink",
+        "dir": "left",
+        "gx": 1,
+        "gy": 4,
+        "type": "bus"
+      },
+      {
+        "color": "yellow",
+        "dir": "left",
+        "gx": 4,
+        "gy": 3
+      },
+      {
+        "color": "orange",
+        "dir": "down",
+        "gx": 0,
+        "gy": 3,
+        "type": "minibus"
+      },
+      {
+        "color": "cyan",
+        "dir": "down",
+        "gx": 2,
+        "gy": 5
+      },
+      {
+        "color": "red",
+        "dir": "left",
+        "gx": 0,
+        "gy": 6
+      },
+      {
+        "color": "purple",
+        "dir": "right",
+        "gx": 6,
+        "gy": 0
+      },
+      {
+        "color": "blue",
+        "dir": "up",
+        "gx": 6,
+        "gy": 5,
+        "type": "minibus"
+      },
+      {
+        "color": "green",
+        "dir": "left",
+        "gx": 1,
+        "gy": 0
+      },
+      {
+        "color": "pink",
+        "dir": "left",
+        "gx": 1,
+        "gy": 5
+      },
+      {
+        "color": "yellow",
+        "dir": "right",
+        "gx": 6,
+        "gy": 4
+      },
+      {
+        "color": "orange",
+        "dir": "left",
+        "gx": 5,
+        "gy": 0
+      }
+    ],
+    "lanes": [
+      [
+        {
+          "color": "purple"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "pink"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "pink"
+        },
+        {
+          "color": "pink"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "blue"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "red"
+        },
+        {
+          "color": "yellow"
+        },
+        {
+          "color": "cyan"
+        }
+      ],
+      [
+        {
+          "color": "yellow"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "yellow"
+        },
+        {
+          "color": "blue"
+        },
+        {
+          "color": "blue"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "blue"
+        },
+        {
+          "color": "blue"
+        },
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "pink"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "blue"
+        }
+      ],
+      [
+        {
+          "color": "orange"
+        },
+        {
+          "color": "blue"
+        },
+        {
+          "color": "red"
+        },
+        {
+          "color": "red"
+        },
+        {
+          "color": "red"
+        },
+        {
+          "color": "blue"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "yellow"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "red"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "pink"
+        }
+      ],
+      [
+        {
+          "color": "pink"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "blue"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "orange"
+        },
+        {
+          "color": "pink"
+        },
+        {
+          "color": "cyan"
+        },
+        {
+          "color": "green"
+        },
+        {
+          "color": "blue"
+        },
+        {
+          "color": "purple"
+        },
+        {
+          "color": "pink"
+        }
+      ],
+      [
+        {
+          "color": "red"
+        },
+        {
+          "color": "yellow"
+        },
+        {
+          "color": "pink"
+        },
+        {
+          "color": "yellow"
+        },
+        {
+          "color": "red"
+        },
+        {
+          "color": "red"
+        },
+        {
+          "color": "yellow"
+        },
+        {
+          "color": "pink"
+        },
+        {
+          "color": "pink"
+        },
+        {
+          "color": "blue"
+        },
+        {
+          "color": "yellow"
+        },
+        {
+          "color": "pink"
+        },
+        {
+          "color": "blue"
+        }
+      ]
+    ]
+  }
+];
+
+
+
+// ============= GAME STATE =============
+let game = null;
+let scene = 'menu'; // menu, levelSelect, playing, complete, fail, store
+let lastTime = 0;
+let globalCoins = 500;
+let globalHearts = 5;
+const MAX_HEARTS = 5;
+let heartTimer = 0; // seconds until next heart
+const HEART_REGEN_TIME = 180; // 3 minutes
+let completedLevels = new Set();
+let winStreak = 0;
+let noAds = false;
+let selectedLevel = 0;
+let freeBoostersUsed = {pick:false, slot:false, maneuver:false};
+let failOfferFreeUsed = false;
+let animations = [];
+let particles = [];
+let buttons = []; // clickable areas for current scene
+let hoveredButton = null;
+let flashMessages = [];
+
+// ============= UTILITY FUNCTIONS =============
+function lerp(a,b,t){ return a+(b-a)*t; }
+function clamp(v,mn,mx){ return Math.max(mn,Math.min(mx,v)); }
+function dist(x1,y1,x2,y2){ return Math.sqrt((x2-x1)**2+(y2-y1)**2); }
+function easeOut(t){ return 1-(1-t)*(1-t); }
+function easeInOut(t){ return t<.5?2*t*t:1-(-2*t+2)**2/2; }
+
+function roundRect(x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);
+  ctx.lineTo(x+w-r,y);
+  ctx.quadraticCurveTo(x+w,y,x+w,y+r);
+  ctx.lineTo(x+w,y+h-r);
+  ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  ctx.lineTo(x+r,y+h);
+  ctx.quadraticCurveTo(x,y+h,x,y+h-r);
+  ctx.lineTo(x,y+r);
+  ctx.quadraticCurveTo(x,y,x+r,y);
+  ctx.closePath();
+}
+
+function addButton(x,y,w,h,id,callback){
+  buttons.push({x,y,w,h,id,callback});
+}
+
+function addFlash(text,x,y,color='#fff'){
+  flashMessages.push({text,x,y,color,life:1.5,maxLife:1.5});
+}
+
+function addParticle(x,y,color){
+  for(let i=0;i<8;i++){
+    const angle = Math.random()*Math.PI*2;
+    const speed = 40+Math.random()*80;
+    particles.push({x,y,vx:Math.cos(angle)*speed,vy:Math.sin(angle)*speed,color,life:0.6+Math.random()*0.4,maxLife:1,size:3+Math.random()*3});
+  }
+}
+
+// ============= GAME OBJECT =============
+function createGame(levelIdx){
+  const def = LEVELS[levelIdx];
+  const g = {
+    levelIdx, def,
+    gridW: def.gridW, gridH: def.gridH,
+    // Grid: 2D array, null or car reference
+    grid: Array.from({length:def.gridH}, ()=>Array(def.gridW).fill(null)),
+    cars: [],
+    conveyorPassengers: [], // passengers on the conveyor
+    convCap: def.convCap,
+    lanes: [], // lane arrays of passenger objects (Pixel Flow style)
+    slots: [], // passengers in slot area
+    slotCount: def.slotCount,
+    totalCarsToRemove: 0,
+    carsRemoved: 0,
+    // Layout calculations
+    cellSize: 0, gridX: 0, gridY: 0,
+    // Conveyor path (array of {x,y,edge,cellX,cellY})
+    convPath: [],
+    convPathLen: 0,
+    // Boosters
+    boosters: {pick:1, slot:1, maneuver:1}, // start with 1 free each
+    boosterPrices: {pick:200, slot:150, maneuver:250},
+    slotPriceMultiplier: 1,
+    activeMode: null, // null, 'pick', 'maneuver', 'honk', 'wrench', 'failOffer'
+    maneuverCar: null,      // the car being turned (preview)
+    maneuverOrigDir: null,  // original direction before preview
+    // Power-ups
+    honkMeter: 0,
+    honkReady: false,
+    lastDriveTime: 0,
+    timeSinceLastDrive: 0,
+    wrenchPoints: 0,
+    wrenchReady: false,
+    // State
+    paused: false,
+    won: false,
+    lost: false,
+    levelTime: 0,
+    coinsEarned: 0,
+    keysCollected: 0,
+  };
+
+  // Create cars (supports multi-cell vehicles)
+  def.cars.forEach((c,i)=>{
+    const type = c.type || 'car';
+    let seats, vw, vh;
+    if(type === 'bus'){
+      seats = 6;
+      if(c.dir==='up'||c.dir==='down'){ vw=1; vh=3; } else { vw=3; vh=1; }
+    } else if(type === 'minibus'){
+      seats = 4;
+      if(c.dir==='up'||c.dir==='down'){ vw=1; vh=2; } else { vw=2; vh=1; }
+    } else {
+      seats = c.seats || 2; vw=1; vh=1;
+    }
+    const car = {
+      id: i, color: c.color, type, dir: c.dir, seats, vw, vh,
+      passengers: 0, gx: c.gx, gy: c.gy,
+      locked: c.locked||false, keys: c.keys||0, maxKeys: c.keys||0,
+      drivingOut: false, driveProgress: 0, driveDir: c.dir,
+      x:0, y:0 // screen pos, calculated later
+    };
+    g.cars.push(car);
+    // Fill all grid cells this vehicle occupies
+    for(let dy=0; dy<vh; dy++){
+      for(let dx=0; dx<vw; dx++){
+        if(c.gy+dy < def.gridH && c.gx+dx < def.gridW)
+          g.grid[c.gy+dy][c.gx+dx] = car;
+      }
+    }
+  });
+  g.totalCarsToRemove = g.cars.length;
+
+  // Create lanes (Pixel Flow style vertical queues)
+  (def.lanes||[]).forEach((laneDef, li)=>{
+    const lane = [];
+    laneDef.forEach(p=>{
+      lane.push({
+        color: p.color,
+        hidden: p.hidden||false,
+        tied: p.tied||0,
+        revealed: !(p.hidden||false),
+        sent: false,
+        screenX:0, screenY:0
+      });
+    });
+    g.lanes.push(lane);
+  });
+  // Reveal hidden passengers at front of each lane
+  revealLanes(g);
+
+  // Calculate layout
+  calcLayout(g);
+  // Build conveyor path
+  buildConveyorPath(g);
+  // Position cars (center of vehicle footprint)
+  g.cars.forEach(c=>{
+    c.x = g.gridX + (c.gx + (c.vw||1)/2) * g.cellSize;
+    c.y = g.gridY + (c.gy + (c.vh||1)/2) * g.cellSize;
+  });
+
+  // Win streak boosters (Keys of the Valet)
+  if(winStreak > 0 && levelIdx >= 4){
+    const bonus = Math.min(winStreak, 3);
+    g.boosters.pick += bonus;
+    g.boosters.maneuver += Math.floor(bonus/2);
+  }
+
+  return g;
+}
+
+function calcLayout(g){
+  const maxGridW = W - 80; // leave room for conveyor track
+  const maxGridH = 380; // game area height for grid
+  g.cellSize = Math.min(Math.floor(maxGridW / g.gridW), Math.floor(maxGridH / g.gridH));
+  g.cellSize = Math.min(g.cellSize, 90); // cap cell size
+  const totalW = g.gridW * g.cellSize;
+  const totalH = g.gridH * g.cellSize;
+  g.gridX = (W - totalW) / 2;
+  g.gridY = 70 + (maxGridH - totalH) / 2;
+}
+
+function buildConveyorPath(g){
+  const pad = TRACK_WIDTH;
+  const gx = g.gridX, gy = g.gridY;
+  const gw = g.gridW * g.cellSize, gh = g.gridH * g.cellSize;
+  const cs = g.cellSize;
+  g.convPath = [];
+
+  // Bottom edge: left to right
+  for(let i=0; i<g.gridW; i++){
+    g.convPath.push({
+      x: gx + i*cs + cs/2,
+      y: gy + gh + pad/2 + 4,
+      edge:'bottom', cellX:i, cellY:g.gridH-1, lookDir:'up'
+    });
+  }
+  // Right edge: bottom to top
+  for(let i=g.gridH-1; i>=0; i--){
+    g.convPath.push({
+      x: gx + gw + pad/2 + 4,
+      y: gy + i*cs + cs/2,
+      edge:'right', cellX:g.gridW-1, cellY:i, lookDir:'left'
+    });
+  }
+  // Top edge: right to left
+  for(let i=g.gridW-1; i>=0; i--){
+    g.convPath.push({
+      x: gx + i*cs + cs/2,
+      y: gy - pad/2 - 4,
+      edge:'top', cellX:i, cellY:0, lookDir:'down'
+    });
+  }
+  // Left edge: top to bottom
+  for(let i=0; i<g.gridH; i++){
+    g.convPath.push({
+      x: gx - pad/2 - 4,
+      y: gy + i*cs + cs/2,
+      edge:'left', cellX:0, cellY:i, lookDir:'right'
+    });
+  }
+
+  // Calculate total path length
+  let len = 0;
+  for(let i=0; i<g.convPath.length; i++){
+    const next = g.convPath[(i+1)%g.convPath.length];
+    const cur = g.convPath[i];
+    len += dist(cur.x, cur.y, next.x, next.y);
+  }
+  g.convPathLen = len;
+}
+
+function getConveyorPos(g, t){
+  // t is 0..1 around the loop
+  t = ((t % 1) + 1) % 1;
+  const targetDist = t * g.convPathLen;
+  let accumulated = 0;
+  for(let i=0; i<g.convPath.length; i++){
+    const cur = g.convPath[i];
+    const next = g.convPath[(i+1)%g.convPath.length];
+    const segLen = dist(cur.x, cur.y, next.x, next.y);
+    if(accumulated + segLen >= targetDist){
+      const frac = (targetDist - accumulated) / segLen;
+      return {
+        x: lerp(cur.x, next.x, frac),
+        y: lerp(cur.y, next.y, frac),
+        idx: i, frac,
+        edge: cur.edge, cellX: cur.cellX, cellY: cur.cellY, lookDir: cur.lookDir
+      };
+    }
+    accumulated += segLen;
+  }
+  return {x:g.convPath[0].x, y:g.convPath[0].y, idx:0, frac:0, edge:'bottom', cellX:0, cellY:g.gridH-1, lookDir:'up'};
+}
+
+function revealLanes(g){
+  // Reveal hidden passengers at front of each lane
+  g.lanes.forEach(lane=>{
+    for(let i=0;i<lane.length;i++){
+      if(lane[i].sent) continue;
+      // Front non-sent passenger: reveal if hidden
+      if(lane[i].hidden && !lane[i].revealed){
+        lane[i].revealed = true;
+      }
+      break; // only check front passenger per lane
+    }
+  });
+}
+
+// ============= CORE GAME LOGIC =============
+function sendPassengerToConveyor(g, laneIdx, specificPIdx){
+  // laneIdx: which lane to send from
+  // specificPIdx: (optional) specific passenger index in lane (for Pick booster)
+  if(g.won || g.lost || g.paused) return false;
+  const lane = g.lanes[laneIdx];
+  if(!lane) return false;
+
+  // Find target passenger
+  let pIdx = -1;
+  if(specificPIdx !== undefined){
+    pIdx = specificPIdx;
+  } else {
+    for(let i=0;i<lane.length;i++){
+      if(!lane[i].sent){ pIdx = i; break; }
+    }
+  }
+  if(pIdx < 0) return false;
+  const p = lane[pIdx];
+  if(!p || p.sent) return false;
+
+  // Check tied group across ALL lanes
+  let group = [{lane:laneIdx, idx:pIdx, p:p}];
+  if(p.tied > 0){
+    group = [];
+    g.lanes.forEach((ln, li)=>{
+      ln.forEach((q, qi)=>{
+        if(!q.sent && q.tied === p.tied) group.push({lane:li, idx:qi, p:q});
+      });
+    });
+  }
+
+  // Check conveyor capacity
+  if(g.conveyorPassengers.length + group.length > g.convCap){
+    addFlash('Conveyor full!', W/2, g.gridY + g.gridH*g.cellSize + 60, DANGER_COLOR);
+    return false;
+  }
+
+  // Send group
+  group.forEach((item, i)=>{
+    item.p.sent = true;
+    const cp = {
+      color: item.p.revealed ? item.p.color : 'grey',
+      actualColor: item.p.color,
+      hidden: item.p.hidden && !item.p.revealed,
+      t: -0.02 * i,
+      loopCount: 0,
+      boarding: false,
+      boardTarget: null,
+      boardProgress: 0,
+      fromX:0, fromY:0,
+    };
+    g.conveyorPassengers.push(cp);
+
+    // Keys: each passenger landing on conveyor contributes a key
+    g.cars.forEach(car=>{
+      if(car.locked && car.keys > 0){
+        car.keys--;
+        if(car.keys <= 0){
+          car.locked = false;
+          addFlash('Unlocked!', car.x, car.y - 20, GOLD_COLOR);
+          addParticle(car.x, car.y, GOLD_COLOR);
+        }
+      }
+    });
+    g.keysCollected++;
+  });
+
+  revealLanes(g);
+  return true;
+}
+
+function sendSlotToConveyor(g, slotIdx){
+  if(g.won || g.lost || g.paused) return false;
+  if(slotIdx >= g.slots.length) return false;
+  if(g.conveyorPassengers.length >= g.convCap) {
+    addFlash('Conveyor full!', W/2, g.gridY + g.gridH*g.cellSize + 60, DANGER_COLOR);
+    return false;
+  }
+  const p = g.slots.splice(slotIdx, 1)[0];
+  const cp = {
+    color: p.color, actualColor: p.color,
+    hidden: false, t: 0, loopCount: 0,
+    boarding: false, boardTarget: null, boardProgress: 0,
+    fromX:0, fromY:0
+  };
+  g.conveyorPassengers.push(cp);
+  return true;
+}
+
+function findBoardableCarFromEdge(g, cellX, cellY, lookDir){
+  let dx=0, dy=0;
+  if(lookDir==='up') dy=-1;
+  else if(lookDir==='down') dy=1;
+  else if(lookDir==='left') dx=-1;
+  else if(lookDir==='right') dx=1;
+
+  // Start from the edge cell and look inward
+  let cx = cellX, cy = cellY;
+
+  // Actually start from outside edge and walk inward
+  // The conveyor is outside, so first cell to check is the edge cell itself
+  while(cx >= 0 && cx < g.gridW && cy >= 0 && cy < g.gridH){
+    const car = g.grid[cy][cx];
+    if(car && !car.drivingOut){
+      return car; // Return the first car found (may or may not match)
+    }
+    cx += dx;
+    cy += dy;
+  }
+  return null;
+}
+
+function updateConveyor(g, dt){
+  const speed = 1 / CONVEYOR_LOOP_TIME; // fraction of loop per second
+
+  for(let i = g.conveyorPassengers.length-1; i>=0; i--){
+    const p = g.conveyorPassengers[i];
+    if(p.boarding) continue; // being animated to car
+
+    p.t += speed * dt;
+
+    // Check if completed a loop
+    if(p.t >= 1){
+      p.t -= 1;
+      p.loopCount++;
+      if(p.loopCount >= 1){
+        // Move to slots
+        if(g.slots.length < g.slotCount){
+          g.slots.push({color: p.actualColor || p.color, actualColor: p.actualColor || p.color});
+          g.conveyorPassengers.splice(i, 1);
+          continue;
+        } else {
+          // Slots full + this passenger can't go anywhere = FAIL
+          g.lost = true;
+          g.conveyorPassengers.splice(i, 1);
+          continue;
+        }
+      }
+    }
+
+    // Try boarding
+    const pos = getConveyorPos(g, p.t);
+    const car = findBoardableCarFromEdge(g, pos.cellX, pos.cellY, pos.lookDir);
+    if(car && car.color === (p.actualColor || p.color) && !car.locked && !car.drivingOut){
+      // Count passengers already boarding this car to prevent over-boarding
+      let alreadyBoarding = 0;
+      for(const other of g.conveyorPassengers){
+        if(other !== p && other.boarding && other.boardTarget === car) alreadyBoarding++;
+      }
+      if(car.passengers + alreadyBoarding < car.seats){
+        // Board!
+        p.boarding = true;
+        p.boardTarget = car;
+        p.boardProgress = 0;
+        const convPos = getConveyorPos(g, p.t);
+        p.fromX = convPos.x;
+        p.fromY = convPos.y;
+      }
+    }
+  }
+}
+
+function updateBoarding(g, dt){
+  for(let i = g.conveyorPassengers.length-1; i>=0; i--){
+    const p = g.conveyorPassengers[i];
+    if(!p.boarding) continue;
+
+    p.boardProgress += dt * 3; // boarding takes ~0.33s
+    if(p.boardProgress >= 1){
+      // Boarded!
+      p.boardTarget.passengers++;
+      addParticle(p.boardTarget.x, p.boardTarget.y, COLORS[p.boardTarget.color]);
+
+      // Check if car should drive out
+      checkCarDriveOut(g, p.boardTarget);
+
+      g.conveyorPassengers.splice(i, 1);
+    }
+  }
+}
+
+function isCarBlocked(g, car){
+  const vw = car.vw||1, vh = car.vh||1;
+  let dx=0, dy=0;
+  if(car.dir==='up') dy=-1;
+  else if(car.dir==='down') dy=1;
+  else if(car.dir==='left') dx=-1;
+  else if(car.dir==='right') dx=1;
+
+  // Check from front edge of vehicle in direction of travel
+  if(dy !== 0){
+    const startY = dy < 0 ? car.gy - 1 : car.gy + vh;
+    for(let col = car.gx; col < car.gx + vw; col++){
+      let cy = startY;
+      while(cy >= 0 && cy < g.gridH){
+        const occ = g.grid[cy][col];
+        if(occ && occ !== car && !occ.drivingOut) return true;
+        cy += dy;
+      }
+    }
+  } else {
+    const startX = dx < 0 ? car.gx - 1 : car.gx + vw;
+    for(let row = car.gy; row < car.gy + vh; row++){
+      let cx = startX;
+      while(cx >= 0 && cx < g.gridW){
+        const occ = g.grid[row][cx];
+        if(occ && occ !== car && !occ.drivingOut) return true;
+        cx += dx;
+      }
+    }
+  }
+  return false;
+}
+
+function checkCarDriveOut(g, car){
+  if(car.drivingOut) return;
+  if(car.passengers >= car.seats && !car.locked && !isCarBlocked(g, car)){
+    car.drivingOut = true;
+    car.driveProgress = 0;
+    g.timeSinceLastDrive = 0;
+
+    // Honk meter
+    g.honkMeter = Math.min(g.honkMeter + 1, HONK_THRESHOLD);
+    if(g.honkMeter >= HONK_THRESHOLD) g.honkReady = true;
+
+    // Wrench points from obstacle resolution
+    if(car.maxKeys > 0){
+      g.wrenchPoints++;
+      if(g.wrenchPoints >= WRENCH_THRESHOLD) g.wrenchReady = true;
+    }
+  }
+}
+
+function updateDriveOuts(g, dt){
+  for(let i=g.cars.length-1; i>=0; i--){
+    const car = g.cars[i];
+    if(!car.drivingOut) continue;
+
+    car.driveProgress += dt * 2; // drive out over 0.5s
+    if(car.driveProgress >= 1){
+      // Remove car from grid (clear all cells) and array
+      const cvw = car.vw||1, cvh = car.vh||1;
+      for(let dy=0; dy<cvh; dy++){
+        for(let dx=0; dx<cvw; dx++){
+          if(car.gy+dy < g.gridH && car.gx+dx < g.gridW)
+            g.grid[car.gy+dy][car.gx+dx] = null;
+        }
+      }
+      g.cars.splice(i, 1);
+      g.carsRemoved++;
+      addParticle(car.x, car.y, COLORS[car.color]);
+
+      // Check if other cars can now drive out
+      g.cars.forEach(c=>{
+        if(!c.drivingOut && c.passengers >= c.seats && !c.locked){
+          checkCarDriveOut(g, c);
+        }
+      });
+
+      // Check win
+      if(g.cars.length === 0){
+        g.won = true;
+        g.coinsEarned = 40 + g.levelIdx * 10;
+      }
+    } else {
+      // Animate position
+      let dx=0, dy=0;
+      if(car.dir==='up') dy=-1;
+      else if(car.dir==='down') dy=1;
+      else if(car.dir==='left') dx=-1;
+      else if(car.dir==='right') dx=1;
+      const baseX = g.gridX + (car.gx + (car.vw||1)/2) * g.cellSize;
+      const baseY = g.gridY + (car.gy + (car.vh||1)/2) * g.cellSize;
+      const moveDist = (g.cellSize * g.gridW + 100) * easeOut(car.driveProgress);
+      car.x = baseX + dx * moveDist;
+      car.y = baseY + dy * moveDist;
+    }
+  }
+}
+
+function checkWinFail(g){
+  if(g.won && !g.lost){
+    return 'win';
+  }
+  if(g.lost) return 'fail';
+
+  // Additional fail check: conveyor full + slots full + no boarding happening
+  if(g.conveyorPassengers.length >= g.convCap && g.slots.length >= g.slotCount){
+    // Check if any passenger is currently boarding
+    const anyBoarding = g.conveyorPassengers.some(p=>p.boarding);
+    if(!anyBoarding){
+      // Check if any can still board
+      let canBoard = false;
+      for(const p of g.conveyorPassengers){
+        if(p.boarding) continue;
+        const pos = getConveyorPos(g, p.t);
+        const car = findBoardableCarFromEdge(g, pos.cellX, pos.cellY, pos.lookDir);
+        if(car && car.color === (p.actualColor||p.color) && car.passengers < car.seats && !car.locked){
+          canBoard = true; break;
+        }
+      }
+      // Also check if there are passengers not yet sent and conveyor might clear
+      // Only fail if truly stuck
+      if(!canBoard){
+        // Give a grace period - wait until passengers have moved a bit
+        // We'll check again next frame
+      }
+    }
+  }
+  return null;
+}
+
+// ============= BOOSTER LOGIC =============
+function activateBooster(g, type){
+  if(type === 'pick'){
+    // If already in pick mode, cancel it
+    if(g.activeMode === 'pick'){ g.activeMode = null; return; }
+    if(g.boosters.pick <= 0 && globalCoins < g.boosterPrices.pick) {
+      addFlash('Not enough coins!', W/2, H/2, DANGER_COLOR);
+      return;
+    }
+    g.activeMode = 'pick';
+    addFlash('Pick any passenger!', W/2, H/2 - 40, '#FFD700');
+  } else if(type === 'slot'){
+    if(g.boosters.slot <= 0 && globalCoins < g.boosterPrices.slot){
+      addFlash('Not enough coins!', W/2, H/2, DANGER_COLOR);
+      return;
+    }
+    // Immediately add slot
+    if(g.boosters.slot > 0) g.boosters.slot--;
+    else { globalCoins -= g.boosterPrices.slot; g.slotPriceMultiplier++; }
+    g.slotCount++;
+    g.slots.length = Math.min(g.slots.length, g.slotCount); // ensure consistency
+    addFlash('+1 Slot!', W/2, H - 180, SUCCESS_COLOR);
+  } else if(type === 'maneuver'){
+    // If already in maneuver mode, cancel it
+    if(g.activeMode === 'maneuver'){
+      // Restore original direction if previewing
+      if(g.maneuverCar && g.maneuverOrigDir !== undefined){
+        g.maneuverCar.dir = g.maneuverOrigDir;
+      }
+      g.activeMode = null; g.maneuverCar = null; g.maneuverOrigDir = null;
+      return;
+    }
+    if(g.boosters.maneuver <= 0 && globalCoins < g.boosterPrices.maneuver){
+      addFlash('Not enough coins!', W/2, H/2, DANGER_COLOR);
+      return;
+    }
+    g.activeMode = 'maneuver';
+    g.maneuverCar = null;
+    g.maneuverOrigDir = null;
+    addFlash('Tap a 1×1 car to turn!', W/2, H/2 - 40, '#FFD700');
+  }
+}
+
+function activateHonk(g){
+  if(!g.honkReady) return;
+  if(g.activeMode === 'honk'){ g.activeMode = null; return; }
+  g.activeMode = 'honk';
+  addFlash('Tap a car to fill it!', W/2, H/2 - 40, '#FFD700');
+}
+
+function activateWrench(g){
+  if(!g.wrenchReady) return;
+  if(g.activeMode === 'wrench'){ g.activeMode = null; return; }
+  g.activeMode = 'wrench';
+  addFlash('Tap a target to fix!', W/2, H/2 - 40, '#FFD700');
+}
+
+function useHonkOnCar(g, car){
+  if(!g.honkReady) return;
+  // Fill all seats from lanes (front passengers first per lane)
+  const needed = car.seats - car.passengers;
+  let filled = 0;
+  for(let li=0; li<g.lanes.length && filled<needed; li++){
+    for(let pi=0; pi<g.lanes[li].length && filled<needed; pi++){
+      const p = g.lanes[li][pi];
+      if(!p.sent && (p.color === car.color || (p.hidden && !p.revealed))){
+        p.sent = true;
+        filled++;
+      }
+    }
+  }
+  car.passengers = car.seats;
+  g.honkMeter = 0;
+  g.honkReady = false;
+  g.activeMode = null;
+  addParticle(car.x, car.y, COLORS[car.color]);
+  addFlash('HONK!', car.x, car.y - 30, '#fff');
+  checkCarDriveOut(g, car);
+}
+
+function useWrenchOnTarget(g, target){
+  // Target could be a hidden passenger in lanes, a tied group, or a locked car
+  if(target.type === 'hidden'){
+    const p = g.lanes[target.laneIdx][target.idx];
+    if(p && p.hidden && !p.revealed){
+      p.revealed = true;
+      p.hidden = false;
+      g.wrenchPoints = 0; g.wrenchReady = false; g.activeMode = null;
+      addFlash('Revealed!', W/2, H-100, SUCCESS_COLOR);
+    }
+  } else if(target.type === 'tied'){
+    // Remove tie from a group - free first member found
+    const groupId = target.groupId;
+    for(const lane of g.lanes){
+      for(const p of lane){
+        if(!p.sent && p.tied === groupId){
+          p.tied = 0;
+          g.wrenchPoints = 0; g.wrenchReady = false; g.activeMode = null;
+          addFlash('Untied!', W/2, H-100, SUCCESS_COLOR);
+          return;
+        }
+      }
+    }
+  } else if(target.type === 'locked'){
+    const car = target.car;
+    if(car.locked && car.keys > 0){
+      car.keys--;
+      if(car.keys <= 0){car.locked = false; addFlash('Unlocked!', car.x, car.y-20, GOLD_COLOR);}
+      g.wrenchPoints = 0; g.wrenchReady = false; g.activeMode = null;
+    }
+  }
+}
+
+// ============= FAIL OFFER =============
+function useFailOffer(g, car){
+  car.passengers = car.seats;
+  car.locked = false;
+  car.keys = 0;
+  g.lost = false;
+  checkCarDriveOut(g, car);
+  g.activeMode = null;
+  addFlash('Drive Out!', car.x, car.y - 20, SUCCESS_COLOR);
+  addParticle(car.x, car.y, GOLD_COLOR);
+}
+
+// ============= UPDATE =============
+function update(dt){
+  // Update flash messages
+  flashMessages = flashMessages.filter(f=>{f.life -= dt; return f.life > 0;});
+  // Update particles
+  particles.forEach(p=>{p.x+=p.vx*dt; p.y+=p.vy*dt; p.life-=dt; p.vy+=80*dt;});
+  particles = particles.filter(p=>p.life>0);
+  // Heart regen
+  if(globalHearts < MAX_HEARTS){
+    heartTimer += dt;
+    if(heartTimer >= HEART_REGEN_TIME){
+      heartTimer -= HEART_REGEN_TIME;
+      globalHearts = Math.min(globalHearts+1, MAX_HEARTS);
+    }
+  }
+
+  if(scene !== 'playing' || !game) return;
+  if(game.paused || game.won || game.lost) return;
+
+  game.levelTime += dt;
+  game.timeSinceLastDrive += dt;
+
+  // Honk cooldown (slow decay after inactivity)
+  if(game.honkMeter > 0 && !game.honkReady && game.timeSinceLastDrive > HONK_COOLDOWN){
+    game.honkMeter = Math.max(0, game.honkMeter - HONK_DECAY_RATE * dt);
+  }
+  // Once honk is ready, it stays ready until used (no decay)
+
+
+  updateConveyor(game, dt);
+  updateBoarding(game, dt);
+  updateDriveOuts(game, dt);
+
+  const result = checkWinFail(game);
+  if(result === 'win' && game.won){
+    setTimeout(()=>{
+      scene = 'complete';
+      globalCoins += game.coinsEarned;
+      completedLevels.add(game.levelIdx);
+      winStreak++;
+    }, 600);
+    game.won = 'transitioning';
+  } else if(result === 'fail' || game.lost === true){
+    setTimeout(()=>{
+      scene = 'fail';
+    }, 400);
+    game.lost = 'transitioning';
+  }
+}
+
+// ============= RENDERING =============
+function drawPassengerFigure(x, y, color, size, hidden){
+  const s = size || 20;
+  const c = hidden ? '#888' : (COLORS[color] || color);
+  const cd = hidden ? '#666' : (COLOR_DARK[color] || '#444');
+
+  // Body (pill shape)
+  ctx.fillStyle = c;
+  roundRect(x - s*0.35, y - s*0.1, s*0.7, s*0.55, s*0.2);
+  ctx.fill();
+  // Body outline
+  ctx.strokeStyle = cd;
+  ctx.lineWidth = 1.5;
+  roundRect(x - s*0.35, y - s*0.1, s*0.7, s*0.55, s*0.2);
+  ctx.stroke();
+
+  // Head
+  ctx.beginPath();
+  ctx.arc(x, y - s*0.3, s*0.25, 0, Math.PI*2);
+  ctx.fillStyle = c;
+  ctx.fill();
+  ctx.strokeStyle = cd;
+  ctx.stroke();
+
+  // Eyes
+  if(!hidden){
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.arc(x - s*0.08, y - s*0.33, s*0.06, 0, Math.PI*2);
+    ctx.arc(x + s*0.08, y - s*0.33, s*0.06, 0, Math.PI*2);
+    ctx.fill();
+    ctx.fillStyle = '#333';
+    ctx.beginPath();
+    ctx.arc(x - s*0.06, y - s*0.32, s*0.03, 0, Math.PI*2);
+    ctx.arc(x + s*0.1, y - s*0.32, s*0.03, 0, Math.PI*2);
+    ctx.fill();
+  } else {
+    // Question mark
+    ctx.fillStyle = '#fff';
+    ctx.font = `bold ${s*0.35}px Arial`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('?', x, y - s*0.3);
+  }
+
+  // Legs (tiny)
+  ctx.fillStyle = cd;
+  ctx.fillRect(x - s*0.2, y + s*0.4, s*0.12, s*0.15);
+  ctx.fillRect(x + s*0.08, y + s*0.4, s*0.12, s*0.15);
+}
+
+function drawCar(car, g){
+  const cs = g.cellSize;
+  const x = car.x, y = car.y;
+  const vw = car.vw||1, vh = car.vh||1;
+  const type = car.type || 'car';
+  const c = COLORS[car.color];
+  const cd = COLOR_DARK[car.color];
+  const cl = COLOR_LIGHT[car.color];
+
+  // Vehicle dimensions in pixels
+  const pw = cs * vw * 0.88;
+  const ph = cs * vh * 0.88;
+  const r = Math.min(pw, ph) * 0.15;
+
+  ctx.save();
+  ctx.translate(x, y);
+
+  // Vehicle body
+  ctx.fillStyle = c;
+  roundRect(-pw/2, -ph/2, pw, ph, r);
+  ctx.fill();
+  ctx.strokeStyle = cd;
+  ctx.lineWidth = 2;
+  roundRect(-pw/2, -ph/2, pw, ph, r);
+  ctx.stroke();
+
+  // Windshield at front edge
+  ctx.fillStyle = cl;
+  ctx.globalAlpha = 0.6;
+  const wDepth = Math.min(cs * 0.18, 12);
+  if(car.dir === 'up'){
+    roundRect(-pw*0.3, -ph/2 + 3, pw*0.6, wDepth, 3);
+  } else if(car.dir === 'down'){
+    roundRect(-pw*0.3, ph/2 - 3 - wDepth, pw*0.6, wDepth, 3);
+  } else if(car.dir === 'left'){
+    roundRect(-pw/2 + 3, -ph*0.3, wDepth, ph*0.6, 3);
+  } else {
+    roundRect(pw/2 - 3 - wDepth, -ph*0.3, wDepth, ph*0.6, 3);
+  }
+  ctx.fill();
+  ctx.globalAlpha = 1;
+
+  // Side windows for minibus/bus
+  if(type !== 'car'){
+    ctx.fillStyle = cl;
+    ctx.globalAlpha = 0.25;
+    const isVert = car.dir==='up'||car.dir==='down';
+    const winCount = type === 'bus' ? 3 : 2;
+    if(isVert){
+      const winH = (ph * 0.5) / winCount;
+      for(let wi=0; wi<winCount; wi++){
+        const wy = -ph*0.15 + wi * (winH + 2);
+        roundRect(-pw*0.38, wy, pw*0.18, winH - 2, 2);
+        ctx.fill();
+        roundRect(pw*0.2, wy, pw*0.18, winH - 2, 2);
+        ctx.fill();
+      }
+    } else {
+      const winW = (pw * 0.5) / winCount;
+      for(let wi=0; wi<winCount; wi++){
+        const wx = -pw*0.15 + wi * (winW + 2);
+        roundRect(wx, -ph*0.38, winW - 2, ph*0.18, 2);
+        ctx.fill();
+        roundRect(wx, ph*0.2, winW - 2, ph*0.18, 2);
+        ctx.fill();
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // Direction arrow at front
+  ctx.fillStyle = '#fff';
+  ctx.globalAlpha = 0.5;
+  ctx.beginPath();
+  if(car.dir === 'up'){
+    ctx.moveTo(0, -ph/2 + 4); ctx.lineTo(-5, -ph/2 + 11); ctx.lineTo(5, -ph/2 + 11);
+  } else if(car.dir === 'down'){
+    ctx.moveTo(0, ph/2 - 4); ctx.lineTo(-5, ph/2 - 11); ctx.lineTo(5, ph/2 - 11);
+  } else if(car.dir === 'left'){
+    ctx.moveTo(-pw/2 + 4, 0); ctx.lineTo(-pw/2 + 11, -5); ctx.lineTo(-pw/2 + 11, 5);
+  } else {
+    ctx.moveTo(pw/2 - 4, 0); ctx.lineTo(pw/2 - 11, -5); ctx.lineTo(pw/2 - 11, 5);
+  }
+  ctx.closePath();
+  ctx.fill();
+  ctx.globalAlpha = 1;
+
+  // Seats arranged within vehicle body
+  const seatSize = Math.min(cs * 0.18, 10);
+  const isVert = car.dir==='up'||car.dir==='down';
+  const cols = isVert ? Math.min(2, vw * 2) : Math.ceil(car.seats / Math.max(1, Math.min(2, vh * 2)));
+  const rows = Math.ceil(car.seats / cols);
+  for(let s=0; s<car.seats; s++){
+    const row = Math.floor(s / cols);
+    const col = s % cols;
+    let sx, sy;
+    if(isVert){
+      sx = -((cols-1) * seatSize * 1.2)/2 + col * seatSize * 1.2;
+      sy = -((rows-1) * seatSize * 1.2)/2 + row * seatSize * 1.2;
+    } else {
+      sx = -((rows-1) * seatSize * 1.2)/2 + row * seatSize * 1.2;
+      sy = -((cols-1) * seatSize * 1.2)/2 + col * seatSize * 1.2;
+    }
+    if(s < car.passengers){
+      ctx.fillStyle = cl;
+      ctx.beginPath(); ctx.arc(sx, sy, seatSize * 0.45, 0, Math.PI*2); ctx.fill();
+      ctx.strokeStyle = cd; ctx.lineWidth = 1; ctx.stroke();
+    } else {
+      ctx.strokeStyle = cd; ctx.lineWidth = 1.5; ctx.globalAlpha = 0.4;
+      ctx.beginPath(); ctx.arc(sx, sy, seatSize * 0.45, 0, Math.PI*2); ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  // Lock icon
+  if(car.locked){
+    ctx.fillStyle = '#FFD700';
+    ctx.font = `bold ${Math.max(12, cs*0.22)}px Arial`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('\uD83D\uDD12' + car.keys, 0, 0);
+  }
+
+  // Type label
+  if(type !== 'car'){
+    ctx.fillStyle = '#fff';
+    ctx.globalAlpha = 0.35;
+    ctx.font = `bold ${Math.max(8, cs*0.14)}px Arial`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const label = type === 'bus' ? 'BUS' : 'VAN';
+    if(isVert) ctx.fillText(label, 0, ph/2 - cs*0.18);
+    else ctx.fillText(label, pw/2 - cs*0.22, 0);
+    ctx.globalAlpha = 1;
+  }
+
+  ctx.restore();
+}
+
+function drawConveyorTrack(g){
+  const pad = TRACK_WIDTH;
+  const gx = g.gridX - pad, gy = g.gridY - pad;
+  const gw = g.gridW * g.cellSize + pad*2;
+  const gh = g.gridH * g.cellSize + pad*2;
+
+  // Track background
+  ctx.strokeStyle = TRACK_COLOR;
+  ctx.lineWidth = pad;
+  ctx.lineJoin = 'round';
+  roundRect(gx + pad/2, gy + pad/2, gw - pad, gh - pad, 12);
+  ctx.stroke();
+
+  // Animated chevrons
+  const time = Date.now() / 1000;
+  ctx.save();
+  ctx.strokeStyle = PANEL_LIGHT;
+  ctx.lineWidth = 2;
+  ctx.globalAlpha = 0.3;
+
+  for(let i=0; i<g.convPath.length; i++){
+    const p = g.convPath[i];
+    const next = g.convPath[(i+1)%g.convPath.length];
+    const mx = (p.x + next.x)/2, my = (p.y + next.y)/2;
+    const t = ((time * 0.5 + i * 0.1) % 1);
+    if(t < 0.5){
+      ctx.globalAlpha = 0.2 + t * 0.4;
+      const dx = next.x - p.x, dy = next.y - p.y;
+      const len = Math.sqrt(dx*dx+dy*dy);
+      if(len > 0){
+        const nx = dx/len, ny = dy/len;
+        ctx.beginPath();
+        ctx.moveTo(mx - ny*4 - nx*4, my + nx*4 - ny*4);
+        ctx.lineTo(mx, my);
+        ctx.lineTo(mx + ny*4 - nx*4, my - nx*4 - ny*4);
+        ctx.stroke();
+      }
+    }
+  }
+  ctx.restore();
+}
+
+function drawGrid(g){
+  const cs = g.cellSize;
+  // Grid background
+  ctx.fillStyle = PANEL_COLOR;
+  roundRect(g.gridX - 4, g.gridY - 4, g.gridW * cs + 8, g.gridH * cs + 8, 8);
+  ctx.fill();
+
+  // Grid cells
+  for(let y=0; y<g.gridH; y++){
+    for(let x=0; x<g.gridW; x++){
+      ctx.strokeStyle = PANEL_LIGHT;
+      ctx.lineWidth = 0.5;
+      ctx.strokeRect(g.gridX + x*cs, g.gridY + y*cs, cs, cs);
+    }
+  }
+}
+
+function drawSlots(g){
+  const slotW = 36, slotH = 36, gap = 6;
+  const totalW = g.slotCount * (slotW + gap) - gap;
+  const startX = (W - totalW) / 2;
+  const startY = g.gridY + g.gridH * g.cellSize + TRACK_WIDTH + 22;
+
+  // Label
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 12px Arial';
+  ctx.textAlign = 'center';
+  ctx.fillText(`Conveyor: ${g.conveyorPassengers.length}/${g.convCap}`, W/2, startY - 12);
+
+  for(let i=0; i<g.slotCount; i++){
+    const sx = startX + i * (slotW + gap);
+    ctx.fillStyle = SLOT_COLOR;
+    ctx.globalAlpha = 0.6;
+    roundRect(sx, startY, slotW, slotH, 6);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = PANEL_LIGHT;
+    ctx.lineWidth = 1;
+    roundRect(sx, startY, slotW, slotH, 6);
+    ctx.stroke();
+
+    if(i < g.slots.length){
+      drawPassengerFigure(sx + slotW/2, startY + slotH/2, g.slots[i].color, slotW * 0.7, false);
+    }
+  }
+  return {x: startX, y: startY, slotW, slotH, gap};
+}
+
+function drawLanes(g){
+  const laneCount = g.lanes.length;
+  if(laneCount === 0) return;
+
+  // Position lanes below booster bar, sized to fit exactly 4 passengers
+  const MAX_VISIBLE = 4; // only show front 4 passengers per lane
+  const laneAreaY = g.gridY + g.gridH * g.cellSize + TRACK_WIDTH + 178;
+  const laneW = 48;
+  const passengerGap = 36;
+  const laneAreaH = 14 + MAX_VISIBLE * passengerGap + 8; // tight fit for 4 passengers
+  const totalLanesW = laneCount * laneW + (laneCount - 1) * 14;
+  const startX = (W - totalLanesW) / 2;
+
+  // Flat grey background
+  ctx.fillStyle = '#4A5568';
+  ctx.globalAlpha = 0.45;
+  roundRect(startX - 12, laneAreaY - 10, totalLanesW + 24, laneAreaH, 8);
+  ctx.fill();
+  ctx.globalAlpha = 1;
+  const crossTied = {};
+
+  g.lanes.forEach((lane, li)=>{
+    const lx = startX + li * (laneW + 14) + laneW / 2;
+
+    // Collect non-sent passengers
+    const visible = [];
+    for(let pi=0; pi<lane.length; pi++){
+      if(!lane[pi].sent) visible.push({p:lane[pi], pi});
+    }
+    // Count hidden (beyond visible 4)
+    const hiddenCount = Math.max(0, visible.length - MAX_VISIBLE);
+
+    // Only render front MAX_VISIBLE
+    const toShow = visible.slice(0, MAX_VISIBLE);
+
+    // If there are hidden passengers, show count indicator at bottom
+    if(hiddenCount > 0){
+      ctx.fillStyle = '#8899aa';
+      ctx.font = 'bold 10px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText(`+${hiddenCount}`, lx, laneAreaY + laneAreaH - 14);
+    }
+
+    toShow.forEach((item, visIdx)=>{
+      const p = item.p;
+      const pi = item.pi;
+
+      const px = lx;
+      const py = laneAreaY + 14 + visIdx * passengerGap;
+      p.screenX = px;
+      p.screenY = py;
+      p.screenLane = li;
+      p.screenIdx = pi;
+
+      // Highlight front passenger (visIdx 0)
+      if(visIdx === 0){
+        ctx.strokeStyle = '#FFD700';
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.arc(px, py, 19, 0, Math.PI*2);
+        ctx.stroke();
+      }
+
+      // Pick mode highlights all visible passengers
+      if(game.activeMode === 'pick'){
+        ctx.strokeStyle = '#FFD700';
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([3,3]);
+        ctx.beginPath();
+        ctx.arc(px, py, 21, 0, Math.PI*2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+
+      const figSize = visIdx === 0 ? 28 : 22;
+      drawPassengerFigure(px, py, p.revealed ? p.color : 'grey', figSize, p.hidden && !p.revealed);
+
+      // Track tied groups for cross-lane lines
+      if(p.tied > 0){
+        if(!crossTied[p.tied]) crossTied[p.tied] = [];
+        crossTied[p.tied].push({x: px, y: py});
+      }
+    });
+
+    // Clear screenX for non-visible passengers so click handler skips them
+    for(let i=MAX_VISIBLE; i<visible.length; i++){
+      visible[i].p.screenX = 0;
+      visible[i].p.screenY = 0;
+    }
+  });
+
+  // Draw cross-lane tied lines (only for visible passengers)
+  ctx.strokeStyle = '#FFD700';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([5,4]);
+  Object.values(crossTied).forEach(points=>{
+    if(points.length < 2) return;
+    ctx.beginPath();
+    ctx.moveTo(points[0].x, points[0].y);
+    for(let i=1;i<points.length;i++) ctx.lineTo(points[i].x, points[i].y);
+    ctx.stroke();
+  });
+  ctx.setLineDash([]);
+}
+
+function drawBoosterBar(g){
+  const barY = g.gridY + g.gridH * g.cellSize + TRACK_WIDTH + 115;
+  const bw = 55, bh = 45, gap = 12;
+  const boosterDefs = [
+    {type:'pick', label:'Pick', icon:'👆', count: g.boosters.pick},
+    {type:'slot', label:'+Slot', icon:'➕', count: g.boosters.slot},
+    {type:'maneuver', label:'Turn', icon:'🔄', count: g.boosters.maneuver},
+  ];
+
+  // Power-ups
+  const puDefs = [];
+  if(g.honkReady) puDefs.push({type:'honk', label:'Honk', icon:'📯'});
+  if(g.wrenchReady) puDefs.push({type:'wrench', label:'Fix', icon:'🔧'});
+
+  const allDefs = [...boosterDefs, ...puDefs];
+  const totalW = allDefs.length * (bw + gap) - gap;
+  const startX = (W - totalW) / 2;
+
+  // Section label
+  ctx.fillStyle = '#aac';
+  ctx.font = 'bold 10px Arial';
+  ctx.textAlign = 'center';
+  ctx.fillText('— BOOSTERS —', W/2, barY - 18);
+
+  allDefs.forEach((b, i)=>{
+    const bx = startX + i * (bw + gap);
+    const active = g.activeMode === b.type;
+    const isPowerup = (b.type === 'honk' || b.type === 'wrench');
+    const canUse = b.count === undefined || b.count > 0 || globalCoins >= (g.boosterPrices[b.type]||0);
+
+    // Button background - more prominent
+    ctx.fillStyle = active ? '#FFD700' : isPowerup ? '#FF6F00' : (canUse ? '#4A6B8A' : '#3D4F6A');
+    ctx.globalAlpha = active ? 1.0 : 0.85;
+    roundRect(bx, barY, bw, bh, 8);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = active ? '#fff' : (canUse ? '#99bbdd' : '#667');
+    ctx.lineWidth = active ? 2.5 : 1.5;
+    roundRect(bx, barY, bw, bh, 8);
+    ctx.stroke();
+
+    ctx.font = '18px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText(b.icon, bx + bw/2, barY + 18);
+
+    ctx.font = 'bold 10px Arial';
+    ctx.fillStyle = '#fff';
+    ctx.fillText(b.label, bx + bw/2, barY + 34);
+
+    if(b.count !== undefined){
+      ctx.fillStyle = b.count > 0 ? SUCCESS_COLOR : '#aaa';
+      ctx.font = 'bold 10px Arial';
+      ctx.fillText(b.count > 0 ? `x${b.count}` : `${g.boosterPrices[b.type]}🪙`, bx + bw/2, barY + bh + 12);
+    } else if(isPowerup){
+      ctx.fillStyle = '#FFD700';
+      ctx.font = 'bold 10px Arial';
+      ctx.fillText('READY', bx + bw/2, barY + bh + 12);
+    }
+
+    // Wider click target for easier tapping
+    addButton(bx - 4, barY - 4, bw + 8, bh + 8, 'booster_'+b.type, ()=>{
+      if(b.type==='honk') activateHonk(g);
+      else if(b.type==='wrench') activateWrench(g);
+      else activateBooster(g, b.type);
+    });
+  });
+
+  // Honk meter bar (visible progress indicator) — positioned between slots and boosters
+  const meterW = 120, meterH = 10;
+  const meterX = (W - meterW)/2, meterY = barY - 44;
+  ctx.fillStyle = '#222';
+  roundRect(meterX, meterY, meterW, meterH, 4);
+  ctx.fill();
+  ctx.strokeStyle = '#555';
+  ctx.lineWidth = 1;
+  roundRect(meterX, meterY, meterW, meterH, 4);
+  ctx.stroke();
+  if(g.honkMeter > 0){
+    ctx.fillStyle = g.honkReady ? '#FFD700' : '#F5A623';
+    roundRect(meterX + 1, meterY + 1, (meterW - 2) * Math.min(1, g.honkMeter / HONK_THRESHOLD), meterH - 2, 3);
+    ctx.fill();
+  }
+  ctx.fillStyle = g.honkReady ? '#FFD700' : '#bbb';
+  ctx.font = g.honkReady ? 'bold 9px Arial' : '9px Arial';
+  ctx.textAlign = 'center';
+  ctx.fillText(g.honkReady ? '📯 HONK READY!' : `Honk: ${Math.floor(g.honkMeter)}/${HONK_THRESHOLD} (drive vehicles!)`, W/2, meterY - 4);
+}
+
+function drawHUD(g){
+  // Top bar
+  ctx.fillStyle = PANEL_COLOR;
+  ctx.globalAlpha = 0.8;
+  ctx.fillRect(0, 0, W, 55);
+  ctx.globalAlpha = 1;
+
+  // Level name
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 16px Arial';
+  ctx.textAlign = 'center';
+  ctx.fillText(`Level ${g.levelIdx+1}: ${g.def.label}`, W/2, 22);
+
+  // Difficulty badge
+  const diff = g.def.difficulty;
+  const diffColors = {easy:SUCCESS_COLOR, medium:'#F5A623', hard:DANGER_COLOR, very_hard:'#AB47BC', extreme:'#E91E63'};
+  ctx.fillStyle = diffColors[diff] || '#888';
+  ctx.font = '11px Arial';
+  ctx.fillText(diff.replace('_',' ').toUpperCase(), W/2, 40);
+
+  // Coins
+  ctx.fillStyle = GOLD_COLOR;
+  ctx.font = 'bold 14px Arial';
+  ctx.textAlign = 'left';
+  ctx.fillText(`🪙 ${globalCoins}`, 15, 35);
+
+  // Hearts
+  ctx.fillStyle = HEART_COLOR;
+  ctx.textAlign = 'right';
+  ctx.fillText(`❤️ ${globalHearts}`, W - 15, 35);
+
+  // Progress
+  ctx.fillStyle = '#aaa';
+  ctx.font = '11px Arial';
+  ctx.textAlign = 'right';
+  ctx.fillText(`${g.carsRemoved}/${g.totalCarsToRemove} vehicles`, W - 15, 18);
+
+  // Win streak
+  if(winStreak > 0){
+    ctx.fillStyle = '#FFD700';
+    ctx.textAlign = 'left';
+    ctx.font = '11px Arial';
+    ctx.fillText(`🔥 Streak: ${winStreak}`, 15, 18);
+  }
+
+  // Cancel mode button
+  if(g.activeMode){
+    const cbx = W - 80, cby = 55;
+    ctx.fillStyle = DANGER_COLOR;
+    roundRect(cbx, cby + 5, 70, 25, 6);
+    ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 11px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('Cancel', cbx + 35, cby + 22);
+    addButton(cbx, cby + 5, 70, 25, 'cancel_mode', ()=>{
+      // Restore original direction if cancelling a maneuver preview
+      if(g.activeMode === 'maneuver' && g.maneuverCar && g.maneuverOrigDir !== undefined){
+        g.maneuverCar.dir = g.maneuverOrigDir;
+      }
+      g.activeMode = null; g.maneuverCar = null; g.maneuverOrigDir = null;
+    });
+
+    ctx.fillStyle = '#FFD700';
+    ctx.textAlign = 'left';
+    ctx.font = 'bold 12px Arial';
+    const modeLabels = {pick:'Pick a passenger', maneuver: g.maneuverCar ? 'Choose a direction' : 'Tap a 1×1 car', honk:'Tap a car to honk', wrench:'Tap a target', failOffer:'Tap a car to save'};
+    ctx.fillText(modeLabels[g.activeMode] || '', 10, cby + 22);
+  }
+}
+
+function drawConveyorPassengers(g){
+  g.conveyorPassengers.forEach(p=>{
+    if(p.boarding){
+      const t = easeOut(p.boardProgress);
+      const tx = p.boardTarget.x, ty = p.boardTarget.y;
+      const cx = lerp(p.fromX, tx, t);
+      const cy = lerp(p.fromY, ty, t);
+      ctx.globalAlpha = 1 - p.boardProgress * 0.5;
+      drawPassengerFigure(cx, cy, p.actualColor || p.color, 18, p.hidden);
+      ctx.globalAlpha = 1;
+    } else {
+      const pos = getConveyorPos(g, p.t);
+      drawPassengerFigure(pos.x, pos.y, p.hidden ? 'grey' : (p.actualColor||p.color), 18, p.hidden);
+    }
+  });
+}
+
+function drawFlashMessages(){
+  flashMessages.forEach(f=>{
+    const alpha = Math.min(1, f.life / (f.maxLife * 0.3));
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = f.color;
+    ctx.font = 'bold 16px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText(f.text, f.x, f.y - (1 - f.life/f.maxLife) * 30);
+    ctx.globalAlpha = 1;
+  });
+}
+
+function drawParticles(){
+  particles.forEach(p=>{
+    ctx.globalAlpha = p.life / p.maxLife;
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size * (p.life/p.maxLife), 0, Math.PI*2);
+    ctx.fill();
+  });
+  ctx.globalAlpha = 1;
+}
+
+// ============= SCENE RENDERERS =============
+function renderMenu(){
+  buttons = [];
+  // Background
+  ctx.fillStyle = BG_COLOR;
+  ctx.fillRect(0,0,W,H);
+
+  // Title
+  ctx.fillStyle = '#1a1a2e';
+  ctx.font = 'bold 56px Arial';
+  ctx.textAlign = 'center';
+  ctx.fillText('DRIVE OUT', W/2 - 20, H/2 - 120);
+  ctx.fillText('→', W/2 + 170, H/2 - 120);
+
+  // Subtitle
+  ctx.fillStyle = '#555';
+  ctx.font = '16px Arial';
+  ctx.fillText('A Casual Puzzle Game', W/2, H/2 - 75);
+
+  // Play button
+  ctx.fillStyle = BUTTON_COLOR;
+  roundRect(W/2 - 90, H/2 - 30, 180, 55, 12);
+  ctx.fill();
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 22px Arial';
+  ctx.fillText('PLAY', W/2, H/2 + 5);
+  addButton(W/2-90, H/2-30, 180, 55, 'play', ()=>{ scene = 'levelSelect'; });
+
+  // Store button
+  ctx.fillStyle = PANEL_LIGHT;
+  roundRect(W/2 - 70, H/2 + 50, 140, 40, 10);
+  ctx.fill();
+  ctx.fillStyle = '#fff';
+  ctx.font = '16px Arial';
+  ctx.fillText('🏪 Store', W/2, H/2 + 76);
+  addButton(W/2-70, H/2+50, 140, 40, 'store', ()=>{ scene = 'store'; });
+
+  // Stats
+  ctx.fillStyle = '#555';
+  ctx.font = '14px Arial';
+  ctx.fillText(`🪙 ${globalCoins}     ❤️ ${globalHearts}/${MAX_HEARTS}     🔥 Streak: ${winStreak}`, W/2, H/2 + 140);
+
+  // No ads toggle
+  ctx.fillStyle = noAds ? SUCCESS_COLOR : '#888';
+  ctx.font = '13px Arial';
+  ctx.fillText(noAds ? '✅ No Ads (ON)' : '🚫 No Ads (OFF)', W/2, H/2 + 170);
+  addButton(W/2-60, H/2+158, 120, 22, 'noads', ()=>{ noAds = !noAds; });
+
+  // Credits
+  ctx.fillStyle = '#888';
+  ctx.font = '12px Arial';
+  ctx.fillText('GDD by Korhan Eren Ata', W/2, H - 30);
+}
+
+function renderLevelSelect(){
+  buttons = [];
+  ctx.fillStyle = BG_COLOR;
+  ctx.fillRect(0,0,W,H);
+
+  ctx.fillStyle = '#1a1a2e';
+  ctx.font = 'bold 28px Arial';
+  ctx.textAlign = 'center';
+  ctx.fillText('SELECT LEVEL', W/2, 50);
+
+  // Back button
+  ctx.fillStyle = PANEL_LIGHT;
+  roundRect(15, 15, 60, 35, 8);
+  ctx.fill();
+  ctx.fillStyle = '#fff';
+  ctx.font = '14px Arial';
+  ctx.fillText('← Back', 45, 37);
+  addButton(15,15,60,35,'back',()=>{scene='menu';});
+
+  const cols = 4, bw = 95, bh = 65, gap = 10;
+  const startX = (W - (cols * bw + (cols-1)*gap))/2;
+  const startY = 80;
+  const diffColors = {easy:SUCCESS_COLOR, medium:'#F5A623', hard:DANGER_COLOR, very_hard:'#AB47BC', extreme:'#E91E63'};
+
+  LEVELS.forEach((lv, i)=>{
+    const col = i % cols, row = Math.floor(i / cols);
+    const bx = startX + col * (bw + gap);
+    const by = startY + row * (bh + gap);
+    const unlocked = i === 0 || completedLevels.has(i-1);
+    const completed = completedLevels.has(i);
+
+    ctx.fillStyle = unlocked ? (completed ? '#d4edda' : '#fff') : '#ccc';
+    ctx.globalAlpha = unlocked ? 1 : 0.5;
+    roundRect(bx, by, bw, bh, 10);
+    ctx.fill();
+    ctx.strokeStyle = completed ? SUCCESS_COLOR : (unlocked ? BUTTON_COLOR : '#999');
+    ctx.lineWidth = completed ? 3 : 1.5;
+    roundRect(bx, by, bw, bh, 10);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+
+    ctx.fillStyle = '#1a1a2e';
+    ctx.font = 'bold 18px Arial';
+    ctx.fillText(`${i+1}`, bx + bw/2, by + 22);
+
+    ctx.fillStyle = diffColors[lv.difficulty] || '#888';
+    ctx.font = '9px Arial';
+    ctx.fillText(lv.difficulty.replace('_',' ').toUpperCase(), bx + bw/2, by + 38);
+
+    ctx.fillStyle = '#666';
+    ctx.font = '10px Arial';
+    ctx.fillText(lv.label, bx + bw/2, by + 52);
+
+    if(completed){
+      ctx.fillStyle = SUCCESS_COLOR;
+      ctx.font = '14px Arial';
+      ctx.fillText('⭐', bx + bw - 14, by + 14);
+    }
+    if(!unlocked){
+      ctx.fillStyle = '#999';
+      ctx.font = '18px Arial';
+      ctx.fillText('🔒', bx + bw/2, by + 24);
+    }
+
+    if(unlocked){
+      addButton(bx, by, bw, bh, 'level_'+i, ()=>{
+        if(globalHearts <= 0){
+          addFlash('No hearts! Wait or buy more.', W/2, H/2, DANGER_COLOR);
+          return;
+        }
+        selectedLevel = i;
+        game = createGame(i);
+        scene = 'playing';
+      });
+    }
+  });
+}
+
+function renderPlaying(){
+  if(!game) return;
+  buttons = [];
+  const g = game;
+
+  // Background
+  ctx.fillStyle = BG_COLOR;
+  ctx.fillRect(0,0,W,H);
+
+  // Draw components
+  drawConveyorTrack(g);
+  drawGrid(g);
+
+  // Draw cars
+  g.cars.forEach(car => drawCar(car, g));
+
+  // Draw conveyor passengers
+  drawConveyorPassengers(g);
+
+  // Draw slots
+  const slotInfo = drawSlots(g);
+
+  // Draw booster bar
+  drawBoosterBar(g);
+
+  // Draw lanes
+  drawLanes(g);
+
+  // Draw HUD
+  drawHUD(g);
+
+  // Draw flash messages & particles
+  drawFlashMessages();
+  drawParticles();
+
+  // Click areas for game elements
+  // Cars (for maneuver step 1 / honk / failOffer)
+  if((g.activeMode === 'maneuver' && !g.maneuverCar) || g.activeMode === 'honk' || g.activeMode === 'failOffer'){
+    g.cars.forEach(car=>{
+      if(car.drivingOut) return;
+      const cs = g.cellSize;
+      const cw = (car.vw||1) * cs * 0.92, ch = (car.vh||1) * cs * 0.92;
+      // Only highlight 1x1 cars in maneuver mode
+      if(g.activeMode === 'maneuver' && (car.type||'car') !== 'car') return;
+      ctx.strokeStyle = '#FFD700';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([4,4]);
+      ctx.strokeRect(car.x - cw/2, car.y - ch/2, cw, ch);
+      ctx.setLineDash([]);
+      addButton(car.x - cw/2, car.y - ch/2, cw, ch, 'car_'+car.id, ()=>{
+        if(g.activeMode === 'honk'){
+          useHonkOnCar(g, car);
+        } else if(g.activeMode === 'maneuver'){
+          // Step 1: select the car → enter direction picker
+          g.maneuverCar = car;
+          g.maneuverOrigDir = car.dir;
+        } else if(g.activeMode === 'failOffer'){
+          if(!failOfferFreeUsed){
+            failOfferFreeUsed = true;
+            useFailOffer(g, car);
+          } else if(globalCoins >= 500){
+            globalCoins -= 500;
+            useFailOffer(g, car);
+          } else {
+            addFlash('Not enough coins (500)', W/2, H/2, DANGER_COLOR);
+          }
+        }
+      });
+    });
+  }
+
+  // Maneuver Step 2: direction picker + preview + confirm/cancel
+  if(g.activeMode === 'maneuver' && g.maneuverCar){
+    const car = g.maneuverCar;
+    const cs = g.cellSize;
+    const cx = car.x, cy = car.y;
+
+    // Highlight the selected car with solid gold border
+    const cw = cs * 0.92, ch = cs * 0.92;
+    ctx.strokeStyle = '#FFD700';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(cx - cw/2, cy - ch/2, cw, ch);
+
+    // Direction picker: 4 arrow buttons around the car
+    const dirs = [
+      {dir:'up',    label:'▲', dx:0,  dy:-1},
+      {dir:'down',  label:'▼', dx:0,  dy:1},
+      {dir:'left',  label:'◀', dx:-1, dy:0},
+      {dir:'right', label:'▶', dx:1,  dy:0}
+    ];
+    const btnSize = Math.max(28, cs * 0.45);
+    const offset = cs * 0.7;
+
+    dirs.forEach(d => {
+      const bx = cx + d.dx * offset - btnSize/2;
+      const by = cy + d.dy * offset - btnSize/2;
+      const isCurrentPreview = (car.dir === d.dir);
+      const isOriginal = (g.maneuverOrigDir === d.dir);
+
+      // Button background
+      ctx.fillStyle = isCurrentPreview ? '#FFD700' : (isOriginal ? '#556' : '#4A6B8A');
+      ctx.globalAlpha = isCurrentPreview ? 1.0 : 0.8;
+      roundRect(bx, by, btnSize, btnSize, 6);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = isCurrentPreview ? '#fff' : '#889';
+      ctx.lineWidth = isCurrentPreview ? 2 : 1;
+      roundRect(bx, by, btnSize, btnSize, 6);
+      ctx.stroke();
+
+      // Arrow label
+      ctx.fillStyle = isCurrentPreview ? '#000' : '#fff';
+      ctx.font = `bold ${Math.round(btnSize*0.55)}px Arial`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(d.label, bx + btnSize/2, by + btnSize/2);
+      ctx.textBaseline = 'alphabetic';
+
+      addButton(bx, by, btnSize, btnSize, 'dir_'+d.dir, ()=>{
+        // Preview: change direction visually (not committed yet)
+        car.dir = d.dir;
+      });
+    });
+
+    // Show "Preview" label above car
+    ctx.fillStyle = '#FFD700';
+    ctx.font = 'bold 11px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('Choose direction', cx, cy - cs * 0.7 - 14);
+
+    // Confirm & Cancel buttons below the grid
+    const btnY = g.gridY + g.gridH * g.cellSize + TRACK_WIDTH + 4;
+    const confirmW = 90, cancelW = 90, gap = 16, btnH = 30;
+    const totalBtnW = confirmW + cancelW + gap;
+    const startBtnX = (W - totalBtnW) / 2;
+
+    // Only allow confirm if direction changed from original
+    const dirChanged = (car.dir !== g.maneuverOrigDir);
+
+    // Confirm button
+    ctx.fillStyle = dirChanged ? SUCCESS_COLOR : '#555';
+    roundRect(startBtnX, btnY, confirmW, btnH, 6);
+    ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 13px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('Confirm ✓', startBtnX + confirmW/2, btnY + 20);
+
+    if(dirChanged){
+      addButton(startBtnX, btnY, confirmW, btnH, 'confirm_maneuver', ()=>{
+        // Commit the turn — consume booster
+        if(g.boosters.maneuver > 0) g.boosters.maneuver--;
+        else globalCoins -= g.boosterPrices.maneuver;
+        g.activeMode = null;
+        g.maneuverCar = null;
+        g.maneuverOrigDir = null;
+        // Recheck all cars for drive outs with new blocking
+        g.cars.forEach(c=>{ if(c.passengers>=c.seats && !c.locked) checkCarDriveOut(g,c); });
+        addFlash('Turned!', car.x, car.y - 20, SUCCESS_COLOR);
+      });
+    }
+
+    // Cancel button
+    ctx.fillStyle = DANGER_COLOR;
+    roundRect(startBtnX + confirmW + gap, btnY, cancelW, btnH, 6);
+    ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.fillText('Cancel ✗', startBtnX + confirmW + gap + cancelW/2, btnY + 20);
+
+    addButton(startBtnX + confirmW + gap, btnY, cancelW, btnH, 'cancel_maneuver', ()=>{
+      // Restore original direction
+      car.dir = g.maneuverOrigDir;
+      g.activeMode = null;
+      g.maneuverCar = null;
+      g.maneuverOrigDir = null;
+    });
+  }
+
+  // Lane passenger click areas
+  g.lanes.forEach((lane, li)=>{
+    let frontFound = false;
+    for(let pi=0;pi<lane.length;pi++){
+      const p = lane[pi];
+      if(p.sent) continue;
+      if(!p.screenX) continue;
+
+      if(!frontFound){
+        // Front passenger - always clickable
+        frontFound = true;
+        addButton(p.screenX-20, p.screenY-22, 40, 44, 'lane_'+li+'_'+pi, ()=>{
+          if(g.activeMode === 'pick'){
+            if(g.boosters.pick > 0) g.boosters.pick--;
+            else globalCoins -= g.boosterPrices.pick;
+            sendPassengerToConveyor(g, li, pi);
+            g.activeMode = null;
+          } else if(g.activeMode === 'wrench' && p.hidden && !p.revealed){
+            useWrenchOnTarget(g, {type:'hidden', laneIdx:li, idx:pi});
+          } else {
+            sendPassengerToConveyor(g, li);
+          }
+        });
+      } else if(g.activeMode === 'pick'){
+        // Pick mode: any passenger clickable (not just front)
+        addButton(p.screenX-20, p.screenY-22, 40, 44, 'lane_'+li+'_'+pi, ()=>{
+          if(g.boosters.pick > 0) g.boosters.pick--;
+          else globalCoins -= g.boosterPrices.pick;
+          sendPassengerToConveyor(g, li, pi);
+          g.activeMode = null;
+        });
+      }
+    }
+  });
+
+  // Slot click areas
+  g.slots.forEach((s, i)=>{
+    const slotW = 36, gap = 6;
+    const totalSlotW = g.slotCount * (slotW + gap) - gap;
+    const sx = (W - totalSlotW)/2 + i * (slotW + gap);
+    const sy = g.gridY + g.gridH*g.cellSize + TRACK_WIDTH + 22;
+    addButton(sx, sy, slotW, slotW, 'slot_'+i, ()=>{
+      sendSlotToConveyor(g, i);
+    });
+  });
+}
+
+function renderLevelComplete(){
+  buttons = [];
+  ctx.fillStyle = BG_COLOR;
+  ctx.fillRect(0,0,W,H);
+
+  // Celebration
+  ctx.fillStyle = '#1a1a2e';
+  ctx.font = 'bold 40px Arial';
+  ctx.textAlign = 'center';
+  ctx.fillText('LEVEL COMPLETE!', W/2, H/2 - 100);
+
+  ctx.font = '24px Arial';
+  ctx.fillText('⭐ ⭐ ⭐', W/2, H/2 - 50);
+
+  ctx.fillStyle = GOLD_COLOR;
+  ctx.font = 'bold 22px Arial';
+  ctx.fillText(`+${game ? game.coinsEarned : 0} coins`, W/2, H/2);
+
+  ctx.fillStyle = '#555';
+  ctx.font = '14px Arial';
+  ctx.fillText(`🔥 Win Streak: ${winStreak}`, W/2, H/2 + 35);
+
+  // Double coins button (simulate ad)
+  if(!noAds){
+    ctx.fillStyle = '#F5A623';
+    roundRect(W/2 - 100, H/2 + 55, 200, 45, 10);
+    ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 16px Arial';
+    ctx.fillText('📺 Watch Ad → x2 Coins', W/2, H/2 + 83);
+    addButton(W/2-100, H/2+55, 200, 45, 'double', ()=>{
+      if(game){
+        globalCoins += game.coinsEarned;
+        addFlash(`+${game.coinsEarned} bonus!`, W/2, H/2+40, GOLD_COLOR);
+      }
+      scene = 'levelSelect';
+    });
+  }
+
+  // Continue button
+  ctx.fillStyle = BUTTON_COLOR;
+  roundRect(W/2 - 80, H/2 + 115, 160, 45, 10);
+  ctx.fill();
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 18px Arial';
+  ctx.fillText('Continue', W/2, H/2 + 143);
+  addButton(W/2-80, H/2+115, 160, 45, 'continue', ()=>{ scene = 'levelSelect'; });
+
+  drawFlashMessages();
+}
+
+function renderLevelFail(){
+  buttons = [];
+  ctx.fillStyle = BG_COLOR;
+  ctx.fillRect(0,0,W,H);
+
+  ctx.fillStyle = DANGER_COLOR;
+  ctx.font = 'bold 36px Arial';
+  ctx.textAlign = 'center';
+  ctx.fillText('LEVEL FAILED', W/2, H/2 - 100);
+
+  ctx.fillStyle = '#555';
+  ctx.font = '16px Arial';
+  ctx.fillText('The parking lot is jammed!', W/2, H/2 - 60);
+
+  // Hearts
+  ctx.fillStyle = HEART_COLOR;
+  ctx.font = '20px Arial';
+  ctx.fillText(`❤️ ${globalHearts} remaining`, W/2, H/2 - 20);
+
+  // Fail offer
+  ctx.fillStyle = '#F5A623';
+  roundRect(W/2 - 110, H/2 + 10, 220, 50, 10);
+  ctx.fill();
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 15px Arial';
+  ctx.fillText('🚗 Drive Out! (Save a car)', W/2, H/2 + 40);
+  addButton(W/2-110, H/2+10, 220, 50, 'failoffer', ()=>{
+    if(game){
+      game.lost = false;
+      game.activeMode = 'failOffer';
+      scene = 'playing';
+    }
+  });
+
+  // Retry
+  ctx.fillStyle = BUTTON_COLOR;
+  roundRect(W/2 - 80, H/2 + 80, 160, 45, 10);
+  ctx.fill();
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 18px Arial';
+  ctx.fillText('Retry', W/2, H/2 + 108);
+  addButton(W/2-80, H/2+80, 160, 45, 'retry', ()=>{
+    globalHearts = Math.max(0, globalHearts - 1);
+    winStreak = 0;
+    if(globalHearts <= 0){
+      addFlash('No hearts left!', W/2, H/2, DANGER_COLOR);
+      scene = 'levelSelect';
+      return;
+    }
+    game = createGame(selectedLevel);
+    scene = 'playing';
+  });
+
+  // Back to levels
+  ctx.fillStyle = PANEL_LIGHT;
+  roundRect(W/2 - 60, H/2 + 145, 120, 35, 8);
+  ctx.fill();
+  ctx.fillStyle = '#fff';
+  ctx.font = '14px Arial';
+  ctx.fillText('← Levels', W/2, H/2 + 167);
+  addButton(W/2-60, H/2+145, 120, 35, 'back', ()=>{
+    globalHearts = Math.max(0, globalHearts - 1);
+    winStreak = 0;
+    scene = 'levelSelect';
+  });
+
+  drawFlashMessages();
+}
+
+function renderStore(){
+  buttons = [];
+  ctx.fillStyle = BG_COLOR;
+  ctx.fillRect(0,0,W,H);
+
+  ctx.fillStyle = '#1a1a2e';
+  ctx.font = 'bold 28px Arial';
+  ctx.textAlign = 'center';
+  ctx.fillText('🏪 GAME STORE', W/2, 50);
+
+  // Back
+  ctx.fillStyle = PANEL_LIGHT;
+  roundRect(15,15,60,35,8);
+  ctx.fill();
+  ctx.fillStyle = '#fff';
+  ctx.font = '14px Arial';
+  ctx.textAlign = 'center';
+  ctx.fillText('← Back', 45, 37);
+  addButton(15,15,60,35,'back',()=>{scene='menu';});
+
+  // Balance
+  ctx.fillStyle = GOLD_COLOR;
+  ctx.font = 'bold 16px Arial';
+  ctx.fillText(`🪙 ${globalCoins}     ❤️ ${globalHearts}`, W/2, 85);
+
+  const items = [
+    {name:'1,000 Coins', price:'FREE*', action:()=>{globalCoins+=1000;}},
+    {name:'5,000 Coins', price:'FREE*', action:()=>{globalCoins+=5000;}},
+    {name:'Refill Hearts', price:'FREE*', action:()=>{globalHearts=MAX_HEARTS;}},
+    {name:'5x Pick Passenger', price:'FREE*', action:()=>{freeBoostersUsed.pick=false; /* boosters reset on level */ }},
+    {name:'5x Add Slot', price:'FREE*', action:()=>{}},
+    {name:'5x Maneuver', price:'FREE*', action:()=>{}},
+    {name:'Small Bundle (All)', price:'FREE*', action:()=>{globalCoins+=3000; globalHearts=MAX_HEARTS;}},
+    {name:'No Ads Toggle', price:noAds?'ON':'OFF', action:()=>{noAds=!noAds;}},
+  ];
+
+  const itemH = 50, gap = 8, startY = 110;
+  items.forEach((item, i)=>{
+    const iy = startY + i * (itemH + gap);
+    ctx.fillStyle = '#fff';
+    roundRect(40, iy, W-80, itemH, 10);
+    ctx.fill();
+    ctx.strokeStyle = BUTTON_COLOR;
+    ctx.lineWidth = 1.5;
+    roundRect(40, iy, W-80, itemH, 10);
+    ctx.stroke();
+
+    ctx.fillStyle = '#1a1a2e';
+    ctx.font = '14px Arial';
+    ctx.textAlign = 'left';
+    ctx.fillText(item.name, 60, iy + 22);
+
+    ctx.fillStyle = SUCCESS_COLOR;
+    ctx.font = 'bold 13px Arial';
+    ctx.textAlign = 'left';
+    ctx.fillText(item.price, 60, iy + 40);
+
+    // Buy button
+    ctx.fillStyle = BUTTON_COLOR;
+    roundRect(W-150, iy + 10, 70, 30, 6);
+    ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 12px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('GET', W-115, iy + 30);
+    addButton(W-150, iy+10, 70, 30, 'buy_'+i, ()=>{
+      item.action();
+      addFlash('Claimed!', W/2, iy + 25, SUCCESS_COLOR);
+    });
+  });
+
+  ctx.fillStyle = '#999';
+  ctx.font = '11px Arial';
+  ctx.textAlign = 'center';
+  ctx.fillText('* Prototype mode: all items are free', W/2, H - 30);
+
+  drawFlashMessages();
+}
+
+// ============= RENDER DISPATCHER =============
+function render(){
+  switch(scene){
+    case 'menu': renderMenu(); break;
+    case 'levelSelect': renderLevelSelect(); break;
+    case 'playing': renderPlaying(); break;
+    case 'complete': renderLevelComplete(); break;
+    case 'fail': renderLevelFail(); break;
+    case 'store': renderStore(); break;
+  }
+}
+
+// ============= INPUT HANDLING =============
+function handleClick(mx, my){
+  // Check buttons (reverse order = top-most first)
+  for(let i = buttons.length-1; i>=0; i--){
+    const b = buttons[i];
+    if(mx >= b.x && mx <= b.x+b.w && my >= b.y && my <= b.y+b.h){
+      b.callback();
+      return;
+    }
+  }
+
+  // If in playing scene and clicked on empty area, cancel active mode
+  // But NOT if in maneuver direction-picker (has dedicated cancel button)
+  if(scene === 'playing' && game && game.activeMode){
+    if(game.activeMode === 'maneuver' && game.maneuverCar){
+      // In direction picker — do nothing on empty clicks (use Cancel button)
+      return;
+    }
+    // Restore maneuver car direction if cancelling before car selection
+    if(game.activeMode === 'maneuver' && game.maneuverCar && game.maneuverOrigDir !== undefined){
+      game.maneuverCar.dir = game.maneuverOrigDir;
+    }
+    game.activeMode = null;
+    game.maneuverCar = null;
+    game.maneuverOrigDir = null;
+  }
+}
+
+let lastTouchTime = 0; // prevent ghost clicks from touch events
+
+canvas.addEventListener('click', (e)=>{
+  // Ignore ghost clicks that follow touch events (300ms threshold)
+  if(Date.now() - lastTouchTime < 500) return;
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  const mx = (e.clientX - rect.left) * scaleX;
+  const my = (e.clientY - rect.top) * scaleY;
+  handleClick(mx, my);
+});
+
+canvas.addEventListener('touchstart', (e)=>{
+  e.preventDefault();
+  lastTouchTime = Date.now();
+  const touch = e.touches[0];
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  const mx = (touch.clientX - rect.left) * scaleX;
+  const my = (touch.clientY - rect.top) * scaleY;
+  handleClick(mx, my);
+}, {passive:false});
+
+// ============= GAME LOOP =============
+function gameLoop(timestamp){
+  const dt = Math.min((timestamp - lastTime) / 1000, 0.1); // cap delta
+  lastTime = timestamp;
+
+  update(dt);
+  render();
+
+  requestAnimationFrame(gameLoop);
+}
+
+// ============= START =============
+requestAnimationFrame(gameLoop);
+
+</script>
+</body>
+</html>

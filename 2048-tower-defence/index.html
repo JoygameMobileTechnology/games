@@ -1,0 +1,1926 @@
+<title>2048 Tower Defence</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>
+  :root {
+    --bg: #EDF0F6;
+    --well: #D7DDE9;
+    --cellbg: #C6CEDE;
+    --chip: #FFFFFF;
+    --ink: #1D2740;
+    --muted: #65718C;
+    --gold: #EFAD12;
+    --gold-ink: #3A2B00;
+    --danger: #D64545;
+    --hp-ok: #3FA97C;
+    --hp-warn: #E8A21C;
+    --shadow: 0 1px 3px rgba(29, 39, 64, .12);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0F1522;
+      --well: #1A2434;
+      --cellbg: #27324A;
+      --chip: #1B2536;
+      --ink: #EDF2FA;
+      --muted: #8B99B5;
+      --gold: #F7BE2A;
+      --gold-ink: #3A2B00;
+      --danger: #F0605C;
+      --hp-ok: #46BD8A;
+      --hp-warn: #F0B027;
+      --shadow: 0 1px 3px rgba(0, 0, 0, .35);
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #EDF0F6;
+    --well: #D7DDE9;
+    --cellbg: #C6CEDE;
+    --chip: #FFFFFF;
+    --ink: #1D2740;
+    --muted: #65718C;
+    --gold: #EFAD12;
+    --gold-ink: #3A2B00;
+    --danger: #D64545;
+    --hp-ok: #3FA97C;
+    --hp-warn: #E8A21C;
+    --shadow: 0 1px 3px rgba(29, 39, 64, .12);
+  }
+  :root[data-theme="dark"] {
+    --bg: #0F1522;
+    --well: #1A2434;
+    --cellbg: #27324A;
+    --chip: #1B2536;
+    --ink: #EDF2FA;
+    --muted: #8B99B5;
+    --gold: #F7BE2A;
+    --gold-ink: #3A2B00;
+    --danger: #F0605C;
+    --hp-ok: #46BD8A;
+    --hp-warn: #F0B027;
+    --shadow: 0 1px 3px rgba(0, 0, 0, .35);
+  }
+
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    min-height: 100dvh;
+    display: flex;
+    justify-content: center;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Avenir Next", "Segoe UI Variable Display", system-ui, -apple-system, "Segoe UI", sans-serif;
+    touch-action: manipulation;
+    overscroll-behavior: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .wrap {
+    --gamew: min(96vw, 620px);
+    width: var(--gamew);
+    padding: clamp(6px, 1.2vh, 14px) 0 10px;
+    display: flex;
+    flex-direction: column;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  .game {
+    position: relative;
+    display: flex;
+    gap: 10px;
+    height: clamp(440px, 90svh, 780px);
+  }
+
+  /* ---------- Field column (left) ---------- */
+  .field-col {
+    flex: 1.15;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .avbox {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 0;
+  }
+  .avatar {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: var(--chip);
+    box-shadow: var(--shadow);
+    display: grid;
+    place-items: center;
+    font-size: 21px;
+    border: 2px solid transparent;
+  }
+  .avbox.me .avatar { border-color: var(--gold); }
+  .avatar.hit { animation: shake .3s; }
+  @keyframes shake {
+    20% { transform: translateX(-3px); box-shadow: 0 0 16px var(--danger); }
+    60% { transform: translateX(3px); box-shadow: 0 0 16px var(--danger); }
+  }
+  .hpbar {
+    width: 92%;
+    height: 8px;
+    border-radius: 999px;
+    background: var(--cellbg);
+    overflow: hidden;
+  }
+  .hpfill {
+    height: 100%;
+    width: 100%;
+    border-radius: 999px;
+    background: var(--hp-ok);
+    transition: width .25s ease, background-color .25s;
+  }
+  .hpfill.warn { background: var(--hp-warn); }
+  .hpfill.low { background: var(--danger); }
+  .hpnum {
+    font-size: 13px;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+  }
+  .dmgf {
+    position: absolute;
+    translate: -50% 0;
+    top: 4px;
+    color: var(--danger);
+    font-weight: 800;
+    font-size: 14px;
+    pointer-events: none;
+    z-index: 5;
+    animation: rise .7s ease-out forwards;
+  }
+  @keyframes rise {
+    to { transform: translateY(-20px); opacity: 0; }
+  }
+
+  /* ---------- Battlefield ---------- */
+  .field {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    background: var(--well);
+    border-radius: 12px;
+    overflow: hidden;
+    touch-action: none;
+    -webkit-touch-callout: none;
+  }
+  .fgrid {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    grid-template-rows: repeat(9, 1fr);
+    gap: 2px;
+    padding: 2px;
+  }
+  .fcell {
+    border-radius: 4px;
+    background: color-mix(in srgb, var(--cellbg) 45%, transparent);
+  }
+  .fcell.mid {
+    background: repeating-linear-gradient(
+      45deg,
+      color-mix(in srgb, var(--muted) 18%, transparent) 0 5px,
+      transparent 5px 10px
+    );
+    border-radius: 0;
+  }
+  .fcell.mine { background: color-mix(in srgb, var(--cellbg) 70%, transparent); }
+  .field.placing .fcell.mine:not(.occ) {
+    outline: 2px dashed var(--gold);
+    outline-offset: -3px;
+    cursor: pointer;
+    animation: glowcell 1.2s ease-in-out infinite;
+  }
+  @keyframes glowcell {
+    50% { background: color-mix(in srgb, var(--gold) 22%, transparent); }
+  }
+  .field.placing .fcell.mine.occ { outline: 2px dashed color-mix(in srgb, var(--muted) 40%, transparent); outline-offset: -3px; }
+  .fcell.deny { animation: celldeny .25s ease; }
+  @keyframes celldeny {
+    30% { background: color-mix(in srgb, var(--danger) 45%, transparent); }
+  }
+
+  /* ---------- Units & towers ---------- */
+  .unit, .twr {
+    position: absolute;
+    left: 0;
+    top: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    pointer-events: none;
+    will-change: transform;
+    z-index: 2;
+  }
+  .twr { z-index: 1; }
+  .unit.born, .twr.born { animation: spawn .18s cubic-bezier(.3, 1.4, .5, 1) backwards; }
+  .unit .g, .twr .g {
+    line-height: 1;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .35));
+  }
+  .g svg, .ic svg { display: block; width: 100%; height: 100%; }
+  .unit.me .tc, .twr.me .tc { fill: var(--gold); }
+  .unit.ai .tc, .twr.ai .tc { fill: var(--danger); }
+  .unit .uhp, .twr .uhp {
+    width: 16px;
+    height: 3px;
+    border-radius: 2px;
+    background: rgba(0, 0, 0, .3);
+    margin-top: 1px;
+    overflow: hidden;
+  }
+  .twr .uhp { width: 20px; }
+  .unit .uhp i, .twr .uhp i { display: block; height: 100%; width: 100%; }
+  .unit.me .uhp i, .twr.me .uhp i { background: var(--gold); }
+  .unit.ai .uhp i, .twr.ai .uhp i { background: var(--danger); }
+  .unit.hurt .g, .twr.hurt .g { animation: hurtf .15s; }
+  @keyframes hurtf {
+    50% { filter: brightness(2.1); }
+  }
+  .unit.chill .g { filter: saturate(.5) brightness(1.15) drop-shadow(0 0 4px #7FD4FF); }
+  .twr.die { animation: twrdie .4s ease forwards; }
+  @keyframes twrdie {
+    to { opacity: 0; scale: .55; filter: grayscale(1); }
+  }
+  .wpn, .orb { transform-box: fill-box; transform-origin: 50% 85%; }
+  .k8 .wpn, .k16 .wpn, .k128 .wpn, .orb { transform-origin: 50% 50%; }
+  .unit.atk.k2 .wpn { animation: swing .32s ease; }
+  .unit.atk.k4 .wpn { animation: swing .3s ease; }
+  .unit.atk.k64 .wpn { animation: swingbig .3s ease-in; }
+  .unit.atk.k8 .wpn { animation: bowkick .25s ease; }
+  .unit.atk.k16 .wpn { animation: bash .3s ease; }
+  .unit.atk.k32 .wpn { animation: cast .35s ease; }
+  .unit.atk.k32 .orb { animation: orbpulse .35s ease; }
+  .unit.atk.k128 .wpn { animation: slam .35s ease; }
+  .twr .wpn { transform-origin: 50% 50%; }
+  .twr.atk .wpn { animation: twrfire .24s ease; }
+  .twr.atk .orb { animation: orbpulse .3s ease; }
+  @keyframes swing { 40% { transform: rotate(-55deg); } }
+  @keyframes swingbig { 35% { transform: rotate(-80deg); } }
+  @keyframes bowkick { 30% { transform: translateX(2px) scaleX(.94); } }
+  @keyframes bash { 35% { transform: translateX(-3.5px); } }
+  @keyframes cast { 40% { transform: rotate(-14deg); } }
+  @keyframes orbpulse { 40% { transform: scale(1.5); } }
+  @keyframes slam { 35% { transform: translateY(3.5px); } }
+  @keyframes twrfire { 40% { transform: scale(1.16); } }
+  .splat {
+    position: absolute;
+    z-index: 1;
+    pointer-events: none;
+    translate: -50% -50%;
+    background:
+      radial-gradient(circle at 30% 40%, rgba(178, 34, 52, .85) 0 28%, transparent 30%),
+      radial-gradient(circle at 65% 30%, rgba(178, 34, 52, .75) 0 18%, transparent 20%),
+      radial-gradient(circle at 55% 65%, rgba(150, 24, 40, .8) 0 32%, transparent 34%),
+      radial-gradient(circle at 20% 75%, rgba(178, 34, 52, .6) 0 12%, transparent 14%),
+      radial-gradient(circle at 82% 62%, rgba(150, 24, 40, .55) 0 10%, transparent 12%);
+    animation: splatfade 2s ease-out forwards;
+  }
+  @keyframes splatfade {
+    0% { scale: .3; opacity: 0; }
+    12% { scale: 1; opacity: 1; }
+    55% { opacity: .85; }
+    100% { opacity: 0; }
+  }
+  .proj {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: #DCE8FF;
+    box-shadow: 0 0 5px rgba(120, 150, 255, .9);
+    z-index: 3;
+    pointer-events: none;
+  }
+  .proj.magic {
+    width: 7px;
+    height: 7px;
+    background: #E9C8FF;
+    box-shadow: 0 0 7px rgba(169, 69, 196, .95);
+  }
+  .proj.arrow {
+    width: 12px;
+    height: 2.5px;
+    border-radius: 2px;
+    background: linear-gradient(90deg, #8B6844 62%, #D7DDE9 62%);
+    box-shadow: none;
+  }
+  .proj.ball {
+    width: 7px;
+    height: 7px;
+    background: #39445C;
+    box-shadow: 0 0 4px rgba(0, 0, 0, .5);
+  }
+  .proj.frost {
+    width: 6px;
+    height: 6px;
+    background: #BFE9FF;
+    box-shadow: 0 0 7px rgba(127, 212, 255, .95);
+  }
+  .proj.flame {
+    width: 6px;
+    height: 6px;
+    background: #FF9A3D;
+    box-shadow: 0 0 7px rgba(255, 122, 40, .95);
+  }
+
+  /* ---------- Boards column (right) ---------- */
+  .boards-col {
+    flex: 1.85;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    gap: 4px;
+  }
+  .bname {
+    font-size: 11px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    font-weight: 700;
+    color: var(--muted);
+    white-space: nowrap;
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+  .hud { line-height: 1.1; text-align: center; }
+  .timer {
+    font-size: clamp(22px, 4svh, 30px);
+    font-weight: 900;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: .02em;
+  }
+  .timer.urgent {
+    color: var(--danger);
+    animation: pulse 1s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    50% { opacity: .45; }
+  }
+  .roundline {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--muted);
+    letter-spacing: .08em;
+    text-transform: uppercase;
+  }
+  .role {
+    font-size: 12.5px;
+    font-weight: 800;
+    letter-spacing: .04em;
+  }
+  .role.atk { color: var(--gold); }
+  .role.def { color: var(--hp-ok); }
+
+  .board {
+    position: relative;
+    flex-shrink: 0;
+    background: var(--well);
+    border-radius: 12px;
+    touch-action: none;
+    -webkit-touch-callout: none;
+    --gap: clamp(5px, 1.2vw, 8px);
+    width: var(--bsize);
+    height: var(--bsize);
+    --cs: calc((var(--bsize) - var(--gap) * 5) / 4);
+  }
+  .board.opp { --bsize: min(calc(var(--gamew) * .34), 22svh); }
+  .board.me { --bsize: min(calc(var(--gamew) * .55), 36svh); }
+  .grid {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    grid-template-rows: repeat(4, 1fr);
+    gap: var(--gap);
+    padding: var(--gap);
+  }
+  .cellbg { background: var(--cellbg); border-radius: 7px; }
+
+  .tile {
+    position: absolute;
+    top: 0; left: 0;
+    width: var(--cs);
+    height: var(--cs);
+    border-radius: 7px;
+    display: grid;
+    place-items: center;
+    color: #fff;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    font-size: calc(var(--cs) * .42);
+    z-index: 1;
+    transform: translate(
+      calc(var(--gap) + var(--c) * (var(--cs) + var(--gap))),
+      calc(var(--gap) + var(--r) * (var(--cs) + var(--gap)))
+    );
+    transition: transform 130ms cubic-bezier(.25, .8, .3, 1), filter .15s, scale .15s;
+  }
+  .tile[data-len="3"] { font-size: calc(var(--cs) * .36); }
+  .tile[data-len="4"] { font-size: calc(var(--cs) * .30); }
+  .tile[data-len="5"], .tile[data-len="6"] { font-size: calc(var(--cs) * .24); }
+  .board.me .tile { cursor: pointer; }
+  @media (hover: hover) {
+    .board.me .tile:not(.firing):hover { filter: brightness(1.12); }
+  }
+  .tile.sel {
+    outline: 3px solid var(--gold);
+    outline-offset: -3px;
+    scale: 1.06;
+    z-index: 2;
+    box-shadow: 0 0 14px color-mix(in srgb, var(--gold) 65%, transparent);
+  }
+  .tile.firing {
+    filter: brightness(.72) saturate(.85);
+    scale: .94;
+    cursor: default;
+  }
+
+  .t2    { background: #43A047; }
+  .t4    { background: #3D77C2; }
+  .t8    { background: #7A4FD6; }
+  .t16   { background: #EE7A28; }
+  .t32   { background: #D9453E; }
+  .t64   { background: #F7B816; color: #3A2B00; box-shadow: 0 0 16px rgba(247, 184, 22, .45); }
+  .t128  { background: #E84A8F; box-shadow: 0 0 22px rgba(232, 74, 143, .5); }
+  .t256  { background: #E25545; box-shadow: 0 0 18px rgba(226, 85, 69, .40); }
+  .t512  { background: #EE7A28; box-shadow: 0 0 20px rgba(238, 122, 40, .45); }
+  .t1024 { background: #F49A18; box-shadow: 0 0 24px rgba(244, 154, 24, .50); text-shadow: 0 1px 2px rgba(0,0,0,.25); }
+  .t2048 { background: #F7B816; color: #3A2B00; box-shadow: 0 0 30px rgba(247, 184, 22, .60); }
+  .tsuper { background: #FFE082; color: #4A3800; box-shadow: 0 0 34px rgba(255, 224, 130, .65); }
+
+  .spawn { animation: spawn 180ms 100ms cubic-bezier(.3, 1.4, .5, 1) backwards; }
+  @keyframes spawn {
+    from { scale: 0; opacity: 0; }
+  }
+  .pop { animation: pop 180ms ease; }
+  @keyframes pop {
+    0% { scale: 1; }
+    45% { scale: 1.2; }
+    100% { scale: 1; }
+  }
+  .consume { animation: consume 180ms ease forwards; }
+  @keyframes consume {
+    to { scale: .2; opacity: 0; }
+  }
+  .deny { animation: deny .22s ease; }
+  @keyframes deny {
+    25% { rotate: -4deg; }
+    75% { rotate: 4deg; }
+  }
+
+  .lock {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    z-index: 5;
+    pointer-events: none;
+  }
+  .lock span {
+    background: var(--chip);
+    color: var(--muted);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    padding: 5px 10px;
+    border-radius: 999px;
+    box-shadow: var(--shadow);
+  }
+
+  /* ---------- Round splash ---------- */
+  .round-splash {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    z-index: 65;
+    pointer-events: none;
+  }
+  .round-splash .inner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    animation: fsplash 1.35s cubic-bezier(.3, 1.4, .5, 1) forwards;
+  }
+  .round-splash .rs-t {
+    font-size: clamp(15px, 3.4vw, 22px);
+    font-weight: 800;
+    letter-spacing: .18em;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+  .round-splash .rs-s {
+    font-size: clamp(34px, 8.4vw, 58px);
+    font-weight: 900;
+    letter-spacing: .05em;
+  }
+  .round-splash .rs-s.atk { color: var(--gold); text-shadow: 0 2px 18px rgba(247, 190, 42, .5); }
+  .round-splash .rs-s.def { color: var(--hp-ok); text-shadow: 0 2px 18px rgba(70, 189, 138, .5); }
+  @keyframes fsplash {
+    0% { scale: .2; opacity: 0; }
+    18% { scale: 1.08; opacity: 1; }
+    80% { scale: 1; opacity: 1; }
+    100% { scale: 1.1; opacity: 0; }
+  }
+
+  /* ---------- Overlay ---------- */
+  .overlay {
+    position: absolute;
+    inset: -6px;
+    display: grid;
+    place-items: center;
+    background: color-mix(in srgb, var(--bg) 74%, transparent);
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+    border-radius: 14px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .25s;
+    z-index: 70;
+  }
+  .overlay.show { opacity: 1; pointer-events: auto; }
+  .panel {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    align-items: center;
+    padding: 16px;
+    max-width: 360px;
+    max-height: 96%;
+    overflow-y: auto;
+  }
+  .panel-title { font-size: 26px; font-weight: 900; margin: 0; text-wrap: balance; }
+  .panel-title .vs { color: var(--gold); }
+  .panel-sub { color: var(--muted); font-size: 13px; margin: 0; line-height: 1.5; text-wrap: balance; }
+  .tally {
+    color: var(--muted);
+    font-size: 12.5px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  .count {
+    font-size: 80px;
+    font-weight: 900;
+    margin: 0;
+    font-variant-numeric: tabular-nums;
+  }
+  .ov-actions { display: flex; gap: 8px; }
+
+  .rgroup {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    align-items: center;
+  }
+  .rlabel {
+    font-size: 10.5px;
+    font-weight: 800;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .rlabel .atk { color: var(--gold); }
+  .rlabel .def { color: var(--hp-ok); }
+  .roster {
+    display: flex;
+    gap: 4px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  .roster .tc { fill: var(--gold); }
+  .ri {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+    width: 46px;
+    font-size: 9px;
+    color: var(--muted);
+  }
+  .ri .ic { width: 27px; height: 27px; }
+  .ri b {
+    font-size: 10.5px;
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .btn {
+    border: 0;
+    cursor: pointer;
+    border-radius: 10px;
+    padding: 10px 16px;
+    font: 600 14px inherit;
+    font-family: inherit;
+    background: var(--chip);
+    color: var(--ink);
+    box-shadow: var(--shadow);
+  }
+  .btn.primary {
+    background: var(--gold);
+    color: var(--gold-ink);
+    font-weight: 800;
+  }
+  .btn.big { padding: 12px 34px; font-size: 16px; }
+  .btn:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+  .seg {
+    display: flex;
+    background: var(--chip);
+    border-radius: 10px;
+    padding: 4px;
+    gap: 4px;
+    box-shadow: var(--shadow);
+  }
+  .seg button {
+    border: 0;
+    background: transparent;
+    padding: 8px 16px;
+    border-radius: 7px;
+    font: 600 14px inherit;
+    font-family: inherit;
+    color: var(--muted);
+    cursor: pointer;
+  }
+  .seg button.on {
+    background: var(--gold);
+    color: var(--gold-ink);
+    font-weight: 800;
+  }
+  .seg button:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+  .hint {
+    margin: 6px 0 0;
+    text-align: center;
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1.5;
+    min-height: 18px;
+  }
+  .hint b { color: var(--ink); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .tile { transition: none; }
+    .spawn, .pop, .consume, .deny, .timer.urgent, .avatar.hit, .dmgf,
+    .unit.born, .twr.born, .unit.hurt .g, .twr.hurt .g, .splat,
+    .field.placing .fcell.mine:not(.occ), .fcell.deny, .twr.die { animation: none; }
+    .unit.atk .wpn, .unit.atk .orb, .twr.atk .wpn, .twr.atk .orb { animation: none; }
+    .overlay { transition: none; }
+  }
+</style>
+
+<div class="wrap">
+  <div class="game" id="game">
+    <div class="field-col">
+      <div class="avbox opp" id="aiCol">
+        <div class="avatar" id="aiAvatar">🤖</div>
+        <div class="hpbar"><div class="hpfill" id="aiHpFill"></div></div>
+        <div class="hpnum" id="aiHpNum">100</div>
+      </div>
+      <div class="field" id="field"><div class="fgrid" id="fgrid"></div></div>
+      <div class="avbox me" id="meCol">
+        <div class="avatar" id="meAvatar">😎</div>
+        <div class="hpbar"><div class="hpfill" id="meHpFill"></div></div>
+        <div class="hpnum" id="meHpNum">100</div>
+      </div>
+    </div>
+
+    <div class="boards-col">
+      <div class="bname">Rakip · <span id="diffLabel"></span> · <span class="role" id="aiRole"></span></div>
+      <div class="board opp" id="aiBoard"></div>
+      <div class="hud">
+        <div class="roundline" id="roundLine">Tur -/-</div>
+        <span class="timer" id="timer">0:45</span>
+        <div class="role" id="meRole"></div>
+      </div>
+      <div class="board me" id="meBoard"></div>
+      <div class="bname">Sen</div>
+    </div>
+
+    <div class="overlay show" id="overlay">
+      <div class="panel" id="startPanel">
+        <p class="panel-title">2048 <span class="vs">TOWER DEFENCE</span></p>
+        <p class="panel-sub">2048 oyna, taşa dokunup seç, kendi alanına yerleştir. <b>Saldırırken</b> taşlar asker olur ve rakip kaleye yürür; <b>savunurken</b> kule olur ve gelenleri vurur. Roller her tur değişir — 6 tur sonunda HP'si yüksek olan kazanır.</p>
+        <div class="rgroup">
+          <span class="rlabel"><span class="atk">⚔️ Saldırı</span> — Askerler</span>
+          <div class="roster" id="rosterAtk"></div>
+        </div>
+        <div class="rgroup">
+          <span class="rlabel"><span class="def">🛡️ Savunma</span> — Kuleler</span>
+          <div class="roster" id="rosterDef"></div>
+        </div>
+        <div class="seg" id="diffSeg" role="group" aria-label="Zorluk">
+          <button data-d="easy">Kolay</button>
+          <button data-d="mid">Orta</button>
+          <button data-d="hard">Zor</button>
+        </div>
+        <button class="btn primary big" id="startBtn">Başla</button>
+        <div class="tally" id="tallyStart"></div>
+      </div>
+      <p class="count" id="countPanel" hidden>3</p>
+      <div class="panel" id="endPanel" hidden>
+        <p class="panel-title" id="endTitle"></p>
+        <p class="panel-sub" id="endSub"></p>
+        <div class="ov-actions">
+          <button class="btn" id="chgBtn">Zorluk Değiştir</button>
+          <button class="btn primary" id="againBtn">Tekrar Oyna</button>
+        </div>
+        <div class="tally" id="tallyEnd"></div>
+      </div>
+    </div>
+  </div>
+
+  <p class="hint" id="hint">Kaydır: hamle · Taşa dokun: seç · Kendi alanına dokun: yerleştir</p>
+</div>
+
+<script>
+  const SIZE = 4;
+  const MOVE_MS = 130;
+  const ROUND_MS = 45000;
+  const ROUNDS = 6;
+  const MAX_HP = 100;
+  const COLS = 5, ROWS = 9, MID_ROW = 4;
+  const DEPLOY_COOLDOWN = 250;
+  const DEPLOY_CAST_MS = 350;
+  const MAX_SOLDIERS = 15;
+
+  /* Tile value → attacker unit. speedC/rangeC in cell units (scale with field). */
+  const SOLDIERS = {
+    2:   { name: 'Çaylak',    hp: 3,  dmg: 1,  per: 1.25, speedC: 0.9,  rangeC: 0.6,  size: 15, px: 22, breach: 6 },
+    4:   { name: 'Asker',     hp: 7,  dmg: 2,  per: 1.0,  speedC: 0.9,  rangeC: 0.6,  size: 17, px: 25, breach: 9 },
+    8:   { name: 'Okçu',      hp: 7,  dmg: 1,  per: 1.0,  speedC: 0.9,  rangeC: 2.3,  size: 17, px: 25, ranged: true, proj: 'arrow', breach: 8 },
+    16:  { name: 'Şövalye',   hp: 32, dmg: 6,  per: 1.25, speedC: 0.6,  rangeC: 0.6,  size: 19, px: 28, breach: 16 },
+    32:  { name: 'Büyücü',    hp: 16, dmg: 5,  per: 1.7,  speedC: 0.6,  rangeC: 2.2,  size: 19, px: 29, ranged: true, proj: 'magic', splashC: 0.7, breach: 14 },
+    64:  { name: 'Berserker', hp: 50, dmg: 14, per: 0.85, speedC: 1.3,  rangeC: 0.6,  size: 19, px: 28, breach: 24 },
+    128: { name: 'Dev',       hp: 90, dmg: 18, per: 2.0,  speedC: 0.45, rangeC: 0.65, size: 25, px: 40, breach: 40 }
+  };
+
+  /* Tile value → defender tower. Barikat has no attack — it's a roadblock. */
+  const TOWERS = {
+    2:   { name: 'Barikat',     hp: 34,  dmg: 0,  per: 0,    rangeC: 0,   size: 20, px: 26 },
+    4:   { name: 'Ok Kulesi',   hp: 20,  dmg: 2,  per: 0.7,  rangeC: 2.3, size: 18, px: 26, proj: 'arrow' },
+    8:   { name: 'Top Kulesi',  hp: 26,  dmg: 5,  per: 1.8,  rangeC: 2.7, size: 20, px: 28, proj: 'ball', splashC: 0.8 },
+    16:  { name: 'Buz Kulesi',  hp: 30,  dmg: 2,  per: 1.0,  rangeC: 2.4, size: 20, px: 28, proj: 'frost', slow: true },
+    32:  { name: 'Büyü Kulesi', hp: 30,  dmg: 9,  per: 1.6,  rangeC: 3.4, size: 20, px: 29, proj: 'magic' },
+    64:  { name: 'Alev Kulesi', hp: 46,  dmg: 4,  per: 0.45, rangeC: 1.8, size: 20, px: 29, proj: 'flame' },
+    128: { name: 'Kale',        hp: 130, dmg: 12, per: 1.2,  rangeC: 3.0, size: 26, px: 40, proj: 'ball', splashC: 0.7 }
+  };
+
+  /* 2D sprites — flat vector, 32×32. class="tc" elements take the team color. */
+  const SPRITES = {
+    2: `<svg viewBox="0 0 32 32">
+      <g class="wpn"><rect x="21.5" y="9" width="3" height="13" rx="1.5" fill="#8B6844" transform="rotate(18 23 15)"/></g>
+      <circle cx="15" cy="9" r="5.2" fill="#E8B88A"/>
+      <rect x="9.8" y="5.4" width="10.4" height="2.6" rx="1.3" class="tc"/>
+      <rect x="9.5" y="14.5" width="11" height="10.5" rx="3" fill="#7A8699"/>
+      <rect x="12" y="25" width="2.6" height="5.5" rx="1" fill="#5A4634"/>
+      <rect x="15.6" y="25" width="2.6" height="5.5" rx="1" fill="#5A4634"/>
+    </svg>`,
+    4: `<svg viewBox="0 0 32 32">
+      <g class="wpn"><rect x="23" y="6" width="2.6" height="14" rx="1" fill="#D7DDE9"/>
+      <rect x="20.8" y="19" width="7" height="2.4" rx="1" fill="#8B6844"/></g>
+      <circle cx="14.5" cy="9.5" r="5" fill="#E8B88A"/>
+      <path d="M9.5 9 a5 5 0 0 1 10 0 z" fill="#9AA7BE"/>
+      <rect x="13" y="2" width="3" height="3.6" rx="1.4" class="tc"/>
+      <rect x="9.3" y="14.8" width="10.4" height="10" rx="3" fill="#9AA7BE"/>
+      <rect x="9.3" y="17.6" width="10.4" height="2" class="tc"/>
+      <rect x="11.5" y="25" width="2.6" height="5.5" rx="1" fill="#39445C"/>
+      <rect x="15.2" y="25" width="2.6" height="5.5" rx="1" fill="#39445C"/>
+    </svg>`,
+    8: `<svg viewBox="0 0 32 32">
+      <g class="wpn"><path d="M24 5 a11 11 0 0 1 0 22" fill="none" stroke="#8B6844" stroke-width="2.2" stroke-linecap="round"/>
+      <line x1="24" y1="5" x2="24" y2="27" stroke="#D7DDE9" stroke-width="1"/></g>
+      <circle cx="14" cy="10" r="4.8" fill="#E8B88A"/>
+      <path d="M8.6 10 L14 2.2 L19.4 10 z" class="tc"/>
+      <path d="M9 15 h10 l-1.2 10 h-7.6 z" fill="#4C7A5E"/>
+      <rect x="11.2" y="25" width="2.6" height="5.5" rx="1" fill="#39445C"/>
+      <rect x="14.9" y="25" width="2.6" height="5.5" rx="1" fill="#39445C"/>
+    </svg>`,
+    16: `<svg viewBox="0 0 32 32">
+      <circle cx="16" cy="8.5" r="5" fill="#9AA7BE"/>
+      <rect x="11.8" y="7.2" width="8.4" height="2" rx="1" fill="#39445C"/>
+      <rect x="12.5" y="1.6" width="7" height="2.4" rx="1.2" class="tc"/>
+      <rect x="10" y="13.8" width="12" height="11" rx="3" fill="#7A8699"/>
+      <rect x="12.2" y="25" width="2.8" height="5.5" rx="1" fill="#39445C"/>
+      <rect x="17" y="25" width="2.8" height="5.5" rx="1" fill="#39445C"/>
+      <g class="wpn"><path d="M5.5 13 h9 v9 q0 4 -4.5 5.5 q-4.5 -1.5 -4.5 -5.5 z" fill="#D7DDE9"/>
+      <rect x="9.1" y="14.6" width="1.8" height="7.2" rx=".9" class="tc"/>
+      <rect x="6.9" y="16.8" width="6.2" height="1.8" rx=".9" class="tc"/></g>
+    </svg>`,
+    32: `<svg viewBox="0 0 32 32">
+      <g class="wpn"><rect x="23.4" y="6" width="2.4" height="20" rx="1.2" fill="#8B6844"/>
+      <g class="orb"><circle cx="24.6" cy="5.4" r="4.4" fill="#F7BE2A" opacity=".3"/>
+      <circle cx="24.6" cy="5.4" r="2.8" fill="#F7BE2A"/></g></g>
+      <circle cx="14" cy="11" r="4.6" fill="#E8B88A"/>
+      <path d="M7.5 11.5 L14 1.5 L20.5 11.5 z" class="tc"/>
+      <path d="M11.8 13.5 h4.4 v3.2 q-2.2 2.2 -4.4 0 z" fill="#E8EDF5"/>
+      <path d="M9 16 h10 l1.6 9.5 h-13.2 z" fill="#5B63D3"/>
+    </svg>`,
+    64: `<svg viewBox="0 0 32 32">
+      <g class="wpn"><rect x="22.6" y="5" width="2.6" height="18" rx="1.3" fill="#8B6844" transform="rotate(14 24 14)"/>
+      <path d="M20 4.5 q6 1.5 6 7 l-4 0 q0 -4 -2 -7 z" fill="#B9C4D6"/></g>
+      <circle cx="14" cy="9.5" r="5" fill="#E8B88A"/>
+      <path d="M8.6 7 q-2.4 -4 1 -5.6 q1 2.6 2.4 3.4 z" fill="#D9CDBB"/>
+      <path d="M19.4 7 q2.4 -4 -1 -5.6 q-1 2.6 -2.4 3.4 z" fill="#D9CDBB"/>
+      <rect x="10.4" y="6.6" width="7.2" height="1.8" rx=".9" class="tc"/>
+      <rect x="9.3" y="14.5" width="9.4" height="10.3" rx="3" fill="#C98B5F"/>
+      <rect x="9.3" y="20.6" width="9.4" height="2" class="tc"/>
+      <rect x="11.4" y="25" width="2.7" height="5.5" rx="1" fill="#5A4634"/>
+      <rect x="15" y="25" width="2.7" height="5.5" rx="1" fill="#5A4634"/>
+    </svg>`,
+    128: `<svg viewBox="0 0 32 32">
+      <rect x="6" y="10" width="20" height="16" rx="6" fill="#7C87A2"/>
+      <rect x="10.5" y="3.5" width="11" height="8" rx="3.5" fill="#8D97B0"/>
+      <rect x="12.6" y="6.4" width="2.4" height="1.8" rx=".9" fill="#2A3348"/>
+      <rect x="17" y="6.4" width="2.4" height="1.8" rx=".9" fill="#2A3348"/>
+      <g class="wpn"><circle cx="5.4" cy="18" r="4.2" fill="#8D97B0"/>
+      <circle cx="26.6" cy="18" r="4.2" fill="#8D97B0"/></g>
+      <path d="M12 14 l3 3 m5 1 l-2.6 2.6" stroke="#5A6579" stroke-width="1.4" fill="none" stroke-linecap="round"/>
+      <rect x="9" y="24.4" width="14" height="2.2" rx="1.1" class="tc"/>
+      <rect x="10.5" y="26.6" width="4.4" height="4.6" rx="1.4" fill="#5A6579"/>
+      <rect x="17.1" y="26.6" width="4.4" height="4.6" rx="1.4" fill="#5A6579"/>
+    </svg>`
+  };
+
+  const TOWER_SPRITES = {
+    2: `<svg viewBox="0 0 32 32">
+      <rect x="4" y="21" width="24" height="4" rx="2" fill="#8B6844"/>
+      <rect x="7" y="8" width="3.4" height="18" rx="1.7" fill="#A98457" transform="rotate(18 8.7 17)"/>
+      <rect x="14.3" y="6" width="3.4" height="20" rx="1.7" fill="#8B6844"/>
+      <rect x="21.6" y="8" width="3.4" height="18" rx="1.7" fill="#A98457" transform="rotate(-18 23.3 17)"/>
+      <rect x="5" y="26.4" width="22" height="3.2" rx="1.6" class="tc"/>
+    </svg>`,
+    4: `<svg viewBox="0 0 32 32">
+      <rect x="9" y="12" width="14" height="16" rx="2" fill="#9AA7BE"/>
+      <rect x="8" y="7" width="4.4" height="6" rx="1" fill="#7A8699"/>
+      <rect x="13.8" y="7" width="4.4" height="6" rx="1" fill="#7A8699"/>
+      <rect x="19.6" y="7" width="4.4" height="6" rx="1" fill="#7A8699"/>
+      <rect x="13.4" y="17.5" width="5.2" height="7" rx="2.4" fill="#2A3348"/>
+      <g class="wpn"><path d="M16 2.6 v6" stroke="#8B6844" stroke-width="2.2" stroke-linecap="round"/>
+      <path d="M12.6 5.6 h6.8" stroke="#D7DDE9" stroke-width="1.6" stroke-linecap="round"/></g>
+      <rect x="9" y="14.2" width="14" height="2" class="tc"/>
+      <rect x="7.5" y="27" width="17" height="3" rx="1.5" fill="#7A8699"/>
+    </svg>`,
+    8: `<svg viewBox="0 0 32 32">
+      <g class="wpn"><rect x="13.6" y="2.5" width="4.8" height="13" rx="2.2" fill="#39445C"/>
+      <rect x="12.6" y="2.5" width="6.8" height="3.4" rx="1.6" fill="#2A3348"/></g>
+      <circle cx="16" cy="20" r="8.5" fill="#7A8699"/>
+      <circle cx="16" cy="20" r="4.6" fill="#39445C"/>
+      <rect x="6" y="26.8" width="20" height="3.2" rx="1.6" class="tc"/>
+    </svg>`,
+    16: `<svg viewBox="0 0 32 32">
+      <rect x="10" y="19" width="12" height="9" rx="2" fill="#7A8699"/>
+      <g class="wpn"><path d="M16 2 L21.5 12 L16 21 L10.5 12 z" fill="#9FDCFF"/>
+      <path d="M16 5 L19.4 12 L16 17.8 L12.6 12 z" fill="#E2F6FF"/></g>
+      <rect x="8.6" y="26.4" width="14.8" height="3.2" rx="1.6" class="tc"/>
+    </svg>`,
+    32: `<svg viewBox="0 0 32 32">
+      <path d="M12 28 L14 10 h4 L20 28 z" fill="#5B63D3"/>
+      <g class="wpn"><g class="orb"><circle cx="16" cy="7" r="5" fill="#A945C4" opacity=".35"/>
+      <circle cx="16" cy="7" r="3.1" fill="#E9C8FF"/></g></g>
+      <rect x="9" y="26.4" width="14" height="3.2" rx="1.6" class="tc"/>
+    </svg>`,
+    64: `<svg viewBox="0 0 32 32">
+      <path d="M10 16 h12 l-1.6 12 h-8.8 z" fill="#7A8699"/>
+      <g class="wpn"><path d="M16 2 q4.5 4.5 2.6 8.2 q3 -.8 3.4 -3 q2.6 6 -2.2 9 q-3.8 2.3 -7.6 0 q-4.8 -3 -2.2 -9 q.5 2.2 3.4 3 Q11.5 6.5 16 2 z" fill="#FF9A3D"/>
+      <path d="M16 8 q2.4 2.8 1 5.2 q-1 1.6 -2.6 1 q-2 -1 -1 -3.4 q.8 -1.6 2.6 -2.8 z" fill="#FFD166"/></g>
+      <rect x="9" y="26.4" width="14" height="3.2" rx="1.6" class="tc"/>
+    </svg>`,
+    128: `<svg viewBox="0 0 32 32">
+      <rect x="5" y="12" width="22" height="16" rx="2" fill="#8D97B0"/>
+      <rect x="4" y="6" width="5" height="8" rx="1" fill="#7A8699"/>
+      <rect x="13.5" y="4" width="5" height="10" rx="1" fill="#7A8699"/>
+      <rect x="23" y="6" width="5" height="8" rx="1" fill="#7A8699"/>
+      <rect x="13.6" y="19" width="4.8" height="9" rx="2.2" fill="#2A3348"/>
+      <g class="wpn"><path d="M16 .8 v4" stroke="#5A6579" stroke-width="1.6"/>
+      <path d="M16 1.2 h5 l-1.4 1.6 L21 4.4 h-5 z" class="tc"/></g>
+      <rect x="5" y="14.5" width="22" height="2" class="tc"/>
+    </svg>`
+  };
+
+  const $ = id => document.getElementById(id);
+  const fieldEl = $('field');
+  const storage = {
+    get(key) { try { return localStorage.getItem(key); } catch { return null; } },
+    set(key, val) { try { localStorage.setItem(key, val); } catch { /* sandboxed */ } }
+  };
+  const inb = (r, c) => r >= 0 && r < SIZE && c >= 0 && c < SIZE;
+
+  /* ---------- 2048 board ---------- */
+
+  class Game {
+    constructor(rootEl) {
+      rootEl.innerHTML = '';
+      const grid = document.createElement('div');
+      grid.className = 'grid';
+      grid.setAttribute('aria-hidden', 'true');
+      for (let i = 0; i < SIZE * SIZE; i++) {
+        const cell = document.createElement('div');
+        cell.className = 'cellbg';
+        grid.appendChild(cell);
+      }
+      this.tilesEl = document.createElement('div');
+      this.lockEl = document.createElement('div');
+      this.lockEl.className = 'lock';
+      this.lockEl.innerHTML = '<span>Hamle yok — taş harca</span>';
+      this.lockEl.hidden = true;
+      rootEl.append(grid, this.tilesEl, this.lockEl);
+
+      this.tiles = new Map();
+      this.nextId = 1;
+      this.busy = false;
+      this.locked = false;
+    }
+
+    reset() {
+      for (const t of this.tiles.values()) t.el.remove();
+      this.tiles.clear();
+      this.busy = false;
+      this.locked = false;
+      this.lockEl.hidden = true;
+      this.spawnRandom();
+      this.spawnRandom();
+    }
+
+    matrix() {
+      const m = Array.from({ length: SIZE }, () => Array(SIZE).fill(null));
+      for (const t of this.tiles.values()) m[t.r][t.c] = t;
+      return m;
+    }
+
+    gridValues() {
+      // Firing (pinned) tiles occupy their cell but can't move or merge — mark -1 as opaque blocker.
+      const g = Array.from({ length: SIZE }, () => Array(SIZE).fill(0));
+      for (const t of this.tiles.values()) g[t.r][t.c] = t.firing ? -1 : t.value;
+      return g;
+    }
+
+    liveTiles() {
+      return [...this.tiles.values()].filter(t => !t.firing);
+    }
+
+    setPos(el, r, c) {
+      el.style.setProperty('--r', r);
+      el.style.setProperty('--c', c);
+    }
+
+    tileClass(v) { return v <= 2048 ? 't' + v : 'tsuper'; }
+
+    applyValue(t) {
+      t.el.className = t.el.className.replace(/\bt(\d+|super)\b/, this.tileClass(t.value));
+      t.el.dataset.len = Math.min(String(t.value).length, 6);
+      t.el.textContent = t.value;
+    }
+
+    createTile(value, r, c) {
+      const el = document.createElement('div');
+      el.className = 'tile ' + this.tileClass(value) + ' spawn';
+      el.dataset.len = Math.min(String(value).length, 6);
+      el.textContent = value;
+      this.setPos(el, r, c);
+      el.addEventListener('animationend', e => {
+        if (e.animationName === 'consume') return;
+        el.classList.remove(e.animationName === 'pop' ? 'pop' : e.animationName === 'deny' ? 'deny' : 'spawn');
+      });
+      this.tilesEl.appendChild(el);
+      const t = { id: this.nextId++, value, r, c, el, firing: false };
+      this.tiles.set(t.id, t);
+      return t;
+    }
+
+    tileByEl(el) {
+      for (const t of this.tiles.values()) if (t.el === el) return t;
+      return null;
+    }
+
+    spawnRandom() {
+      const m = this.matrix();
+      const empty = [];
+      for (let r = 0; r < SIZE; r++)
+        for (let c = 0; c < SIZE; c++)
+          if (!m[r][c]) empty.push([r, c]);
+      if (!empty.length) return;
+      const [r, c] = empty[(Math.random() * empty.length) | 0];
+      this.createTile(Math.random() < 0.9 ? 2 : 4, r, c);
+    }
+
+    movesAvailable() {
+      const m = this.matrix();
+      for (let r = 0; r < SIZE; r++) {
+        for (let c = 0; c < SIZE; c++) {
+          const t = m[r][c];
+          if (!t) return true;
+          if (t.firing) continue;
+          const right = inb(r, c + 1) ? m[r][c + 1] : null;
+          if (right && !right.firing && right.value === t.value) return true;
+          const down = inb(r + 1, c) ? m[r + 1][c] : null;
+          if (down && !down.firing && down.value === t.value) return true;
+        }
+      }
+      return false;
+    }
+
+    updateLock() {
+      this.locked = !this.movesAvailable();
+      this.lockEl.hidden = !this.locked;
+    }
+
+    beginFire(tile) {
+      tile.firing = true;
+      tile.el.classList.remove('sel');
+      tile.el.classList.add('firing');
+      this.updateLock();
+    }
+
+    deleteTile(tile) {
+      this.tiles.delete(tile.id);
+      tile.el.classList.add('consume');
+      setTimeout(() => tile.el.remove(), 200);
+      this.updateLock();
+    }
+
+    move(dr, dc) {
+      if (this.busy || this.locked) return;
+      const m = this.matrix();
+      const rows = dr === 1 ? [3, 2, 1, 0] : [0, 1, 2, 3];
+      const cols = dc === 1 ? [3, 2, 1, 0] : [0, 1, 2, 3];
+      const merges = [];
+      const mergedIds = new Set();
+      let moved = false;
+
+      for (const r of rows) {
+        for (const c of cols) {
+          const t = m[r][c];
+          if (!t || t.firing) continue;
+          let nr = r, nc = c;
+          let tr = r + dr, tc = c + dc;
+          while (inb(tr, tc) && !m[tr][tc]) { nr = tr; nc = tc; tr += dr; tc += dc; }
+          const target = inb(tr, tc) ? m[tr][tc] : null;
+          if (target && !target.firing && target.value === t.value && !mergedIds.has(target.id)) {
+            m[r][c] = null;
+            mergedIds.add(target.id);
+            t.r = target.r; t.c = target.c;
+            this.setPos(t.el, t.r, t.c);
+            merges.push({ src: t, dst: target });
+            moved = true;
+          } else if (nr !== r || nc !== c) {
+            m[r][c] = null;
+            m[nr][nc] = t;
+            t.r = nr; t.c = nc;
+            this.setPos(t.el, nr, nc);
+            moved = true;
+          }
+        }
+      }
+
+      if (!moved) return;
+      this.busy = true;
+
+      setTimeout(() => {
+        for (const { src, dst } of merges) {
+          this.tiles.delete(src.id);
+          src.el.remove();
+          dst.value *= 2;
+          this.applyValue(dst);
+          dst.el.classList.add('pop');
+        }
+        this.spawnRandom();
+        this.busy = false;
+        this.updateLock();
+      }, MOVE_MS);
+    }
+  }
+
+  /* ---------- Pure-grid simulation for the AI board ---------- */
+
+  const DIRS = { up: [-1, 0], down: [1, 0], left: [0, -1], right: [0, 1] };
+
+  function simMove(g, [dr, dc]) {
+    const s = g.map(row => row.slice());
+    const rows = dr === 1 ? [3, 2, 1, 0] : [0, 1, 2, 3];
+    const cols = dc === 1 ? [3, 2, 1, 0] : [0, 1, 2, 3];
+    const merged = Array.from({ length: SIZE }, () => Array(SIZE).fill(false));
+    let moved = false, gained = 0;
+    for (const r of rows) {
+      for (const c of cols) {
+        const v = s[r][c];
+        if (v <= 0) continue;
+        let nr = r, nc = c, tr = r + dr, tc = c + dc;
+        while (inb(tr, tc) && !s[tr][tc]) { nr = tr; nc = tc; tr += dr; tc += dc; }
+        if (inb(tr, tc) && s[tr][tc] === v && !merged[tr][tc]) {
+          s[r][c] = 0;
+          s[tr][tc] = v * 2;
+          merged[tr][tc] = true;
+          gained += v * 2;
+          moved = true;
+        } else if (nr !== r || nc !== c) {
+          s[r][c] = 0;
+          s[nr][nc] = v;
+          moved = true;
+        }
+      }
+    }
+    return { s, gained, moved };
+  }
+
+  function validMoves(g) {
+    return Object.values(DIRS)
+      .map(d => ({ d, ...simMove(g, d) }))
+      .filter(m => m.moved);
+  }
+
+  function pickRandom(g) {
+    const ms = validMoves(g);
+    return ms.length ? ms[(Math.random() * ms.length) | 0].d : null;
+  }
+
+  function pickOrdered(g) {
+    for (const key of ['down', 'left', 'right', 'up']) {
+      if (simMove(g, DIRS[key]).moved) return DIRS[key];
+    }
+    return null;
+  }
+
+  function pickGreedy(g) {
+    const ms = validMoves(g);
+    if (!ms.length) return null;
+    let bestScore = -Infinity, best = null;
+    for (const m of ms) {
+      let empties = 0, max = 0;
+      for (let r = 0; r < SIZE; r++)
+        for (let c = 0; c < SIZE; c++) {
+          if (!m.s[r][c]) empties++;
+          if (m.s[r][c] > max) max = m.s[r][c];
+        }
+      const corner = m.s[3][0] === max ? max / 2 : 0;
+      const score = m.gained + empties * 10 + corner + Math.random() * 4;
+      if (score > bestScore) { bestScore = score; best = m.d; }
+    }
+    return best;
+  }
+
+  const DIFFS = {
+    easy: { label: 'Kolay', tempo: 950 },
+    mid:  { label: 'Orta',  tempo: 700 },
+    hard: { label: 'Zor',   tempo: 480 }
+  };
+
+  /* ---------- HP / avatars ---------- */
+
+  const hp = { me: MAX_HP, ai: MAX_HP };
+
+  function renderHP(side) {
+    const fill = $(side === 'me' ? 'meHpFill' : 'aiHpFill');
+    const num = $(side === 'me' ? 'meHpNum' : 'aiHpNum');
+    const v = hp[side];
+    const pct = v / MAX_HP;
+    fill.style.width = (pct * 100) + '%';
+    fill.classList.toggle('warn', pct <= .5 && pct > .25);
+    fill.classList.toggle('low', pct <= .25);
+    num.textContent = v;
+  }
+
+  function hitFx(side, n) {
+    const avatar = $(side === 'me' ? 'meAvatar' : 'aiAvatar');
+    avatar.classList.remove('hit');
+    void avatar.offsetWidth;
+    avatar.classList.add('hit');
+    const col = $(side === 'me' ? 'meCol' : 'aiCol');
+    const f = document.createElement('span');
+    f.className = 'dmgf';
+    f.textContent = '-' + n;
+    f.style.left = `calc(50% + ${Math.round(Math.random() * 40 - 20)}px)`;
+    col.appendChild(f);
+    f.addEventListener('animationend', () => f.remove());
+  }
+
+  function applyDamage(side, n) {
+    if (state !== 'round') return;
+    hp[side] = Math.max(0, hp[side] - n);
+    renderHP(side);
+    hitFx(side, n);
+    if (hp[side] === 0) finish('ko');
+  }
+
+  /* ---------- Battlefield ---------- */
+
+  const cellEls = [];
+  const ck = (r, c) => r * COLS + c;
+  {
+    const grid = $('fgrid');
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        const cell = document.createElement('div');
+        cell.className = 'fcell' + (r === MID_ROW ? ' mid' : r > MID_ROW ? ' mine' : '');
+        cell.dataset.r = r;
+        cell.dataset.c = c;
+        cell.addEventListener('animationend', () => cell.classList.remove('deny'));
+        grid.appendChild(cell);
+        cellEls[ck(r, c)] = cell;
+      }
+    }
+  }
+  const ownRow = (side, r) => side === 'me' ? r > MID_ROW : r < MID_ROW;
+
+  let soldiers = [];
+  let towersArr = [];
+  const towerGrid = new Map(); // ck(r,c) → tower | 'pending'
+
+  function aliveSoldiers(side) {
+    return soldiers.filter(u => u.side === side && !u.dead).length;
+  }
+
+  function freeCells(side) {
+    let n = 0;
+    for (let r = 0; r < ROWS; r++)
+      for (let c = 0; c < COLS; c++)
+        if (ownRow(side, r) && !towerGrid.has(ck(r, c))) n++;
+    return n;
+  }
+
+  function metrics() {
+    const fw = fieldEl.clientWidth, fh = fieldEl.clientHeight;
+    return { fw, fh, cw: fw / COLS, ch: fh / ROWS };
+  }
+
+  function makeSpriteEl(kind, side, value, spec) {
+    const el = document.createElement('div');
+    el.className = `${kind} born ${side} k${value}`;
+    const art = kind === 'unit' ? SPRITES[value] : TOWER_SPRITES[value];
+    el.innerHTML = `<span class="g" style="width:${spec.px}px;height:${spec.px}px">${art}</span><div class="uhp"><i></i></div>`;
+    el.addEventListener('animationend', e => {
+      if (e.animationName === 'spawn') el.classList.remove('born');
+      else if (e.animationName === 'hurtf') el.classList.remove('hurt');
+    });
+    fieldEl.appendChild(el);
+    return el;
+  }
+
+  function spawnSoldier(side, value, r, c) {
+    const spec = SOLDIERS[value];
+    const { cw, ch } = metrics();
+    const el = makeSpriteEl('unit', side, value, spec);
+    const u = {
+      side, spec, value,
+      col: c,
+      ox: Math.random() * 10 - 5,
+      x: (c + .5) * cw,
+      y: (r + .5) * ch,
+      hp: spec.hp,
+      cd: 0.4,
+      slowUntil: 0,
+      dead: false,
+      el,
+      hpEl: el.querySelector('.uhp i')
+    };
+    el.style.transform = `translate(${u.x}px, ${u.y}px) translate(-50%, -50%)`;
+    soldiers.push(u);
+  }
+
+  function spawnTower(side, value, r, c) {
+    const spec = TOWERS[value];
+    const { cw, ch } = metrics();
+    const el = makeSpriteEl('twr', side, value, spec);
+    const t = {
+      side, spec, value, r, c,
+      x: (c + .5) * cw,
+      y: (r + .5) * ch,
+      hp: spec.hp,
+      cd: 0.5,
+      dead: false,
+      el,
+      hpEl: el.querySelector('.uhp i')
+    };
+    el.style.transform = `translate(${t.x}px, ${t.y}px) translate(-50%, -50%)`;
+    towerGrid.set(ck(r, c), t);
+    cellEls[ck(r, c)].classList.add('occ');
+    towersArr.push(t);
+  }
+
+  function bloodSplat(x, y, size) {
+    const s = document.createElement('div');
+    s.className = 'splat';
+    const d = Math.round(size * 1.5);
+    s.style.width = d + 'px';
+    s.style.height = d + 'px';
+    s.style.left = x + 'px';
+    s.style.top = y + 'px';
+    s.style.rotate = ((Math.random() * 360) | 0) + 'deg';
+    fieldEl.appendChild(s);
+    setTimeout(() => s.remove(), 2100);
+  }
+
+  function shootProj(x0, y0, x1, y1, type) {
+    const p = document.createElement('div');
+    p.className = 'proj' + (type ? ' ' + type : '');
+    fieldEl.appendChild(p);
+    const rot = type === 'arrow' ? ` rotate(${(Math.atan2(y1 - y0, x1 - x0) * 180 / Math.PI).toFixed(1)}deg)` : '';
+    p.style.transform = `translate(${x0}px, ${y0}px)` + rot;
+    p.animate(
+      [{ transform: `translate(${x0}px, ${y0}px)` + rot }, { transform: `translate(${x1}px, ${y1}px)` + rot }],
+      { duration: 130, easing: 'linear', fill: 'forwards' }
+    );
+    setTimeout(() => p.remove(), 170);
+  }
+
+  function atkFx(el) {
+    el.classList.remove('atk');
+    void el.offsetWidth;
+    el.classList.add('atk');
+  }
+
+  function hurtSoldier(u, dmg, slow) {
+    u.hp -= dmg;
+    u.el.classList.remove('hurt');
+    void u.el.offsetWidth;
+    u.el.classList.add('hurt');
+    u.hpEl.style.width = Math.max(0, u.hp / u.spec.hp * 100) + '%';
+    if (slow) u.slowUntil = performance.now() + 1500;
+    if (u.hp <= 0) {
+      u.dead = true;
+      bloodSplat(u.x, u.y, u.spec.size);
+      u.el.remove();
+    }
+  }
+
+  function hurtTower(t, dmg) {
+    t.hp -= dmg;
+    t.el.classList.remove('hurt');
+    void t.el.offsetWidth;
+    t.el.classList.add('hurt');
+    t.hpEl.style.width = Math.max(0, t.hp / t.spec.hp * 100) + '%';
+    if (t.hp <= 0) {
+      t.dead = true;
+      towerGrid.delete(ck(t.r, t.c));
+      cellEls[ck(t.r, t.c)].classList.remove('occ');
+      const el = t.el;
+      el.classList.add('die');
+      setTimeout(() => el.remove(), 450);
+    }
+  }
+
+  function breach(u) {
+    u.dead = true;
+    u.el.remove();
+    applyDamage(u.side === 'me' ? 'ai' : 'me', u.spec.breach);
+  }
+
+  function towerAttack(t, target, ch) {
+    atkFx(t.el);
+    if (t.spec.proj) shootProj(t.x, t.y, target.x, target.y, t.spec.proj);
+    if (t.spec.splashC) {
+      const rad = t.spec.splashC * ch;
+      for (const u of soldiers) {
+        if (u.dead || u.side === t.side) continue;
+        if (Math.hypot(u.x - target.x, u.y - target.y) <= rad) hurtSoldier(u, t.spec.dmg, t.spec.slow);
+      }
+    } else {
+      hurtSoldier(target, t.spec.dmg, t.spec.slow);
+    }
+  }
+
+  function soldierAttack(u, target, ch) {
+    atkFx(u.el);
+    if (u.spec.ranged) shootProj(u.x, u.y, target.x, target.y, u.spec.proj);
+    if (u.spec.splashC) {
+      const rad = u.spec.splashC * ch;
+      for (const t of towersArr) {
+        if (t.dead || t.side === u.side) continue;
+        if (Math.hypot(t.x - target.x, t.y - target.y) <= rad) hurtTower(t, u.spec.dmg);
+      }
+    } else {
+      hurtTower(target, u.spec.dmg);
+    }
+  }
+
+  function simulate(dt) {
+    const { fh, cw, ch } = metrics();
+    const now = performance.now();
+
+    for (const t of towersArr) {
+      if (t.dead) continue;
+      t.x = (t.c + .5) * cw;
+      t.y = (t.r + .5) * ch;
+      t.cd -= dt;
+      if (!t.spec.dmg) continue;
+      let best = null, bd = Infinity;
+      for (const u of soldiers) {
+        if (u.dead || u.side === t.side) continue;
+        const d = Math.hypot(u.x - t.x, u.y - t.y);
+        if (d < bd) { bd = d; best = u; }
+      }
+      if (best && bd <= t.spec.rangeC * ch && t.cd <= 0) {
+        t.cd = t.spec.per;
+        towerAttack(t, best, ch);
+      }
+    }
+
+    for (const u of soldiers) {
+      if (u.dead) continue;
+      u.cd -= dt;
+      u.x = (u.col + .5) * cw + u.ox;
+      u.el.classList.toggle('chill', now < u.slowUntil);
+
+      let best = null, bd = Infinity;
+      for (const t of towersArr) {
+        if (t.dead || t.side === u.side) continue;
+        const d = Math.hypot(t.x - u.x, t.y - u.y);
+        if (d < bd) { bd = d; best = t; }
+      }
+      if (best && bd <= u.spec.rangeC * ch + best.spec.size / 2) {
+        if (u.cd <= 0) { u.cd = u.spec.per; soldierAttack(u, best, ch); }
+      } else {
+        const dir = u.side === 'me' ? -1 : 1;
+        const slow = now < u.slowUntil ? 0.5 : 1;
+        u.y += dir * u.spec.speedC * ch * dt * slow;
+        if (u.side === 'me' ? u.y <= 6 : u.y >= fh - 6) {
+          breach(u);
+          if (state !== 'round') return;
+          continue;
+        }
+      }
+      u.el.style.transform = `translate(${u.x}px, ${u.y}px) translate(-50%, -50%)`;
+    }
+
+    for (const t of towersArr) {
+      if (!t.dead) t.el.style.transform = `translate(${t.x}px, ${t.y}px) translate(-50%, -50%)`;
+    }
+
+    soldiers = soldiers.filter(u => !u.dead);
+    towersArr = towersArr.filter(t => !t.dead);
+  }
+
+  let lastTick = 0;
+  function battleLoop(ts) {
+    if (state !== 'round') return;
+    const dt = Math.min(0.05, (ts - lastTick) / 1000 || 0.016);
+    lastTick = ts;
+    simulate(dt);
+    requestAnimationFrame(battleLoop);
+  }
+
+  function clearField() {
+    for (const u of soldiers) u.el.remove();
+    soldiers = [];
+    for (const t of towersArr) t.el.remove();
+    towersArr = [];
+    towerGrid.clear();
+    for (const cell of cellEls) cell.classList.remove('occ');
+  }
+
+  /* ---------- Deploy (tile → soldier or tower) ---------- */
+
+  function deployTile(game, tile, side, place) {
+    game.beginFire(tile);
+    const value = tile.value;
+    const k = ck(place.r, place.c);
+    if (place.kind === 'tower') {
+      // reserve the cell immediately so a second deploy can't race into it
+      towerGrid.set(k, 'pending');
+      cellEls[k].classList.add('occ');
+    }
+    setTimeout(() => {
+      game.deleteTile(tile);
+      if (state !== 'round') {
+        if (place.kind === 'tower' && towerGrid.get(k) === 'pending') {
+          towerGrid.delete(k);
+          cellEls[k].classList.remove('occ');
+        }
+        return;
+      }
+      if (place.kind === 'soldier') spawnSoldier(side, value, place.r, place.c);
+      else spawnTower(side, value, place.r, place.c);
+    }, DEPLOY_CAST_MS);
+  }
+
+  /* ---------- Match controller ---------- */
+
+  let state = 'idle'; // idle | countdown | splash | round | ended
+  let diffKey = storage.get('td2048diff') || 'mid';
+  if (!DIFFS[diffKey]) diffKey = 'mid';
+  let clockTimer = null, aiTimer = null, splashTimer = null, endAt = 0;
+  let lastDeploy = 0;
+  let round = 0;
+  let meFirstAtk = true;
+  let meAtk = true;
+
+  const overlay = $('overlay');
+  const startPanel = $('startPanel');
+  const countPanel = $('countPanel');
+  const endPanel = $('endPanel');
+  const timerEl = $('timer');
+
+  const me = new Game($('meBoard'));
+  const ai = new Game($('aiBoard'));
+
+  function renderTimer(ms) {
+    const sec = Math.ceil(ms / 1000);
+    timerEl.textContent = Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0');
+    timerEl.classList.toggle('urgent', state === 'round' && sec <= 10);
+  }
+
+  function startClock(ms, onEnd) {
+    clearInterval(clockTimer);
+    endAt = performance.now() + ms;
+    renderTimer(ms);
+    clockTimer = setInterval(() => {
+      const rem = endAt - performance.now();
+      if (rem <= 0) {
+        clearInterval(clockTimer);
+        renderTimer(0);
+        onEnd();
+      } else renderTimer(rem);
+    }, 100);
+  }
+
+  function renderRoles() {
+    $('roundLine').textContent = `Tur ${round}/${ROUNDS}`;
+    const mr = $('meRole'), ar = $('aiRole');
+    mr.textContent = meAtk ? '⚔️ Saldırıyorsun' : '🛡️ Savunuyorsun';
+    mr.className = 'role ' + (meAtk ? 'atk' : 'def');
+    ar.textContent = meAtk ? '🛡️ Savunma' : '⚔️ Saldırı';
+    ar.className = 'role ' + (meAtk ? 'def' : 'atk');
+  }
+
+  function setHint(html) {
+    $('hint').innerHTML = html;
+  }
+
+  function defaultHint() {
+    const what = meAtk ? 'asker' : 'kule';
+    setHint(`Kaydır: hamle · Taşa dokun: seç · Kendi alanına dokun: <b>${what}</b> yerleştir`);
+  }
+
+  function showPanel(panel) {
+    for (const p of [startPanel, countPanel, endPanel]) p.hidden = p !== panel;
+    overlay.classList.toggle('show', !!panel);
+  }
+
+  function loadTally() {
+    try { return JSON.parse(storage.get('td2048tally')) || { w: 0, l: 0, d: 0 }; }
+    catch { return { w: 0, l: 0, d: 0 }; }
+  }
+  function renderTally() {
+    const t = loadTally();
+    const text = `Seri: ${t.w}G · ${t.l}M · ${t.d}B`;
+    $('tallyStart').textContent = text;
+    $('tallyEnd').textContent = text;
+  }
+  function addTally(result) {
+    const t = loadTally();
+    t[result]++;
+    storage.set('td2048tally', JSON.stringify(t));
+    renderTally();
+  }
+
+  function setDiff(key) {
+    diffKey = key;
+    storage.set('td2048diff', key);
+    $('diffLabel').textContent = DIFFS[key].label;
+    for (const b of $('diffSeg').children) b.classList.toggle('on', b.dataset.d === key);
+  }
+
+  function beginCountdown() {
+    state = 'countdown';
+    let n = 3;
+    countPanel.textContent = n;
+    showPanel(countPanel);
+    const step = () => {
+      n--;
+      if (n === 0) { showPanel(null); startMatch(); return; }
+      countPanel.textContent = n;
+      setTimeout(step, 650);
+    };
+    setTimeout(step, 650);
+  }
+
+  function startMatch() {
+    me.reset();
+    ai.reset();
+    clearField();
+    clearSel();
+    aiTally.low = 0;
+    aiTally.mid = 0;
+    aiTally.high = 0;
+    hp.me = MAX_HP;
+    hp.ai = MAX_HP;
+    renderHP('me');
+    renderHP('ai');
+    round = 0;
+    meFirstAtk = Math.random() < .5;
+    nextRound();
+  }
+
+  function roundSplash() {
+    const sp = document.createElement('div');
+    sp.className = 'round-splash';
+    const cls = meAtk ? 'atk' : 'def';
+    const word = meAtk ? 'SALDIR! ⚔️' : 'SAVUN! 🛡️';
+    sp.innerHTML = `<div class="inner"><span class="rs-t">Tur ${round}/${ROUNDS}</span><span class="rs-s ${cls}">${word}</span></div>`;
+    $('game').appendChild(sp);
+    setTimeout(() => sp.remove(), 1400);
+  }
+
+  function nextRound() {
+    round++;
+    clearSel();
+    clearField();
+    clearTimeout(aiTimer);
+    clearInterval(clockTimer);
+    meAtk = (round % 2 === 1) === meFirstAtk;
+    renderRoles();
+    defaultHint();
+    renderTimer(ROUND_MS);
+    state = 'splash';
+    roundSplash();
+    splashTimer = setTimeout(() => {
+      state = 'round';
+      startClock(ROUND_MS, endRound);
+      lastTick = performance.now();
+      requestAnimationFrame(battleLoop);
+      aiTick();
+    }, 1400);
+  }
+
+  function endRound() {
+    clearTimeout(aiTimer);
+    if (round >= ROUNDS) finish('time');
+    else nextRound();
+  }
+
+  function finish(kind) {
+    if (state !== 'round') return;
+    state = 'ended';
+    clearInterval(clockTimer);
+    clearTimeout(aiTimer);
+    clearTimeout(splashTimer);
+    clearSel();
+    timerEl.classList.remove('urgent');
+
+    const result = kind === 'ko'
+      ? (hp.ai === 0 ? 'w' : 'l')
+      : (hp.me > hp.ai ? 'w' : hp.me < hp.ai ? 'l' : 'd');
+
+    $('endTitle').textContent = result === 'w' ? 'Kazandın!' : result === 'l' ? 'Kaybettin' : 'Berabere';
+    const why = kind === 'ko' ? 'Kale düştü! · ' : `${ROUNDS} tur bitti · `;
+    $('endSub').textContent = `${why}Sen ${hp.me} HP · Rakip ${hp.ai} HP`;
+    addTally(result);
+    showPanel(endPanel);
+  }
+
+  /* ---------- AI ---------- */
+
+  const TIER = v => (v >= 64 ? 'high' : v >= 16 ? 'mid' : 'low');
+  const COMP_TARGET = { low: 3, mid: 2, high: 1 };
+  const aiTally = { low: 0, mid: 0, high: 0 };
+
+  function pickComposition(eligible) {
+    const total = aiTally.low + aiTally.mid + aiTally.high;
+    let bestTier = null, bestDef = -Infinity;
+    for (const t of ['high', 'mid', 'low']) {
+      if (!eligible.some(x => TIER(x.value) === t)) continue;
+      const def = COMP_TARGET[t] / 6 - (total ? aiTally[t] / total : 0);
+      if (def > bestDef) { bestDef = def; bestTier = t; }
+    }
+    if (!bestTier) return null;
+    const cands = eligible.filter(x => TIER(x.value) === bestTier);
+    return cands.reduce((a, b) => (b.value > a.value ? b : a), cands[0]);
+  }
+
+  function towerDps(t) {
+    return t.spec.per ? t.spec.dmg / t.spec.per : 0;
+  }
+
+  /* Attack the least-defended column: sum enemy tower dps reaching each column. */
+  function aiAttackPlace() {
+    const cover = Array(COLS).fill(0);
+    for (const t of towersArr) {
+      if (t.dead || t.side !== 'me') continue;
+      const reach = Math.ceil(t.spec.rangeC / 2);
+      for (let c = t.c - reach; c <= t.c + reach; c++)
+        if (c >= 0 && c < COLS) cover[c] += towerDps(t) + t.spec.hp / 20;
+    }
+    let best = 0, bestScore = Infinity;
+    for (let c = 0; c < COLS; c++) {
+      const score = cover[c] + Math.random() * 2;
+      if (score < bestScore) { bestScore = score; best = c; }
+    }
+    return { kind: 'soldier', r: MID_ROW - 1, c: best };
+  }
+
+  /* Defend the most-threatened, least-covered column; build front rows first. */
+  function aiDefendPlace() {
+    const threat = Array(COLS).fill(0);
+    for (const u of soldiers) {
+      if (u.dead || u.side !== 'me') continue;
+      threat[u.col] += u.spec.breach + u.hp;
+    }
+    const cover = Array(COLS).fill(0);
+    for (const t of towersArr) {
+      if (t.dead || t.side !== 'ai') continue;
+      const reach = Math.ceil(t.spec.rangeC / 2);
+      for (let c = t.c - reach; c <= t.c + reach; c++)
+        if (c >= 0 && c < COLS) cover[c] += towerDps(t) * 4 + t.spec.hp / 10;
+    }
+    const order = [...Array(COLS).keys()]
+      .sort((a, b) => (threat[b] * 2 - cover[b]) - (threat[a] * 2 - cover[a]) + (Math.random() - .5));
+    for (const c of order) {
+      for (const r of [MID_ROW - 1, MID_ROW - 2, MID_ROW - 3, MID_ROW - 4]) {
+        if (!towerGrid.has(ck(r, c))) return { kind: 'tower', r, c };
+      }
+    }
+    return null;
+  }
+
+  function aiDeployPick(eligible) {
+    const pick = pickComposition(eligible) || eligible[0];
+    const place = meAtk ? aiDefendPlace() : aiAttackPlace();
+    if (!place) return false;
+    aiTally[TIER(pick.value)]++;
+    deployTile(ai, pick, 'ai', place);
+    return true;
+  }
+
+  function aiAct() {
+    if (ai.busy) return;
+    const live = ai.liveTiles();
+    if (!live.length) return;
+    const eligible = live.filter(t => SOLDIERS[t.value]);
+    const capOk = meAtk ? freeCells('ai') > 0 : aliveSoldiers('ai') < MAX_SOLDIERS;
+    const canDeploy = live.length > 1 && eligible.length > 0 && capOk;
+
+    if (ai.locked) {
+      if (canDeploy) aiDeployPick(eligible);
+      return;
+    }
+    // defending with soldiers incoming and no towers yet → react fast
+    const urgent = meAtk && soldiers.some(u => u.side === 'me') && !towersArr.some(t => t.side === 'ai');
+    const freq = urgent ? 0.85 : diffKey === 'hard' ? 0.6 : diffKey === 'mid' ? 0.45 : 0.25;
+    if (canDeploy && Math.random() < freq && aiDeployPick(eligible)) return;
+    const g = ai.gridValues();
+    const d = diffKey === 'hard' ? pickGreedy(g) : diffKey === 'mid' ? pickOrdered(g) : pickRandom(g);
+    if (d) ai.move(d[0], d[1]);
+  }
+
+  function aiTick() {
+    if (state !== 'round') return;
+    aiAct();
+    aiTimer = setTimeout(aiTick, DIFFS[diffKey].tempo * (0.85 + Math.random() * 0.3));
+  }
+
+  /* ---------- Input ---------- */
+
+  let selTile = null;
+
+  function denyTile(tile) {
+    tile.el.classList.remove('deny');
+    void tile.el.offsetWidth;
+    tile.el.classList.add('deny');
+  }
+
+  function denyCell(cell) {
+    cell.classList.remove('deny');
+    void cell.offsetWidth;
+    cell.classList.add('deny');
+  }
+
+  function clearSel() {
+    if (selTile) selTile.el.classList.remove('sel');
+    selTile = null;
+    fieldEl.classList.remove('placing');
+    if (state === 'round') defaultHint();
+  }
+
+  function trySelect(el) {
+    if (state !== 'round' || me.busy) return;
+    const tile = me.tileByEl(el);
+    if (!tile || tile.firing) return;
+    if (tile === selTile) { clearSel(); return; }
+    if (!SOLDIERS[tile.value] || me.liveTiles().length <= 1) {
+      denyTile(tile);
+      return;
+    }
+    if (selTile) selTile.el.classList.remove('sel');
+    selTile = tile;
+    tile.el.classList.add('sel');
+    fieldEl.classList.add('placing');
+    const item = (meAtk ? SOLDIERS : TOWERS)[tile.value];
+    setHint(`<b>${tile.value} → ${item.name}</b> · kendi alanına dokun (alt yarı)`);
+  }
+
+  function tryPlace(cellEl) {
+    if (state !== 'round' || !selTile) return;
+    if (!me.tiles.has(selTile.id) || selTile.firing) { clearSel(); return; }
+    const r = +cellEl.dataset.r, c = +cellEl.dataset.c;
+    if (!ownRow('me', r)) { denyCell(cellEl); return; }
+    const now = performance.now();
+    if (now - lastDeploy < DEPLOY_COOLDOWN) return;
+    let place;
+    if (meAtk) {
+      if (aliveSoldiers('me') >= MAX_SOLDIERS) { denyCell(cellEl); return; }
+      place = { kind: 'soldier', r, c };
+    } else {
+      if (towerGrid.has(ck(r, c))) { denyCell(cellEl); return; }
+      place = { kind: 'tower', r, c };
+    }
+    lastDeploy = now;
+    deployTile(me, selTile, 'me', place);
+    clearSel();
+  }
+
+  const KEYS = {
+    ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1],
+    w: [-1, 0], s: [1, 0], a: [0, -1], d: [0, 1]
+  };
+  window.addEventListener('keydown', e => {
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    const dir = KEYS[e.key.length === 1 ? e.key.toLowerCase() : e.key];
+    if (!dir) return;
+    e.preventDefault();
+    if (state === 'round') me.move(dir[0], dir[1]);
+  });
+
+  let pStart = null;
+  window.addEventListener('pointerdown', e => {
+    if (!e.isPrimary) return;
+    pStart = {
+      x: e.clientX, y: e.clientY,
+      t: performance.now(),
+      target: e.target,
+      touch: e.pointerType !== 'mouse'
+    };
+  });
+  window.addEventListener('pointerup', e => {
+    if (!e.isPrimary || !pStart) return;
+    const dx = e.clientX - pStart.x;
+    const dy = e.clientY - pStart.y;
+    const dist = Math.max(Math.abs(dx), Math.abs(dy));
+    const dt = performance.now() - pStart.t;
+    const s = pStart;
+    pStart = null;
+    if (state !== 'round') return;
+    const tapMax = s.touch ? 18 : 10; // finger jitter tolerance
+    if (dist < tapMax && dt < 350) {
+      const tileEl = s.target.closest?.('.tile');
+      if (tileEl) { trySelect(tileEl); return; } // AI tiles resolve to null in me.tileByEl
+      const cellEl = s.target.closest?.('.fcell');
+      if (cellEl) tryPlace(cellEl);
+    } else if (dist >= 22) {
+      if (Math.abs(dx) > Math.abs(dy)) me.move(0, dx > 0 ? 1 : -1);
+      else me.move(dy > 0 ? 1 : -1, 0);
+    }
+  });
+  window.addEventListener('pointercancel', () => { pStart = null; });
+  // Block page scroll only mid-match so full-screen swipes stay game input.
+  window.addEventListener('touchmove', e => {
+    if (state !== 'idle' && state !== 'ended') e.preventDefault();
+  }, { passive: false });
+
+  /* ---------- Wiring ---------- */
+
+  $('diffSeg').addEventListener('click', e => {
+    const b = e.target.closest('button');
+    if (b) setDiff(b.dataset.d);
+  });
+  $('startBtn').addEventListener('click', beginCountdown);
+  $('againBtn').addEventListener('click', beginCountdown);
+  $('chgBtn').addEventListener('click', () => {
+    state = 'idle';
+    showPanel(startPanel);
+  });
+
+  function buildRoster(rootId, specs, sprites) {
+    const root = $(rootId);
+    for (const [v, spec] of Object.entries(specs)) {
+      const d = document.createElement('div');
+      d.className = 'ri';
+      d.innerHTML = `<span class="ic">${sprites[v]}</span><b>${v}</b><span>${spec.name}</span>`;
+      root.appendChild(d);
+    }
+  }
+  buildRoster('rosterAtk', SOLDIERS, SPRITES);
+  buildRoster('rosterDef', TOWERS, TOWER_SPRITES);
+
+  setDiff(diffKey);
+  renderTally();
+  renderHP('me');
+  renderHP('ai');
+  showPanel(startPanel);
+</script>
