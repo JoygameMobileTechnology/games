@@ -90,11 +90,23 @@
   @keyframes fpop{ 45%{ scale:1.18; } }
   #aim{ position:absolute; top:0; bottom:0; width:0; border-left:2px dashed #b89b6a66; z-index:1; pointer-events:none; }
   #held{ position:absolute; z-index:4; border-radius:50%; display:flex; align-items:center; justify-content:center;
-         box-shadow:inset 0 -3px 6px #00000022, 0 2px 4px #0003; pointer-events:none; transition:left 60ms linear; }
+         box-shadow:inset 0 -3px 6px #00000022, 0 2px 4px #0003; pointer-events:none; }
 
-  /* Emisyon parçacığı */
-  .particle{ position:fixed; z-index:50; font-size:22px; pointer-events:none;
-             filter:drop-shadow(0 0 6px #fff59d); transition:left .7s cubic-bezier(.3,-.2,.4,1), top .7s cubic-bezier(.2,.6,.4,1); }
+  /* Emisyon parçacığı: patlama halkası + kuyruklu ana parçacık + varış rozeti */
+  .particle{ position:fixed; z-index:50; font-size:27px; pointer-events:none;
+             filter:drop-shadow(0 0 9px #ffe082) drop-shadow(0 0 18px #ffd95e77);
+             transition:left .85s cubic-bezier(.3,-.3,.45,1), top .85s cubic-bezier(.2,.65,.35,1);
+             animation:pglow .85s ease-in-out; }
+  @keyframes pglow{ 0%{ scale:.5; } 25%{ scale:1.4; } 100%{ scale:1; } }
+  .ptrail{ position:fixed; z-index:49; font-size:15px; opacity:.65; pointer-events:none;
+           filter:drop-shadow(0 0 6px #ffe082);
+           transition:left .85s cubic-bezier(.3,-.3,.45,1), top .85s cubic-bezier(.2,.65,.35,1), opacity .8s ease; }
+  .mergeburst{ position:fixed; z-index:48; width:16px; height:16px; margin:-8px; border-radius:50%;
+               border:3px solid #ffe082; pointer-events:none; animation:burst .45s ease-out forwards; }
+  @keyframes burst{ from{ scale:.4; opacity:.95; } to{ scale:3.4; opacity:0; } }
+  .arrive{ position:fixed; z-index:51; font-size:13px; font-weight:800; color:#fff; pointer-events:none;
+           text-shadow:0 1px 3px #0007; animation:arrive .8s ease-out forwards; }
+  @keyframes arrive{ from{ opacity:1; translate:0 0; } to{ opacity:0; translate:0 -20px; } }
 
   /* Overlay */
   #overlay{ position:fixed; inset:0; background:#0007; display:none; align-items:center; justify-content:center; z-index:100; }
@@ -413,28 +425,33 @@ function updateFruitEls() {
 }
 
 // --- Nişancı + kuyruk ---
-let aimX = 50, canDrop = true, gameOverShown = false;
+let aimX = 50, heldX = 50, canDrop = true, gameOverShown = false;
 const held = $('#held');
 function updateAim() {
-  const t = state.queue[0], r = C.radius(t), d = r * 2 * px;
-  const x = Math.max(r, Math.min(C.W - r, aimX));
-  $('#aim').style.left = (x * px) + 'px';
+  const t = state.queue[0], d = C.radius(t) * 2 * px;
   held.style.width = held.style.height = d + 'px';
   held.style.fontSize = (d * 0.55) + 'px';
   held.style.background = fruitBg(t);
   held.textContent = FRUIT_ART[t];
-  held.style.left = ((x - r) * px) + 'px';
-  held.style.top = (2 * px) + 'px';
   held.style.opacity = canDrop && !gameOverShown ? 1 : 0.35;
   const [cur, nxt] = state.queue;
   const setNx = (id, t2) => { const e = $(id); e.style.background = fruitBg(t2); e.textContent = FRUIT_ART[t2]; };
   setNx('#nx-cur', cur); setNx('#nx-next', nxt);
+  positionHeld();
+}
+// her frame: heldX aimX'i üstel yumuşatmayla izler (bkz. frame)
+function positionHeld() {
+  const r = C.radius(state.queue[0]);
+  const x = Math.max(r, Math.min(C.W - r, heldX));
+  $('#aim').style.left = (x * px) + 'px';
+  held.style.left = ((x - r) * px) + 'px';
+  held.style.top = (2 * px) + 'px';
 }
 function drop() {
   if (!canDrop || gameOverShown) return;
   const tier = state.queue.shift();
   state.queue.push(C.randTier(Math.random));
-  C.addFruit(world, tier, aimX);
+  C.addFruit(world, tier, heldX);   // görünen (yumuşatılmış) konumdan bırak
   canDrop = false;
   setTimeout(() => { canDrop = true; updateAim(); }, 400);
   save();
@@ -447,7 +464,11 @@ let last = 0, acc = 0, dangerSince = null, rafSeen = false;
 function frame(ts) {
   rafSeen = true;
   const t = ts / 1000;
-  acc += Math.min(0.05, t - (last || t)); last = t;
+  const fdt = Math.min(0.05, t - (last || t)); last = t;
+  acc += fdt;
+  // nişancı yumuşak takibi (kare hızından bağımsız üstel yaklaşma)
+  heldX += (aimX - heldX) * (1 - Math.exp(-16 * fdt));
+  positionHeld();
   const merges = [];
   while (acc >= DT) { merges.push(...C.stepWorld(world, DT).merges); acc -= DT; }
   if (merges.length) handleMerges(merges);
@@ -531,15 +552,34 @@ function flyParticle(em, events) {
   if (!target && events.some(e => e.kind === 'bank')) target = $('#bank');
   if (!target) target = $('#garden-wrap');
   const tr = target.getBoundingClientRect();
-  const p = document.createElement('div');
-  p.className = 'particle';
-  p.textContent = EMIT_ICON[em.type] || '✨';
-  p.style.left = sx + 'px'; p.style.top = sy + 'px';
-  document.body.appendChild(p);
-  requestAnimationFrame(() => requestAnimationFrame(() => {
-    p.style.left = (tr.left + tr.width / 2) + 'px';
-    p.style.top = (tr.top + tr.height / 2) + 'px';
-  }));
+  const tx = tr.left + tr.width / 2, ty = tr.top + tr.height / 2;
+  const icon = EMIT_ICON[em.type] || '✨';
+
+  // 1) birleşme noktasında patlama halkası: "buradan bir şey fırladı"
+  const burst = document.createElement('div');
+  burst.className = 'mergeburst';
+  burst.style.left = sx + 'px'; burst.style.top = sy + 'px';
+  document.body.appendChild(burst);
+  setTimeout(() => burst.remove(), 500);
+
+  // 2) ana parçacık + gecikmeli iki kuyruk hayaleti: göz yolu takip edebilsin
+  const launch = (cls, delay) => {
+    const el = document.createElement('div');
+    el.className = cls;
+    el.textContent = icon;
+    el.style.left = sx + 'px'; el.style.top = sy + 'px';
+    document.body.appendChild(el);
+    setTimeout(() => requestAnimationFrame(() => requestAnimationFrame(() => {
+      el.style.left = tx + 'px'; el.style.top = ty + 'px';
+      if (cls === 'ptrail') el.style.opacity = 0;
+    })), delay);
+    return el;
+  };
+  const p = launch('particle', 0);
+  const g1 = launch('ptrail', 80), g2 = launch('ptrail', 160);
+  setTimeout(() => { g1.remove(); g2.remove(); }, 1400);
+
+  // 3) varış: bloom + "+1" rozeti
   let finished = false;
   const finish = () => {
     if (finished) return;
@@ -549,9 +589,15 @@ function flyParticle(em, events) {
       const slotEl = document.querySelector(`.slot[data-key="${plant.zone}:${plant.slot}"]`);
       if (slotEl) { slotEl.classList.remove('bloom'); void slotEl.offsetWidth; slotEl.classList.add('bloom'); }
     }
+    const a = document.createElement('div');
+    a.className = 'arrive';
+    a.textContent = '+1 ' + icon;
+    a.style.left = (tx - 14) + 'px'; a.style.top = (ty - 10) + 'px';
+    document.body.appendChild(a);
+    setTimeout(() => a.remove(), 900);
   };
   p.addEventListener('transitionend', finish, { once: true });
-  setTimeout(finish, 800);
+  setTimeout(finish, 1000);
 }
 
 // --- Ses ---
