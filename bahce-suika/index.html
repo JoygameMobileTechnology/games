@@ -22,8 +22,17 @@
   #tree-wrap.sky1{ background:linear-gradient(#aedcf5 0%,#d8eec9 52%,#a9d485 78%,#87b964 100%); }
   #tree-wrap.sky2{ background:linear-gradient(#ffdfae 0%,#ffe9c4 40%,#b8d98a 75%,#8fbf68 100%); }
   #tree-wrap.sky3{ background:linear-gradient(#c4a7e0 0%,#f2c9a8 42%,#a3cf75 75%,#7fb654 100%); }
-  #tree-svg{ position:absolute; inset:0; width:100%; height:100%; }
+  #tree-svg{ position:absolute; inset:0; width:100%; height:100%; transform-origin:50% 95%; }
+  #tree-wrap::after{ content:''; position:absolute; inset:0; pointer-events:none; z-index:7;
+                     background:radial-gradient(ellipse at 50% 45%, transparent 58%, #00000014 100%); }
   #flash{ position:absolute; inset:0; background:#fff8d8; opacity:0; pointer-events:none; z-index:8; }
+  /* ağacın rüzgar salınımı + nefes alan zemin gölgesi */
+  #tree-sway{ transform-box:fill-box; transform-origin:50% 100%; animation:treesway 6.5s ease-in-out infinite alternate; }
+  @keyframes treesway{ from{ transform:rotate(-1.1deg); } to{ transform:rotate(1.3deg); } }
+  #tree-shadow{ transform-box:fill-box; transform-origin:center; animation:shadowsway 6.5s ease-in-out infinite alternate; }
+  @keyframes shadowsway{ from{ transform:translateX(-1.4px); } to{ transform:translateX(1.6px) scaleX(1.05); } }
+  .leaf.shimmer{ animation:leafshimmer ease-in-out infinite alternate; }
+  @keyframes leafshimmer{ from{ opacity:.78; } to{ opacity:1; } }
 
   .sun{ position:absolute; top:22px; left:56%; width:32px; height:32px; border-radius:50%; z-index:1;
         background:radial-gradient(circle at 35% 35%,#fff6c9,#ffd95e 70%);
@@ -36,21 +45,44 @@
             box-shadow:0 0 8px 3px #ffe98288; animation:fly 7s ease-in-out infinite alternate; }
   @keyframes fly{ 0%{ transform:translate(0,0); opacity:.2; } 30%{ opacity:1; }
                   60%{ opacity:.35; } 100%{ transform:translate(34px,-26px); opacity:.9; } }
+  .rays{ position:absolute; width:120px; height:120px; border-radius:50%; z-index:0; opacity:.45; pointer-events:none;
+         background:repeating-conic-gradient(#ffe98200 0 13deg, #ffe98230 13deg 19deg);
+         animation:spin 44s linear infinite; }
+  @keyframes spin{ to{ rotate:360deg; } }
+  .mist{ position:absolute; left:-10%; right:-10%; height:26px; border-radius:50%; background:#ffffff59;
+         filter:blur(7px); z-index:2; animation:mistdrift 22s ease-in-out infinite alternate; }
+  @keyframes mistdrift{ from{ transform:translateX(-14px); } to{ transform:translateX(18px); } }
+  .star{ position:absolute; width:3px; height:3px; border-radius:50%; background:#fff; z-index:1;
+         animation:twinkle ease-in-out infinite alternate; }
+  @keyframes twinkle{ from{ opacity:.15; } to{ opacity:.95; } }
+  .moon{ position:absolute; top:16px; left:60%; width:26px; height:26px; border-radius:50%; z-index:1;
+         background:radial-gradient(circle at 62% 38%, #fffdf2, #e8e2c8 70%);
+         box-shadow:0 0 18px #fffdf277, inset -5px -4px 0 #d8d2b855; }
+  .flybird{ position:absolute; z-index:2; font-size:13px; pointer-events:none; animation:birdfly linear forwards; }
+  @keyframes birdfly{ from{ left:-6%; } to{ left:104%; } }
+  .fallleaf{ position:absolute; z-index:6; font-size:11px; pointer-events:none; animation:fall ease-in forwards; }
+  @keyframes fall{ 0%{ translate:0 0; rotate:0deg; opacity:0; } 12%{ opacity:.9; }
+                   100%{ translate:-28px 120px; rotate:150deg; opacity:0; } }
   .inhab{ position:absolute; z-index:5; line-height:1; filter:drop-shadow(0 2px 2px #0004);
           transform:translate(-50%,-50%); }
   .inhab.flutter{ animation:flutter 6s ease-in-out infinite alternate; }
   @keyframes flutter{ 0%{ translate:0 0; } 40%{ translate:22px -14px; } 100%{ translate:-12px -24px; } }
+  .inhab.bob{ animation:bob 3.2s ease-in-out infinite alternate; }
+  @keyframes bob{ from{ margin-top:0; } to{ margin-top:-4px; } }
 
   .chip{ position:absolute; z-index:9; background:var(--chip); border-radius:20px; padding:5px 12px; color:#fff;
          font-family:var(--font-round); font-weight:800; box-shadow:0 2px 6px #00000026;
          display:flex; align-items:center; gap:8px; }
   #energy-chip{ top:8px; left:8px; font-size:14px; }
-  #energy-chip .bar{ width:70px; height:8px; background:#ffffff3d; border-radius:4px; overflow:hidden; }
-  #energy-chip .bar i{ display:block; height:100%; background:linear-gradient(#d8ffa8,#8bd44a); border-radius:4px;
+  #energy-chip .bar{ width:88px; height:9px; background:#ffffff3d; border-radius:5px; overflow:hidden; }
+  #energy-chip .bar i{ display:block; height:100%; background:linear-gradient(#d8ffa8,#8bd44a); border-radius:5px;
                        transition:width .35s ease; }
+  #energy-chip.close .bar i{ animation:barglow .9s ease-in-out infinite alternate; }
+  @keyframes barglow{ from{ filter:brightness(1); } to{ filter:brightness(1.5); } }
   #energy-chip .cnt{ font-size:12px; color:#d8ffa8; }
   #level-chip{ top:8px; right:8px; font-size:12.5px; }
-  #legend-chip{ top:42px; right:8px; font-size:12px; display:none; }
+  #next-chip{ top:42px; right:8px; font-size:11.5px; opacity:.95; }
+  #legend-chip{ top:74px; right:8px; font-size:12px; display:none; }
 
   /* HUD */
   #hud{ display:flex; align-items:center; gap:8px; padding:6px 12px; font-family:var(--font-round); }
@@ -118,13 +150,17 @@
           <stop offset="0" stop-color="#a5d97e"/><stop offset="1" stop-color="#5f9e43"/>
         </radialGradient>
       </defs>
-      <ellipse cx="50" cy="106" rx="70" ry="9" fill="#00000014"/>
+      <filter id="treeshadow" x="-20%" y="-20%" width="140%" height="140%">
+        <feDropShadow dx="0.7" dy="1.3" stdDeviation="0.9" flood-color="#2c4416" flood-opacity="0.3"/>
+      </filter>
       <ellipse cx="50" cy="104" rx="46" ry="6" fill="#7aa855"/>
-      <g id="tree-g"></g>
+      <ellipse id="tree-shadow" cx="50" cy="105" rx="30" ry="4" fill="#00000016"/>
+      <g id="tree-g"><g id="tree-sway" filter="url(#treeshadow)"></g></g>
     </svg>
     <div id="flash"></div>
     <span class="chip" id="energy-chip">🌱<span class="bar"><i id="energy-bar"></i></span><span class="cnt" id="energy-cnt"></span></span>
     <span class="chip" id="level-chip"></span>
+    <span class="chip" id="next-chip"></span>
     <span class="chip" id="legend-chip"></span>
   </div>
   <div id="hud">
@@ -480,12 +516,13 @@ function topology() {
 const treeScale = level => 0.55 + level * 0.0375;
 
 function renderTree(animDepth) {
-  const g = $('#tree-g');
+  const scaleG = $('#tree-g'), g = $('#tree-sway');
   g.innerHTML = '';
   const lvl = state.tree.level;
   const vd = C.visibleDepth(lvl);
   const sc = treeScale(lvl);
-  g.setAttribute('transform', `translate(${50 * (1 - sc)} ${104 * (1 - sc)}) scale(${sc})`);
+  scaleG.setAttribute('transform', `translate(${50 * (1 - sc)} ${104 * (1 - sc)}) scale(${sc})`);
+  $('#tree-shadow').setAttribute('rx', 14 + lvl * 2.4);   // gölge ağaçla büyür → ilerleme zeminden de okunur
   const topo = topology();
   const vis = topo.filter(b => b.depth <= vd);
   const newOnes = [];
@@ -518,6 +555,11 @@ function renderTree(animDepth) {
       c.setAttribute('fill', 'url(#leafgrad)');
       c.setAttribute('opacity', 0.9);
       c.classList.add('leaf');
+      if (rnd() < 0.4) {   // yaprak pırıltısı: rastgele kümeler nefes alır
+        c.classList.add('shimmer');
+        c.style.animationDuration = (3 + rnd() * 3) + 's';
+        c.style.animationDelay = (rnd() * 4) + 's';
+      }
       g.appendChild(c);
     }
     // çiçekler / meyveler
@@ -552,7 +594,8 @@ function renderInhabitants(vd) {
     if (state.tree.level < minLvl) continue;
     const b = tips[Math.floor(rnd() * tips.length)] || topo[0];
     const el = document.createElement('div');
-    el.className = 'inhab ' + cls;
+    el.className = 'inhab ' + (cls || 'bob');
+    el.style.animationDelay = (ti * 0.9) + 's';
     el.textContent = glyph;
     el.style.fontSize = (13 + ti) + 'px';
     // svg koordinatı → yüzde (viewBox 100x108, xMidYMax)
@@ -569,21 +612,39 @@ function renderChips() {
   const maxed = t.level >= C.MAX_LEVEL;
   $('#energy-bar').style.width = maxed ? '100%' : Math.min(100, Math.round(t.energy / cost * 100)) + '%';
   $('#energy-cnt').textContent = maxed ? 'MAX' : `${t.energy}/${cost}`;
+  $('#energy-chip').classList.toggle('close', !maxed && t.energy / cost >= 0.8);   // dolmaya yakın: parla
   $('#level-chip').textContent = `Sv.${t.level} · ${LEVEL_NAMES[t.level]}`;
+  // sıradaki kilometre taşı: ne için oynuyorum?
+  const nx = INHABITANTS.find(([minLvl]) => minLvl > t.level);
+  $('#next-chip').textContent = maxed ? '🌟 Efsane tamam' :
+    nx ? `Sıradaki: ${nx[1]} Sv.${nx[0]}` : `Sıradaki: 🌟 Sv.${C.MAX_LEVEL}`;
   const lg = $('#legend-chip');
   if (t.legend > 0) { lg.style.display = 'flex'; lg.textContent = `⭐ ${t.legend}`; }
 }
 
 function renderAmbient(lvl) {
   const wrap = $('#tree-wrap');
-  wrap.className = 'sky' + Math.min(3, Math.floor(lvl / 4));
-  wrap.querySelectorAll('.sun,.cloud,.firefly').forEach(e => e.remove());
+  const stage = Math.min(3, Math.floor(lvl / 4));
+  wrap.className = 'sky' + stage;
+  wrap.querySelectorAll('.sun,.cloud,.firefly,.rays,.mist,.star,.moon').forEach(e => e.remove());
   const add = (cls, style) => { const d = document.createElement('div'); d.className = cls; Object.assign(d.style, style); wrap.appendChild(d); };
-  add('sun');
+  if (stage === 3) {
+    // alacakaranlık: ay + yıldızlar
+    add('moon');
+    const rnd = C.mulberry32(state.tree.seed ^ 0x77aa);
+    for (let i = 0; i < 9; i++)
+      add('star', { left: (4 + rnd() * 90) + '%', top: (4 + rnd() * 34) + '%',
+                    animationDuration: (1.4 + rnd() * 2.4) + 's', animationDelay: (rnd() * 2) + 's' });
+  } else {
+    add('sun');
+    // güneş ışınları (altın saatte daha belirgin)
+    add('rays', { left: 'calc(56% - 44px)', top: '-22px', opacity: stage === 2 ? .6 : .35 });
+  }
   add('cloud', { top: '16px', animationDuration: '40s' });
   add('cloud', { top: '38px', animationDuration: '58s', animationDelay: '-24s', opacity: .7, scale: '.75' });
-  if (lvl >= 9) for (let i = 0; i < 5; i++)
-    add('firefly', { left: (15 + i * 17) + '%', top: (35 + (i % 3) * 14) + '%', animationDelay: (i * 1.4) + 's' });
+  if (stage === 0) add('mist', { bottom: '18%' });
+  if (lvl >= 9) for (let i = 0; i < 6; i++)
+    add('firefly', { left: (12 + i * 15) + '%', top: (32 + (i % 3) * 15) + '%', animationDelay: (i * 1.2) + 's' });
 }
 
 // --- Enerji zerresi + kutlama ---
@@ -612,6 +673,7 @@ function flyMote(m, pts, events) {
     done = true;
     p.remove();
     renderChips();
+    if (hasAnime()) anime({ targets: '#energy-chip', scale: [1, 1.07, 1], duration: 260, easing: 'easeOutQuad' });
     const ups = events.filter(e => e.kind === 'levelup');
     if (ups.length) celebrate(ups[ups.length - 1].level);
   };
@@ -626,7 +688,7 @@ function celebrate(newLevel) {
   const wrap = $('#tree-wrap');
   if (hasAnime()) {
     anime({ targets: '#flash', opacity: [0.85, 0], duration: 900, easing: 'easeOutQuad' });
-    anime({ targets: '#tree-g', scale: [1, 1.05, 1], duration: 700, easing: 'easeInOutSine' });
+    anime({ targets: '#tree-svg', scale: [1, 1.05, 1], duration: 700, easing: 'easeInOutSine' });
     anime({ targets: '#level-chip', scale: [1, 1.25, 1], duration: 600, easing: 'easeOutBack' });
   }
   // emniyet: animasyon motoru ilerleyemese bile flaş asılı kalmasın
@@ -805,6 +867,29 @@ setTimeout(() => {
     }
   }, 33);
 }, 700);
+
+// Ambiyans yaşamı: ara ara gökten kuş geçer, taçtan yaprak düşer
+setInterval(() => {
+  if (document.hidden) return;
+  const b = document.createElement('div');
+  b.className = 'flybird';
+  b.textContent = Math.random() < 0.5 ? '🐦' : '🕊️';
+  b.style.top = (8 + Math.random() * 22) + '%';
+  b.style.animationDuration = (10 + Math.random() * 6) + 's';
+  $('#tree-wrap').appendChild(b);
+  setTimeout(() => b.remove(), 17000);
+}, 21000 + Math.random() * 14000);
+setInterval(() => {
+  if (document.hidden || state.tree.level < 2) return;
+  const l = document.createElement('div');
+  l.className = 'fallleaf';
+  l.textContent = state.tree.level >= 5 && Math.random() < 0.4 ? '🌸' : '🍃';
+  l.style.left = (30 + Math.random() * 40) + '%';
+  l.style.top = (22 + Math.random() * 18) + '%';
+  l.style.animationDuration = (4.5 + Math.random() * 2.5) + 's';
+  $('#tree-wrap').appendChild(l);
+  setTimeout(() => l.remove(), 8000);
+}, 3800);
 
 // ?debug=1: enerji enjeksiyonu + sıfırlama
 if (new URLSearchParams(location.search).get('debug') === '1') {
