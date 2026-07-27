@@ -1,3 +1,4 @@
 {
-  "title": "Memory Merge"
+  "title": "Memory Merge",
+  "description": "Mahjong katmanlarındaki kapalı kartları çevir, aynı görselin parçalarını hatırlayıp merge tahtasında birleştir; tahta dolarsa kaybedersin."
 }
