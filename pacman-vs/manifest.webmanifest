@@ -1,0 +1,15 @@
+{
+  "name": "Pac-Man VS",
+  "short_name": "PacManVS",
+  "description": "Two Pac-Men. Two mazes. Ninety seconds. Highest dot count wins.",
+  "start_url": ".",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#06060B",
+  "theme_color": "#06060B",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

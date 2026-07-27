@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="theme-color" content="#06060B" />
+  <title>PAC-MAN VS</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" href="icon.svg" type="image/svg+xml" />
+  <script type="module" crossorigin src="./assets/index-DFoKvZJe.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-CDRAdm7H.css">
+</head>
+<body>
+  <!-- Tap-to-start gate: unlocks WebAudio (§16.3) -->
+  <section id="screen-gate" class="screen active">
+    <div class="gate-inner">
+      <h1 class="logo">PAC-MAN <span>VS</span></h1>
+      <p class="tap-hint">TAP TO PLAY</p>
+    </div>
+  </section>
+
+  <section id="screen-menu" class="screen">
+    <h1 class="logo">PAC-MAN <span>VS</span></h1>
+    <p id="best-score" class="subtle"></p>
+    <div class="menu-col">
+      <button id="btn-quick" class="big">QUICK MATCH <small>vs AI</small></button>
+      <button id="btn-lan" class="big">LAN 1v1 <small>same Wi-Fi</small></button>
+      <button id="btn-howto">HOW TO PLAY</button>
+      <button id="btn-settings">SETTINGS</button>
+    </div>
+  </section>
+
+  <section id="screen-difficulty" class="screen">
+    <h2>DIFFICULTY</h2>
+    <div class="menu-col">
+      <button data-diff="rookie" class="big">ROOKIE <small>learning the maze</small></button>
+      <button data-diff="standard" class="big">STANDARD <small>a fair fight</small></button>
+      <button data-diff="ace" class="big">ACE <small>good luck</small></button>
+      <button id="btn-diff-back" class="ghost-btn">BACK</button>
+    </div>
+  </section>
+
+  <section id="screen-howto" class="screen">
+    <h2>HOW TO PLAY</h2>
+    <div class="howto">
+      <p><b>90 seconds. Two mazes. Most dots wins.</b></p>
+      <p>Swipe (or WASD/arrows) to steer. Eat pips. Watch your opponent in the corner window.</p>
+      <p><b class="c-crate">CRATES</b> — walking over one instantly fires an attack at your opponent. White = common, blue = uncommon, gold = rare.</p>
+      <p><b class="c-reflect">REFLECT</b> — super pellets grant one charge. Tap Reflect during the incoming warning to bounce an attack back. Siphon can ONLY be reflected.</p>
+      <p><b class="c-pac">DASH</b> — 3 per match, short burst of speed. Escape, contest, close out.</p>
+      <p>Getting caught drops 10 of your dots on the floor — run back and reclaim them before they fade.</p>
+      <p>Dot waves at 0:30 and 0:60 respawn the dots furthest from you. Final 15 seconds: crates come faster.</p>
+    </div>
+    <button id="btn-howto-back" class="ghost-btn">BACK</button>
+  </section>
+
+  <section id="screen-settings" class="screen">
+    <h2>SETTINGS</h2>
+    <div class="settings-col">
+      <label>Volume <input id="set-volume" type="range" min="0" max="1" step="0.05" /></label>
+      <label><input id="set-lefty" type="checkbox" /> Left-handed buttons</label>
+      <label><input id="set-cb" type="checkbox" /> Colourblind mode</label>
+      <label>Name <input id="set-name" type="text" maxlength="12" /></label>
+    </div>
+    <button id="btn-settings-back" class="ghost-btn">BACK</button>
+  </section>
+
+  <section id="screen-lan" class="screen">
+    <h2>LAN 1v1</h2>
+    <p class="subtle">Same Wi-Fi. One hosts, one joins. Two QR scans, no server.</p>
+    <p id="lan-error" class="error"></p>
+    <div class="menu-col">
+      <button id="btn-host" class="big">HOST <small>show a QR</small></button>
+      <button id="btn-join" class="big">JOIN <small>scan a QR</small></button>
+      <button id="btn-lan-back" class="ghost-btn">BACK</button>
+    </div>
+  </section>
+
+  <section id="screen-lanhost" class="screen scroll">
+    <h2>HOSTING</h2>
+    <p id="host-status" class="subtle">…</p>
+    <canvas id="host-qr" class="qr"></canvas>
+    <details class="code-details"><summary>code (copy / paste fallback)</summary>
+      <textarea id="host-code" readonly rows="3"></textarea>
+      <button id="btn-copy-host">COPY</button>
+    </details>
+    <div id="host-answer-wrap" class="hidden">
+      <h3>PLAYER 2'S ANSWER</h3>
+      <button id="btn-host-scan">SCAN ANSWER QR</button>
+      <video id="host-video" class="scan-video hidden" muted playsinline></video>
+      <textarea id="host-answer-input" rows="3" placeholder="…or paste their answer code here"></textarea>
+      <button id="btn-host-accept">CONNECT</button>
+    </div>
+    <button id="btn-lanhost-back" class="ghost-btn">BACK</button>
+  </section>
+
+  <section id="screen-lanjoin" class="screen scroll">
+    <h2>JOINING</h2>
+    <p id="join-status" class="subtle">…</p>
+    <button id="btn-join-scan">SCAN HOST QR</button>
+    <video id="join-video" class="scan-video hidden" muted playsinline></video>
+    <textarea id="join-offer-input" rows="3" placeholder="…or paste the host code here"></textarea>
+    <button id="btn-join-accept">CONNECT</button>
+    <div id="join-answer-wrap" class="hidden">
+      <h3>YOUR ANSWER</h3>
+      <canvas id="join-qr" class="qr"></canvas>
+      <details class="code-details"><summary>answer code (copy / paste fallback)</summary>
+        <textarea id="join-code" readonly rows="3"></textarea>
+        <button id="btn-copy-join">COPY</button>
+      </details>
+    </div>
+    <button id="btn-lanjoin-back" class="ghost-btn">BACK</button>
+  </section>
+
+  <section id="screen-lobby" class="screen">
+    <h2>LOBBY</h2>
+    <div class="lobby-players">
+      <p id="lobby-me">…</p>
+      <p id="lobby-peer">…</p>
+    </div>
+    <p id="lobby-status" class="subtle">…</p>
+    <div class="menu-col">
+      <button id="btn-ready" class="big">READY</button>
+      <button id="btn-lobby-back" class="ghost-btn">LEAVE</button>
+    </div>
+  </section>
+
+  <section id="screen-game" class="screen">
+    <div id="game-surface"><canvas id="game-canvas"></canvas></div>
+    <div class="hud">
+      <div id="hud-top">
+        <div class="hud-cell"><span class="hud-label">YOU</span><span id="hud-score">0</span></div>
+        <div class="hud-cell"><span id="hud-clock" class="clock">90</span></div>
+        <div class="hud-cell"><span class="hud-label">OPP</span><span id="hud-opp-score">0</span></div>
+      </div>
+      <div id="pip-wrap" class="pip-wrap"><canvas id="pip-canvas"></canvas></div>
+      <div id="telegraph-banner"><span id="banner-name"></span><div class="bar-track"><div id="banner-bar"></div></div></div>
+      <div id="fx-icons"></div>
+      <div id="toast"></div>
+      <div id="conn-overlay"></div>
+      <button id="btn-dash" class="action-btn dash"><span>DASH</span><span id="dash-pips" class="pips">●●●</span></button>
+      <button id="btn-reflect" class="action-btn reflect"><span>RFLX</span><span id="reflect-charge" class="charge"></span></button>
+      <div id="countdown-overlay"></div>
+      <div id="pause-overlay">
+        <h2>PAUSED</h2>
+        <button id="btn-resume" class="big">RESUME</button>
+        <button id="btn-quit" class="ghost-btn">QUIT MATCH</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="screen-result" class="screen">
+    <h1 id="result-title"></h1>
+    <p id="result-reason" class="subtle"></p>
+    <div id="result-scores"></div>
+    <table id="result-stats"></table>
+    <div class="menu-col">
+      <button id="btn-rematch" class="big">REMATCH</button>
+      <button id="btn-result-menu" class="ghost-btn">MENU</button>
+    </div>
+  </section>
+
+</body>
+</html>

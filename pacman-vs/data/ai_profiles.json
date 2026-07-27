@@ -1,0 +1,40 @@
+{
+  "profiles": {
+    "rookie": {
+      "label": "Rookie",
+      "reactionDelay": 0.5,
+      "mistakeChance": 0.24,
+      "dangerWeight": 0.5,
+      "crateWeight": 4,
+      "planHorizon": 6,
+      "reflectAccuracy": 0.2,
+      "reflectPriority": "any",
+      "dashUsage": "never",
+      "pelletDiscipline": 0.1
+    },
+    "standard": {
+      "label": "Standard",
+      "reactionDelay": 0.3,
+      "mistakeChance": 0.24,
+      "dangerWeight": 1.0,
+      "crateWeight": 9,
+      "planHorizon": 8,
+      "reflectAccuracy": 0.6,
+      "reflectPriority": "rare",
+      "dashUsage": "escape",
+      "pelletDiscipline": 0.4
+    },
+    "ace": {
+      "label": "Ace",
+      "reactionDelay": 0.14,
+      "mistakeChance": 0.06,
+      "dangerWeight": 1.3,
+      "crateWeight": 14,
+      "planHorizon": 12,
+      "reflectAccuracy": 0.92,
+      "reflectPriority": "rareSiphon",
+      "dashUsage": "full",
+      "pelletDiscipline": 0.65
+    }
+  }
+}

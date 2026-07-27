@@ -1,0 +1,68 @@
+{
+  "attacks": [
+    {
+      "id": "GHOST_RAGE",
+      "name": "Ghost Rage",
+      "rarity": "common",
+      "durationSec": 6.0,
+      "icon": "rage",
+      "params": { "speedMult": 1.35 }
+    },
+    {
+      "id": "SLOW_FIELD",
+      "name": "Slow Field",
+      "rarity": "common",
+      "durationSec": 5.0,
+      "icon": "slow",
+      "params": { "speedMult": 0.70 }
+    },
+    {
+      "id": "INK_CLOUD",
+      "name": "Ink Cloud",
+      "rarity": "common",
+      "durationSec": 5.0,
+      "icon": "ink",
+      "params": { "baseRadiusTiles": 4, "radiusGrowTiles": 1, "radiusGrowEverySec": 1.5 }
+    },
+    {
+      "id": "GATE_LOCKDOWN",
+      "name": "Gate Lockdown",
+      "rarity": "uncommon",
+      "durationSec": 7.0,
+      "icon": "gate",
+      "params": { "junctionCount": 4 }
+    },
+    {
+      "id": "DOT_FREEZE",
+      "name": "Dot Freeze",
+      "rarity": "uncommon",
+      "durationSec": 5.0,
+      "icon": "freeze",
+      "params": {}
+    },
+    {
+      "id": "SCRAMBLE",
+      "name": "Scramble",
+      "rarity": "uncommon",
+      "durationSec": 4.0,
+      "icon": "scramble",
+      "params": {}
+    },
+    {
+      "id": "GHOST_SWARM",
+      "name": "Ghost Swarm",
+      "rarity": "rare",
+      "durationSec": 8.0,
+      "icon": "swarm",
+      "params": { "count": 2, "speedMult": 1.1 }
+    },
+    {
+      "id": "SIPHON",
+      "name": "Siphon",
+      "rarity": "rare",
+      "durationSec": 0,
+      "icon": "siphon",
+      "params": { "amount": 12 }
+    }
+  ]
+}
