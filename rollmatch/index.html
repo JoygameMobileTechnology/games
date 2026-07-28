@@ -822,16 +822,17 @@ function selectB(i){
 function tryMoveM2(dir){ // returns false when the move is impossible (hold-repeat stops on it)
   if(phase!=='play')return false;
   if(anim){queuedDir=dir;return true;}
-  const s=m2B[selB];
+  const bi=selB; // lock the moving block: selection may change mid-animation
+  const s=m2B[bi];
   const ns=m2Move(s,dir);
-  if(!ns||m2Blocked(ns,selB)){bumpPv(m2Views[selB].pv,dir);return false;}
+  if(!ns||m2Blocked(ns,bi)){bumpPv(m2Views[bi].pv,dir);return false;}
   anim=true;m2Moves++;
   selRingEl.style.opacity='0'; // the ring can't follow the tumble — hide it mid-roll
-  const v=m2Views[selB];
+  const v=m2Views[bi];
   animRoll(v.pv,dir,()=>{
-    m2B[selB]=ns;
+    m2B[bi]=ns;
     resetPivot(v.pv);
-    buildCuboid(v.pv,v.bk,v.sh,ns,MCOL[selB],null,false);
+    buildCuboid(v.pv,v.bk,v.sh,ns,MCOL[bi],null,false);
     puffsAt(m2Cells(ns));
     updateSel();updateTgts();updateHudM2();
     selRingEl.style.opacity='1';
@@ -881,12 +882,10 @@ function showLevels(){
     ?'Bir taş kaldır, <b>yuvarlayarak</b> gezdir ve <b>ikizinin</b> üstüne birebir hizalı yatır — ikon ikonun üstüne gelirse ikisi de patlar. 🎮 Kaydır / ok tuşları'
     :'Renkli blokları <b>kendi renkteki hedefe</b> park et: 1 hücrelik hedef = <b>dik</b>, 2 hücrelik = <b>yatık</b>. Bloklar birbirini engeller! 🎮 Bloğa tıkla ya da 1-2-3, sonra kaydır / ok tuşları';
   const list=curMode===1?LEVELS:M2LEVELS;
-  const pr=curMode===1?prog:prog2;
   const g=$('lvlGrid');
   g.innerHTML='';
-  for(let n=1;n<=list.length;n++){
+  for(let n=1;n<=list.length;n++){ // all levels open — start anywhere
     const b=document.createElement('button');
-    const open=n<=pr.unlocked;
     let mark='&nbsp;';
     let done=false;
     if(curMode===1){
@@ -897,9 +896,9 @@ function showLevels(){
       done=!!prog2.done[n];
       if(done)mark='✓';
     }
-    b.className='lb'+(open?(done?' done':''):' lock');
-    b.innerHTML=open?n+'<small>'+mark+'</small>':'🔒';
-    if(open)b.addEventListener('click',()=>loadLevel(n));
+    b.className='lb'+(done?' done':'');
+    b.innerHTML=n+'<small>'+mark+'</small>';
+    b.addEventListener('click',()=>loadLevel(n));
     g.appendChild(b);
   }
   $('lvlOv').hidden=false;
@@ -1014,7 +1013,22 @@ function applyTest(){
       },300);
     }
   }else{
-    if(TEST==='auto'){
+    if(TEST==='race'){
+      // regression: switch selection mid-roll; block states must not cross-contaminate
+      const b0=JSON.stringify(m2B[0]),b1=JSON.stringify(m2B[1]);
+      let dir=null;
+      for(const d of ['R','L','D','U']){
+        const ns=m2Move(m2B[0],d);
+        if(ns&&!m2Blocked(ns,0)){dir=d;break;}
+      }
+      selectB(0);tryMoveM2(dir);
+      setTimeout(()=>selectB(1),60);
+      setTimeout(()=>{
+        const ok=JSON.stringify(m2B[1])===b1&&JSON.stringify(m2B[0])!==b0&&selB===1;
+        document.title='RACE '+(ok?'OK':'FAIL');
+      },700);
+    }
+    else if(TEST==='auto'){
       const toks=m2lv.sol.match(/\d[RLDU]/g)||[];
       let k=0;
       const iv=setInterval(()=>{
