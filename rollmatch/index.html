@@ -653,11 +653,11 @@ function updateHudM1(){
   $('stats').innerHTML='Kalan <b>'+left+'</b> taş · Hamle <b>'+pMoves+'</b> · Tahmin <b>'+pred+'</b>';
   $('lvlTag').innerHTML='Level <b>'+level+'</b> · ★ '+totalStars();
 }
-function tryMoveM1(dir){
-  if(phase!=='play'||!pState)return;
-  if(anim){queuedDir=dir;return;}
+function tryMoveM1(dir){ // returns false when the move is impossible (hold-repeat stops on it)
+  if(phase!=='play'||!pState)return false;
+  if(anim){queuedDir=dir;return true;}
   const ns=move(pState,dir);
-  if(!ns){bumpPv(pivotEl,dir);return;}
+  if(!ns){bumpPv(pivotEl,dir);return false;}
   anim=true;pMoves++;
   if(!startT)startT=Date.now();
   animRoll(pivotEl,dir,()=>{
@@ -671,6 +671,7 @@ function tryMoveM1(dir){
     anim=false;
     if(queuedDir){const d=queuedDir;queuedDir=null;tryMoveM1(d);}
   });
+  return true;
 }
 function doMatch(di){
   const [i,j]=board.doms[di];
@@ -818,12 +819,12 @@ function selectB(i){
   selB=i;
   updateSel();updateHudM2();
 }
-function tryMoveM2(dir){
-  if(phase!=='play')return;
-  if(anim){queuedDir=dir;return;}
+function tryMoveM2(dir){ // returns false when the move is impossible (hold-repeat stops on it)
+  if(phase!=='play')return false;
+  if(anim){queuedDir=dir;return true;}
   const s=m2B[selB];
   const ns=m2Move(s,dir);
-  if(!ns||m2Blocked(ns,selB)){bumpPv(m2Views[selB].pv,dir);return;}
+  if(!ns||m2Blocked(ns,selB)){bumpPv(m2Views[selB].pv,dir);return false;}
   anim=true;m2Moves++;
   selRingEl.style.opacity='0'; // the ring can't follow the tumble — hide it mid-roll
   const v=m2Views[selB];
@@ -838,6 +839,7 @@ function tryMoveM2(dir){
     if(m2B.every((st,i)=>m2Eq(st,m2G[i]))){doWinM2();return;}
     if(queuedDir){const d=queuedDir;queuedDir=null;tryMoveM2(d);}
   });
+  return true;
 }
 function loadM2(n){
   mode=2;level=n;
@@ -921,19 +923,52 @@ document.addEventListener('keydown',e=>{
   }
   if(mode===2&&phase==='play'&&e.key>='1'&&e.key<='3')selectB(+e.key-1);
 });
-let swS=null;
-function swStart(x,y){swS=[x,y];}
-function swEnd(x,y){
-  if(!swS)return;
-  const dx=x-swS[0],dy=y-swS[1];swS=null;
-  if(Math.abs(dx)<22&&Math.abs(dy)<22)return;
-  const dir=Math.abs(dx)>Math.abs(dy)?(dx>0?'R':'L'):(dy>0?'D':'U');
-  if(mode===1)tryMoveM1(dir);else tryMoveM2(dir);
+/* swipe anywhere on the game area; the move fires as soon as the drag passes
+   the threshold, and KEEPS rolling in that direction while the finger stays
+   down (hold-to-roll). Lifting the finger — or hitting a wall/block — stops it. */
+let swS=null,swDone=false,swHold=null,swTimer=null;
+function swDir(dx,dy){return Math.abs(dx)>Math.abs(dy)?(dx>0?'R':'L'):(dy>0?'D':'U');}
+function swFire(dir){
+  return mode===1?tryMoveM1(dir):tryMoveM2(dir);
 }
-stageEl.addEventListener('touchstart',e=>{swStart(e.touches[0].clientX,e.touches[0].clientY);},{passive:true});
-stageEl.addEventListener('touchend',e=>{swEnd(e.changedTouches[0].clientX,e.changedTouches[0].clientY);},{passive:true});
-stageEl.addEventListener('mousedown',e=>swStart(e.clientX,e.clientY));
-stageEl.addEventListener('mouseup',e=>swEnd(e.clientX,e.clientY));
+function stopHold(){
+  swHold=null;
+  if(swTimer){clearInterval(swTimer);swTimer=null;}
+}
+function swStart(e,x,y){
+  if(e.target.closest('button,.chip,.ov'))return;
+  swS=[x,y];swDone=false;
+}
+function swMove(x,y){
+  if(!swS||swDone)return;
+  const dx=x-swS[0],dy=y-swS[1];
+  if(Math.abs(dx)<24&&Math.abs(dy)<24)return;
+  swDone=true;
+  const dir=swDir(dx,dy);
+  if(swFire(dir)===false)return;
+  swHold=dir;
+  swTimer=setInterval(()=>{
+    if(!swHold){stopHold();return;}
+    if(anim)return;
+    if(swFire(swHold)===false)stopHold();
+  },40);
+}
+function swEnd(x,y){
+  if(swS&&!swDone){
+    const dx=x-swS[0],dy=y-swS[1];
+    if(Math.abs(dx)>=16||Math.abs(dy)>=16)swFire(swDir(dx,dy)); // short-flick fallback
+  }
+  swS=null;swDone=false;
+  stopHold();
+}
+const appEl=$('app');
+appEl.addEventListener('touchstart',e=>{swStart(e,e.touches[0].clientX,e.touches[0].clientY);},{passive:true});
+appEl.addEventListener('touchmove',e=>{swMove(e.touches[0].clientX,e.touches[0].clientY);},{passive:true});
+appEl.addEventListener('touchend',e=>{swEnd(e.changedTouches[0].clientX,e.changedTouches[0].clientY);},{passive:true});
+appEl.addEventListener('touchcancel',()=>{swS=null;swDone=false;stopHold();},{passive:true});
+appEl.addEventListener('mousedown',e=>swStart(e,e.clientX,e.clientY));
+appEl.addEventListener('mousemove',e=>{if(e.buttons)swMove(e.clientX,e.clientY);});
+appEl.addEventListener('mouseup',e=>swEnd(e.clientX,e.clientY));
 gridEl.addEventListener('click',e=>{
   if(mode===1){
     const h=e.target.closest('.pi');
