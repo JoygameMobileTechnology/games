@@ -1,4 +1,4 @@
 {
   "title": "RollMatch",
-  "description": "Bloxorz tarzı yuvarlanan blok puzzle'ı, iki mod: No Blocker — taşı kaldır, ikizinin üstüne birebir hizalı yatır, 20 level + yıldız; Blocker — renkli blokları birbirini engelleyerek kendi renkteki hedefe dik/yatık park et, 20 level."
+  "description": "Takla atan blok puzzle'ı, iki mod: Blocker — renkli 1x2 blokları birbirini engelleyerek kendi renkteki hedefe dik/yatık park et; Tetris — polycube parçayı taş engellerin arasından hedef alana yuvarla. 20+20 level, ortak takla çekirdeği."
 }
