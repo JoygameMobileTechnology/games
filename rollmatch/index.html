@@ -211,14 +211,30 @@ let seed=1;
 function rnd(){seed=(seed*1664525+1013904223)>>>0;return seed/4294967296;}
 let W=5,H=5;
 const ROLL_MS=150;
+function onBoard(x,y){return x>=0&&x<W&&y>=0&&y<H;}
+// Availability: the roll is legal if AT LEAST ONE cube column stays on-board.
+// Settle: if every on-board cube is elevated (min z = m > 0), the whole rigid
+// piece drops by m so the on-board part sits on the ground ("dönüp oturtma").
+// Off-board cubes may end below the board plane (hanging over the edge).
+// Returns null (illegal) or {c: settled cubes, drop: m}.
 function rollCubes(cubes,dir){
   let nc=null;
   if(dir==='R'){const P=Math.max(...cubes.map(c=>c[0]))+1;nc=cubes.map(([x,y,z])=>[P+z,y,P-x-1]);}
   else if(dir==='L'){const P=Math.min(...cubes.map(c=>c[0]));nc=cubes.map(([x,y,z])=>[P-z-1,y,x-P]);}
   else if(dir==='D'){const P=Math.max(...cubes.map(c=>c[1]))+1;nc=cubes.map(([x,y,z])=>[x,P+z,P-y-1]);}
   else{const P=Math.min(...cubes.map(c=>c[1]));nc=cubes.map(([x,y,z])=>[x,P-z-1,y-P]);}
-  for(const [x,y] of nc)if(x<0||x>=W||y<0||y>=H)return null;
-  return nc;
+  const ob=nc.filter(([x,y])=>onBoard(x,y));
+  if(!ob.length)return null;
+  const drop=Math.min(...ob.map(c=>c[2]));
+  if(drop>0)nc=nc.map(([x,y,z])=>[x,y,z-drop]);
+  return {c:nc,drop:Math.max(0,drop)};
+}
+/* Edge rule: top-down, at least one cube must ALWAYS stand on the board.
+   A roll that would carry the whole piece off is simply illegal — there is
+   no folding/hanging outside the board footprint. */
+function resolveMove(cubes,dir){ // core entry for the mode layers
+  const r=rollCubes(cubes,dir);
+  return r?{c:r.c,drop:r.drop}:null;
 }
 function cubeKey(cubes){return cubes.map(c=>c.join(',')).sort().join('|');}
 function footCells(cubes){
@@ -251,6 +267,7 @@ const M3ROCK={top:'linear-gradient(180deg,#A7B0C0,#8A93A5)',fr:'#767F91',sd:'#67
 const $=id=>document.getElementById(id);
 const gridEl=$('grid'),stageEl=$('stage'),tiltEl=$('tilt');
 let CELL=64;
+let EDGE_RES=1; // free cells kept per board side for partial-overhang rendering
 let mode=2,curMode=2,level=1;
 let phase='menu';          // menu|play|end
 let anim=false,queuedDir=null;
@@ -270,7 +287,8 @@ try{
 function computeCell(){
   const sw=stageEl.clientWidth,sh=stageEl.clientHeight;
   const reserve=mode===3?2.1:0.55; // tumbling towers get up to 3 cells tall
-  CELL=Math.floor(Math.min((sw-24)/W,(sh-24)/(H+reserve),88));
+  // EDGE_RES free cells per side: partial overhang extends at most (piece max dim - 1)
+  CELL=Math.floor(Math.min((sw-24)/(W+2*EDGE_RES),(sh-24)/(H+2*EDGE_RES+reserve),88));
 }
 function buildCells(){
   computeCell();
@@ -306,11 +324,15 @@ function buildPoly(pv,bk,sh,cubes,shade){ // per-cube cuboid with internal-face 
   const has=new Set(cubes.map(c=>c.join(',')));
   for(const [x,y,z] of cubes){
     const lx=(x-gx)*CELL,ly=(y-gy)*CELL,ez=z*CELL;
+    // off-board overhang cubes render ghosted: under the tilt an elevated cube and
+    // an outside cube otherwise look alike, which reads as a wrong row
+    const out=!onBoard(x,y);
+    const ghost=out?' saturate(0.35) opacity(0.5)':'';
     if(!has.has(x+','+y+','+(z+1))){
       const f=face(CELL-2,CELL-2,lx+1,ly+1,'translateZ('+(ez+CELL)+'px)');
       f.classList.add('ftop3');
       f.style.background=shade.top;
-      f.style.filter='brightness('+(1+z*0.07)+')'; // height cue for top-down reading
+      f.style.filter='brightness('+(1+z*0.07)+')'+ghost; // height cue for top-down reading
       bk.appendChild(f);
     }
     const sides=[
@@ -325,6 +347,7 @@ function buildPoly(pv,bk,sh,cubes,shade){ // per-cube cuboid with internal-face 
       f.classList.add('fsd3');
       f.style.transformOrigin=org;
       f.style.background=bg;
+      if(out)f.style.filter=ghost;
       bk.appendChild(f);
     }
   }
@@ -352,6 +375,15 @@ function animRoll(pv,dir,done){
   pv.style.transition='transform '+ROLL_MS+'ms cubic-bezier(.5,.05,.9,.45)';
   pv.style.transform=o[1];
   setTimeout(done,ROLL_MS+15);
+}
+function dropIn(pv,drop,done){ // settle animation: the piece falls onto the ground
+  if(!drop){done();return;}
+  pv.style.transition='none';
+  pv.style.transform='translateZ('+drop*CELL+'px)';
+  void pv.offsetWidth;
+  pv.style.transition='transform 90ms cubic-bezier(.4,0,1,1)';
+  pv.style.transform='none';
+  setTimeout(done,105);
 }
 function resetPivot(pv){
   pv.style.transition='none';
@@ -450,21 +482,23 @@ function tryMoveM2(dir){ // returns false when the move is impossible (hold-repe
   if(phase!=='play')return false;
   if(anim){queuedDir=dir;return true;}
   const bi=selB; // lock the moving block: selection may change mid-animation
-  const nc=rollCubes(m2B[bi],dir);
-  if(!nc||m2Blocked(nc,bi)){bumpPv(m2Views[bi].pv,dir);return false;}
+  const r=resolveMove(m2B[bi],dir);
+  if(!r||m2Blocked(r.c,bi)){bumpPv(m2Views[bi].pv,dir);return false;}
   anim=true;
   selRingEl.style.opacity='0'; // the ring can't follow the tumble — hide it mid-roll
   const v=m2Views[bi];
   animRoll(v.pv,dir,()=>{
-    m2B[bi]=nc;
+    m2B[bi]=r.c;
     resetPivot(v.pv);
-    buildPoly(v.pv,v.bk,v.sh,nc,MCOL[bi]);
-    puffsAt(footCells(nc));
-    updateSel();updateTgts();updateHudM2();
-    selRingEl.style.opacity='1';
-    anim=false;
-    if(m2B.every((c,i)=>m2Parked(i))){doWin(prog2,'rollm_prog2',M2LEVELS.length);return;}
-    if(queuedDir){const d=queuedDir;queuedDir=null;tryMoveM2(d);}
+    buildPoly(v.pv,v.bk,v.sh,r.c,MCOL[bi]);
+    dropIn(v.pv,r.drop,()=>{
+      puffsAt(footCells(r.c).filter(([x,y])=>onBoard(x,y)));
+      updateSel();updateTgts();updateHudM2();
+      selRingEl.style.opacity='1';
+      anim=false;
+      if(m2B.every((c,i)=>m2Parked(i))){doWin(prog2,'rollm_prog2',M2LEVELS.length);return;}
+      if(queuedDir){const d=queuedDir;queuedDir=null;tryMoveM2(d);}
+    });
   });
   return true;
 }
@@ -475,6 +509,7 @@ function loadM2(n){
   W=m2lv.w;H=m2lv.h;
   m2B=m2lv.blocks.map(b=>stateToCubes(b.s));
   m2G=m2lv.blocks.map(b=>stateToCubes(b.g));
+  EDGE_RES=1; // dominoes overhang at most one cell
   selB=0;anim=false;queuedDir=null;
   buildCells();
   m2TgtEls=m2G.map((g,i)=>renderTgt(footCells(g),MCOL[i].c));
@@ -508,8 +543,8 @@ function renderWall(x,y){
   add(face(CELL,CELL-4,lx-CELL,ly+2,'translateZ(0px) rotateY(90deg)'),'right',M3ROCK.sd);
   add(face(CELL,CELL-4,lx+CELL,ly+2,'translateZ(0px) rotateY(-90deg)'),'left',M3ROCK.sd);
 }
-function m3WallHit(nc){
-  return nc.some(([x,y,z])=>z===0&&m3Walls.has(y*W+x));
+function m3WallHit(nc){ // on-board guard: off-board coords must not wrap into wall keys
+  return nc.some(([x,y,z])=>z===0&&onBoard(x,y)&&m3Walls.has(y*W+x));
 }
 function updateHudM3(){
   $('held').innerHTML='';
@@ -519,21 +554,23 @@ function updateHudM3(){
 function tryMoveM3(dir){ // returns false when the move is impossible (hold-repeat stops on it)
   if(phase!=='play')return false;
   if(anim){queuedDir=dir;return true;}
-  const nc=rollCubes(m3P,dir);
-  if(!nc||m3WallHit(nc)){bumpPv(m3View.pv,dir);return false;}
+  const r=resolveMove(m3P,dir);
+  if(!r||m3WallHit(r.c)){bumpPv(m3View.pv,dir);return false;}
   anim=true;
   animRoll(m3View.pv,dir,()=>{
-    m3P=nc;
+    m3P=r.c;
     resetPivot(m3View.pv);
     buildPoly(m3View.pv,m3View.bk,m3View.sh,m3P,M3SH);
-    puffsAt(footCells(m3P).slice(0,3));
-    anim=false;
-    if(footKey(m3P)===m3GoalKey){
-      for(const t of m3TgtEls){t.classList.add('on');t.style.background=M3SH.c+'66';}
-      doWin(prog3,'rollm_prog3',M3LEVELS.length);
-      return;
-    }
-    if(queuedDir){const d=queuedDir;queuedDir=null;tryMoveM3(d);}
+    dropIn(m3View.pv,r.drop,()=>{
+      puffsAt(footCells(m3P).filter(([x,y])=>onBoard(x,y)).slice(0,3));
+      anim=false;
+      if(footKey(m3P)===m3GoalKey){
+        for(const t of m3TgtEls){t.classList.add('on');t.style.background=M3SH.c+'66';}
+        doWin(prog3,'rollm_prog3',M3LEVELS.length);
+        return;
+      }
+      if(queuedDir){const d=queuedDir;queuedDir=null;tryMoveM3(d);}
+    });
   });
   return true;
 }
@@ -542,6 +579,9 @@ function loadM3(n){
   m3lv=M3LEVELS[n-1];
   W=m3lv.w;H=m3lv.h;
   m3P=m3lv.p.map(c=>c.slice());
+  // overhang capacity = piece max dimension - 1 (rotation-invariant)
+  EDGE_RES=Math.max(...[0,1,2].map(ax=>
+    Math.max(...m3P.map(c=>c[ax]))-Math.min(...m3P.map(c=>c[ax]))))||1;
   m3Walls=new Set((m3lv.o||[]).map(([x,y])=>y*W+x));
   m3GoalKey=[...new Set(m3lv.g.map(([x,y])=>x+','+y))].sort().join('|');
   anim=false;queuedDir=null;
@@ -684,8 +724,8 @@ function applyTest(){
       const b0=cubeKey(m2B[0]),b1=cubeKey(m2B[1]);
       let dir=null;
       for(const d of ['R','L','D','U']){
-        const nc=rollCubes(m2B[0],d);
-        if(nc&&!m2Blocked(nc,0)){dir=d;break;}
+        const r=rollCubes(m2B[0],d);
+        if(r&&!m2Blocked(r.c,0)){dir=d;break;}
       }
       selectB(0);tryMoveM2(dir);
       setTimeout(()=>selectB(1),60);
@@ -693,6 +733,17 @@ function applyTest(){
         const ok=cubeKey(m2B[1])===b1&&cubeKey(m2B[0])!==b0&&selB===1;
         document.title='RACE '+(ok?'OK':'FAIL');
       },700);
+    }
+    else if(TEST==='seq'){ // scripted driver: ?test=seq&mv=0R0R... -> title carries final state
+      const toks=(Q.get('mv')||'').match(/\d[RLDU]/g)||[];
+      let k=0;
+      const iv=setInterval(()=>{
+        if(anim)return;
+        if(k>=toks.length){clearInterval(iv);document.title='SEQ '+m2B.map(cubeKey).join(' / ');return;}
+        selectB(+toks[k][0]);
+        tryMoveM2(toks[k][1]);
+        k++;
+      },200);
     }
     else if(TEST==='auto'){
       const toks=m2lv.sol.match(/\d[RLDU]/g)||[];
@@ -706,16 +757,29 @@ function applyTest(){
       },300);
     }
   }else{
-    if(TEST==='edge'){ // regression: the board edge is a hard wall — no cell may ever leave it
-      let sawOff=false,guard=0;
+    if(TEST==='edge'){ // regression: pushing past the lip must be refused; >=1 cube stays on board
+      let guard=0;
       const iv=setInterval(()=>{
         if(anim)return;
-        const ok=tryMoveM3('L');
-        if(m3P.some(([x])=>x<0))sawOff=true;
-        if(ok===false||++guard>12){
+        const onB=m3P.filter(([x,y])=>onBoard(x,y)).length;
+        if(onB<1){clearInterval(iv);document.title='EDGE FAIL';return;}
+        if(tryMoveM3('L')===false){
           clearInterval(iv);
-          document.title='EDGE '+(!sawOff&&ok===false?'OK':'FAIL');
+          const still=m3P.filter(([x,y])=>onBoard(x,y)).length;
+          document.title='EDGE '+(still>=1?'OK':'FAIL'); // refused at the lip, piece kept on board
+          return;
         }
+        if(++guard>12){clearInterval(iv);document.title='EDGE FAIL';}
+      },200);
+    }
+    else if(TEST==='seq'){ // scripted move driver: ?test=seq&mv=DRUL -> title carries final state
+      const toks=(Q.get('mv')||'').split('');
+      let k=0;
+      const iv=setInterval(()=>{
+        if(anim)return;
+        if(k>=toks.length){clearInterval(iv);document.title='SEQ '+cubeKey(m3P);return;}
+        tryMoveM3(toks[k]);
+        k++;
       },200);
     }
     else if(TEST==='auto'){
