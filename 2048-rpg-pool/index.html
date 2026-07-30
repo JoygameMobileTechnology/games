@@ -1,0 +1,2862 @@
+<meta charset="utf-8">
+<title>2048 RPG Pool</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>
+  /* Committed dark fantasy look — the game is art-directed, not theme-following */
+  :root {
+    --bg: #0B1020;
+    --bgfx: radial-gradient(130% 65% at 50% -8%, #26345E 0%, #141C38 48%, #0B1020 100%);
+    --well: #151C33;
+    --cellbg: #232D4E;
+    --chip: #1B2442;
+    --panel: #131A30;
+    --line: rgba(255, 255, 255, .07);
+    --ink: #F2F5FF;
+    --muted: #8E9AC0;
+    --gold: #F7BE2A;
+    --gold-hi: #FFD34D;
+    --gold-lo: #F0A818;
+    --gold-edge: #B87E10;
+    --gold-ink: #3A2B00;
+    --danger: #F0605C;
+    --hp-ok: #46BD8A;
+    --hp-warn: #F0B027;
+    --shadow: 0 1px 3px rgba(0, 0, 0, .35);
+  }
+
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    min-height: 100dvh;
+    display: flex;
+    justify-content: center;
+    background: var(--bg);
+    background-image: var(--bgfx);
+    background-attachment: fixed;
+    color: var(--ink);
+    font-family: "Avenir Next", "Segoe UI Variable Display", system-ui, -apple-system, "Segoe UI", sans-serif;
+    touch-action: manipulation;
+    overscroll-behavior: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .wrap {
+    /* 18:9 phone column — width tracks half the viewport height, capped for desktop */
+    --gamew: min(94vw, 430px, 50dvh);
+    width: var(--gamew);
+    padding: clamp(6px, 1.2vh, 14px) 0 10px;
+    display: flex;
+    flex-direction: column;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  .game {
+    position: relative;
+    display: flex;
+    gap: 10px;
+    height: clamp(420px, 90svh, 780px);
+  }
+
+  /* ---------- Lane column (left 1/4) ---------- */
+  .lane-col {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .avbox {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 0;
+  }
+  .avatar {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: var(--chip);
+    box-shadow: var(--shadow);
+    display: grid;
+    place-items: center;
+    font-size: 21px;
+    border: 2px solid transparent;
+  }
+  .avbox.me .avatar { border-color: var(--gold); }
+
+  .lane {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    border-radius: 12px;
+    overflow: hidden;
+    /* dusty packed-earth battlefield */
+    background:
+      radial-gradient(rgba(0, 0, 0, .16) 1.2px, transparent 1.8px) 0 0 / 27px 31px,
+      radial-gradient(rgba(255, 244, 214, .05) 1px, transparent 1.5px) 13px 9px / 34px 26px,
+      radial-gradient(55% 40% at 28% 30%, rgba(146, 112, 62, .32), transparent 72%),
+      radial-gradient(50% 42% at 74% 58%, rgba(112, 86, 48, .35), transparent 72%),
+      radial-gradient(48% 38% at 42% 84%, rgba(146, 112, 62, .26), transparent 72%),
+      radial-gradient(120% 100% at 50% 50%, transparent 55%, rgba(0, 0, 0, .34)),
+      linear-gradient(180deg, #4C3E2B, #3D3223 55%, #342B1E);
+    box-shadow: inset 0 0 34px rgba(0, 0, 0, .4);
+  }
+  .unit {
+    position: absolute;
+    left: 0;
+    top: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    pointer-events: none;
+    will-change: transform;
+    z-index: 2;
+  }
+  /* one-shot spawn pop; the class is removed on animationend so later class
+     changes on the root can't restart it (position-flick bug) */
+  .unit.born { animation: spawn .18s cubic-bezier(.3, 1.4, .5, 1) backwards; }
+  .unit .g {
+    line-height: 1;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .35));
+  }
+  .g svg, .ic svg { display: block; width: 100%; height: 100%; }
+  .unit.ai .g { transform: scaleX(-1); } /* opponents face the other way */
+  .unit .uhp {
+    width: 16px;
+    height: 3px;
+    border-radius: 2px;
+    background: rgba(0, 0, 0, .3);
+    margin-top: 1px;
+    overflow: hidden;
+  }
+  .unit .uhp i { display: block; height: 100%; width: 100%; }
+  .unit.me .uhp i { background: var(--gold); }
+  .unit.ai .uhp i { background: var(--danger); }
+  .unit.hurt .g { animation: hurtf .15s; }
+  @keyframes hurtf {
+    50% { filter: brightness(2.1); }
+  }
+  .unit .wpn { transform-box: fill-box; transform-origin: 25% 88%; }
+  .unit.atk.fx-swing .wpn { animation: fxswing .32s ease; }
+  @keyframes fxswing { 40% { transform: rotate(-58deg); } }
+  .unit.atk.fx-smash .wpn { animation: fxsmash .34s ease-in; }
+  @keyframes fxsmash {
+    30% { transform: rotate(24deg) translateY(-3px); }
+    60% { transform: rotate(-75deg); }
+  }
+  .unit.atk.fx-stab .wpn { animation: fxstab .26s ease; }
+  @keyframes fxstab { 40% { transform: translate(9px, -3px); } }
+  .unit.atk.fx-shoot .wpn { animation: fxshoot .22s ease; }
+  @keyframes fxshoot { 35% { transform: translateX(-4px) scaleX(.92); } }
+  .unit.atk.fx-cast .wpn { animation: fxcast .38s ease; }
+  @keyframes fxcast { 45% { transform: rotate(-15deg) translateY(-5px); } }
+  .unit.atk.fx-throw .wpn { animation: fxthrow .3s ease-out; }
+  @keyframes fxthrow { 45% { transform: rotate(-70deg) translate(0, -6px); } }
+  .unit.atk.fx-spin .wpn { animation: fxspin .34s linear; }
+  @keyframes fxspin { to { transform: rotate(-360deg); } }
+  .unit.atk.fx-punch .g svg { animation: fxpunch .26s ease; }
+  @keyframes fxpunch { 45% { transform: scale(1.2) rotate(-6deg); } }
+  .splat {
+    position: absolute;
+    z-index: 1;
+    pointer-events: none;
+    translate: -50% -50%;
+    background:
+      radial-gradient(circle at 30% 40%, rgba(178, 34, 52, .85) 0 28%, transparent 30%),
+      radial-gradient(circle at 65% 30%, rgba(178, 34, 52, .75) 0 18%, transparent 20%),
+      radial-gradient(circle at 55% 65%, rgba(150, 24, 40, .8) 0 32%, transparent 34%),
+      radial-gradient(circle at 20% 75%, rgba(178, 34, 52, .6) 0 12%, transparent 14%),
+      radial-gradient(circle at 82% 62%, rgba(150, 24, 40, .55) 0 10%, transparent 12%);
+    animation: splatfade 2s ease-out forwards;
+  }
+  @keyframes splatfade {
+    0% { scale: .3; opacity: 0; }
+    12% { scale: 1; opacity: 1; }
+    55% { opacity: .85; }
+    100% { opacity: 0; }
+  }
+  .proj { position: absolute; left: 0; top: 0; z-index: 3; pointer-events: none; }
+  .p-stone { width: 7px; height: 7px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #B9C4D6, #6E7686); }
+  .p-arrow { width: 15px; height: 3px; border-radius: 2px; background: linear-gradient(90deg, #C0392B 0 18%, #8B6844 18% 78%, #D7DDE9 78%); }
+  .p-bullet { width: 11px; height: 2.6px; border-radius: 2px; background: linear-gradient(90deg, transparent, #FFD34D 55%, #FFF6D8); box-shadow: 0 0 6px rgba(255, 211, 77, .8); }
+  .p-tracer { width: 18px; height: 2.4px; border-radius: 2px; background: linear-gradient(90deg, transparent, #DCE8FF 60%, #fff); box-shadow: 0 0 8px rgba(180, 210, 255, .9); }
+  .p-bomb { width: 9px; height: 9px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #5A6270, #23272E); border: 1px solid #17191C; }
+  .p-fireball { width: 12px; height: 12px; border-radius: 50%; background: radial-gradient(circle at 40% 35%, #FFE082, #F08C1B 55%, #C25A10); box-shadow: 0 0 12px rgba(240, 140, 27, .95); }
+  .p-iceshard { width: 14px; height: 6px; clip-path: polygon(0 50%, 28% 0, 100% 50%, 28% 100%); background: linear-gradient(90deg, #C9EEFC, #7FD4F5 60%, #2A9BD4); filter: drop-shadow(0 0 6px rgba(127, 212, 245, .9)); }
+  .p-holy { width: 10px; height: 10px; border-radius: 50%; background: radial-gradient(circle at 40% 35%, #FFF6D8, #F0B429 65%); box-shadow: 0 0 10px rgba(240, 180, 41, .9); }
+  .p-boneorb { width: 11px; height: 11px; border-radius: 50%; background: radial-gradient(circle at 40% 35%, #D9F5C9, #9BE07E 55%, #3E7A2E); box-shadow: 0 0 10px rgba(155, 224, 126, .85); }
+  .p-spark { width: 11px; height: 11px; border-radius: 50%; background: radial-gradient(circle at 40% 35%, #FFF9CC, #F7CE3A 60%, #B8860B); box-shadow: 0 0 12px rgba(247, 206, 58, .95); }
+  .impact {
+    position: absolute;
+    z-index: 4;
+    width: 20px;
+    height: 20px;
+    translate: -50% -50%;
+    border-radius: 50%;
+    pointer-events: none;
+    background: radial-gradient(circle, var(--ic) 0 32%, transparent 70%);
+    box-shadow: 0 0 14px var(--ic);
+    animation: impactfx .28s ease-out forwards;
+  }
+  @keyframes impactfx {
+    from { scale: .3; opacity: 1; }
+    to { scale: 1.6; opacity: 0; }
+  }
+
+  /* ---------- Boards column (right 3/4) ---------- */
+  .boards-col {
+    flex: 3;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    gap: 4px;
+  }
+  .bname {
+    font-size: 11px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    font-weight: 700;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .hud { line-height: 1; }
+  .timer {
+    font-size: clamp(22px, 4svh, 30px);
+    font-weight: 900;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: .02em;
+  }
+  .timer.urgent {
+    color: var(--danger);
+    animation: pulse 1s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    50% { opacity: .45; }
+  }
+
+  .board {
+    position: relative;
+    flex-shrink: 0; /* tiles position by --bsize; a flex-squished board desyncs them */
+    background: var(--well);
+    border-radius: 12px;
+    touch-action: none;
+    -webkit-touch-callout: none;
+    --gap: clamp(5px, 1.2vw, 8px);
+    width: var(--bsize);
+    height: var(--bsize);
+    --cs: calc((var(--bsize) - var(--gap) * 5) / 4);
+  }
+  .board.opp { --bsize: min(calc(var(--gamew) * .5), 24svh); }
+  .board.me { --bsize: min(calc(var(--gamew) * .6), 28svh); }
+  .grid {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    grid-template-rows: repeat(4, 1fr);
+    gap: var(--gap);
+    padding: var(--gap);
+  }
+  .cellbg { background: var(--cellbg); border-radius: 7px; }
+
+  .tile {
+    position: absolute;
+    top: 0; left: 0;
+    width: var(--cs);
+    height: var(--cs);
+    border-radius: 7px;
+    display: grid;
+    place-items: center;
+    color: #fff;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    font-size: calc(var(--cs) * .42);
+    z-index: 1;
+    transform: translate(
+      calc(var(--gap) + var(--c) * (var(--cs) + var(--gap))),
+      calc(var(--gap) + var(--r) * (var(--cs) + var(--gap)))
+    );
+    transition: transform 130ms cubic-bezier(.25, .8, .3, 1), filter .15s, scale .15s;
+  }
+  .tile[data-len="3"] { font-size: calc(var(--cs) * .36); }
+  .tile[data-len="4"] { font-size: calc(var(--cs) * .30); }
+  .tile[data-len="5"], .tile[data-len="6"] { font-size: calc(var(--cs) * .24); }
+  .board.me .tile { cursor: pointer; }
+  @media (hover: hover) {
+    .board.me .tile:not(.firing):hover { filter: brightness(1.12); }
+  }
+  .tile.firing {
+    filter: brightness(.72) saturate(.85);
+    scale: .94;
+    cursor: default;
+  }
+
+  .t2    { background: #43A047; }
+  .t4    { background: #3D77C2; }
+  .t8    { background: #7A4FD6; }
+  .t16   { background: #EE7A28; }
+  .t32   { background: #D9453E; }
+  .t64   { background: #F7B816; color: #3A2B00; box-shadow: 0 0 16px rgba(247, 184, 22, .45); }
+  .t128  { background: #E84A8F; box-shadow: 0 0 22px rgba(232, 74, 143, .5); }
+  /* Values whose shared stock is exhausted go gray on the boards */
+  .game.dep2 .tile.t2, .game.dep4 .tile.t4, .game.dep8 .tile.t8,
+  .game.dep16 .tile.t16, .game.dep32 .tile.t32, .game.dep64 .tile.t64,
+  .game.dep128 .tile.t128 {
+    background: #9AA3B2;
+    color: rgba(255, 255, 255, .75);
+    box-shadow: none;
+    cursor: default;
+  }
+  .t256  { background: #E25545; box-shadow: 0 0 18px rgba(226, 85, 69, .40); }
+  .t512  { background: #EE7A28; box-shadow: 0 0 20px rgba(238, 122, 40, .45); }
+  .t1024 { background: #F49A18; box-shadow: 0 0 24px rgba(244, 154, 24, .50); text-shadow: 0 1px 2px rgba(0,0,0,.25); }
+  .t2048 { background: #F7B816; color: #3A2B00; box-shadow: 0 0 30px rgba(247, 184, 22, .60); }
+  .tsuper { background: #FFE082; color: #4A3800; box-shadow: 0 0 34px rgba(255, 224, 130, .65); }
+
+  .spawn { animation: spawn 180ms 100ms cubic-bezier(.3, 1.4, .5, 1) backwards; }
+  @keyframes spawn {
+    from { scale: 0; opacity: 0; }
+  }
+  .pop { animation: pop 180ms ease; }
+  @keyframes pop {
+    0% { scale: 1; }
+    45% { scale: 1.2; }
+    100% { scale: 1; }
+  }
+  .consume { animation: consume 180ms ease forwards; }
+  @keyframes consume {
+    to { scale: .2; opacity: 0; }
+  }
+  .deny { animation: deny .22s ease; }
+  @keyframes deny {
+    25% { rotate: -4deg; }
+    75% { rotate: 4deg; }
+  }
+
+  .lock {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    z-index: 5;
+    pointer-events: none;
+  }
+  .lock span {
+    background: var(--chip);
+    color: var(--muted);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    padding: 5px 10px;
+    border-radius: 999px;
+    box-shadow: var(--shadow);
+  }
+
+  /* ---------- Overlay ---------- */
+  .overlay {
+    position: absolute;
+    inset: -6px;
+    display: grid;
+    place-items: center;
+    background: color-mix(in srgb, var(--bg) 74%, transparent);
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+    border-radius: 14px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .25s;
+    z-index: 70;
+  }
+  .overlay.show { opacity: 1; pointer-events: auto; }
+  .panel {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    gap: 13px;
+    align-items: center;
+    padding: 16px;
+    max-width: 340px;
+  }
+  .panel-title { font-size: 26px; font-weight: 900; margin: 0; text-wrap: balance; }
+  .panel-title .vs { color: var(--gold); }
+  .panel-sub { color: var(--muted); font-size: 13.5px; margin: 0; line-height: 1.5; text-wrap: balance; }
+  .tally {
+    color: var(--muted);
+    font-size: 12.5px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  .count {
+    font-size: 80px;
+    font-weight: 900;
+    margin: 0;
+    font-variant-numeric: tabular-nums;
+  }
+  .ov-actions { display: flex; gap: 8px; }
+
+  .btn {
+    border: 0;
+    cursor: pointer;
+    border-radius: 12px;
+    padding: 11px 18px;
+    font: 700 14px inherit;
+    font-family: inherit;
+    background: var(--chip);
+    color: var(--ink);
+    border: 1px solid var(--line);
+    box-shadow: 0 3px 0 rgba(0, 0, 0, .35), var(--shadow);
+  }
+  .btn.primary {
+    background: linear-gradient(180deg, var(--gold-hi), var(--gold-lo));
+    color: var(--gold-ink);
+    font-weight: 900;
+    border: 0;
+    box-shadow: 0 3px 0 var(--gold-edge), 0 8px 16px rgba(0, 0, 0, .4);
+  }
+  .btn:active { translate: 0 2px; box-shadow: 0 1px 0 rgba(0, 0, 0, .35); }
+  .btn.primary:active { box-shadow: 0 1px 0 var(--gold-edge); }
+  .btn.big { padding: 13px 36px; font-size: 16px; }
+  .btn:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+  /* ---------- Build + arena ---------- */
+  .m2b {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    gap: 3px;
+  }
+  .m2timer { text-align: center; line-height: 1; }
+  .m2meter {
+    display: flex;
+    gap: 4px;
+    justify-content: center;
+    width: 100%;
+  }
+  .mcol {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    flex: 1;
+    max-width: 52px;
+  }
+  .vchip {
+    width: 100%;
+    max-width: 40px;
+    aspect-ratio: 1;
+    border-radius: 7px;
+    display: grid;
+    place-items: center;
+    color: #fff;
+    font-weight: 800;
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+  }
+  .mcnt {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 12px;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+  }
+  .mcnt .ic { width: 18px; height: 18px; }
+  .mcnt.zero { opacity: .35; }
+  .mcnt.bump { animation: pop .18s ease; }
+  .mcol .pool {
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--muted);
+    line-height: 1;
+    white-space: nowrap;
+  }
+  .vchip.depleted { opacity: .35; filter: grayscale(.6); }
+  .m2f {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+  .m2fhud { text-align: center; line-height: 1; }
+  .m2f .lane {
+    width: min(calc(var(--gamew) * .6), 320px);
+    flex: 1;
+  }
+  .bonus-hl {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: var(--cs);
+    height: var(--cs);
+    border-radius: 7px;
+    border: 3px solid var(--gold);
+    box-shadow: 0 0 14px rgba(247, 190, 42, .7), inset 0 0 10px rgba(247, 190, 42, .4);
+    z-index: 6;
+    pointer-events: none;
+    transform: translate(
+      calc(var(--gap) + var(--c) * (var(--cs) + var(--gap))),
+      calc(var(--gap) + var(--r) * (var(--cs) + var(--gap)))
+    );
+  }
+  .bonus-hl.lock { animation: pop .3s ease; }
+  .fight-splash {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    z-index: 65;
+    pointer-events: none;
+  }
+  .fight-splash span {
+    font-size: clamp(40px, 10vw, 72px);
+    font-weight: 900;
+    color: var(--gold);
+    letter-spacing: .06em;
+    text-shadow: 0 2px 18px rgba(247, 190, 42, .5);
+    animation: fsplash .9s cubic-bezier(.3, 1.4, .5, 1) forwards;
+  }
+  @keyframes fsplash {
+    0% { scale: .2; opacity: 0; }
+    25% { scale: 1.1; opacity: 1; }
+    75% { scale: 1; opacity: 1; }
+    100% { scale: 1.15; opacity: 0; }
+  }
+
+  .hint {
+    margin: 6px 0 0;
+    text-align: center;
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1.5;
+  }
+
+  /* ---------- Main menu ---------- */
+  .menu {
+    position: fixed;
+    inset: 0;
+    z-index: 80;
+    display: flex;
+    justify-content: center;
+    background: var(--bg);
+    background-image: var(--bgfx);
+  }
+  .menu-inner {
+    width: min(94vw, 430px, 50dvh);
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    padding-top: max(10px, env(safe-area-inset-top));
+  }
+
+  /* top bar: player identity + resources */
+  .topbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 4px 2px 12px;
+  }
+  .pav {
+    width: 44px;
+    height: 44px;
+    border-radius: 14px;
+    display: grid;
+    place-items: center;
+    font-size: 24px;
+    background: linear-gradient(180deg, #26345E, #1A2340);
+    border: 1px solid var(--line);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .1), 0 3px 8px rgba(0, 0, 0, .4);
+  }
+  .pinfo { display: flex; flex-direction: column; line-height: 1.15; }
+  .pinfo b { font-size: 14.5px; font-weight: 800; }
+  .pinfo span {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .res { margin-left: auto; display: flex; gap: 6px; }
+  .pill {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 11px 5px 7px;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, .32);
+    border: 1px solid var(--line);
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, .45);
+    font-size: 12.5px;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+  }
+  .pill i { font-style: normal; font-size: 13px; filter: drop-shadow(0 1px 1px rgba(0,0,0,.5)); }
+
+  .mview {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 2px 2px 10px;
+  }
+  .vhead {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    padding: 2px 2px 10px;
+  }
+  .vhead h2 {
+    margin: 0;
+    font-size: 19px;
+    font-weight: 900;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+  }
+  .vhead span { font-size: 11.5px; color: var(--muted); font-weight: 700; }
+
+  .fightview, .deckview { display: flex; flex-direction: column; }
+  .fightview { align-items: center; justify-content: center; gap: 16px; text-align: center; }
+
+  /* ---------- Dock ---------- */
+  .dock {
+    position: relative;
+    display: flex;
+    align-items: stretch;
+    gap: 4px;
+    margin: 6px 0 max(10px, env(safe-area-inset-bottom));
+    padding: 8px;
+    border-radius: 20px;
+    background: linear-gradient(180deg, #1C2544, #131A30);
+    border: 1px solid var(--line);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .07), 0 10px 24px rgba(0, 0, 0, .5);
+  }
+  .dock button {
+    flex: 1 1 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    padding: 8px 0 7px;
+    border: 0;
+    border-radius: 14px;
+    background: transparent;
+    color: var(--muted);
+    font: 800 10.5px inherit;
+    font-family: inherit;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: transform .16s cubic-bezier(.3, 1.3, .5, 1), color .15s;
+  }
+  .dock button svg { width: 24px; height: 24px; }
+  /* selected: dark amber plate, popped up + scaled */
+  .dock button.on {
+    color: #2E2200;
+    background: linear-gradient(180deg, #E8AC14, #C4870A);
+    transform: translateY(-9px) scale(1.09);
+    box-shadow: 0 4px 0 #8F6206, 0 10px 18px rgba(0, 0, 0, .5), inset 0 1px 0 rgba(255, 255, 255, .35);
+  }
+  .dock button:not(.on):active { transform: translateY(1px); }
+  .dock button:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+  /* ---------- Rarity filter ---------- */
+  .rtabs {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    padding: 2px 2px 12px;
+    scrollbar-width: none;
+  }
+  .rtabs::-webkit-scrollbar { display: none; }
+  .rtabs button {
+    --rc: var(--gold);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 7px 13px;
+    background: rgba(0, 0, 0, .28);
+    color: var(--muted);
+    font: 800 11.5px inherit;
+    font-family: inherit;
+    letter-spacing: .03em;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  .rtabs button::before {
+    content: '';
+    width: 8px;
+    height: 8px;
+    rotate: 45deg;
+    border-radius: 2px;
+    background: var(--rc);
+    box-shadow: 0 0 6px color-mix(in srgb, var(--rc) 70%, transparent);
+    flex-shrink: 0;
+  }
+  .rtabs button.on {
+    background: linear-gradient(180deg, color-mix(in srgb, var(--rc) 88%, #fff), color-mix(in srgb, var(--rc) 82%, #000));
+    border-color: color-mix(in srgb, var(--rc) 60%, #fff);
+    color: #fff;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, .45);
+    box-shadow: 0 0 14px color-mix(in srgb, var(--rc) 45%, transparent), inset 0 1px 0 rgba(255, 255, 255, .35);
+  }
+  .rtabs button.on::before { background: #fff; box-shadow: none; }
+  .rtabs button[data-r="0"].on { color: var(--gold-ink); text-shadow: none; }
+  .rtabs button[data-r="0"].on::before { background: var(--gold-ink); }
+
+  /* ---------- Character cards ---------- */
+  .invgrid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 9px;
+    padding-bottom: 8px;
+  }
+  .ccard {
+    --rc: #6E7686;
+    position: relative;
+    border-radius: 15px;
+    overflow: hidden;
+    background:
+      linear-gradient(168deg, color-mix(in srgb, var(--rc) 30%, var(--panel)) 0%, var(--panel) 62%);
+    border: 1px solid color-mix(in srgb, var(--rc) 55%, transparent);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, .12),
+      0 5px 12px rgba(0, 0, 0, .45);
+    animation: cardin .3s cubic-bezier(.2, .9, .3, 1.2) backwards;
+  }
+  .ccard.glow {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, .14),
+      0 0 16px color-mix(in srgb, var(--rc) 38%, transparent),
+      0 5px 12px rgba(0, 0, 0, .45);
+  }
+  @keyframes cardin {
+    from { scale: .88; opacity: 0; }
+  }
+  .cfol {
+    position: relative;
+    aspect-ratio: 1.18;
+    display: grid;
+    place-items: center;
+    background: radial-gradient(85% 68% at 50% 45%, color-mix(in srgb, var(--rc) 24%, transparent), transparent 75%);
+  }
+  .cfol svg {
+    width: 76%;
+    height: 76%;
+    filter: drop-shadow(0 4px 5px rgba(0, 0, 0, .45));
+  }
+  .clv {
+    position: absolute;
+    left: 6px;
+    top: 6px;
+    z-index: 2;
+    padding: 3px 8px 3px 7px;
+    clip-path: polygon(0 0, 100% 0, 100% 68%, 50% 100%, 0 68%);
+    background: linear-gradient(180deg, var(--gold-hi), var(--gold-lo));
+    color: var(--gold-ink);
+    font-size: 9.5px;
+    font-weight: 900;
+    padding-bottom: 7px;
+    font-variant-numeric: tabular-nums;
+    filter: drop-shadow(0 2px 2px rgba(0, 0, 0, .5));
+  }
+  .cgem {
+    position: absolute;
+    right: 8px;
+    top: 8px;
+    z-index: 2;
+    width: 20px;
+    height: 20px;
+    rotate: 45deg;
+    border-radius: 5px;
+    background: linear-gradient(135deg, color-mix(in srgb, var(--rc) 75%, #fff), color-mix(in srgb, var(--rc) 78%, #000));
+    border: 1px solid color-mix(in srgb, var(--rc) 55%, #fff);
+    box-shadow: 0 0 8px color-mix(in srgb, var(--rc) 60%, transparent);
+    display: grid;
+    place-items: center;
+  }
+  .cgem span {
+    rotate: -45deg;
+    color: #fff;
+    font-size: 9.5px;
+    font-weight: 900;
+    text-shadow: 0 1px 1px rgba(0, 0, 0, .5);
+    font-variant-numeric: tabular-nums;
+  }
+  .cstats {
+    position: absolute;
+    left: 6px;
+    bottom: 6px;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 3px;
+  }
+  .cstats span {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 7px 2px 5px;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, .42);
+    border: 1px solid rgba(255, 255, 255, .09);
+    font-size: 9.5px;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    color: #fff;
+  }
+  .cstats svg { width: 10px; height: 10px; }
+  .cplate {
+    position: relative;
+    padding: 7px 8px 8px;
+    background: rgba(0, 0, 0, .34);
+    border-top: 1px solid color-mix(in srgb, var(--rc) 35%, transparent);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .cplate b {
+    font-size: 12.5px;
+    line-height: 1.15;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .cplate span {
+    font-size: 8.5px;
+    font-weight: 800;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: color-mix(in srgb, var(--rc) 75%, #fff);
+  }
+
+  /* ---------- Fight view ---------- */
+  .emblem {
+    width: 92px;
+    height: 92px;
+    border-radius: 28px;
+    display: grid;
+    place-items: center;
+    background: linear-gradient(180deg, #26345E, #16204040);
+    border: 1px solid var(--line);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .12), 0 0 34px rgba(247, 190, 42, .18), 0 12px 22px rgba(0, 0, 0, .4);
+  }
+  .emblem svg {
+    width: 54px;
+    height: 54px;
+    color: var(--gold-hi);
+    filter: drop-shadow(0 3px 5px rgba(0, 0, 0, .55));
+  }
+  .ftitle {
+    margin: 0;
+    font-size: 33px;
+    font-weight: 900;
+    letter-spacing: .02em;
+    line-height: 1;
+    text-shadow: 0 3px 12px rgba(0, 0, 0, .55);
+  }
+  .ftitle em {
+    font-style: normal;
+    background: linear-gradient(180deg, var(--gold-hi), var(--gold-lo));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .fsub {
+    margin: 0;
+    max-width: 42ch;
+    color: var(--muted);
+    font-size: 12.5px;
+    line-height: 1.55;
+    text-wrap: balance;
+  }
+  .diffrow { display: flex; gap: 8px; width: min(100%, 340px); }
+  .diffrow button {
+    flex: 1;
+    padding: 11px 0 10px;
+    border-radius: 13px;
+    border: 1px solid var(--line);
+    background: rgba(0, 0, 0, .28);
+    color: var(--muted);
+    font: 800 13px inherit;
+    font-family: inherit;
+    cursor: pointer;
+  }
+  .diffrow button.on {
+    border-color: color-mix(in srgb, var(--gold) 65%, transparent);
+    color: var(--gold-hi);
+    background: linear-gradient(180deg, rgba(255, 211, 77, .16), rgba(255, 211, 77, .04));
+    box-shadow: 0 0 12px rgba(247, 190, 42, .18), inset 0 1px 0 rgba(255, 255, 255, .07);
+  }
+  .diffrow button:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+  .cta {
+    border: 0;
+    cursor: pointer;
+    margin-top: 2px;
+    padding: 16px 58px;
+    border-radius: 17px;
+    background: linear-gradient(180deg, var(--gold-hi), var(--gold-lo));
+    color: var(--gold-ink);
+    font: 900 19px inherit;
+    font-family: inherit;
+    letter-spacing: .09em;
+    text-transform: uppercase;
+    box-shadow: 0 5px 0 var(--gold-edge), 0 14px 24px rgba(0, 0, 0, .45), inset 0 1px 0 rgba(255, 255, 255, .55);
+  }
+  .cta:active { translate: 0 4px; box-shadow: 0 1px 0 var(--gold-edge), 0 5px 12px rgba(0, 0, 0, .45); }
+  .cta:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
+
+  /* ---------- Deck view ---------- */
+  .deckgrid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 9px;
+  }
+  .dslot {
+    --rc: #6E7686;
+    aspect-ratio: .82;
+    border-radius: 13px;
+    border: 1.5px dashed color-mix(in srgb, var(--rc) 55%, transparent);
+    background: color-mix(in srgb, var(--rc) 8%, transparent);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    padding: 6px 3px;
+    font-family: inherit;
+    color: inherit;
+    cursor: pointer;
+    transition: transform .12s;
+  }
+  .dslot:active { transform: scale(.95); }
+  .dslot:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+  .dslot .cgem { position: static; flex-shrink: 0; }
+  .dslot i {
+    font-style: normal;
+    font-size: 9.5px;
+    font-weight: 800;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .dslot .dplus {
+    font-size: 17px;
+    font-weight: 800;
+    line-height: 1;
+    color: color-mix(in srgb, var(--rc) 70%, #fff);
+    opacity: .8;
+  }
+  .deckgrid .ccard {
+    display: block;
+    width: 100%;
+    padding: 0;
+    font-family: inherit;
+    text-align: left;
+    color: var(--ink);
+    cursor: pointer;
+  }
+  .deckgrid .ccard:active { transform: scale(.96); }
+  .deckgrid .ccard:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+  .decknote { color: var(--muted); font-size: 12px; text-align: center; margin: 14px 0 0; }
+
+  /* ---------- Bottom sheet (slot -> hero picker) ---------- */
+  .sheetwrap {
+    position: fixed;
+    inset: 0;
+    z-index: 90;
+    display: flex;
+    justify-content: center;
+    align-items: flex-end;
+  }
+  .scrim {
+    position: absolute;
+    inset: 0;
+    background: rgba(4, 7, 16, .62);
+    opacity: 0;
+    transition: opacity .28s;
+  }
+  .sheet {
+    position: relative;
+    width: min(94vw, 430px, 50dvh);
+    max-height: 74dvh;
+    overflow-y: auto;
+    background: linear-gradient(180deg, #1D2647, #10162B);
+    border: 1px solid var(--line);
+    border-bottom: 0;
+    border-radius: 22px 22px 0 0;
+    padding: 8px 12px max(16px, env(safe-area-inset-bottom));
+    transform: translateY(102%);
+    transition: transform .32s cubic-bezier(.3, 1, .4, 1);
+    box-shadow: 0 -12px 34px rgba(0, 0, 0, .55);
+  }
+  .sheetwrap.open .scrim { opacity: 1; }
+  .sheetwrap.open .sheet { transform: translateY(0); }
+  .sheet-grab {
+    width: 42px;
+    height: 4.5px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, .18);
+    margin: 4px auto 12px;
+  }
+  .sheet-head {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 0 2px 12px;
+  }
+  .sheet-head .cgem { position: static; flex-shrink: 0; }
+  .sheet-head h3 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 900;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+  }
+  .sheet-head span { margin-left: auto; color: var(--muted); font-size: 11px; font-weight: 700; }
+  .sheet-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 9px;
+  }
+  .sheet-grid .ccard {
+    display: block;
+    width: 100%;
+    padding: 0;
+    font-family: inherit;
+    text-align: left;
+    color: var(--ink);
+    cursor: pointer;
+  }
+  .sheet-grid .ccard:active { transform: scale(.96); }
+  .sheet-grid .ccard:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+  .eq {
+    position: absolute;
+    right: 7px;
+    bottom: 7px;
+    z-index: 2;
+    width: 20px;
+    height: 20px;
+    border-radius: 999px;
+    background: linear-gradient(180deg, var(--gold-hi), var(--gold-lo));
+    color: var(--gold-ink);
+    display: grid;
+    place-items: center;
+    font-size: 12px;
+    font-weight: 900;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, .5);
+  }
+
+  /* ---------- Matchmaking ---------- */
+  .mm {
+    position: fixed;
+    inset: 0;
+    z-index: 85;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 12px;
+    padding: max(16px, env(safe-area-inset-top)) 0 max(14px, env(safe-area-inset-bottom));
+    overflow-y: auto;
+    background: var(--bg);
+    background-image: var(--bgfx);
+  }
+  .mm-decks { display: flex; flex-direction: column; gap: 10px; }
+  .mm-drow { display: flex; align-items: center; gap: 14px; }
+  .mm-cell {
+    width: 48px;
+    height: 48px;
+    border-radius: 11px;
+    display: grid;
+    place-items: center;
+    color: #fff;
+    font-weight: 800;
+    font-size: 17px;
+    font-variant-numeric: tabular-nums;
+  }
+  .mm-mini {
+    --rc: #6E7686;
+    position: relative;
+    width: 60px;
+    height: 60px;
+    border-radius: 15px;
+    display: grid;
+    place-items: center;
+    background: linear-gradient(180deg, #1D2647, #131A30);
+    border: 1px solid color-mix(in srgb, var(--rc) 50%, transparent);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .08);
+  }
+  .mm-mini svg { width: 94%; height: 94%; }
+  .mm-mini .mlv {
+    position: absolute;
+    bottom: -6px;
+    left: 50%;
+    translate: -50% 0;
+    padding: 1.5px 7px;
+    border-radius: 999px;
+    background: linear-gradient(180deg, var(--gold-hi), var(--gold-lo));
+    color: var(--gold-ink);
+    font-size: 9px;
+    font-weight: 800;
+    white-space: nowrap;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, .5);
+  }
+  .mm-mini.empty {
+    border-style: dashed;
+    border-color: var(--line);
+    color: var(--muted);
+    font-size: 19px;
+    font-weight: 800;
+  }
+  .mm-mini.q {
+    color: var(--muted);
+    font-size: 22px;
+    font-weight: 900;
+    animation: mmpulse 1.2s ease-in-out infinite;
+  }
+  .mm-arena { display: flex; align-items: stretch; gap: 12px; }
+  .mm-card {
+    width: 138px;
+    padding: 14px 8px 12px;
+    border-radius: 18px;
+    background: linear-gradient(180deg, #1D2647, #131A30);
+    border: 1px solid var(--line);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .09), 0 8px 18px rgba(0, 0, 0, .45);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+  }
+  .mm-card.me { border-color: color-mix(in srgb, var(--gold) 45%, transparent); }
+  .mm-card.reveal { animation: mmpop .4s cubic-bezier(.3, 1.4, .5, 1); }
+  @keyframes mmpop {
+    from { scale: .6; opacity: 0; }
+  }
+  .mm-av {
+    width: 62px;
+    height: 62px;
+    border-radius: 18px;
+    display: grid;
+    place-items: center;
+    font-size: 34px;
+    background: linear-gradient(180deg, #26345E, #1A2340);
+    border: 1px solid var(--line);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .1), 0 3px 8px rgba(0, 0, 0, .4);
+  }
+  .mm-av.unknown {
+    color: var(--muted);
+    font-weight: 900;
+    animation: mmpulse 1.2s ease-in-out infinite;
+  }
+  @keyframes mmpulse {
+    50% { opacity: .35; scale: .94; }
+  }
+  .mm-name { font-size: 13.5px; font-weight: 800; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mm-rank {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: .03em;
+  }
+  .mm-rank svg { flex-shrink: 0; }
+  .mm-meta {
+    font-size: 10.5px;
+    font-weight: 700;
+    color: var(--muted);
+    text-align: center;
+    line-height: 1.55;
+    font-variant-numeric: tabular-nums;
+  }
+  .mm-vs {
+    align-self: center;
+    font-size: 27px;
+    font-weight: 900;
+    font-style: italic;
+    color: var(--gold-hi);
+    text-shadow: 0 0 18px rgba(247, 190, 42, .45), 0 2px 4px rgba(0, 0, 0, .5);
+  }
+  .mm-status { font-size: 15.5px; font-weight: 800; letter-spacing: .03em; }
+  .mm-status.found { color: var(--gold-hi); text-shadow: 0 0 14px rgba(247, 190, 42, .35); }
+  .mm-timer {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+    min-height: 1.2em;
+  }
+  .mm .cta { margin-top: 4px; }
+  .mm-cancel { margin-top: 10px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .tile { transition: none; }
+    .spawn, .pop, .consume, .deny, .timer.urgent, .ccard,
+    .unit.born, .unit.hurt .g, .splat, .bonus-hl.lock { animation: none; }
+    .sheet, .scrim, .dslot, .dock button { transition: none; }
+    .mm-av.unknown, .mm-card.reveal, .mm-mini.q { animation: none; }
+    .unit.atk .wpn, .unit.atk .g svg, .impact { animation: none; }
+    .overlay { transition: none; }
+  }
+</style>
+
+<div class="wrap">
+  <div class="game" id="game">
+    <div class="m2b" id="m2Build">
+      <div class="bname">Rakip · <span id="diffLabel"></span></div>
+      <div class="board opp" id="aiBoard"></div>
+      <div class="m2timer" id="m2TimerSlot"><span class="timer" id="timer">0:45</span></div>
+      <div class="m2meter" id="m2Meter"></div>
+      <div class="board me" id="meBoard"></div>
+      <div class="bname">Sen</div>
+    </div>
+    <div class="m2f" id="m2Fight" hidden>
+      <div class="m2fhud" id="m2fHud"></div>
+      <div class="avbox opp" id="aiCol"><div class="avatar" id="aiAvatar">🤖</div></div>
+      <div class="lane" id="lane"></div>
+      <div class="avbox me" id="meCol"><div class="avatar" id="meAvatar">😎</div></div>
+    </div>
+
+    <div class="overlay" id="overlay">
+      <p class="count" id="countPanel" hidden>3</p>
+      <div class="panel" id="endPanel" hidden>
+        <p class="panel-title" id="endTitle"></p>
+        <p class="panel-sub" id="endSub"></p>
+        <div class="ov-actions">
+          <button class="btn" id="chgBtn">Menü</button>
+          <button class="btn primary" id="againBtn">Tekrar Oyna</button>
+        </div>
+        <div class="tally" id="tallyEnd"></div>
+      </div>
+    </div>
+  </div>
+
+  <p class="hint">Kaydır: hamle · Taşa dokun: stoktan asker kap</p>
+
+  <div class="menu" id="menu">
+    <div class="menu-inner">
+      <header class="topbar">
+        <div class="pav">😎</div>
+        <div class="pinfo"><b>Komutan</b><span id="pSub">2048 RPG Pool</span></div>
+        <div class="res">
+          <span class="pill"><i>🏆</i><b id="trophyCount">0</b></span>
+          <span class="pill"><i>🪙</i><b id="goldCount">0</b></span>
+        </div>
+      </header>
+      <div class="mview" id="viewInv" hidden>
+        <div class="vhead"><h2>Envanter</h2><span id="invCount"></span></div>
+        <div class="rtabs" id="rTabs"></div>
+        <div class="invgrid" id="invGrid"></div>
+      </div>
+      <div class="mview fightview" id="viewFight">
+        <div class="emblem"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 4.5 L16.5 16.5 M16.5 16.5 l3 3 M14 17 l3 -3"/><path d="M19.5 4.5 L7.5 16.5 M7.5 16.5 l-3 3 M10 17 l-3 -3"/></svg></div>
+        <h1 class="ftitle">2048 <em>RPG</em> POOL</h1>
+        <p class="fsub">Asker stoğu iki oyuncu için ortak. 45 saniye taş biriktir — kapan alır, rakipten önce davran. Ardından ordular savaşır: son ayakta kalan kazanır.</p>
+        <div class="diffrow" id="diffSeg" role="group" aria-label="Zorluk">
+          <button data-d="easy">Kolay</button>
+          <button data-d="mid">Orta</button>
+          <button data-d="hard">Zor</button>
+        </div>
+        <button class="cta" id="startBtn">Savaş</button>
+        <div class="tally" id="tallyStart"></div>
+      </div>
+      <div class="mview" id="viewDeck" hidden>
+        <div class="vhead"><h2>Deck</h2><span id="deckCount">savaş kadrosu</span></div>
+        <div class="deckgrid" id="deckGrid"></div>
+        <p class="decknote">Slota dokun, o rarity için savaşacak kahramanı seç.</p>
+      </div>
+      <nav class="dock" id="tabbar">
+        <button data-t="inv"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9 h14 l-1.3 11 h-11.4 z"/><path d="M9 9 a3 3 0 0 1 6 0"/></svg>Envanter</button>
+        <button data-t="fight" class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 4.5 L16.5 16.5 M16.5 16.5 l3 3 M14 17 l3 -3"/><path d="M19.5 4.5 L7.5 16.5 M7.5 16.5 l-3 3 M10 17 l-3 -3"/></svg>Savaş</button>
+        <button data-t="deck"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="6" width="10" height="14" rx="2"/><path d="M14 4 l5.5 1.5 -3.6 13.4 -2 -.55"/></svg>Deck</button>
+      </nav>
+    </div>
+    <div class="mm" id="mmScene" hidden>
+      <div class="mm-arena">
+        <div class="mm-card me">
+          <div class="mm-av">😎</div>
+          <div class="mm-name">Komutan</div>
+          <div class="mm-rank" id="mmMyRank"></div>
+          <div class="mm-meta" id="mmMyMeta"></div>
+        </div>
+        <div class="mm-vs">VS</div>
+        <div class="mm-card" id="mmOppCard">
+          <div class="mm-av unknown" id="mmOppAv">?</div>
+          <div class="mm-name" id="mmOppName">·····</div>
+          <div class="mm-rank" id="mmOppRank"></div>
+          <div class="mm-meta" id="mmOppMeta"></div>
+        </div>
+      </div>
+      <div class="mm-decks" id="mmDecks"></div>
+      <div class="mm-status" id="mmStatus">Rakip aranıyor…</div>
+      <div class="mm-timer" id="mmTimer">0.0s</div>
+      <button class="cta" id="mmGo" hidden>Savaşa Gir</button>
+      <button class="btn mm-cancel" id="mmCancel">İptal</button>
+    </div>
+    <div class="sheetwrap" id="sheetWrap" hidden>
+      <div class="scrim" id="sheetScrim"></div>
+      <div class="sheet">
+        <div class="sheet-grab"></div>
+        <div class="sheet-head">
+          <span class="cgem" id="sheetGem"><span>2</span></span>
+          <h3 id="sheetTitle"></h3>
+          <span>kahraman seç</span>
+        </div>
+        <div class="sheet-grid" id="sheetGrid"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const SIZE = 4;
+  const MOVE_MS = 130;
+  const BUILD_MS = 45000;
+  const BATTLE_MS = 45000;
+  const DEPLOY_COOLDOWN = 250;
+  const DEPLOY_CAST_MS = 350;
+
+  const UNITS = {
+    2:   { name: 'Çaylak',    hp: 3,  dmg: 1,  per: 1.25, speed: 45, range: 16, size: 15, px: 22 },
+    4:   { name: 'Asker',     hp: 7,  dmg: 2,  per: 1.0,  speed: 45, range: 16, size: 17, px: 25 },
+    8:   { name: 'Okçu',      hp: 7,  dmg: 1,  per: 1.0,  speed: 45, range: 75, size: 17, px: 25, ranged: true },
+    16:  { name: 'Şövalye',   hp: 32, dmg: 6,  per: 1.25, speed: 30, range: 16, size: 19, px: 28 },
+    32:  { name: 'Büyücü',    hp: 16, dmg: 5,  per: 1.7,  speed: 30, range: 75, size: 19, px: 29, ranged: true, splash: 26 },
+    64:  { name: 'Berserker', hp: 50, dmg: 14, per: 0.85, speed: 68, range: 16, size: 19, px: 28 },
+    128: { name: 'Dev',       hp: 90, dmg: 18, per: 2.0,  speed: 22, range: 18, size: 25, px: 40 }
+  };
+
+  const $ = id => document.getElementById(id);
+  const laneEl = $('lane');
+  const storage = {
+    get(key) { try { return localStorage.getItem(key); } catch { return null; } },
+    set(key, val) { try { localStorage.setItem(key, val); } catch { /* sandboxed */ } }
+  };
+  const inb = (r, c) => r >= 0 && r < SIZE && c >= 0 && c < SIZE;
+
+  /* ---------- Board ---------- */
+
+  class Game {
+    constructor(rootEl) {
+      rootEl.innerHTML = '';
+      const grid = document.createElement('div');
+      grid.className = 'grid';
+      grid.setAttribute('aria-hidden', 'true');
+      for (let i = 0; i < SIZE * SIZE; i++) {
+        const cell = document.createElement('div');
+        cell.className = 'cellbg';
+        grid.appendChild(cell);
+      }
+      this.tilesEl = document.createElement('div');
+      this.lockEl = document.createElement('div');
+      this.lockEl.className = 'lock';
+      this.lockEl.innerHTML = '<span>Hamle yok — taş harca</span>';
+      this.lockEl.hidden = true;
+      rootEl.append(grid, this.tilesEl, this.lockEl);
+
+      this.tiles = new Map();
+      this.nextId = 1;
+      this.busy = false;
+      this.locked = false;
+    }
+
+    reset() {
+      for (const t of this.tiles.values()) t.el.remove();
+      this.tiles.clear();
+      this.busy = false;
+      this.locked = false;
+      this.lockEl.hidden = true;
+      this.spawnRandom();
+      this.spawnRandom();
+    }
+
+    matrix() {
+      const m = Array.from({ length: SIZE }, () => Array(SIZE).fill(null));
+      for (const t of this.tiles.values()) m[t.r][t.c] = t;
+      return m;
+    }
+
+    gridValues() {
+      // Firing (pinned) tiles occupy their cell but can't move or merge — mark -1 as opaque blocker.
+      const g = Array.from({ length: SIZE }, () => Array(SIZE).fill(0));
+      for (const t of this.tiles.values()) g[t.r][t.c] = t.firing ? -1 : t.value;
+      return g;
+    }
+
+    liveTiles() {
+      return [...this.tiles.values()].filter(t => !t.firing);
+    }
+
+    setPos(el, r, c) {
+      el.style.setProperty('--r', r);
+      el.style.setProperty('--c', c);
+    }
+
+    tileClass(v) { return v <= 2048 ? 't' + v : 'tsuper'; }
+
+    applyValue(t) {
+      t.el.className = t.el.className.replace(/\bt(\d+|super)\b/, this.tileClass(t.value));
+      t.el.dataset.len = Math.min(String(t.value).length, 6);
+      t.el.textContent = t.value;
+    }
+
+    createTile(value, r, c) {
+      const el = document.createElement('div');
+      el.className = 'tile ' + this.tileClass(value) + ' spawn';
+      el.dataset.len = Math.min(String(value).length, 6);
+      el.textContent = value;
+      this.setPos(el, r, c);
+      el.addEventListener('animationend', e => {
+        if (e.animationName === 'consume') return;
+        el.classList.remove(e.animationName === 'pop' ? 'pop' : e.animationName === 'deny' ? 'deny' : 'spawn');
+      });
+      this.tilesEl.appendChild(el);
+      const t = { id: this.nextId++, value, r, c, el, firing: false };
+      this.tiles.set(t.id, t);
+      return t;
+    }
+
+    tileByEl(el) {
+      for (const t of this.tiles.values()) if (t.el === el) return t;
+      return null;
+    }
+
+    spawnRandom() {
+      const m = this.matrix();
+      const empty = [];
+      for (let r = 0; r < SIZE; r++)
+        for (let c = 0; c < SIZE; c++)
+          if (!m[r][c]) empty.push([r, c]);
+      if (!empty.length) return;
+      const [r, c] = empty[(Math.random() * empty.length) | 0];
+      this.createTile(Math.random() < 0.9 ? 2 : 4, r, c);
+    }
+
+    movesAvailable() {
+      const m = this.matrix();
+      for (let r = 0; r < SIZE; r++) {
+        for (let c = 0; c < SIZE; c++) {
+          const t = m[r][c];
+          if (!t) return true;
+          if (t.firing) continue;
+          const right = inb(r, c + 1) ? m[r][c + 1] : null;
+          if (right && !right.firing && right.value === t.value) return true;
+          const down = inb(r + 1, c) ? m[r + 1][c] : null;
+          if (down && !down.firing && down.value === t.value) return true;
+        }
+      }
+      return false;
+    }
+
+    updateLock() {
+      this.locked = !this.movesAvailable();
+      this.lockEl.hidden = !this.locked;
+    }
+
+    beginFire(tile) {
+      tile.firing = true;
+      tile.el.classList.add('firing');
+      this.updateLock();
+    }
+
+    deleteTile(tile) {
+      this.tiles.delete(tile.id);
+      tile.el.classList.add('consume');
+      setTimeout(() => tile.el.remove(), 200);
+      this.updateLock();
+    }
+
+    move(dr, dc) {
+      if (this.busy || this.locked) return;
+      const m = this.matrix();
+      const rows = dr === 1 ? [3, 2, 1, 0] : [0, 1, 2, 3];
+      const cols = dc === 1 ? [3, 2, 1, 0] : [0, 1, 2, 3];
+      const merges = [];
+      const mergedIds = new Set();
+      let moved = false;
+
+      for (const r of rows) {
+        for (const c of cols) {
+          const t = m[r][c];
+          if (!t || t.firing) continue;
+          let nr = r, nc = c;
+          let tr = r + dr, tc = c + dc;
+          while (inb(tr, tc) && !m[tr][tc]) { nr = tr; nc = tc; tr += dr; tc += dc; }
+          const target = inb(tr, tc) ? m[tr][tc] : null;
+          if (target && !target.firing && target.value === t.value && !mergedIds.has(target.id)) {
+            m[r][c] = null;
+            mergedIds.add(target.id);
+            t.r = target.r; t.c = target.c;
+            this.setPos(t.el, t.r, t.c);
+            merges.push({ src: t, dst: target });
+            moved = true;
+          } else if (nr !== r || nc !== c) {
+            m[r][c] = null;
+            m[nr][nc] = t;
+            t.r = nr; t.c = nc;
+            this.setPos(t.el, nr, nc);
+            moved = true;
+          }
+        }
+      }
+
+      if (!moved) return;
+      this.busy = true;
+
+      setTimeout(() => {
+        for (const { src, dst } of merges) {
+          this.tiles.delete(src.id);
+          src.el.remove();
+          dst.value *= 2;
+          this.applyValue(dst);
+          dst.el.classList.add('pop');
+        }
+        this.spawnRandom();
+        this.busy = false;
+        this.updateLock();
+      }, MOVE_MS);
+    }
+  }
+
+  /* ---------- Pure-grid simulation for the AI board ---------- */
+  /* Cell values: 0 = empty, -1 = pinned blocker (firing tile), >0 = tile. */
+
+  const DIRS = { up: [-1, 0], down: [1, 0], left: [0, -1], right: [0, 1] };
+
+  function simMove(g, [dr, dc]) {
+    const s = g.map(row => row.slice());
+    const rows = dr === 1 ? [3, 2, 1, 0] : [0, 1, 2, 3];
+    const cols = dc === 1 ? [3, 2, 1, 0] : [0, 1, 2, 3];
+    const merged = Array.from({ length: SIZE }, () => Array(SIZE).fill(false));
+    let moved = false, gained = 0;
+    for (const r of rows) {
+      for (const c of cols) {
+        const v = s[r][c];
+        if (v <= 0) continue;
+        let nr = r, nc = c, tr = r + dr, tc = c + dc;
+        while (inb(tr, tc) && !s[tr][tc]) { nr = tr; nc = tc; tr += dr; tc += dc; }
+        if (inb(tr, tc) && s[tr][tc] === v && !merged[tr][tc]) {
+          s[r][c] = 0;
+          s[tr][tc] = v * 2;
+          merged[tr][tc] = true;
+          gained += v * 2;
+          moved = true;
+        } else if (nr !== r || nc !== c) {
+          s[r][c] = 0;
+          s[nr][nc] = v;
+          moved = true;
+        }
+      }
+    }
+    return { s, gained, moved };
+  }
+
+  function validMoves(g) {
+    return Object.values(DIRS)
+      .map(d => ({ d, ...simMove(g, d) }))
+      .filter(m => m.moved);
+  }
+
+  function pickRandom(g) {
+    const ms = validMoves(g);
+    return ms.length ? ms[(Math.random() * ms.length) | 0].d : null;
+  }
+
+  function pickOrdered(g) {
+    for (const key of ['down', 'left', 'right', 'up']) {
+      if (simMove(g, DIRS[key]).moved) return DIRS[key];
+    }
+    return null;
+  }
+
+  function pickGreedy(g) {
+    const ms = validMoves(g);
+    if (!ms.length) return null;
+    let bestScore = -Infinity, best = null;
+    for (const m of ms) {
+      let empties = 0, max = 0;
+      for (let r = 0; r < SIZE; r++)
+        for (let c = 0; c < SIZE; c++) {
+          if (!m.s[r][c]) empties++;
+          if (m.s[r][c] > max) max = m.s[r][c];
+        }
+      const corner = m.s[3][0] === max ? max / 2 : 0;
+      const score = m.gained + empties * 10 + corner + Math.random() * 4;
+      if (score > bestScore) { bestScore = score; best = m.d; }
+    }
+    return best;
+  }
+
+  const DIFFS = {
+    easy: { label: 'Kolay', tempo: 950 },
+    mid:  { label: 'Orta',  tempo: 700 },
+    hard: { label: 'Zor',   tempo: 480 }
+  };
+
+  const inCombat = () => state === 'fight';
+
+  /* ---------- Arena battle simulation ---------- */
+
+  let units = [];
+
+  function spawnUnit(side, value, x, y) {
+    const spec = UNITS[value];
+
+    const hero = heroFor(side, value);
+    const px = Math.round(spec.px * 1.3);
+    const el = document.createElement('div');
+    el.className = 'unit born ' + side + ' fx-' + ((FX[hero.id] || {}).anim || 'punch');
+    el.innerHTML = `<span class="g" style="width:${px}px;height:${px}px">${hero.svg()}</span><div class="uhp"><i></i></div>`;
+    el.addEventListener('animationend', e => {
+      if (e.animationName === 'spawn') el.classList.remove('born');
+      else if (e.animationName === 'hurtf') el.classList.remove('hurt');
+    });
+    laneEl.appendChild(el);
+
+    const u = {
+      side, spec, hero,
+      hp: spec.hp,
+      x, y,
+      cd: 0.4,
+      dead: false,
+      el,
+      hpEl: el.querySelector('.uhp i')
+    };
+    el.style.transform = `translate(${x}px, ${y}px) translate(-50%, -50%)`;
+    units.push(u);
+  }
+
+  function bloodSplat(x, y, size) {
+    const s = document.createElement('div');
+    s.className = 'splat';
+    const d = Math.round(size * 1.5);
+    s.style.width = d + 'px';
+    s.style.height = d + 'px';
+    s.style.left = x + 'px';
+    s.style.top = y + 'px';
+    s.style.rotate = ((Math.random() * 360) | 0) + 'deg';
+    laneEl.appendChild(s);
+    setTimeout(() => s.remove(), 2100);
+  }
+
+  function killUnit(u) {
+    u.dead = true;
+    bloodSplat(u.x, u.y, u.spec.size);
+    u.el.remove();
+  }
+
+  function hurtUnit(u, dmg) {
+    u.hp -= dmg;
+    u.el.classList.remove('hurt');
+    void u.el.offsetWidth;
+    u.el.classList.add('hurt');
+    u.hpEl.style.width = Math.max(0, u.hp / u.spec.hp * 100) + '%';
+    if (u.hp <= 0) killUnit(u);
+  }
+
+  const PROJ_AIM = { arrow: 1, bullet: 1, tracer: 1, iceshard: 1 }; // point along the flight
+  const IMPACT_C = {
+    fireball: '#F08C1B', iceshard: '#7FD4F5', holy: '#F0B429', boneorb: '#9BE07E',
+    spark: '#F7CE3A', arrow: '#D7DDE9', bullet: '#FFD34D', tracer: '#DCE8FF',
+    bomb: '#F08C1B', stone: '#9AA3B2',
+  };
+
+  function impactFx(x, y, kind) {
+    const s = document.createElement('div');
+    s.className = 'impact';
+    s.style.left = x + 'px';
+    s.style.top = y + 'px';
+    s.style.setProperty('--ic', IMPACT_C[kind] || '#fff');
+    laneEl.appendChild(s);
+    setTimeout(() => s.remove(), 320);
+  }
+
+  function shootProj(x0, y0, x1, y1, kind) {
+    kind = kind || 'stone';
+    const p = document.createElement('div');
+    p.className = 'proj p-' + kind;
+    laneEl.appendChild(p);
+    const rot = PROJ_AIM[kind] ? ` rotate(${(Math.atan2(y1 - y0, x1 - x0) * 180 / Math.PI).toFixed(1)}deg)` : '';
+    p.style.transform = `translate(${x0}px, ${y0}px)` + rot;
+    p.animate(
+      [{ transform: `translate(${x0}px, ${y0}px)` + rot }, { transform: `translate(${x1}px, ${y1}px)` + rot }],
+      { duration: 130, easing: 'linear', fill: 'forwards' }
+    );
+    setTimeout(() => { p.remove(); impactFx(x1, y1, kind); }, 150);
+  }
+
+  function atkFx(u) {
+    u.el.classList.remove('atk');
+    void u.el.offsetWidth;
+    u.el.classList.add('atk');
+  }
+
+  function attack(u, target) {
+    atkFx(u);
+    if (u.spec.ranged) shootProj(u.x, u.y, target.x, target.y, (FX[u.hero.id] || {}).proj);
+    if (u.spec.splash) {
+      for (const v of units) {
+        if (v.dead || v.side === u.side) continue;
+        if (Math.hypot(v.x - target.x, v.y - target.y) <= u.spec.splash) hurtUnit(v, u.spec.dmg);
+      }
+    } else {
+      hurtUnit(target, u.spec.dmg);
+    }
+  }
+
+  function simulate(dt) {
+    const laneW = laneEl.clientWidth, laneH = laneEl.clientHeight;
+
+    for (const u of units) {
+      if (u.dead) continue;
+      u.cd -= dt;
+
+      // nearest living enemy, freeform across the whole lane
+      let nearest = null, nd = Infinity;
+      for (const v of units) {
+        if (v.dead || v.side === u.side) continue;
+        const d = Math.hypot(v.x - u.x, v.y - u.y);
+        if (d < nd) { nd = d; nearest = v; }
+      }
+
+      if (nearest) {
+        const eff = u.spec.range + (u.spec.size + nearest.spec.size) / 4;
+        if (nd <= eff) {
+          if (u.cd <= 0) { u.cd = u.spec.per; attack(u, nearest); }
+        } else {
+          const s = u.spec.speed * dt / nd;
+          u.x += (nearest.x - u.x) * s;
+          u.y += (nearest.y - u.y) * s;
+        }
+      }
+    }
+
+    // gentle separation between same-side units so they don't stack
+    for (let i = 0; i < units.length; i++) {
+      const a = units[i];
+      if (a.dead) continue;
+      for (let j = i + 1; j < units.length; j++) {
+        const b = units[j];
+        if (b.dead || b.side !== a.side) continue;
+        const dx = b.x - a.x, dy = b.y - a.y;
+        const d = Math.hypot(dx, dy);
+        const min = (a.spec.size + b.spec.size) / 2;
+        if (d > 0 && d < min) {
+          const push = (min - d) / 2;
+          a.x -= dx / d * push; a.y -= dy / d * push;
+          b.x += dx / d * push; b.y += dy / d * push;
+        }
+      }
+    }
+
+    for (const u of units) {
+      if (u.dead) continue;
+      u.x = Math.min(laneW - 8, Math.max(8, u.x));
+      u.y = Math.min(laneH - 8, Math.max(8, u.y));
+      u.el.style.transform = `translate(${u.x}px, ${u.y}px) translate(-50%, -50%)`;
+    }
+
+    units = units.filter(u => !u.dead);
+
+    // a wiped-out army ends the battle immediately
+    if (inCombat()) {
+      const mAlive = units.some(u => u.side === 'me');
+      const aAlive = units.some(u => u.side === 'ai');
+      if (!mAlive || !aAlive) finish();
+    }
+  }
+
+  let lastTick = 0;
+  function battleLoop(ts) {
+    if (!inCombat()) return;
+    const dt = Math.min(0.05, (ts - lastTick) / 1000 || 0.016);
+    lastTick = ts;
+    simulate(dt);
+    requestAnimationFrame(battleLoop);
+  }
+
+  function clearUnits() {
+    for (const u of units) u.el.remove();
+    units = [];
+  }
+
+  /* ---------- Deploy (tile → unit or bank) ---------- */
+
+  function deploy(game, tile, side) {
+    claimPool(tile.value); // claimed at tap time so the race is fair
+    game.beginFire(tile);
+    const value = tile.value;
+    setTimeout(() => {
+      game.deleteTile(tile);
+      if (state === 'build' || state === 'bonus' || state === 'fightsplash') bankUnit(side, value);
+    }, DEPLOY_CAST_MS);
+  }
+
+  /* ---------- Match controller ---------- */
+
+  let state = 'idle'; // idle | countdown | build | bonus | fightsplash | fight | ended
+  let diffKey = storage.get('rpgpool-diff') || 'mid';
+  if (!DIFFS[diffKey]) diffKey = 'mid';
+  let clockTimer = null, aiTimer = null, endAt = 0;
+  let lastDeploy = 0;
+
+  const POOL_LIMITS = { 2: 10, 4: 6, 8: 4, 16: 2, 32: 1, 64: 1, 128: 1 };
+  const pool = {};
+  const poolEls = {};
+
+  function renderPool(v) {
+    const p = poolEls[v];
+    p.label.textContent = pool[v] > 0 ? 'kalan ' + pool[v] : 'bitti';
+    p.chip.classList.toggle('depleted', pool[v] <= 0);
+    $('game').classList.toggle('dep' + v, pool[v] <= 0);
+  }
+
+  function initPool() {
+    for (const v of Object.keys(POOL_LIMITS)) {
+      pool[v] = POOL_LIMITS[v];
+      renderPool(v);
+    }
+  }
+
+  function poolRemainingTotal() {
+    return Object.values(pool).reduce((s, n) => s + n, 0);
+  }
+
+  function claimPool(v) {
+    pool[v]--;
+    renderPool(v);
+    // pool exhausted early → still run the bonus round before the fight
+    if (state === 'build' && poolRemainingTotal() === 0) beginBonusRound();
+  }
+
+  const overlay = $('overlay');
+  const countPanel = $('countPanel');
+  const endPanel = $('endPanel');
+  const timerEl = $('timer');
+
+  const me = new Game($('meBoard'));
+  const ai = new Game($('aiBoard'));
+
+  function renderTimer(ms) {
+    const sec = Math.ceil(ms / 1000);
+    timerEl.textContent = Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0');
+    const active = state === 'build' || state === 'fight';
+    timerEl.classList.toggle('urgent', active && sec <= 10);
+  }
+
+  function startClock(ms, onEnd) {
+    clearInterval(clockTimer);
+    endAt = performance.now() + ms;
+    renderTimer(ms);
+    clockTimer = setInterval(() => {
+      const rem = endAt - performance.now();
+      if (rem <= 0) {
+        clearInterval(clockTimer);
+        renderTimer(0);
+        onEnd();
+      } else renderTimer(rem);
+    }, 100);
+  }
+
+  /* ---------- Layouts (timer is shared, gets re-parented) ---------- */
+
+  function layoutBuild() {
+    $('m2Fight').hidden = true;
+    $('m2Build').hidden = false;
+    $('m2TimerSlot').append(timerEl);
+  }
+
+  function layoutFight() {
+    $('m2Build').hidden = true;
+    $('m2Fight').hidden = false;
+    $('m2fHud').append(timerEl);
+  }
+
+  /* ---------- Unit bank + meters ---------- */
+
+  const bank = { me: {}, ai: {} };
+  const meterCells = { me: {}, ai: {} };
+
+  function buildMeters() {
+    const strip = $('m2Meter');
+    for (const v of Object.keys(UNITS)) {
+      const col = document.createElement('div');
+      col.className = 'mcol';
+      col.innerHTML = `
+        <div class="mcnt ai zero"><span class="ic"></span><b>0</b></div>
+        <div class="vchip t${v}">${v}</div>
+        <span class="pool"></span>
+        <div class="mcnt me zero"><span class="ic"></span><b>0</b></div>`;
+      strip.appendChild(col);
+      poolEls[v] = { label: col.querySelector('.pool'), chip: col.querySelector('.vchip') };
+      for (const side of ['ai', 'me']) {
+        const cell = col.querySelector('.mcnt.' + side);
+        cell.addEventListener('animationend', () => cell.classList.remove('bump'));
+        meterCells[side][v] = cell;
+      }
+    }
+  }
+
+  function updateMeterIcons() {
+    for (const side of ['ai', 'me'])
+      for (const v of Object.keys(UNITS))
+        meterCells[side][v].querySelector('.ic').innerHTML = heroFor(side, +v).svg();
+  }
+
+  function resetBanks() {
+    for (const side of ['me', 'ai']) {
+      for (const v of Object.keys(UNITS)) {
+        bank[side][v] = 0;
+        const cell = meterCells[side][v];
+        cell.querySelector('b').textContent = '0';
+        cell.classList.add('zero');
+      }
+    }
+  }
+
+  function bankUnit(side, value) {
+    bank[side][value]++;
+    const cell = meterCells[side][value];
+    cell.querySelector('b').textContent = bank[side][value];
+    cell.classList.remove('zero');
+    cell.classList.remove('bump');
+    void cell.offsetWidth;
+    cell.classList.add('bump');
+  }
+
+  function showPanel(panel) {
+    for (const p of [countPanel, endPanel]) p.hidden = p !== panel;
+    overlay.classList.toggle('show', !!panel);
+  }
+
+  function loadTally() {
+    try { return JSON.parse(storage.get('rpgpool-tally')) || { w: 0, l: 0, d: 0 }; }
+    catch { return { w: 0, l: 0, d: 0 }; }
+  }
+  function renderTally() {
+    const t = loadTally();
+    const text = `Seri: ${t.w}G · ${t.l}M · ${t.d}B`;
+    $('tallyStart').textContent = text;
+    $('tallyEnd').textContent = text;
+  }
+  function addTally(result) {
+    const t = loadTally();
+    t[result]++;
+    storage.set('rpgpool-tally', JSON.stringify(t));
+    renderTally();
+  }
+
+  function setDiff(key) {
+    diffKey = key;
+    storage.set('rpgpool-diff', key);
+    $('diffLabel').textContent = DIFFS[key].label;
+    for (const b of $('diffSeg').children) b.classList.toggle('on', b.dataset.d === key);
+  }
+
+  function beginCountdown() {
+    state = 'countdown';
+    layoutBuild();
+    let n = 3;
+    countPanel.textContent = n;
+    showPanel(countPanel);
+    const step = () => {
+      n--;
+      if (n === 0) { showPanel(null); startMatch(); return; }
+      countPanel.textContent = n;
+      setTimeout(step, 650);
+    };
+    setTimeout(step, 650);
+  }
+
+  function startMatch() {
+    me.reset();
+    ai.reset();
+    clearUnits();
+    resetBanks();
+    updateMeterIcons();
+    aiTally.low = 0;
+    aiTally.mid = 0;
+    aiTally.high = 0;
+    initPool();
+    state = 'build';
+    startClock(BUILD_MS, beginBonusRound);
+    aiTick();
+  }
+
+  /* Bonus roulette: a gold highlight hops across deployable tiles on both
+     boards, slows down and lands on a random one — that unit joins for free. */
+  function rouletteFor(game, side, boardRoot, cb) {
+    // bonus ignores the shared pool: any unit-producing tile can win
+    const elig = [...game.tiles.values()].filter(t => !t.firing && UNITS[t.value]);
+    if (!elig.length) { cb(); return; }
+    const winner = elig[(Math.random() * elig.length) | 0];
+
+    const hl = document.createElement('div');
+    hl.className = 'bonus-hl';
+    boardRoot.appendChild(hl);
+
+    const steps = [];
+    let interval = 90, total = 0;
+    while (total < 2600) { steps.push(interval); total += interval; interval *= 1.13; }
+
+    let i = 0;
+    const hop = () => {
+      if (state !== 'bonus') { hl.remove(); cb(); return; }
+      const isLast = i >= steps.length - 1;
+      const t = isLast ? winner : elig[(Math.random() * elig.length) | 0];
+      hl.style.setProperty('--r', t.r);
+      hl.style.setProperty('--c', t.c);
+      if (isLast) {
+        hl.classList.add('lock');
+        setTimeout(() => {
+          hl.remove();
+          bankUnit(side, winner.value); // free bonus, outside the pool economy
+          winner.el.classList.add('pop');
+          cb();
+        }, 450);
+        return;
+      }
+      setTimeout(hop, steps[i++]);
+    };
+    hop();
+  }
+
+  /* Anti-abuse: before the roulette, every empty cell fills with a 2 in a
+     quick one-by-one cascade — an emptied board can't guarantee a big bonus. */
+  function fillEmpty(game, cb) {
+    const step = () => {
+      if (state !== 'bonus') { cb(); return; }
+      const m = game.matrix();
+      const empty = [];
+      for (let r = 0; r < SIZE; r++)
+        for (let c = 0; c < SIZE; c++)
+          if (!m[r][c]) empty.push([r, c]);
+      if (!empty.length) { setTimeout(cb, 150); return; }
+      const [r, c] = empty[(Math.random() * empty.length) | 0];
+      game.createTile(2, r, c);
+      setTimeout(step, 60);
+    };
+    step();
+  }
+
+  function beginBonusRound() {
+    state = 'bonus';
+    clearInterval(clockTimer);
+    clearTimeout(aiTimer);
+    let filled = 0;
+    const afterFill = () => { if (++filled === 2) startRoulettes(); };
+    fillEmpty(me, afterFill);
+    fillEmpty(ai, afterFill);
+  }
+
+  function startRoulettes() {
+    let done = 0;
+    const onDone = () => { if (++done === 2) setTimeout(beginFightSplash, 500); };
+    rouletteFor(me, 'me', $('meBoard'), onDone);
+    rouletteFor(ai, 'ai', $('aiBoard'), onDone);
+  }
+
+  function beginFightSplash() {
+    state = 'fightsplash';
+    clearInterval(clockTimer);
+    clearTimeout(aiTimer);
+    const sp = document.createElement('div');
+    sp.className = 'fight-splash';
+    sp.innerHTML = '<span>FIGHT!</span>';
+    $('game').appendChild(sp);
+    setTimeout(() => sp.remove(), 950);
+    setTimeout(startFight, 900);
+  }
+
+  function startFight() {
+    layoutFight();
+    state = 'fight';
+    const laneW = laneEl.clientWidth, laneH = laneEl.clientHeight;
+    const zone = Math.min(70, laneH * .2);
+    for (const side of ['me', 'ai']) {
+      for (const [v, count] of Object.entries(bank[side])) {
+        for (let i = 0; i < count; i++) {
+          const x = 12 + Math.random() * (laneW - 24);
+          const y = side === 'me'
+            ? laneH - 14 - Math.random() * zone
+            : 14 + Math.random() * zone;
+          spawnUnit(side, +v, x, y);
+        }
+      }
+    }
+    startClock(BATTLE_MS, finish);
+    lastTick = performance.now();
+    requestAnimationFrame(battleLoop);
+  }
+
+  /* AI army composition: chase a 3 low : 2 mid : 1 high unit ratio so the
+     army has both numbers and punch (pure big-unit play gets outnumbered). */
+  const TIER = v => (v >= 64 ? 'high' : v >= 16 ? 'mid' : 'low');
+  const COMP_TARGET = { low: 3, mid: 2, high: 1 };
+  const aiTally = { low: 0, mid: 0, high: 0 };
+
+  function pickComposition(eligible) {
+    const total = aiTally.low + aiTally.mid + aiTally.high;
+    let bestTier = null, bestDef = -Infinity;
+    for (const t of ['high', 'mid', 'low']) {
+      if (!eligible.some(x => TIER(x.value) === t)) continue;
+      const def = COMP_TARGET[t] / 6 - (total ? aiTally[t] / total : 0);
+      if (def > bestDef) { bestDef = def; bestTier = t; }
+    }
+    if (!bestTier) return null;
+    const cands = eligible.filter(x => TIER(x.value) === bestTier);
+    return cands.reduce((a, b) => (b.value > a.value ? b : a), cands[0]);
+  }
+
+  function aiDeploy(tile) {
+    aiTally[TIER(tile.value)]++;
+    deploy(ai, tile, 'ai');
+  }
+
+  function aiAct() {
+    if (ai.busy) return;
+    const live = ai.liveTiles();
+    if (!live.length) return;
+    const eligible = live.filter(t => UNITS[t.value] && pool[t.value] > 0);
+    const canDeploy = live.length > 1 && eligible.length > 0;
+    const smallest = eligible.reduce((a, b) => (b.value < a.value ? b : a), eligible[0]);
+
+    if (ai.locked) {
+      if (canDeploy) aiDeploy(smallest);
+      return;
+    }
+    if (canDeploy) {
+      // scarcity race: grab high-value or nearly-exhausted stock before the player
+      const scarce = eligible
+        .filter(t => t.value >= 16 || pool[t.value] <= 2)
+        .sort((a, b) => (pool[a.value] - pool[b.value]) || (b.value - a.value))[0];
+      const p = diffKey === 'hard' ? 0.6 : diffKey === 'mid' ? 0.35 : 0.15;
+      if (scarce && Math.random() < p) { aiDeploy(scarce); return; }
+    }
+    const g = ai.gridValues();
+    const freq = diffKey === 'hard' ? 0.6 : diffKey === 'mid' ? 0.45 : 0.25;
+    if (canDeploy && Math.random() < freq) {
+      const pick = pickComposition(eligible);
+      if (pick) { aiDeploy(pick); return; }
+    }
+    const d = diffKey === 'hard' ? pickGreedy(g) : diffKey === 'mid' ? pickOrdered(g) : pickRandom(g);
+    if (d) ai.move(d[0], d[1]);
+  }
+
+  function aiTick() {
+    if (state !== 'build') return;
+    aiAct();
+    aiTimer = setTimeout(aiTick, DIFFS[diffKey].tempo * (0.85 + Math.random() * 0.3));
+  }
+
+  function livingUnitHp(side) {
+    return units.reduce((s, u) => s + (u.side === side && !u.dead ? u.hp : 0), 0);
+  }
+
+  function livingUnitCount(side) {
+    return units.filter(u => u.side === side && !u.dead).length;
+  }
+
+  function finish() {
+    if (!inCombat()) return;
+    state = 'ended';
+    clearInterval(clockTimer);
+    clearTimeout(aiTimer);
+    timerEl.classList.remove('urgent');
+
+    // surviving army decides (strength as tiebreak on timeout)
+    const m = livingUnitHp('me'), a = livingUnitHp('ai');
+    const result = m > a ? 'w' : m < a ? 'l' : 'd';
+
+    $('endTitle').textContent = result === 'w' ? 'Kazandın!' : result === 'l' ? 'Kaybettin' : 'Berabere';
+    $('endSub').textContent = `Kalan birim: Sen ${livingUnitCount('me')} · Rakip ${livingUnitCount('ai')}`;
+    addTally(result);
+    showPanel(endPanel);
+  }
+
+  /* ---------- Input ---------- */
+
+  function denyTile(tile) {
+    tile.el.classList.remove('deny');
+    void tile.el.offsetWidth;
+    tile.el.classList.add('deny');
+  }
+
+  function tryDeploy(el) {
+    if (state !== 'build' || me.busy) return;
+    const tile = me.tileByEl(el);
+    if (!tile || tile.firing) return;
+    const poolOut = !(pool[tile.value] > 0);
+    if (!UNITS[tile.value] || poolOut || me.liveTiles().length <= 1) {
+      denyTile(tile);
+      return;
+    }
+    const now = performance.now();
+    if (now - lastDeploy < DEPLOY_COOLDOWN) return;
+    lastDeploy = now;
+    deploy(me, tile, 'me');
+  }
+
+  const KEYS = {
+    ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1],
+    w: [-1, 0], s: [1, 0], a: [0, -1], d: [0, 1]
+  };
+  window.addEventListener('keydown', e => {
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    const dir = KEYS[e.key.length === 1 ? e.key.toLowerCase() : e.key];
+    if (!dir) return;
+    e.preventDefault();
+    if (state === 'build') me.move(dir[0], dir[1]);
+  });
+
+  let pStart = null;
+  window.addEventListener('pointerdown', e => {
+    if (!e.isPrimary) return;
+    pStart = {
+      x: e.clientX, y: e.clientY,
+      t: performance.now(),
+      target: e.target,
+      touch: e.pointerType !== 'mouse'
+    };
+  });
+  window.addEventListener('pointerup', e => {
+    if (!e.isPrimary || !pStart) return;
+    const dx = e.clientX - pStart.x;
+    const dy = e.clientY - pStart.y;
+    const dist = Math.max(Math.abs(dx), Math.abs(dy));
+    const dt = performance.now() - pStart.t;
+    const s = pStart;
+    pStart = null;
+    if (state !== 'build') return;
+    const tapMax = s.touch ? 18 : 10; // finger jitter tolerance
+    if (dist < tapMax && dt < 350) {
+      const tileEl = s.target.closest?.('.tile');
+      if (tileEl) tryDeploy(tileEl); // AI tiles resolve to null in me.tileByEl
+    } else if (dist >= 22) {
+      if (Math.abs(dx) > Math.abs(dy)) me.move(0, dx > 0 ? 1 : -1);
+      else me.move(dy > 0 ? 1 : -1, 0);
+    }
+  });
+  window.addEventListener('pointercancel', () => { pStart = null; });
+  // Block page scroll only mid-match so full-screen swipes stay game input.
+  window.addEventListener('touchmove', e => {
+    if (state !== 'idle' && state !== 'ended') e.preventDefault();
+  }, { passive: false });
+
+  /* ---------- Character roster (rgs_dev stick-figure recipe) ---------- */
+
+  const INK = '#171717', SKIN = '#FCFCFC';
+  const WOOD = '#8B6844', METAL = '#C9CFDA', DMETAL = '#8E97A8', OUT = '#2A2A2A';
+  /* slightly irregular head blob — hand-drawn wobble, not a perfect circle */
+  const HEAD_D = 'M64 22 c18 0 30 13 30 29 c1 18 -14 31 -30 31 c-17 0 -31 -13 -30 -30 c0 -17 13 -30 30 -30 z';
+
+  /* per-character face library: brow + mouth pick the personality */
+  const BROWS = {
+    angry:   'M48 39 L60 45 M70 45 L82 39',
+    fierce:  'M46 36 L60 46 M70 46 L84 36',
+    calm:    'M50 42 L61 42 M71 42 L82 42',
+    worried: 'M50 45 L61 40 M71 40 L82 45',
+    uneven:  'M50 41 L61 41 M70 44 L82 37',
+    heavy:   'M46 41 L60 46 M70 46 L84 41',
+  };
+  /* mouths sit centered under the eyes (x≈66), level and symmetric */
+  const MOUTHS = {
+    line:  `<path d="M60 64 L73 64" stroke="${INK}" stroke-width="3.4" stroke-linecap="round" fill="none"/>`,
+    short: `<path d="M62 64 L71 64" stroke="${INK}" stroke-width="3.2" stroke-linecap="round" fill="none"/>`,
+    smile: `<path d="M59 62.5 Q66.5 69 74 62.5" stroke="${INK}" stroke-width="3.2" stroke-linecap="round" fill="none"/>`,
+    smirk: `<path d="M59 64.5 Q67 65 73.5 60.5" stroke="${INK}" stroke-width="3.2" stroke-linecap="round" fill="none"/>`,
+    frown: `<path d="M59 66 Q66.5 60 74 66" stroke="${INK}" stroke-width="3.2" stroke-linecap="round" fill="none"/>`,
+    o:     `<circle cx="66.5" cy="64" r="3" fill="none" stroke="${INK}" stroke-width="2.8"/>`,
+    wavy:  `<path d="M58.5 64 q4 -2.6 8 0 q4 2.6 8 0" stroke="${INK}" stroke-width="3" stroke-linecap="round" fill="none"/>`,
+    jagged: `<path d="M58.5 64 L63 61 L67.5 64.5 L72 61 L75.5 64" stroke="${INK}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>`,
+    grit:  `<rect x="59" y="60.5" width="15" height="6.5" rx="2.2" fill="#fff" stroke="${INK}" stroke-width="2.6"/>
+            <path d="M64 60.5 v6.5 M69 60.5 v6.5" stroke="${INK}" stroke-width="1.6"/>`,
+    shout: `<ellipse cx="66.5" cy="64.5" rx="4.8" ry="5.4" fill="${INK}"/>`,
+    fang:  `<ellipse cx="66.5" cy="64.5" rx="5.2" ry="5.6" fill="${INK}"/>
+            <path d="M62.5 60.5 L64 64 L65.5 60.7 z M67.5 60.7 L69 64 L70.5 60.5 z" fill="#fff"/>`,
+    wide:  `<path d="M57 66 L76 66" stroke="${INK}" stroke-width="4" stroke-linecap="round" fill="none"/>`,
+    pick:  `<path d="M60 64 L73 64" stroke="${INK}" stroke-width="3.4" stroke-linecap="round"/>
+            <path d="M71 63 L81 58" stroke="${WOOD}" stroke-width="2.4" stroke-linecap="round"/>`,
+    mstache: `<path d="M57.5 61 Q62.5 57 66 61 M66 61 Q69.5 57 74.5 61" stroke="${INK}" stroke-width="2.8" stroke-linecap="round" fill="none"/>
+              <path d="M60.5 66 Q66 69.5 71.5 65.5" stroke="${INK}" stroke-width="2.8" stroke-linecap="round" fill="none"/>`,
+  };
+
+  function figHead(o = {}) {
+    let f = `<path d="${HEAD_D}" fill="${o.fill || SKIN}" stroke="${INK}" stroke-width="6"/>`;
+    if (o.face === 'skull') {
+      f += `<circle cx="57" cy="52" r="4.6" fill="${INK}"/><circle cx="75" cy="52" r="4.6" fill="${INK}"/>
+            <path d="M62 65 h10 M64 62 v6 M69 62 v6" stroke="${INK}" stroke-width="2.4" stroke-linecap="round"/>`;
+      return f;
+    }
+    f += `<path d="${BROWS[o.brow] || BROWS.angry}" stroke="${INK}" stroke-width="${o.brow === 'heavy' ? 6 : 4.5}" stroke-linecap="round" fill="none"/>`;
+    f += o.squint
+      ? `<path d="M53 52 L62 52" stroke="${INK}" stroke-width="3.4" stroke-linecap="round"/><circle cx="74" cy="53" r="2.7" fill="${INK}"/>`
+      : `<circle cx="58" cy="53" r="2.7" fill="${INK}"/><circle cx="74" cy="53" r="2.7" fill="${INK}"/>`;
+    if (o.face !== 'mask') f += MOUTHS[o.mouth] || MOUTHS.line;
+    return f;
+  }
+
+  function figBody(o = {}) {
+    const lw = o.limb || 5, torsoW = o.torsoW || 13;
+    const arms = `<path d="${o.armL || 'M58 88 L45 98'}" stroke="${INK}" stroke-width="${lw}" stroke-linecap="round" fill="none"/>
+                  <path d="${o.armR || 'M68 88 L80 97'}" stroke="${INK}" stroke-width="${lw}" stroke-linecap="round" fill="none"/>`;
+    const legs = `<path d="${o.legL || 'M60 100 L55 106 L50 114'}" stroke="${INK}" stroke-width="${lw}" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                  <path d="${o.legR || 'M66 100 L70 106 L74 114'}" stroke="${INK}" stroke-width="${lw}" stroke-linecap="round" stroke-linejoin="round" fill="none"/>`;
+    const torso = `<rect x="${63 - torsoW / 2}" y="82" width="${torsoW}" height="19" rx="4" fill="${o.torsoFill || SKIN}" stroke="${INK}" stroke-width="4.5"/>`;
+    return legs + torso + arms;
+  }
+
+  function fig(o = {}) {
+    const inner = (o.pre || '') + figBody(o) + figHead(o) + (o.post || '') +
+      (o.wpn ? `<g class="wpn">${o.wpn}</g>` : '');
+    return `<svg viewBox="-6 0 140 128" fill="none">${o.tf ? `<g transform="${o.tf}">${inner}</g>` : inner}</svg>`;
+  }
+
+  const swordP = (tf) => `<g transform="${tf}">
+    <path d="M1 0 L4.5 -30 L7.5 -34 L10.5 -30 L14 0 z" fill="${METAL}" stroke="${OUT}" stroke-width="3"/>
+    <rect x="-4" y="-1" width="23" height="5" rx="2.4" fill="${WOOD}" stroke="${OUT}" stroke-width="2.6"/>
+    <rect x="5" y="4" width="5.4" height="11" rx="2.6" fill="#5A4634"/>
+  </g>`;
+
+  const CHARS = [
+  { id: 'caylak', v: 2, name: 'Çaylak', arch: 'Vurucu', st: { hp: 3, dmg: 1, per: 1.25 },
+    svg: () => fig({ brow: 'angry', mouth: 'smile', armL: 'M58 88 L46 84', armR: 'M68 88 L82 84',
+      post: `<circle cx="44" cy="83" r="4.4" fill="${INK}"/><circle cx="84" cy="83" r="4.4" fill="${INK}"/>` }) },
+  { id: 'sopali', v: 2, name: 'Sopalı', arch: 'Kontrol', st: { hp: 4, dmg: 2, per: 1.6 },
+    svg: () => fig({ brow: 'uneven', mouth: 'smirk', armR: 'M68 88 L82 96',
+      wpn: `<path d="M82 98 L106 66" stroke="${OUT}" stroke-width="13" stroke-linecap="round"/>
+             <path d="M82 98 L106 66" stroke="${WOOD}" stroke-width="9.5" stroke-linecap="round"/>
+             <path d="M96 82 L101 86" stroke="#5F4225" stroke-width="2.8" stroke-linecap="round"/>` }) },
+  { id: 'sapanci', v: 2, name: 'Sapancı', arch: 'Menzilli', st: { hp: 2, dmg: 1, per: 1.4 },
+    svg: () => fig({ brow: 'angry', mouth: 'o', armR: 'M68 88 L86 82',
+      wpn: `<path d="M90 84 L90 72 M90 75 L81 61 M90 75 L99 61" stroke="${WOOD}" stroke-width="5" stroke-linecap="round"/>
+             <path d="M81 60 Q90 68 99 60" stroke="#4A4A4A" stroke-width="2.2" fill="none"/>
+             <circle cx="90" cy="65" r="3" fill="#7A8699"/>` }) },
+  { id: 'asker', v: 4, name: 'Asker', arch: 'Vurucu', st: { hp: 7, dmg: 2, per: 1.0 },
+    svg: () => fig({ brow: 'angry', mouth: 'line', armR: 'M68 88 L84 94', wpn: swordP('translate(86 96) rotate(34) scale(1.35)') }) },
+  { id: 'mizrakci', v: 4, name: 'Mızrakçı', arch: 'Menzil-vurucu', st: { hp: 6, dmg: 2, per: 1.2 },
+    svg: () => fig({ brow: 'fierce', mouth: 'frown', armR: 'M68 88 L84 80', armL: 'M58 88 L72 98',
+      wpn: `<path d="M64 116 L112 48" stroke="${OUT}" stroke-width="6.6" stroke-linecap="round"/>
+             <path d="M64 116 L112 48" stroke="${WOOD}" stroke-width="4" stroke-linecap="round"/>
+             <path d="M109 50 L116 34 L123 47 z" fill="${METAL}" stroke="${OUT}" stroke-width="2.8"/>` }) },
+  { id: 'hancerci', v: 4, name: 'Hançerci', arch: 'Çevik', st: { hp: 5, dmg: 1, per: 0.45 },
+    svg: () => fig({ brow: 'fierce', mouth: 'smirk', armL: 'M58 88 L42 94', armR: 'M68 88 L86 94',
+      wpn: `<path d="M40 94 L26 80 z" stroke="${OUT}" stroke-width="9" stroke-linecap="round"/>
+             <path d="M40 94 L27 81" stroke="${METAL}" stroke-width="5" stroke-linecap="round"/>
+             <path d="M88 94 L102 80 z" stroke="${OUT}" stroke-width="9" stroke-linecap="round"/>
+             <path d="M88 94 L101 81" stroke="${METAL}" stroke-width="5" stroke-linecap="round"/>` }) },
+  { id: 'okcu', v: 8, name: 'Okçu', arch: 'Menzilli', st: { hp: 7, dmg: 1, per: 1.0 },
+    svg: () => fig({ brow: 'calm', mouth: 'short', armR: 'M68 88 L92 86', armL: 'M58 88 L76 87',
+      wpn: `<path d="M94 54 A30 30 0 0 1 94 118" stroke="${WOOD}" stroke-width="5" stroke-linecap="round" fill="none"/>
+             <path d="M94 54 L94 118" stroke="#4A4A4A" stroke-width="2"/>
+             <path d="M68 86 L116 86" stroke="${WOOD}" stroke-width="3" stroke-linecap="round"/>
+             <path d="M116 86 L108 81 M116 86 L108 91" stroke="${DMETAL}" stroke-width="3" stroke-linecap="round"/>` }) },
+  { id: 'tabancaci', v: 8, name: 'Tabancacı', arch: 'Çevik-menzilli', st: { hp: 6, dmg: 1, per: 0.8 },
+    svg: () => fig({ brow: 'uneven', mouth: 'pick', armR: 'M68 88 L88 88',
+      wpn: `<rect x="88" y="82" width="24" height="8" rx="2" fill="#AEB6C4" stroke="${OUT}" stroke-width="2.8"/>
+             <rect x="90" y="90" width="7" height="11" rx="2.2" fill="#D96E2C" stroke="${OUT}" stroke-width="2.6" transform="rotate(10 93 95)"/>` }) },
+  { id: 'bombaci', v: 8, name: 'Bombacı', arch: 'Alan', st: { hp: 8, dmg: 2, per: 1.8 },
+    svg: () => fig({ brow: 'worried', mouth: 'wavy', armR: 'M68 88 L88 82',
+      wpn: `<circle cx="98" cy="78" r="11" fill="#3A404A" stroke="#17191C" stroke-width="3"/>
+             <rect x="94.5" y="63.5" width="7" height="5" rx="1.6" fill="#5A6270"/>
+             <path d="M98 63 Q103 55 109 57" stroke="#6E4E2E" stroke-width="2.6" fill="none"/>
+             <path d="M109 51 l2.5 4 4-1.5 -1.5 4 4 2.5 -4 1.5 0 4 -4-2.5 -4 2.5 1.5-5 z" fill="#F7B816"/>` }) },
+  { id: 'sovalye', v: 16, name: 'Şövalye', arch: 'Tank', st: { hp: 32, dmg: 6, per: 1.25 },
+    svg: () => fig({ brow: 'angry', mouth: 'grit', armR: 'M68 88 L84 94', armL: 'M58 88 L44 92',
+      wpn: swordP('translate(86 96) rotate(36) scale(1.3)'),
+      post: `<path d="M28 84 h24 v16 q0 12 -12 15 q-12 -3 -12 -15 z" fill="${METAL}" stroke="${OUT}" stroke-width="3.2"/>
+             <path d="M40 88 v22 M31 96 h18" stroke="${DMETAL}" stroke-width="3" stroke-linecap="round"/>
+             <path d="M40 30 A27 25 0 0 1 88 30 L86 40 L42 40 z" fill="#AEB6C4" stroke="${OUT}" stroke-width="3.4"/>
+             <rect x="60" y="24" width="7" height="4" rx="2" fill="#EE7A28"/>` }) },
+  { id: 'balyozcu', v: 16, name: 'Balyozcu', arch: 'Kontrol-vurucu', st: { hp: 24, dmg: 9, per: 1.7 },
+    svg: () => fig({ brow: 'heavy', mouth: 'shout', armL: 'M58 88 L76 84', armR: 'M68 88 L84 82',
+      wpn: `<path d="M74 100 L108 56" stroke="${OUT}" stroke-width="7" stroke-linecap="round"/>
+             <path d="M74 100 L108 56" stroke="${WOOD}" stroke-width="4.4" stroke-linecap="round"/>
+             <rect x="96" y="38" width="28" height="19" rx="3.4" fill="#9AA3B2" stroke="${OUT}" stroke-width="3.2" transform="rotate(-38 110 47)"/>` }) },
+  { id: 'duellocu', v: 16, name: 'Düellocu', arch: 'Çevik-vurucu', st: { hp: 20, dmg: 5, per: 0.9 },
+    svg: () => fig({ brow: 'uneven', mouth: 'mstache', armR: 'M68 88 L88 90',
+      wpn: `<path d="M92 90 L126 82" stroke="${OUT}" stroke-width="5" stroke-linecap="round"/>
+             <path d="M92 90 L124 82.5" stroke="${METAL}" stroke-width="2.8" stroke-linecap="round"/>
+             <circle cx="91" cy="90" r="5.4" fill="${DMETAL}" stroke="${OUT}" stroke-width="2.4"/>` }) },
+  { id: 'atesbuyucusu', v: 32, name: 'Ateş Büyücüsü', arch: 'Alan', st: { hp: 16, dmg: 5, per: 1.7 },
+    svg: () => fig({ brow: 'fierce', mouth: 'shout', armR: 'M68 88 L88 92',
+      wpn: `<path d="M92 112 L100 52" stroke="${OUT}" stroke-width="6.6" stroke-linecap="round"/>
+             <path d="M92 112 L100 52" stroke="${WOOD}" stroke-width="4.2" stroke-linecap="round"/>
+             <path d="M100 52 q-12 -10 -2 -26 q3 10 9 13 q4 -6 3 -12 q11 12 -1 25 q-4 4 -9 0 z" fill="#F08C1B" stroke="#C25A10" stroke-width="2.8"/>
+             <circle cx="102" cy="41" r="4" fill="#FFCE54"/>
+             <circle cx="115" cy="58" r="2.2" fill="#F08C1B"/><circle cx="88" cy="42" r="1.8" fill="#F08C1B"/>` }) },
+  { id: 'buzbuyucusu', v: 32, name: 'Buz Büyücüsü', arch: 'Kontrol', st: { hp: 16, dmg: 4, per: 1.5 },
+    svg: () => fig({ brow: 'calm', mouth: 'line', armR: 'M68 88 L88 92',
+      wpn: `<path d="M92 112 L100 52" stroke="${OUT}" stroke-width="6.6" stroke-linecap="round"/>
+             <path d="M92 112 L100 52" stroke="${WOOD}" stroke-width="4.2" stroke-linecap="round"/>
+             <path d="M100 52 L109 38 L118 52 L109 66 z" fill="#7FD4F5" stroke="#2A6E8E" stroke-width="3"/>
+             <path d="M109 42 L109 62" stroke="#C9EEFC" stroke-width="2.6"/>
+             <circle cx="122" cy="64" r="2.2" fill="#7FD4F5"/><circle cx="94" cy="40" r="2" fill="#7FD4F5"/>` }) },
+  { id: 'sifaci', v: 32, name: 'Şifacı', arch: 'Destek', st: { hp: 18, dmg: 0, per: 1.0 },
+    svg: () => fig({ brow: 'calm', mouth: 'smile', armR: 'M68 88 L88 92',
+      wpn: `<path d="M92 112 L98 54" stroke="${OUT}" stroke-width="6.6" stroke-linecap="round"/>
+            <path d="M92 112 L98 54" stroke="${WOOD}" stroke-width="4.2" stroke-linecap="round"/>
+            <rect x="92.5" y="34" width="12" height="22" rx="3" fill="#F0B429" stroke="#8A6410" stroke-width="2.8"/>
+            <rect x="87" y="41" width="23" height="8" rx="3" fill="#F0B429" stroke="#8A6410" stroke-width="2.8"/>`,
+      post: `<path d="M28 68 h10 M33 63 v10" stroke="#46BD8A" stroke-width="3.4" stroke-linecap="round"/>
+             <path d="M112 78 h8 M116 74 v8" stroke="#46BD8A" stroke-width="3" stroke-linecap="round"/>` }) },
+  { id: 'berserker', v: 64, name: 'Berserker', arch: 'Vurucu', st: { hp: 50, dmg: 14, per: 0.85 },
+    svg: () => fig({ brow: 'fierce', mouth: 'fang', armR: 'M68 88 L84 92',
+      wpn: `<path d="M84 96 L108 58" stroke="${OUT}" stroke-width="7" stroke-linecap="round"/>
+            <path d="M84 96 L108 58" stroke="${WOOD}" stroke-width="4.6" stroke-linecap="round"/>
+            <path d="M102 42 q20 5 16 28 l-15 -4 q3 -13 -4 -21 z" fill="#B9C4D6" stroke="${OUT}" stroke-width="3.2"/>`,
+      post: `<path d="M38 44 Q64 35 90 44" stroke="#C0392B" stroke-width="5.5" fill="none" stroke-linecap="round"/>
+             <path d="M38 44 L32 52 M38 44 L30 45" stroke="#C0392B" stroke-width="3.4" stroke-linecap="round"/>` }) },
+  { id: 'golge', v: 64, name: 'Gölge', arch: 'Suikastçı', st: { hp: 30, dmg: 16, per: 0.9 },
+    svg: () => fig({ face: 'mask', brow: 'fierce',
+      armL: 'M58 88 L44 90', armR: 'M68 88 L82 90',
+      legL: 'M60 100 L52 105 L46 112', legR: 'M66 100 L72 106 L78 112',
+      post: `<path d="M38 56 Q64 70 90 54 L90 63 Q64 78 38 65 z" fill="#39445C" stroke="#232B3D" stroke-width="2.6"/>
+             <path d="M38 60 Q26 66 22 78 L30 78 Q34 68 40 65 z" fill="#39445C" stroke="#232B3D" stroke-width="2.4"/>`,
+      wpn: `<path d="M40 92 L24 78 z" stroke="${OUT}" stroke-width="8.5" stroke-linecap="round"/>
+             <path d="M40 92 L25 79" stroke="${METAL}" stroke-width="4.6" stroke-linecap="round"/>
+             <path d="M86 92 L102 78 z" stroke="${OUT}" stroke-width="8.5" stroke-linecap="round"/>
+             <path d="M86 92 L101 79" stroke="${METAL}" stroke-width="4.6" stroke-linecap="round"/>` }) },
+  { id: 'nisanci', v: 64, name: 'Keskin Nişancı', arch: 'Menzilli', st: { hp: 22, dmg: 24, per: 2.6 },
+    svg: () => fig({ brow: 'calm', mouth: 'line', squint: true, armR: 'M68 88 L88 88', armL: 'M58 88 L78 92',
+      wpn: `<rect x="62" y="86" width="40" height="7" rx="2.4" fill="#6E7686" stroke="${OUT}" stroke-width="2.8"/>
+             <rect x="102" y="87.6" width="28" height="4" rx="2" fill="#4A515E" stroke="${OUT}" stroke-width="2.2"/>
+             <rect x="52" y="88" width="11" height="10" rx="2.8" fill="${WOOD}" stroke="${OUT}" stroke-width="2.6" transform="rotate(14 57 92)"/>
+             <rect x="76" y="78" width="11" height="5.6" rx="2.4" fill="#3A404A" stroke="${OUT}" stroke-width="2.2"/>` }) },
+  { id: 'dev', v: 128, name: 'Dev', arch: 'Tank-alan', st: { hp: 90, dmg: 18, per: 2.0 },
+    svg: () => fig({ brow: 'heavy', mouth: 'wide', tf: 'translate(-8 -9) scale(1.14)', fill: '#E3E7EE', torsoFill: '#D4DAE4', torsoW: 17, limb: 6.5,
+      armL: 'M56 88 L42 96', armR: 'M70 88 L84 96',
+      post: `<circle cx="40" cy="97" r="6" fill="#B9C4D6" stroke="${INK}" stroke-width="3.4"/>
+             <circle cx="86" cy="97" r="6" fill="#B9C4D6" stroke="${INK}" stroke-width="3.4"/>
+             <path d="M46 32 l6 7 M84 34 l-5 6" stroke="#5A6579" stroke-width="2.6" stroke-linecap="round"/>` }) },
+  { id: 'kemiklordu', v: 128, name: 'Kemik Lordu', arch: 'Çağırıcı', st: { hp: 60, dmg: 10, per: 1.4 },
+    svg: () => fig({ face: 'skull', fill: '#F2F0E9', armR: 'M68 88 L88 92',
+      wpn: `<path d="M92 112 L98 50" stroke="#2E2A20" stroke-width="6.6" stroke-linecap="round"/>
+            <path d="M92 112 L98 50" stroke="#4A4438" stroke-width="4.2" stroke-linecap="round"/>
+            <circle cx="99" cy="42" r="10" fill="#9BE07E" stroke="#3E7A2E" stroke-width="3"/>
+            <circle cx="95.5" cy="40" r="2.2" fill="#2E5A22"/><circle cx="102.5" cy="40" r="2.2" fill="#2E5A22"/>`,
+      post: `<path d="M53 27 L58 15 L63 23 L67 12 L72 23 L78 15 L82 28" fill="none" stroke="#F0B429" stroke-width="4.4" stroke-linejoin="round"/>` }) },
+  { id: 'yildirim', v: 128, name: 'Yıldırım Hükümdarı', arch: 'Alan', st: { hp: 55, dmg: 14, per: 1.6 },
+    svg: () => fig({ brow: 'fierce', mouth: 'jagged', armR: 'M68 88 L88 92',
+      pre: `<path d="M50 22 L46 12 M62 19 L61 8 M75 20 L79 10" stroke="${INK}" stroke-width="3.6" stroke-linecap="round"/>`,
+      wpn: `<path d="M92 112 L98 54" stroke="#3A414E" stroke-width="6.6" stroke-linecap="round"/>
+             <path d="M92 112 L98 54" stroke="#5A6579" stroke-width="4.2" stroke-linecap="round"/>
+             <path d="M96 34 L111 34 L104 46 L114 46 L92 70 L99 50 L89 50 z" fill="#F7CE3A" stroke="#B8860B" stroke-width="2.8" stroke-linejoin="round"/>
+             <circle cx="119" cy="40" r="2.2" fill="#F7CE3A"/><circle cx="87" cy="38" r="1.8" fill="#F7CE3A"/>` }) },
+  ];
+
+  /* combat FX per hero: attack animation + projectile skin */
+  const FX = {
+    caylak: { anim: 'punch' },
+    sopali: { anim: 'swing' },
+    sapanci: { anim: 'spin', proj: 'stone' },
+    asker: { anim: 'swing' },
+    mizrakci: { anim: 'stab' },
+    hancerci: { anim: 'stab' },
+    okcu: { anim: 'shoot', proj: 'arrow' },
+    tabancaci: { anim: 'shoot', proj: 'bullet' },
+    bombaci: { anim: 'throw', proj: 'bomb' },
+    sovalye: { anim: 'swing' },
+    balyozcu: { anim: 'smash' },
+    duellocu: { anim: 'stab' },
+    atesbuyucusu: { anim: 'cast', proj: 'fireball' },
+    buzbuyucusu: { anim: 'cast', proj: 'iceshard' },
+    sifaci: { anim: 'cast', proj: 'holy' },
+    berserker: { anim: 'swing' },
+    golge: { anim: 'stab' },
+    nisanci: { anim: 'shoot', proj: 'tracer' },
+    dev: { anim: 'punch' },
+    kemiklordu: { anim: 'cast', proj: 'boneorb' },
+    yildirim: { anim: 'cast', proj: 'spark' },
+  };
+
+  /* ---------- Inventory + level ---------- */
+
+  const RNAME = { 2: 'Common', 4: 'Uncommon', 8: 'Rare', 16: 'Epic', 32: 'Legendary', 64: 'Mythic', 128: 'Mythic+' };
+  const RCOLOR = { 2: '#43A047', 4: '#3D77C2', 8: '#7A4FD6', 16: '#EE7A28', 32: '#D9453E', 64: '#F7B816', 128: '#E84A8F' };
+
+  /* tiny stat icons: heart / blade / bolt */
+  const ICO = {
+    hp:  `<svg viewBox="0 0 12 12"><path d="M6 10.6 C3.1 8.4 1.2 6.6 1.2 4.5 A2.5 2.5 0 0 1 6 3.2 A2.5 2.5 0 0 1 10.8 4.5 C10.8 6.6 8.9 8.4 6 10.6 z" fill="#F0605C"/></svg>`,
+    dmg: `<svg viewBox="0 0 12 12"><path d="M10.4 1 L11 1.6 L5.8 6.8 L6.6 8.2 L5 8.4 L3.6 9.8 L2.2 8.4 L3.6 7 L3.8 5.4 L5.2 6.2 z" fill="#F0A818"/></svg>`,
+    spd: `<svg viewBox="0 0 12 12"><path d="M6.8 .8 L2.4 6.8 H5 L4.2 11.2 L9.6 5 H6.6 L7.8 .8 z" fill="#FFD34D"/></svg>`,
+  };
+
+  const charLv = (() => {
+    try { return JSON.parse(storage.get('rpgpool-charlv')) || {}; } catch { return {}; }
+  })();
+  const lvOf = id => charLv[id] || 1; // everyone starts at level 1
+
+  let rFilter = 0; // 0 = ALL
+
+  function renderRarityTabs() {
+    for (const b of $('rTabs').children) b.classList.toggle('on', +b.dataset.r === rFilter);
+  }
+
+  function buildRarityTabs() {
+    const wrap = $('rTabs');
+    for (const v of [0, 2, 4, 8, 16, 32, 64, 128]) {
+      const b = document.createElement('button');
+      b.dataset.r = v;
+      if (v) b.style.setProperty('--rc', RCOLOR[v]);
+      b.textContent = v === 0 ? 'ALL' : RNAME[v];
+      b.addEventListener('click', () => {
+        rFilter = v;
+        renderRarityTabs();
+        renderInventory();
+        b.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+      });
+      wrap.appendChild(b);
+    }
+    renderRarityTabs();
+  }
+
+  function renderInventory() {
+    const list = CHARS.filter(c => !rFilter || c.v === rFilter);
+    $('invCount').textContent = list.length + ' karakter';
+    $('invGrid').innerHTML = list.map((c, i) => `
+      <div class="ccard${c.v >= 32 ? ' glow' : ''}" style="--rc:${RCOLOR[c.v]};animation-delay:${i * 24}ms">
+        <div class="cfol">${c.svg()}
+          <span class="clv">Lv ${lvOf(c.id)}</span>
+          <span class="cgem"><span>${c.v}</span></span>
+          <div class="cstats">
+            <span>${ICO.hp}${c.st.hp}</span>
+            <span>${ICO.dmg}${c.st.dmg}</span>
+            <span>${ICO.spd}${c.st.per}s</span>
+          </div></div>
+        <div class="cplate"><b>${c.name}</b><span>${RNAME[c.v]} · ${c.arch}</span></div>
+      </div>`).join('');
+  }
+
+  /* ---------- Deck (one hero per rarity slot) ---------- */
+
+  const RARITIES = [2, 4, 8, 16, 32, 64, 128];
+  const deck = (() => {
+    try { return JSON.parse(storage.get('rpgpool-deck')) || {}; } catch { return {}; }
+  })();
+  const saveDeck = () => storage.set('rpgpool-deck', JSON.stringify(deck));
+
+  /* battle-side resolver: my picks from the deck, opponent's from the rolled oppDeck */
+  function heroFor(side, v) {
+    const c = side === 'me'
+      ? CHARS.find(x => x.id === deck[v] && x.v === v)
+      : (oppDeck && oppDeck[v]);
+    return c || CHARS.find(x => x.v === v);
+  }
+
+  function renderDeck() {
+    let filled = 0;
+    $('deckGrid').innerHTML = RARITIES.map(v => {
+      const c = CHARS.find(x => x.id === deck[v] && x.v === v);
+      if (c) {
+        filled++;
+        return heroCard(c, false, `data-v="${v}"`);
+      }
+      return `<button class="dslot" data-v="${v}" style="--rc:${RCOLOR[v]}">
+        <span class="cgem"><span>${v}</span></span>
+        <span class="dplus">+</span>
+        <i>${RNAME[v]}</i>
+      </button>`;
+    }).join('');
+    $('deckCount').textContent = `${filled}/7 seçildi`;
+  }
+
+  /* bottom sheet: pick the hero for one slot */
+  let sheetV = 2;
+
+  function heroCard(c, equipped, dataAttr) {
+    return `<button class="ccard${c.v >= 32 ? ' glow' : ''}${equipped ? ' equipped' : ''}" ${dataAttr || `data-c="${c.id}"`} style="--rc:${RCOLOR[c.v]}">
+      <div class="cfol">${c.svg()}
+        <span class="clv">Lv ${lvOf(c.id)}</span>
+        <span class="cgem"><span>${c.v}</span></span>
+        ${equipped ? '<span class="eq">✓</span>' : ''}
+        <div class="cstats">
+          <span>${ICO.hp}${c.st.hp}</span>
+          <span>${ICO.dmg}${c.st.dmg}</span>
+          <span>${ICO.spd}${c.st.per}s</span>
+        </div></div>
+      <div class="cplate"><b>${c.name}</b><span>${RNAME[c.v]} · ${c.arch}</span></div>
+    </button>`;
+  }
+
+  function openSheet(v) {
+    sheetV = v;
+    $('sheetGem').style.setProperty('--rc', RCOLOR[v]);
+    $('sheetGem').firstElementChild.textContent = v;
+    $('sheetTitle').textContent = RNAME[v] + ' slotu';
+    $('sheetGrid').innerHTML = CHARS.filter(c => c.v === v)
+      .map(c => heroCard(c, deck[v] === c.id)).join('');
+    const w = $('sheetWrap');
+    w.hidden = false;
+    requestAnimationFrame(() => requestAnimationFrame(() => w.classList.add('open')));
+  }
+
+  function closeSheet() {
+    const w = $('sheetWrap');
+    w.classList.remove('open');
+    setTimeout(() => { w.hidden = true; }, 320);
+  }
+
+  $('deckGrid').addEventListener('click', e => {
+    const s = e.target.closest('[data-v]');
+    if (s) openSheet(+s.dataset.v);
+  });
+  $('sheetGrid').addEventListener('click', e => {
+    const b = e.target.closest('[data-c]');
+    if (!b) return;
+    deck[sheetV] = b.dataset.c;
+    saveDeck();
+    renderDeck();
+    closeSheet();
+  });
+  $('sheetScrim').addEventListener('click', closeSheet);
+
+  /* ---------- Main menu ---------- */
+
+  const menuEl = $('menu');
+
+  function switchTab(t) {
+    for (const b of $('tabbar').children) b.classList.toggle('on', b.dataset.t === t);
+    $('viewInv').hidden = t !== 'inv';
+    $('viewFight').hidden = t !== 'fight';
+    $('viewDeck').hidden = t !== 'deck';
+  }
+
+  function showMenu(tab) {
+    menuEl.hidden = false;
+    switchTab(tab);
+  }
+
+  $('tabbar').addEventListener('click', e => {
+    const b = e.target.closest('button');
+    if (b) switchTab(b.dataset.t);
+  });
+
+  /* ---------- Player profile, ranks, fake ladder ---------- */
+
+  const LEAGUES = [
+    { name: 'Bronze',   min: 0,    c1: '#C98B5F', c2: '#7A4A22' },
+    { name: 'Silver',   min: 800,  c1: '#D7DDE9', c2: '#7E8AA0' },
+    { name: 'Gold',     min: 1100, c1: '#FFD34D', c2: '#B8860B' },
+    { name: 'Platinum', min: 1400, c1: '#9FE8E4', c2: '#2E7A76' },
+    { name: 'Diamond',  min: 1700, c1: '#9FC8FF', c2: '#3D5FC4' },
+  ];
+  const leagueOf = tr => [...LEAGUES].reverse().find(l => tr >= l.min);
+  const rankBadge = (l, size = 15) =>
+    `<svg viewBox="0 0 24 24" style="width:${size}px;height:${size}px"><path d="M12 2.5 L21 9.5 L12 21.5 L3 9.5 z" fill="${l.c1}" stroke="${l.c2}" stroke-width="1.8"/><path d="M3.6 9.5 h16.8 M12 2.9 L8.4 9.5 L12 20.8 L15.6 9.5 z" stroke="${l.c2}" stroke-width="1" fill="none"/></svg>`;
+
+  const PROFILE = { name: 'Komutan', av: '😎', tr: 1758, w: 328, l: 214 };
+  const FAKES = [
+    { name: 'DragonSlayerTR', av: '🐉', tr: 2103, w: 412, l: 187 },
+    { name: 'KebabWarrior',   av: '🥷', tr: 1985, w: 380, l: 214 },
+    { name: 'PixelPasha',     av: '🤠', tr: 1876, w: 356, l: 231 },
+    { name: 'MermerElif',     av: '👸', tr: 1799, w: 340, l: 205 },
+    { name: 'GazapHan',       av: '😤', tr: 1642, w: 301, l: 246 },
+    { name: 'SessizOk',       av: '🦉', tr: 1512, w: 275, l: 232 },
+    { name: 'TurboDokuz',     av: '🤖', tr: 1287, w: 243, l: 261 },
+    { name: 'LunaCanavarı',   av: '👾', tr: 1104, w: 198, l: 240 },
+    { name: 'ZeytinKral',     av: '🐢', tr: 934,  w: 154, l: 236 },
+    { name: 'ÇaylakAvcısı',   av: '🐤', tr: 712,  w: 121, l: 260 },
+  ];
+  const LADDER = [...FAKES, PROFILE].sort((a, b) => b.tr - a.tr);
+  const lbPos = u => LADDER.indexOf(u) + 1;
+
+  /* ---------- Matchmaking ---------- */
+
+  const mmEl = $('mmScene');
+  let mmTick = null, mmWait = null;
+  let oppDeck = null; // { tileValue: char } — rolled fresh every match
+
+  function mmMini(c, lv) {
+    if (!c) return '<div class="mm-mini empty">+</div>';
+    return `<div class="mm-mini" style="--rc:${RCOLOR[c.v]}">${c.svg()}<span class="mlv">Lv ${lv}</span></div>`;
+  }
+
+  function renderMMDecks() {
+    $('mmDecks').innerHTML = RARITIES.map(v => {
+      const mine = CHARS.find(x => x.id === deck[v] && x.v === v);
+      const opp = oppDeck && oppDeck[v];
+      return `<div class="mm-drow">
+        ${mmMini(mine, mine ? lvOf(mine.id) : 1)}
+        <div class="mm-cell t${v}">${v}</div>
+        ${opp ? mmMini(opp, 1) : '<div class="mm-mini q">?</div>'}
+      </div>`;
+    }).join('');
+  }
+
+  const mmUserMeta = u => `🏆 ${u.tr} · Sıra #${lbPos(u)}<br>${u.w}G · ${u.l}M`;
+  function mmRankHtml(u) {
+    const l = leagueOf(u.tr);
+    return `${rankBadge(l)}<span style="color:${l.c1}">${l.name}</span>`;
+  }
+
+  function openMM() {
+    // the scene lives inside #menu and covers it (z 85) — the menu stays un-hidden
+    mmEl.hidden = false;
+    $('mmMyRank').innerHTML = mmRankHtml(PROFILE);
+    $('mmMyMeta').innerHTML = mmUserMeta(PROFILE);
+    const av = $('mmOppAv');
+    av.textContent = '?';
+    av.classList.add('unknown');
+    $('mmOppCard').classList.remove('reveal');
+    $('mmOppName').textContent = '·····';
+    $('mmOppRank').innerHTML = '';
+    $('mmOppMeta').innerHTML = '';
+    $('mmStatus').textContent = 'Rakip aranıyor…';
+    $('mmStatus').classList.remove('found');
+    $('mmGo').hidden = true;
+    $('mmCancel').hidden = false;
+    oppDeck = null;
+    renderMMDecks();
+    const t0 = performance.now();
+    $('mmTimer').textContent = '0.0s';
+    clearInterval(mmTick);
+    mmTick = setInterval(() => {
+      $('mmTimer').textContent = ((performance.now() - t0) / 1000).toFixed(1) + 's';
+    }, 100);
+    clearTimeout(mmWait);
+    mmWait = setTimeout(() => mmFound(FAKES[(Math.random() * FAKES.length) | 0]), 2200 + Math.random() * 1900);
+  }
+
+  function mmFound(u) {
+    clearInterval(mmTick);
+    oppDeck = {};
+    for (const v of RARITIES) {
+      const opts = CHARS.filter(c => c.v === v);
+      oppDeck[v] = opts[(Math.random() * opts.length) | 0];
+    }
+    renderMMDecks();
+    const av = $('mmOppAv');
+    av.textContent = u.av;
+    av.classList.remove('unknown');
+    const card = $('mmOppCard');
+    card.classList.remove('reveal');
+    void card.offsetWidth;
+    card.classList.add('reveal');
+    $('mmOppName').textContent = u.name;
+    $('mmOppRank').innerHTML = mmRankHtml(u);
+    $('mmOppMeta').innerHTML = mmUserMeta(u);
+    $('mmStatus').textContent = 'Rakip bulundu!';
+    $('mmStatus').classList.add('found');
+    $('mmGo').hidden = false;
+    $('mmCancel').hidden = true;
+  }
+
+  function closeMM() {
+    clearInterval(mmTick);
+    clearTimeout(mmWait);
+    mmEl.hidden = true;
+  }
+
+  $('mmGo').addEventListener('click', () => {
+    closeMM();
+    menuEl.hidden = true;
+    beginCountdown();
+  });
+  $('mmCancel').addEventListener('click', () => { closeMM(); showMenu('fight'); });
+
+  /* ---------- Wiring ---------- */
+
+  $('diffSeg').addEventListener('click', e => {
+    const b = e.target.closest('button');
+    if (b) setDiff(b.dataset.d);
+  });
+  $('startBtn').addEventListener('click', openMM);
+  $('againBtn').addEventListener('click', beginCountdown);
+  $('chgBtn').addEventListener('click', () => {
+    state = 'idle';
+    showPanel(null);
+    showMenu('fight');
+  });
+
+  const gold = +(storage.get('rpgpool-gold') ?? 500);
+  storage.set('rpgpool-gold', gold);
+  $('goldCount').textContent = gold;
+  $('trophyCount').textContent = PROFILE.tr;
+  $('pSub').textContent = `${leagueOf(PROFILE.tr).name} · Sıra #${lbPos(PROFILE)}`;
+
+  buildMeters();
+  setDiff(diffKey);
+  renderTally();
+  buildRarityTabs();
+  renderInventory();
+  renderDeck();
+  showMenu('fight');
+  // headless screenshot drivers
+  const Q = new URLSearchParams(location.search);
+  const testMode = Q.get('test');
+  if (testMode === 'start') { menuEl.hidden = true; beginCountdown(); }
+  if (testMode === 'inv') {
+    showMenu('inv');
+    const r = +(Q.get('r') || 0);
+    if (r) { rFilter = r; renderRarityTabs(); renderInventory(); }
+  }
+  if (testMode === 'deck') showMenu('deck');
+  if (testMode === 'sheet') { showMenu('deck'); openSheet(+(Q.get('v')) || 2); }
+  if (testMode === 'pick') {
+    deck[+(Q.get('v')) || 2] = Q.get('c');
+    renderDeck();
+    showMenu('deck');
+  }
+  if (testMode === 'pickall') {
+    for (const v of RARITIES) deck[v] = CHARS.find(c => c.v === v).id;
+    renderDeck();
+    showMenu('deck');
+  }
+  if (Q.get('fill')) for (const v of RARITIES) deck[v] = CHARS.find(c => c.v === v).id;
+  if (testMode === 'sim') {
+    layoutFight();
+    state = 'fight';
+    spawnUnit('me', 4, 100, 500);
+    spawnUnit('ai', 4, 120, 60);
+    for (let i = 0; i < 500; i++) simulate(1 / 60);
+    document.title = 'SIM ' + units.map(u => u.side + ':' + Math.round(u.x) + ',' + Math.round(u.y) + ',hp' + u.hp).join(' | ');
+  }
+  if (testMode === 'fxdemo') {
+    menuEl.hidden = true;
+    layoutFight();
+    state = 'fight';
+    setTimeout(() => {
+      deck[8] = 'okcu'; deck[32] = 'atesbuyucusu';
+      spawnUnit('me', 8, 70, 430); spawnUnit('me', 32, 160, 430);
+      deck[8] = 'tabancaci'; deck[32] = 'buzbuyucusu';
+      spawnUnit('me', 8, 250, 430); spawnUnit('me', 32, 340, 430);
+      for (const x of [70, 160, 250, 340]) spawnUnit('ai', 16, x, 350);
+      for (let i = 0; i < 40; i++) simulate(1 / 60);
+    }, 2600);
+  }
+  if (testMode === 'mm') openMM();
+  if (testMode === 'mmfound') {
+    openMM();
+    clearTimeout(mmWait);
+    mmFound(FAKES[+(Q.get('o')) || 0]);
+  }
+  if (testMode === 'measure') {
+    menuEl.hidden = true;
+    layoutBuild();
+    setTimeout(() => {
+      const m = $('m2Meter').getBoundingClientRect();
+      const cols = $('m2Meter').children;
+      const last = cols[cols.length - 1].getBoundingClientRect();
+      document.title = `MEASURE meter=${Math.round(m.width)} cols=${cols.length} lastRight=${Math.round(last.right)} vw=${window.innerWidth}`;
+    }, 300);
+  }
+</script>
