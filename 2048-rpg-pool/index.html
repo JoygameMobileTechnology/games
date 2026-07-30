@@ -304,14 +304,25 @@
   .t32   { background: #D9453E; }
   .t64   { background: #F7B816; color: #3A2B00; box-shadow: 0 0 16px rgba(247, 184, 22, .45); }
   .t128  { background: #E84A8F; box-shadow: 0 0 22px rgba(232, 74, 143, .5); }
-  /* Values whose shared stock is exhausted go gray on the boards */
+  /* Depleted stock: keep the tile's colour (it still carries merge info and
+     the tile can still merge) — dim it and stripe it instead of graying out. */
   .game.dep2 .tile.t2, .game.dep4 .tile.t4, .game.dep8 .tile.t8,
   .game.dep16 .tile.t16, .game.dep32 .tile.t32, .game.dep64 .tile.t64,
   .game.dep128 .tile.t128 {
-    background: #9AA3B2;
-    color: rgba(255, 255, 255, .75);
+    /* !important: the depleted state must also beat the :hover highlight */
+    filter: saturate(.55) brightness(.72) !important;
     box-shadow: none;
     cursor: default;
+  }
+  .game.dep2 .tile.t2::after, .game.dep4 .tile.t4::after, .game.dep8 .tile.t8::after,
+  .game.dep16 .tile.t16::after, .game.dep32 .tile.t32::after, .game.dep64 .tile.t64::after,
+  .game.dep128 .tile.t128::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 7px;
+    background: repeating-linear-gradient(45deg, rgba(0, 0, 0, .22) 0 5px, transparent 5px 11px);
+    pointer-events: none;
   }
   .t256  { background: #E25545; box-shadow: 0 0 18px rgba(226, 85, 69, .40); }
   .t512  { background: #EE7A28; box-shadow: 0 0 20px rgba(238, 122, 40, .45); }
@@ -1098,31 +1109,31 @@
     flex-direction: column;
     align-items: center;
     justify-content: flex-start;
-    gap: 12px;
-    padding: max(16px, env(safe-area-inset-top)) 0 max(14px, env(safe-area-inset-bottom));
+    gap: 8px;
+    padding: max(10px, env(safe-area-inset-top)) 0 max(10px, env(safe-area-inset-bottom));
     overflow-y: auto;
     background: var(--bg);
     background-image: var(--bgfx);
   }
-  .mm-decks { display: flex; flex-direction: column; gap: 10px; }
-  .mm-drow { display: flex; align-items: center; gap: 14px; }
+  .mm-decks { display: flex; flex-direction: column; gap: 7px; }
+  .mm-drow { display: flex; align-items: center; gap: 12px; }
   .mm-cell {
-    width: 48px;
-    height: 48px;
-    border-radius: 11px;
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
     display: grid;
     place-items: center;
     color: #fff;
     font-weight: 800;
-    font-size: 17px;
+    font-size: 14.5px;
     font-variant-numeric: tabular-nums;
   }
   .mm-mini {
     --rc: #6E7686;
     position: relative;
-    width: 60px;
-    height: 60px;
-    border-radius: 15px;
+    width: 48px;
+    height: 48px;
+    border-radius: 13px;
     display: grid;
     place-items: center;
     background: linear-gradient(180deg, #1D2647, #131A30);
@@ -1159,8 +1170,8 @@
   }
   .mm-arena { display: flex; align-items: stretch; gap: 12px; }
   .mm-card {
-    width: 138px;
-    padding: 14px 8px 12px;
+    width: 132px;
+    padding: 10px 8px 9px;
     border-radius: 18px;
     background: linear-gradient(180deg, #1D2647, #131A30);
     border: 1px solid var(--line);
@@ -1168,7 +1179,7 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 6px;
+    gap: 4px;
   }
   .mm-card.me { border-color: color-mix(in srgb, var(--gold) 45%, transparent); }
   .mm-card.reveal { animation: mmpop .4s cubic-bezier(.3, 1.4, .5, 1); }
@@ -1176,12 +1187,12 @@
     from { scale: .6; opacity: 0; }
   }
   .mm-av {
-    width: 62px;
-    height: 62px;
-    border-radius: 18px;
+    width: 48px;
+    height: 48px;
+    border-radius: 14px;
     display: grid;
     place-items: center;
-    font-size: 34px;
+    font-size: 27px;
     background: linear-gradient(180deg, #26345E, #1A2340);
     border: 1px solid var(--line);
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, .1), 0 3px 8px rgba(0, 0, 0, .4);
@@ -1194,7 +1205,7 @@
   @keyframes mmpulse {
     50% { opacity: .35; scale: .94; }
   }
-  .mm-name { font-size: 13.5px; font-weight: 800; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mm-name { font-size: 12.5px; font-weight: 800; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .mm-rank {
     display: flex;
     align-items: center;
@@ -1205,32 +1216,32 @@
   }
   .mm-rank svg { flex-shrink: 0; }
   .mm-meta {
-    font-size: 10.5px;
+    font-size: 10px;
     font-weight: 700;
     color: var(--muted);
     text-align: center;
-    line-height: 1.55;
+    line-height: 1.45;
     font-variant-numeric: tabular-nums;
   }
   .mm-vs {
     align-self: center;
-    font-size: 27px;
+    font-size: 23px;
     font-weight: 900;
     font-style: italic;
     color: var(--gold-hi);
     text-shadow: 0 0 18px rgba(247, 190, 42, .45), 0 2px 4px rgba(0, 0, 0, .5);
   }
-  .mm-status { font-size: 15.5px; font-weight: 800; letter-spacing: .03em; }
+  .mm-status { font-size: 14px; font-weight: 800; letter-spacing: .03em; }
   .mm-status.found { color: var(--gold-hi); text-shadow: 0 0 14px rgba(247, 190, 42, .35); }
   .mm-timer {
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 700;
     color: var(--muted);
     font-variant-numeric: tabular-nums;
     min-height: 1.2em;
   }
-  .mm .cta { margin-top: 4px; }
-  .mm-cancel { margin-top: 10px; }
+  .mm .cta { margin-top: 0; padding: 13px 46px; font-size: 17px; }
+  .mm-cancel { margin-top: 2px; }
 
   @media (prefers-reduced-motion: reduce) {
     .tile { transition: none; }
@@ -2873,6 +2884,28 @@
   }
   if (Q.get('fill')) for (const v of RARITIES) deck[v] = CHARS.find(c => c.v === v).id;
   if (testMode === 'block') $('startBtn').click();
+  if (testMode === 'dep2') {
+    menuEl.hidden = true;
+    beginCountdown();
+    setTimeout(() => {
+      for (const t of [...me.tiles.values()]) { me.tiles.delete(t.id); t.el.remove(); }
+      me.createTile(2, 0, 0);
+      me.createTile(2, 0, 1);
+      me.createTile(4, 2, 2);         // direct-spawn 4
+      me.move(0, -1);                 // merge the 2s -> 4 at (0,0)
+      pool[4] = 0; renderPool(4);
+      setTimeout(() => {
+        document.title = 'DEP2 ' + [...me.tiles.values()]
+          .map(t => `${t.value}[${t.el.className}] f=${getComputedStyle(t.el).filter}`)
+          .join(' || ');
+      }, 800);
+    }, 4200);
+  }
+  if (testMode === 'dep') {
+    menuEl.hidden = true;
+    beginCountdown();
+    setTimeout(() => { for (const v of [2, 4]) { pool[v] = 0; renderPool(v); } }, 4200);
+  }
   if (testMode === 'sim') {
     layoutFight();
     state = 'fight';
