@@ -1064,6 +1064,31 @@
     box-shadow: 0 2px 5px rgba(0, 0, 0, .5);
   }
 
+  /* ---------- Toast ---------- */
+  .toast {
+    position: fixed;
+    left: 50%;
+    bottom: 102px;
+    translate: -50% 12px;
+    z-index: 95;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 11px 18px;
+    border-radius: 13px;
+    background: linear-gradient(180deg, #33202A, #241722);
+    border: 1px solid color-mix(in srgb, var(--danger) 45%, transparent);
+    color: var(--ink);
+    font-size: 13px;
+    font-weight: 700;
+    white-space: nowrap;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, .5);
+    opacity: 0;
+    transition: opacity .22s, translate .22s;
+    pointer-events: none;
+  }
+  .toast.show { opacity: 1; translate: -50% 0; }
+
   /* ---------- Matchmaking ---------- */
   .mm {
     position: fixed;
@@ -1211,7 +1236,7 @@
     .tile { transition: none; }
     .spawn, .pop, .consume, .deny, .timer.urgent, .ccard,
     .unit.born, .unit.hurt .g, .splat, .bonus-hl.lock { animation: none; }
-    .sheet, .scrim, .dslot, .dock button { transition: none; }
+    .sheet, .scrim, .dslot, .dock button, .toast { transition: none; }
     .mm-av.unknown, .mm-card.reveal, .mm-mini.q { animation: none; }
     .unit.atk .wpn, .unit.atk .g svg, .impact { animation: none; }
     .overlay { transition: none; }
@@ -2779,7 +2804,32 @@
     const b = e.target.closest('button');
     if (b) setDiff(b.dataset.d);
   });
-  $('startBtn').addEventListener('click', openMM);
+  const deckFilledCount = () =>
+    RARITIES.filter(v => CHARS.some(x => x.id === deck[v] && x.v === v)).length;
+
+  let toastTimer = null;
+  function toast(msg) {
+    let t = document.querySelector('.toast');
+    if (!t) {
+      t = document.createElement('div');
+      t.className = 'toast';
+      document.body.appendChild(t);
+    }
+    t.textContent = msg;
+    clearTimeout(toastTimer);
+    requestAnimationFrame(() => t.classList.add('show'));
+    toastTimer = setTimeout(() => t.classList.remove('show'), 2400);
+  }
+
+  $('startBtn').addEventListener('click', () => {
+    const n = deckFilledCount();
+    if (n < 7) {
+      switchTab('deck');
+      toast(`⚔️ Önce kadronu kur — ${n}/7 seçili`);
+      return;
+    }
+    openMM();
+  });
   $('againBtn').addEventListener('click', beginCountdown);
   $('chgBtn').addEventListener('click', () => {
     state = 'idle';
@@ -2822,6 +2872,7 @@
     showMenu('deck');
   }
   if (Q.get('fill')) for (const v of RARITIES) deck[v] = CHARS.find(c => c.v === v).id;
+  if (testMode === 'block') $('startBtn').click();
   if (testMode === 'sim') {
     layoutFight();
     state = 'fight';
