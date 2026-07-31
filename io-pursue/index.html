@@ -1,0 +1,1382 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Pursue.io</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body { height:100%; overflow:hidden; background:#edeeea; touch-action:none; overscroll-behavior:none;
+    font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  canvas { display:block; position:fixed; inset:0; }
+
+  .hud { position:fixed; z-index:10; pointer-events:none; user-select:none; -webkit-user-select:none; }
+  #stats { top:calc(10px + env(safe-area-inset-top)); left:12px; background:rgba(255,255,255,.88);
+    border:1px solid #d8dbd4; border-radius:12px; padding:7px 12px; font-size:14px; font-weight:700; color:#2a2f28;
+    box-shadow:0 2px 8px rgba(0,0,0,.08); display:flex; gap:12px; align-items:center; }
+  #stats .coin { color:#b8860b; }
+  #zone { top:calc(10px + env(safe-area-inset-top)); left:50%; transform:translateX(-50%);
+    background:rgba(255,255,255,.88); border:1px solid #d8dbd4; border-radius:12px; padding:7px 12px;
+    font-size:12.5px; font-weight:800; color:#b23434; box-shadow:0 2px 8px rgba(0,0,0,.08); }
+  #zone.calm { color:#6b7264; }
+  #lb { top:calc(10px + env(safe-area-inset-top)); right:12px; background:rgba(255,255,255,.88);
+    border:1px solid #d8dbd4; border-radius:12px; padding:6px 10px; font-size:10.5px; color:#2a2f28;
+    box-shadow:0 2px 8px rgba(0,0,0,.08); min-width:108px; }
+  #lb .row { display:flex; align-items:center; gap:5px; padding:1px 0; font-weight:600; }
+  #lb .row .dot { width:7px; height:7px; border-radius:50%; flex:0 0 auto; }
+  #lb .row .n { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:82px; }
+  #lb .row.dead { opacity:.38; text-decoration:line-through; }
+  #hint { left:50%; bottom:calc(84px + env(safe-area-inset-bottom)); transform:translateX(-50%);
+    background:rgba(30,34,28,.82); color:#f2f3ef; border-radius:20px; padding:8px 16px; font-size:12.5px;
+    font-weight:600; white-space:nowrap; transition:opacity .6s; }
+  #hint.gone { opacity:0; }
+
+  #joy { position:fixed; z-index:9; width:96px; height:96px; border-radius:50%;
+    background:rgba(40,45,38,.14); border:2px solid rgba(40,45,38,.22); display:none; pointer-events:none; }
+  #knob { position:fixed; z-index:9; width:42px; height:42px; border-radius:50%;
+    background:rgba(40,45,38,.42); display:none; pointer-events:none; }
+
+  #over { position:fixed; inset:0; z-index:20; display:none; align-items:center; justify-content:center;
+    background:rgba(20,23,18,.55); backdrop-filter:blur(3px); }
+  #over.on { display:flex; }
+  #over .card { background:#fbfcf9; border:1px solid #d8dbd4; border-radius:18px; padding:26px 30px;
+    text-align:center; box-shadow:0 14px 40px rgba(0,0,0,.3); min-width:230px; }
+  #over .big { font-size:34px; }
+  #over h2 { font-size:21px; color:#22261f; margin:6px 0 2px; }
+  #over p { font-size:13px; color:#6b7264; margin-bottom:16px; }
+  #over button { pointer-events:auto; border:0; border-radius:12px; padding:11px 26px; font-size:15px;
+    font-weight:800; cursor:pointer; background:linear-gradient(180deg,#f5c33b,#dfa41c); color:#3d2e05;
+    box-shadow:0 3px 0 #b8860b; }
+  #over button:active { transform:translateY(2px); box-shadow:0 1px 0 #b8860b; }
+  #over .sub { pointer-events:auto; display:block; margin:12px auto 0; background:none; box-shadow:none;
+    color:#6b7264; font-size:12px; font-weight:700; text-decoration:underline; padding:2px; }
+  #over .sub:active { transform:none; }
+
+  #pick { position:fixed; inset:0; z-index:30; display:flex; align-items:center; justify-content:center;
+    background:rgba(20,23,18,.55); backdrop-filter:blur(3px); }
+  #pick .card { background:#fbfcf9; border:1px solid #d8dbd4; border-radius:18px; padding:22px;
+    box-shadow:0 14px 40px rgba(0,0,0,.3); width:min(88vw, 340px); }
+  #pick h2 { font-size:19px; color:#22261f; text-align:center; margin-bottom:14px; }
+  .pbtn { display:flex; align-items:center; gap:12px; width:100%; text-align:left; margin-bottom:10px;
+    border:1.5px solid #d8dbd4; border-radius:14px; padding:12px 14px; background:#fff; cursor:pointer; }
+  .pbtn:last-child { margin-bottom:0; }
+  .pbtn:active { transform:scale(.97); border-color:#dfa41c; background:#fdf6e3; }
+  .pbtn .pi { font-size:26px; flex:0 0 auto; }
+  .pbtn b { display:block; font-size:14.5px; color:#22261f; }
+  .pbtn i { display:block; font-style:normal; font-size:11.5px; color:#6b7264; margin-top:2px; }
+</style>
+</head>
+<body>
+<canvas id="cv"></canvas>
+<div class="hud" id="stats"><span class="coin">💰 <b id="hWallet">30$</b></span><span>👥 <b id="hArmy">0</b></span></div>
+<div class="hud calm" id="zone"></div>
+<div class="hud" id="lb"></div>
+<div class="hud" id="hint">Sürükle / WASD · idle askerin yanında dur, takımına kat</div>
+<div id="joy"></div><div id="knob"></div>
+<div id="pick"><div class="card">
+  <h2>Kahramanını seç</h2>
+  <button class="pbtn" onclick="pickHero('nisanci')"><span class="pi">🎯</span>
+    <span><b>Keskin Nişancı</b><i>En güçlü düşmanı vurur · iz bırakan tek atış · geniş görüş çemberi</i></span></button>
+  <button class="pbtn" onclick="pickHero('kemiklordu')"><span class="pi">💀</span>
+    <span><b>Kemik Lordu</b><i>Her 3 kill'de bedava Sapancı · kill başına +1$ haraç</i></span></button>
+  <button class="pbtn" onclick="pickHero('yildirim')"><span class="pi">⚡</span>
+    <span><b>Yıldırım Hükümdarı</b><i>Atışlar 2 düşmana zincirlenir · çarpılan kısa süre şoklanır</i></span></button>
+</div></div>
+<div id="over"><div class="card"><div class="big" id="ovIco">🏆</div><h2 id="ovTitle"></h2><p id="ovSub"></p>
+  <button onclick="location.reload()">Tekrar Oyna</button>
+  <button class="sub" id="ovWatch">İzlemeye devam et</button></div></div>
+
+<script>
+'use strict';
+/* =========================================================
+   Pursue.io — v0 prototype
+   10 players (1 human + 9 bots) · pursue/buy idle soldiers
+   AoR grows with army · homing bullets · last man standing
+   ========================================================= */
+
+const Q = new URLSearchParams(location.search);
+const TEST = Q.get('test');
+if (TEST) window.onerror = (m, s, l) => { document.title = 'ERR ' + m + ' @' + l; };
+
+/* ---------- seeded RNG ---------- */
+let _seed = (+Q.get('seed') || ((Math.random() * 1e9) | 0)) >>> 0;
+function rnd() {
+  _seed |= 0; _seed = _seed + 0x6D2B79F5 | 0;
+  let t = Math.imul(_seed ^ _seed >>> 15, 1 | _seed);
+  t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+  return ((t ^ t >>> 14) >>> 0) / 4294967296;
+}
+const rr = (a, b) => a + rnd() * (b - a);
+
+/* ---------- config ---------- */
+const WORLD = 3600;
+const MIN_PRICE = 5;           // cheapest soldier price — used for scarcity/afford checks
+const START_WALLET = 30;
+const PURSUE_T = 2.2;          // seconds in range to recruit
+const S_HP = 3, S_DMG = 1, S_ROF = 0.9, S_SPD = 240;
+const H_HP = 25, H_DMG = 1, H_ROF = 1.0, H_SPD = 170;
+const BULLET_SPD = 460;
+const aorR = p => 85 + (HCLASS[p.cls]?.sight || 0) + 11 * p.army;   // sniper sees further
+const heroSpd = p => H_SPD * Math.max(.5, 1 - p.army * .015);  // big armies march slower
+const BOUNTY_K = .4;           // kill bounty = max(2, price * .4)
+const INCOME_T = 2;            // +1$ every N seconds to every alive player
+
+/* soldier types: tier 0=Common 5$, 1=Rare 10$, 2=Legendary 20$ */
+const STYPES = {
+  sapanci:      { name: 'Sapancı',       price: 5,  hp: 3, dmg: 1, rof: .9,  tier: 0, knockback: 9, pcol: '#6b7264', kind: 'stone' },
+  okcu:         { name: 'Okçu',          price: 10, hp: 4, dmg: 1, rof: .8,  tier: 1, pierce: 3, pcol: '#8b5a2b', kind: 'arrow' },
+  tabancaci:    { name: 'Tabancacı',     price: 10, hp: 4, dmg: 1, rof: .7,  tier: 1, kite: 60, kind: 'tracer' },
+  bombaci:      { name: 'Bombacı',       price: 10, hp: 4, dmg: 1, rof: 1.1, tier: 1, splash: 26, deathBlast: { dmg: 2, r: 40 }, pcol: '#33352f', kind: 'bomb' },
+  atesbuyucusu: { name: 'Ateş Büyücüsü', price: 20, hp: 5, dmg: 1, rof: 1,   tier: 2, burn: { dur: 2 }, pcol: '#f97316', kind: 'fire' },
+  buzbuyucusu:  { name: 'Buz Büyücüsü',  price: 20, hp: 5, dmg: 1, rof: 1,   tier: 2, slow: { dur: 2 }, pcol: '#38bdf8', kind: 'ice' },
+  sifaci:       { name: 'Şifacı',        price: 20, hp: 5, tier: 2, healer: { amount: 2, r: 150, t: 1 } },
+};
+const KSPD = { stone: 420, arrow: 560, tracer: 700, bomb: 380, fire: 460, ice: 500, bone: 460, spark: 900, snipe: 1000 };
+const TIER_COL = ['#8a9086', '#2e6fd8', '#c9880a'];
+function rollType() {
+  const r = rnd();
+  return r < .6 ? 'sapanci'
+    : r < .9 ? ['okcu', 'tabancaci', 'bombaci'][(rnd() * 3) | 0]
+    : ['atesbuyucusu', 'buzbuyucusu', 'sifaci'][(rnd() * 3) | 0];
+}
+
+/* hero classes: picked at match start */
+const HCLASS = {
+  nisanci:    { name: 'Keskin Nişancı',     dmg: 3, rof: 1.6, sniper: true, kind: 'snipe', sight: 60 },
+  kemiklordu: { name: 'Kemik Lordu',        dmg: 1, rof: 1.0, bone: 3, loot: 1, pcol: '#cbd5e1', kind: 'bone' },
+  yildirim:   { name: 'Yıldırım Hükümdarı', dmg: 2, rof: 1.2, chain: 2, slow: { dur: .35 }, pcol: '#eab308', kind: 'spark' },
+};
+const WPN = { sapanci: 'sling', okcu: 'bow', tabancaci: 'pistol', bombaci: 'bomb', atesbuyucusu: 'staff#f97316', buzbuyucusu: 'staff#38bdf8', sifaci: 'staff#2eaf62' };
+const HWPN = { nisanci: 'sniper', kemiklordu: 'bonestaff', yildirim: 'stormstaff' };
+const IDLE_TARGET = 110;       // keep this many idles on the map
+const SPAWN_T = 3;             // reinforcement check period
+const FOUNT_R = 130;           // healing fountain radius, +1 hp/s inside
+const FOUNTS = [0, 1, 2].map(i => {
+  const a = Math.PI / 2 + i * Math.PI * 2 / 3;
+  return { x: WORLD / 2 + Math.cos(a) * WORLD * .30, y: WORLD / 2 + Math.sin(a) * WORLD * .30 };
+});
+/* battle-royale zone: shrinks every 30s, 6 steps ≈ 3 min of play */
+const ZONE_T = 30, ZONE_STEPS = 6, ZONE_K = .6;
+const ZONE_DMG_H = 2, ZONE_DMG_S = 1;   // hp/s outside the zone
+const ZONE_C = { x: WORLD / 2, y: WORLD / 2 };
+
+const NAMES = ['Sen', 'Baron', 'Gölge42', 'TurboEfe', 'PusuBey', 'DeliKaan', 'Nova', 'Çelik', 'Sessiz', 'Miraç'];
+const COLORS = ['#2563eb', '#e5484d', '#f59e0b', '#10b981', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316', '#84cc16', '#64748b'];
+
+/* formation slots: rings around the hero */
+const RINGS = [{ r: 46, n: 8 }, { r: 76, n: 12 }, { r: 106, n: 16 }, { r: 138, n: 24 }];
+function slotOffset(i) {
+  let k = i;
+  for (const ring of RINGS) {
+    if (k < ring.n) {
+      const a = (k / ring.n) * Math.PI * 2 + ring.r; // ring.r as fixed angle offset per ring
+      return { x: Math.cos(a) * ring.r, y: Math.sin(a) * ring.r };
+    }
+    k -= ring.n;
+  }
+  const a = k * 2.4;
+  return { x: Math.cos(a) * 165, y: Math.sin(a) * 165 };
+}
+
+/* ---------- state ---------- */
+let tSim = 0;
+const players = [];   // {i,name,color,x,y,mv:{x,y},hp,wallet,army,alive,bot,fireCd,face,ph,wt,slotSeq,inc}
+const soldiers = [];  // {x,y,owner:-1|idx,hp,fireCd,face,ph,joinIdx,prog:{},dead,inc}
+const bullets = [];   // {x,y,tgt,dmg,color}
+const coins = [];     // {x,y,amt}
+const parts = [];     // particles {x,y,vx,vy,life,col?,r?,g?}
+const stains = [];    // {x,y,r,life}
+const floats = [];    // {x,y,txt,color,life}
+const impacts = [];   // expanding rings {x,y,age,max,col,r0,r1}
+const beams = [];     // lingering sniper trails {x1,y1,x2,y2,age,max,col}
+const vrnd = Math.random;  // visual-only RNG — never touches the seeded sim RNG
+let shakeT = 0, shakeAmp = 0;
+function shake(a, d) { shakeAmp = Math.max(shakeAmp, a); shakeT = Math.max(shakeT, d); }
+function spray(x, y, col, n, v, g, life = .4, r = 2.2) {
+  if (parts.length > 500) return;
+  for (let i = 0; i < n; i++) {
+    const a = vrnd() * 6.28, s = v * (.3 + vrnd());
+    parts.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s - v * .2, life: life * (.6 + vrnd() * .8), col, r, g });
+  }
+}
+function boom(x, y, col, big) {
+  impacts.push({ x, y, age: 0, max: big ? .5 : .32, col, r0: 6, r1: big ? 52 : 28 });
+  impacts.push({ x, y, age: 0, max: big ? .3 : .2, col: '#fde68a', r0: 2, r1: big ? 26 : 14 });
+  spray(x, y, '#fb923c', big ? 14 : 7, big ? 260 : 170, 120, .5);
+  spray(x, y, '#57534e', big ? 6 : 3, 70, -40, .8, 3.2);
+  if (big) shake(6, .28);
+}
+function hitFx(b, x, y) {
+  switch (b.kind) {
+    case 'snipe':
+      beams.push({ x1: b.sx, y1: b.sy, x2: x, y2: y, age: 0, max: .45, col: b.color });
+      impacts.push({ x, y, age: 0, max: .18, col: '#ffffff', r0: 3, r1: 16 });
+      spray(x, y, '#e7e5e4', 5, 200, 120, .3, 1.8); break;
+    case 'fire': boom(x, y, '#fb923c', false); break;
+    case 'ice':
+      impacts.push({ x, y, age: 0, max: .25, col: '#7dd3fc', r0: 3, r1: 17 });
+      spray(x, y, '#bae6fd', 6, 170, 200, .35); break;
+    case 'spark':
+      impacts.push({ x, y, age: 0, max: .16, col: '#fde047', r0: 3, r1: 20 });
+      spray(x, y, '#fde047', 7, 260, 60, .25, 1.8); break;
+    case 'stone': spray(x, y, '#9ca3af', 4, 120, 260, .3); break;
+    case 'bomb': impacts.push({ x, y, age: 0, max: .2, col: '#f97316', r0: 3, r1: 14 }); break;
+    case 'bone':
+      impacts.push({ x, y, age: 0, max: .2, col: '#e2e8f0', r0: 2, r1: 13 });
+      spray(x, y, '#e2e8f0', 4, 130, 180, .3); break;
+    default: impacts.push({ x, y, age: 0, max: .13, col: '#ffffff', r0: 2, r1: 10 });
+  }
+}
+let over = false, winner = null, deadOrder = [];
+let aiFreeze = false, inputFreeze = false;
+let bloodCount = 0;
+let incomeClock = INCOME_T, spawnClock = SPAWN_T, fountClock = 1;
+let zoneR = WORLD * .72, zoneTarget = WORLD * .72, zoneRate = 0, zoneStep = 0, nextShrink = ZONE_T, zoneClock = 1;
+
+const cx0 = WORLD / 2;
+for (let i = 0; i < 10; i++) {
+  const a = (i / 10) * Math.PI * 2 + 0.31;
+  players.push({
+    i, name: NAMES[i], color: COLORS[i], bot: i !== 0,
+    cls: ['nisanci', 'kemiklordu', 'yildirim'][(rnd() * 3) | 0], kills: 0,
+    x: cx0 + Math.cos(a) * WORLD * .37 + rr(-40, 40), y: cx0 + Math.sin(a) * WORLD * .37 + rr(-40, 40),
+    mv: { x: 0, y: 0 }, hp: H_HP, wallet: START_WALLET, army: 0, alive: true,
+    fireCd: rr(0, .5), face: a + Math.PI, ph: 0, wt: null, slotSeq: 0, inc: 0,
+    slowUntil: 0, burnUntil: 0, burnAcc: 0,
+  });
+}
+const me = players[0];
+
+/* idle soldiers: one cluster guaranteed near every hero + the rest spread out */
+for (const p of players) {
+  const a = rr(0, 6.28), d = rr(210, 320);
+  idleClusterAt(p.x + Math.cos(a) * d, p.y + Math.sin(a) * d);
+}
+for (let c = 0; c < 26; c++) idleClusterAt(rr(300, WORLD - 300), rr(300, WORLD - 300));
+
+function spawnIdleCluster() {
+  let x = 0, y = 0;
+  for (let t = 0; t < 14; t++) {          // try to land outside every player's AoR
+    x = rr(260, WORLD - 260); y = rr(260, WORLD - 260);
+    let clear = Math.hypot(x - ZONE_C.x, y - ZONE_C.y) < zoneR - 160;   // spawn inside the zone
+    if (clear) for (const p of players) if (p.alive && Math.hypot(p.x - x, p.y - y) < aorR(p) + 200) { clear = false; break; }
+    if (clear) break;
+  }
+  idleClusterAt(x, y);
+}
+function idleClusterAt(x, y) {
+  x = Math.max(90, Math.min(WORLD - 90, x)); y = Math.max(90, Math.min(WORLD - 90, y));
+  const n = 3 + (rnd() * 3 | 0);          // 3-5 soldiers per cluster
+  for (let k = 0; k < n; k++) spawnSoldier(-1, x + rr(-55, 55), y + rr(-55, 55), rollType());
+}
+
+function spawnSoldier(owner, x, y, type = 'sapanci') {
+  const st = STYPES[type];
+  const s = { type, x, y, owner, hp: st.hp, maxHp: st.hp, fireCd: rr(0, .6), face: rr(0, 6.28), ph: rr(0, 9),
+    joinIdx: 0, prog: {}, dead: false, inc: 0, shots: 0, slowUntil: 0, burnUntil: 0, burnAcc: 0 };
+  if (owner >= 0) { s.joinIdx = players[owner].slotSeq++; players[owner].army++; }
+  soldiers.push(s);
+  return s;
+}
+
+const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+
+/* every alive fighting unit (soldiers + heroes) */
+function unitsOf(pi) { const out = []; for (const s of soldiers) if (s.owner === pi && !s.dead) out.push(s); return out; }
+function enemyUnits(pi) {
+  const out = [];
+  for (const s of soldiers) if (s.owner >= 0 && s.owner !== pi && !s.dead) out.push(s);
+  for (const p of players) if (p.i !== pi && p.alive) out.push(p);
+  return out;
+}
+const isHero = u => u.name !== undefined;
+
+function closestFoe(foes, ref, exclude) {
+  let best = null, bd = 1e9;
+  for (const f of foes) {
+    if (exclude.includes(f) || f.hp - f.inc <= 0) continue;
+    const d = dist(ref, f);
+    if (d < bd) { bd = d; best = f; }
+  }
+  return best;
+}
+function fire(p, u, tgt, dmg, st) {
+  tgt.inc += dmg;
+  const kind = st.kind || 'tracer';
+  const col = st.pcol || p.color;
+  const mx = Math.cos(u.face), my = Math.sin(u.face);
+  impacts.push({ x: u.x + mx * 15, y: u.y - 14 + my * 6, age: 0, max: .09, col, r0: 2, r1: 8 });  // muzzle flash
+  bullets.push({
+    x: u.x, y: u.y - 14, sx: u.x, sy: u.y - 14, tgt, dmg, from: p.i,
+    kind, sp: KSPD[kind] || 460, color: col,
+    eff: (st.knockback || st.burn || st.slow || st.splash)
+      ? { kb: st.knockback, burn: st.burn, slow: st.slow, splash: st.splash } : null,
+  });
+}
+
+/* ---------- damage / death ---------- */
+function hitUnit(u, dmg, from) {
+  u.hp -= dmg;
+  if (u.hp > 0) return;
+  if (isHero(u)) eliminate(u, false); else killSoldier(u, from);
+}
+function killSoldier(s, from) {
+  if (s.dead) return;
+  s.dead = true; bloodCount++;
+  if (s.owner >= 0) players[s.owner].army--;
+  blood(s.x, s.y);
+  const st = STYPES[s.type];
+  /* bombacı goes out with a bang */
+  if (st.deathBlast && s.owner >= 0) {
+    boom(s.x, s.y - 8, '#fb923c', true);
+    for (const f of enemyUnits(s.owner)) {
+      if (dist(f, s) > st.deathBlast.r) continue;
+      hitUnit(f, st.deathBlast.dmg, s.owner);
+    }
+  }
+  /* kill bounty: shrinking the enemy funds your growth */
+  if (s.owner >= 0 && from >= 0 && players[from].alive) {
+    let pay = Math.max(2, Math.round(st.price * BOUNTY_K));
+    pay += HCLASS[players[from].cls].loot || 0;   // kemik lordu: haraç
+    players[from].wallet += pay;
+    floats.push({ x: s.x, y: s.y - 30, txt: '+' + pay + '$', color: '#b8860b', life: .9 });
+    /* kemik lordu: every 3rd team kill raises a free sapancı at his side */
+    const k = players[from];
+    if (HCLASS[k.cls].bone && ++k.kills % HCLASS[k.cls].bone === 0) {
+      const ns = spawnSoldier(k.i, k.x + rr(-22, 22), k.y + rr(16, 32), 'sapanci');
+      floats.push({ x: ns.x, y: ns.y - 30, txt: '+1 Sapancı', color: k.color, life: 1 });
+    }
+  }
+}
+function eliminate(p, silent) {
+  if (!p.alive) return;
+  p.alive = false; deadOrder.push(p.i);
+  if (!silent) {
+    blood(p.x, p.y); blood(p.x + 6, p.y - 6);
+    impacts.push({ x: p.x, y: p.y - 10, age: 0, max: .55, col: p.color, r0: 8, r1: 64 });
+    spray(p.x, p.y - 10, p.color, 16, 240, 120, .6, 2.8);
+    shake(6, .3);
+    if (p.wallet > 0) coins.push({ x: p.x, y: p.y, amt: p.wallet });
+    p.wallet = 0;
+    for (const s of soldiers) if (s.owner === p.i && !s.dead) { s.owner = -1; s.prog = {}; s.hp = s.maxHp; s.inc = 0; }
+    p.army = 0;
+  }
+  if (p === me && !TEST) showOver(false);
+  checkEnd();
+}
+function checkEnd() {
+  if (over) return;
+  const alive = players.filter(p => p.alive);
+  if (alive.length <= 1) { over = true; winner = alive[0] || null; if (!TEST) showOver(winner === me); }
+}
+function blood(x, y) {
+  stains.push({ x: x + rr(-4, 4), y: y + rr(-2, 6), r: rr(9, 15), life: 5 });
+  impacts.push({ x, y: y - 10, age: 0, max: .18, col: '#b02525', r0: 3, r1: 15 });
+  for (let i = 0; i < 12; i++) {
+    const a = rr(0, 6.28), v = rr(30, 150);
+    parts.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 50, life: rr(.3, .6) });
+  }
+}
+
+/* ---------- simulation ---------- */
+function sim(dt) {
+  if (over && TEST) return;
+  tSim += dt;
+
+  /* heroes move */
+  for (const p of players) {
+    if (!p.alive) continue;
+    const m = Math.hypot(p.mv.x, p.mv.y);
+    if (m > .01) {
+      const spd = heroSpd(p) * (p.slowUntil > tSim ? .8 : 1);  // ice slows heroes at half strength
+      const sp = spd * dt / m;
+      p.x += p.mv.x * sp; p.y += p.mv.y * sp;
+      p.face = Math.atan2(p.mv.y, p.mv.x);
+      p.ph += spd * dt * .05;
+      p.x = Math.max(30, Math.min(WORLD - 30, p.x));
+      p.y = Math.max(30, Math.min(WORLD - 30, p.y));
+    }
+  }
+
+  /* soldiers: pursue (idle) or follow formation (owned) */
+  for (const s of soldiers) {
+    if (s.dead) continue;
+    if (s.owner < 0) {
+      const price = STYPES[s.type].price;
+      for (const p of players) {
+        if (!p.alive) { delete s.prog[p.i]; continue; }
+        const inR = dist(p, s) < aorR(p) && p.wallet >= price;
+        let v = s.prog[p.i] || 0;
+        v += inR ? dt / PURSUE_T : -dt * 1.6;
+        if (v <= 0) { delete s.prog[p.i]; continue; }
+        if (v >= 1) {
+          p.wallet -= price;
+          s.owner = p.i; s.prog = {}; s.joinIdx = p.slotSeq++; p.army++;
+          floats.push({ x: p.x, y: p.y - 34, txt: '-' + price + '$', color: '#c0392b', life: 1 });
+          floats.push({ x: s.x, y: s.y - 26, txt: '+' + STYPES[s.type].name, color: p.color, life: 1 });
+          break;
+        }
+        s.prog[p.i] = v;
+      }
+    } else {
+      const p = players[s.owner];
+      const off = slotOffset(s.slotIdx ?? 0);
+      let tx = p.x + off.x, ty = p.y + off.y;
+      /* tabancacı: back away from enemies that get too close */
+      const kite = STYPES[s.type].kite;
+      if (kite && s.tgt && dist(s, s.tgt) < kite) {
+        const dx = s.x - s.tgt.x, dy = s.y - s.tgt.y, km = Math.hypot(dx, dy) || 1;
+        tx = s.x + dx / km * 40; ty = s.y + dy / km * 40;
+      }
+      const d = Math.hypot(tx - s.x, ty - s.y);
+      if (d > .25) {   // no dead zone: sub-pixel steps every frame, or followers judder at ~30Hz
+        const step = Math.min(S_SPD * (s.slowUntil > tSim ? .6 : 1) * dt, d);
+        s.x += (tx - s.x) / d * step; s.y += (ty - s.y) / d * step;
+        s.ph += step * .06;
+        if (!s.tgt) s.face = Math.atan2(ty - s.y, tx - s.x);
+      }
+    }
+  }
+  /* compact formation indices (rebuilt every frame, cheap) */
+  for (const p of players) {
+    if (!p.alive) continue;
+    const mine = unitsOf(p.i).sort((a, b) => a.joinIdx - b.joinIdx);
+    mine.forEach((s, idx) => s.slotIdx = idx);
+  }
+
+  /* targeting + fire: a unit shoots enemies inside its OWNER's AoR */
+  for (const p of players) {
+    if (!p.alive) continue;
+    const R = aorR(p);
+    const foes = enemyUnits(p.i).filter(u => dist(p, u) < R);
+    const shooters = unitsOf(p.i); shooters.push(p);
+    for (const u of shooters) {
+      u.fireCd -= dt;
+      const st = isHero(u) ? HCLASS[u.cls] : STYPES[u.type];
+
+      /* şifacı: never attacks, patches the most wounded nearby ally */
+      if (st.healer) {
+        u.tgt = null;
+        if (u.fireCd <= 0) {
+          const mates = unitsOf(p.i); mates.push(p);
+          let ally = null, worst = 1;
+          for (const mt of mates) {
+            if (mt === u || dist(u, mt) > st.healer.r) continue;
+            const cap = isHero(mt) ? H_HP : mt.maxHp;
+            const frac = mt.hp / cap;
+            if (frac < 1 && frac < worst) { worst = frac; ally = mt; }
+          }
+          if (ally) {
+            u.fireCd = st.healer.t;
+            ally.hp = Math.min(isHero(ally) ? H_HP : ally.maxHp, ally.hp + st.healer.amount);
+            u.face = Math.atan2(ally.y - u.y, ally.x - u.x);
+            floats.push({ x: ally.x, y: ally.y - 34, txt: '+' + st.healer.amount, color: '#2eaf62', life: .8 });
+            spray(ally.x, ally.y - 18, '#4ade80', 5, 55, -70, .5, 1.8);
+            impacts.push({ x: ally.x, y: ally.y - 12, age: 0, max: .3, col: '#4ade80', r0: 4, r1: 15 });
+          }
+        }
+        continue;
+      }
+
+      let tgt = null, best = 1e9;
+      if (st.sniper) {
+        for (const f of foes) if (f.hp - f.inc > 0 && f.hp > (tgt ? tgt.hp : -1)) tgt = f;
+      } else {
+        for (const f of foes) {
+          if (f.hp - f.inc <= 0) continue;
+          const d = dist(u, f);
+          if (d < best) { best = d; tgt = f; }
+        }
+      }
+      if (!tgt && foes.length) { best = 1e9; for (const f of foes) { const d = dist(u, f); if (d < best) { best = d; tgt = f; } } }
+      u.tgt = tgt;
+      if (tgt) u.face = Math.atan2(tgt.y - u.y, tgt.x - u.x);
+      if (tgt && u.fireCd <= 0) {
+        u.fireCd = st.rof * rr(.9, 1.1) * (u.slowUntil > tSim ? 1.5 : 1);
+        fire(p, u, tgt, st.dmg, st);
+        /* okçu: every 3rd arrow also pierces to the 2nd-closest enemy */
+        if (st.pierce && ++u.shots % st.pierce === 0) {
+          const alt = closestFoe(foes, tgt, [tgt]);
+          if (alt) fire(p, u, alt, st.dmg, st);
+        }
+        /* yıldırım: chains to extra targets with 1 dmg */
+        if (st.chain) {
+          const hitList = [tgt];
+          for (let k = 0; k < st.chain; k++) {
+            const alt = closestFoe(foes, tgt, hitList);
+            if (!alt) break;
+            hitList.push(alt);
+            fire(p, u, alt, 1, st);
+          }
+        }
+      }
+    }
+  }
+
+  /* bullets: homing, guaranteed hit */
+  for (let i = bullets.length - 1; i >= 0; i--) {
+    const b = bullets[i];
+    const dead = isHero(b.tgt) ? !b.tgt.alive : b.tgt.dead;
+    if (dead) { b.tgt.inc -= b.dmg; bullets.splice(i, 1); continue; }
+    const d = Math.hypot(b.tgt.x - b.x, (b.tgt.y - 12) - b.y);
+    if (d < 13) {
+      b.tgt.inc -= b.dmg;
+      const t = b.tgt;
+      if (b.eff) {
+        if (b.eff.kb) {
+          const kd = Math.hypot(t.x - b.x, t.y - b.y) || 1;
+          t.x = Math.max(30, Math.min(WORLD - 30, t.x + (t.x - b.x) / kd * b.eff.kb));
+          t.y = Math.max(30, Math.min(WORLD - 30, t.y + (t.y - b.y) / kd * b.eff.kb));
+        }
+        if (b.eff.burn) t.burnUntil = tSim + b.eff.burn.dur;
+        if (b.eff.slow) t.slowUntil = tSim + b.eff.slow.dur;
+      }
+      hitFx(b, t.x, t.y - 12);
+      hitUnit(t, b.dmg, b.from);
+      if (b.eff && b.eff.splash) {
+        boom(t.x, t.y, '#f97316', false);
+        for (const f of enemyUnits(b.from)) {
+          if (f === t || dist(f, t) > b.eff.splash) continue;
+          hitUnit(f, 1, b.from);
+        }
+      }
+      bullets.splice(i, 1);
+      continue;
+    }
+    b.x += (b.tgt.x - b.x) / d * b.sp * dt;
+    b.y += ((b.tgt.y - 12) - b.y) / d * b.sp * dt;
+  }
+
+  /* coins pickup */
+  for (let i = coins.length - 1; i >= 0; i--) {
+    const c = coins[i];
+    for (const p of players) {
+      if (!p.alive || dist(p, c) > 34) continue;
+      p.wallet += c.amt;
+      floats.push({ x: p.x, y: p.y - 34, txt: '+' + c.amt + '$', color: '#b8860b', life: 1.1 });
+      coins.splice(i, 1);
+      break;
+    }
+  }
+
+  /* fx */
+  for (let i = parts.length - 1; i >= 0; i--) {
+    const q = parts[i]; q.life -= dt;
+    if (q.life <= 0) { parts.splice(i, 1); continue; }
+    q.x += q.vx * dt; q.y += q.vy * dt; q.vy += (q.g ?? 260) * dt;
+  }
+  for (let i = impacts.length - 1; i >= 0; i--) {
+    impacts[i].age += dt;
+    if (impacts[i].age >= impacts[i].max) impacts.splice(i, 1);
+  }
+  for (let i = beams.length - 1; i >= 0; i--) {
+    beams[i].age += dt;
+    if (beams[i].age >= beams[i].max) beams.splice(i, 1);
+  }
+  for (let i = stains.length - 1; i >= 0; i--) { stains[i].life -= dt; if (stains[i].life <= 0) stains.splice(i, 1); }
+  for (let i = floats.length - 1; i >= 0; i--) { const f = floats[i]; f.life -= dt; f.y -= 22 * dt; if (f.life <= 0) floats.splice(i, 1); }
+
+  /* cleanup dead soldiers */
+  for (let i = soldiers.length - 1; i >= 0; i--) if (soldiers[i].dead) soldiers.splice(i, 1);
+
+  /* economy: passive income + idle reinforcements */
+  incomeClock -= dt;
+  if (incomeClock <= 0) {
+    incomeClock += INCOME_T;
+    for (const p of players) if (p.alive) p.wallet += 1;
+  }
+  spawnClock -= dt;
+  if (spawnClock <= 0) {
+    spawnClock += SPAWN_T;
+    let idleN = 0;
+    for (const s of soldiers) if (s.owner === -1) idleN++;
+    if (idleN < IDLE_TARGET) spawnIdleCluster();
+  }
+
+  /* battle-royale zone: step every 30s, animate over 4s, drain hp outside */
+  if (zoneStep < ZONE_STEPS && tSim >= nextShrink) {
+    zoneStep++; nextShrink += ZONE_T;
+    zoneTarget = zoneR * ZONE_K;
+    zoneRate = (zoneR - zoneTarget) / 4;
+  }
+  if (zoneR > zoneTarget) zoneR = Math.max(zoneTarget, zoneR - zoneRate * dt);
+  zoneClock -= dt;
+  if (zoneClock <= 0) {
+    zoneClock += 1;
+    for (const p of players) {
+      if (!p.alive || dist(p, ZONE_C) <= zoneR) continue;
+      floats.push({ x: p.x, y: p.y - 44, txt: '-' + ZONE_DMG_H, color: '#e5484d', life: .8 });
+      hitUnit(p, ZONE_DMG_H);
+    }
+    for (const s of soldiers) {
+      if (s.dead || dist(s, ZONE_C) <= zoneR) continue;
+      hitUnit(s, ZONE_DMG_S);
+    }
+  }
+
+  /* fountains: +1 hp/s while standing inside */
+  fountClock -= dt;
+  if (fountClock <= 0) {
+    fountClock += 1;
+    for (const f of FOUNTS) {
+      for (const p of players) {
+        if (!p.alive || p.hp >= H_HP || dist(p, f) > FOUNT_R) continue;
+        p.hp = Math.min(H_HP, p.hp + 1);
+        floats.push({ x: p.x, y: p.y - 44, txt: '+1', color: '#2eaf62', life: .8 });
+      }
+      for (const s of soldiers) {
+        if (s.dead || s.hp >= s.maxHp || dist(s, f) > FOUNT_R) continue;
+        s.hp += 1;
+      }
+    }
+  }
+
+  /* burn dot: 1 dmg per second while burning */
+  for (const p of players) {
+    if (!p.alive || p.burnUntil <= tSim) continue;
+    p.burnAcc += dt;
+    if (p.burnAcc >= 1) { p.burnAcc -= 1; hitUnit(p, 1); spray(p.x, p.y - 24, '#fb923c', 2, 50, -70, .35, 1.8); }
+  }
+  for (const s of soldiers) {
+    if (s.dead || s.burnUntil <= tSim) continue;
+    s.burnAcc += dt;
+    if (s.burnAcc >= 1) { s.burnAcc -= 1; hitUnit(s, 1); spray(s.x, s.y - 18, '#fb923c', 2, 50, -70, .35, 1.8); }
+  }
+
+  /* AI */
+  if (!aiFreeze) { aiClock -= dt; if (aiClock <= 0) { aiClock = .25; for (const p of players) if (p.bot && p.alive) aiTick(p); } }
+}
+let aiClock = 0;
+
+/* ---------- bot AI ---------- */
+const power = p => p.army * 3 + p.hp / 6;
+function aiTick(p) {
+  /* zone first: being outside is certain death */
+  const zd = dist(p, ZONE_C);
+  if (zd > zoneR - 80) {
+    p.mv = { x: (ZONE_C.x - p.x) / zd, y: (ZONE_C.y - p.y) / zd };
+    return;
+  }
+  const myPow = power(p);
+  /* scarcity endgame: no money left to farm -> stop fleeing, force the fight */
+  const scarce = p.wallet < MIN_PRICE && coins.length === 0;
+  /* flee from clearly stronger players closing in */
+  let threat = null, tScore = 1e9;
+  if (!scarce) for (const q of players) {
+    if (q === p || !q.alive) continue;
+    if (power(q) < myPow * 1.2 + 2) continue;
+    const gap = dist(p, q) - aorR(q);
+    if (gap < 170 && gap < tScore) { tScore = gap; threat = q; }
+  }
+  if (threat) {
+    const dx = p.x - threat.x, dy = p.y - threat.y, m = Math.hypot(dx, dy) || 1;
+    p.mv = { x: dx / m, y: dy / m };
+    /* steer off walls */
+    if (p.x < 160) p.mv.x = Math.abs(p.mv.x); if (p.x > WORLD - 160) p.mv.x = -Math.abs(p.mv.x);
+    if (p.y < 160) p.mv.y = Math.abs(p.mv.y); if (p.y > WORLD - 160) p.mv.y = -Math.abs(p.mv.y);
+    return;
+  }
+  let goal = null, gBest = 1e9;
+  /* wounded: go sit at a fountain (only ones still inside the zone) */
+  if (p.hp < H_HP * .55) {
+    let fd = 1e9;
+    for (const f of FOUNTS) {
+      if (dist(f, ZONE_C) > zoneR - 100) continue;
+      const d = dist(p, f); if (d < 1100 && d < fd) { fd = d; goal = f; }
+    }
+  }
+  /* nearby coin (skip loot lying outside the zone) */
+  if (!goal) for (const c of coins) {
+    if (dist(c, ZONE_C) > zoneR - 40) continue;
+    const d = dist(p, c); if (d < 460 && d < gBest) { gBest = d; goal = c; }
+  }
+  /* recruit */
+  if (!goal && p.wallet >= MIN_PRICE) {
+    for (const s of soldiers) {
+      if (s.owner !== -1 || s.dead || dist(s, ZONE_C) > zoneR - 60) continue;
+      if (STYPES[s.type].price > p.wallet) continue;
+      const d = dist(p, s);
+      if (d < gBest) { gBest = d; goal = s; }
+    }
+  }
+  /* hunt weaker player */
+  if (!goal) {
+    for (const q of players) {
+      if (q === p || !q.alive || power(q) > myPow * .85) continue;
+      const d = dist(p, q);
+      if (d < gBest) { gBest = d; goal = q; }
+    }
+  }
+  /* scarcity: nothing to farm -> chase nearest enemy no matter the odds */
+  if (!goal && scarce) {
+    for (const q of players) {
+      if (q === p || !q.alive) continue;
+      const d = dist(p, q);
+      if (d < gBest) { gBest = d; goal = q; }
+    }
+  }
+  /* wander */
+  if (!goal) {
+    if (!p.wt || dist(p, p.wt) < 60) p.wt = { x: rr(220, WORLD - 220), y: rr(220, WORLD - 220) };
+    goal = p.wt;
+  }
+  const dx = goal.x - p.x, dy = goal.y - p.y, m = Math.hypot(dx, dy) || 1;
+  p.mv = m < 14 ? { x: 0, y: 0 } : { x: dx / m, y: dy / m };
+}
+
+/* ---------- input ---------- */
+const keys = {};
+addEventListener('keydown', e => { keys[e.key.toLowerCase()] = 1; });
+addEventListener('keyup', e => { keys[e.key.toLowerCase()] = 0; });
+
+const joyEl = document.getElementById('joy'), knobEl = document.getElementById('knob');
+let joyId = null, joyBase = null;
+addEventListener('pointerdown', e => {
+  if (e.target.closest('#over')) return;
+  if (joyId !== null) return;
+  joyId = e.pointerId; joyBase = { x: e.clientX, y: e.clientY };
+  joyEl.style.display = knobEl.style.display = 'block';
+  placeJoy(e.clientX, e.clientY);
+});
+addEventListener('pointermove', e => {
+  if (e.pointerId !== joyId) return;
+  let dx = e.clientX - joyBase.x, dy = e.clientY - joyBase.y;
+  const m = Math.hypot(dx, dy);
+  if (m > 48) { dx = dx / m * 48; dy = dy / m * 48; }
+  placeJoy(joyBase.x + dx, joyBase.y + dy);
+  if (!inputFreeze) me.mv = { x: dx / 48, y: dy / 48 };
+});
+function endJoy(e) {
+  if (e.pointerId !== joyId) return;
+  joyId = null; joyEl.style.display = knobEl.style.display = 'none';
+  if (!inputFreeze) me.mv = { x: 0, y: 0 };
+}
+addEventListener('pointerup', endJoy); addEventListener('pointercancel', endJoy);
+function placeJoy(kx, ky) {
+  joyEl.style.left = (joyBase.x - 48) + 'px'; joyEl.style.top = (joyBase.y - 48) + 'px';
+  knobEl.style.left = (kx - 21) + 'px'; knobEl.style.top = (ky - 21) + 'px';
+}
+function keyMove() {
+  if (joyId !== null || inputFreeze || !me.alive) return;
+  let x = 0, y = 0;
+  if (keys.w || keys.arrowup) y -= 1; if (keys.s || keys.arrowdown) y += 1;
+  if (keys.a || keys.arrowleft) x -= 1; if (keys.d || keys.arrowright) x += 1;
+  me.mv = { x, y };
+}
+
+/* ---------- render ---------- */
+const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+let vw = 0, vh = 0, dpr = 1;
+function resize() {
+  dpr = Math.min(devicePixelRatio || 1, 2);
+  vw = innerWidth; vh = innerHeight;
+  cv.width = vw * dpr; cv.height = vh * dpr;
+  cv.style.width = vw + 'px'; cv.style.height = vh + 'px';   // backing 2x, display 1x (retina)
+}
+addEventListener('resize', () => { resize(); if (TEST) { camSnap(); draw(); } }); resize();
+
+let camX = me.x, camY = me.y, camS = 1;
+function camTarget() {
+  if (me.alive) return me;
+  let best = null, bp = -1;
+  for (const p of players) if (p.alive && power(p) > bp) { bp = power(p); best = p; }
+  return best || me;
+}
+function camSnap() {
+  const f = camTarget();
+  camX = f.x; camY = f.y;
+  camS = Math.max(.52, Math.min(1, 250 / (aorR(f) + 130)));
+}
+
+function draw(dt = 1 / 60) {
+  const foc = camTarget();
+  const wantS = Math.max(.52, Math.min(1, 250 / (aorR(foc) + 130)));
+  const kS = 1 - Math.exp(-3.5 * dt), kP = 1 - Math.exp(-10 * dt);  // framerate-independent smoothing
+  camS += (wantS - camS) * kS;
+  camX += (foc.x - camX) * kP; camY += (foc.y - camY) * kP;
+
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.fillStyle = '#e3e4df'; ctx.fillRect(0, 0, vw, vh);
+  let shX = 0, shY = 0;
+  if (shakeT > 0) {
+    shakeT -= dt;
+    const k = shakeAmp * Math.min(1, shakeT * 5);
+    shX = (vrnd() * 2 - 1) * k; shY = (vrnd() * 2 - 1) * k;
+    if (shakeT <= 0) shakeAmp = 0;
+  }
+  ctx.translate(vw / 2 + shX, vh / 2 + shY); ctx.scale(camS, camS); ctx.translate(-camX, -camY);
+
+  /* world + grid */
+  ctx.fillStyle = '#f6f7f3'; ctx.fillRect(0, 0, WORLD, WORLD);
+  ctx.strokeStyle = '#e2e5df'; ctx.lineWidth = 1;
+  const step = 48;
+  const x0 = Math.max(0, camX - vw / 2 / camS), x1 = Math.min(WORLD, camX + vw / 2 / camS);
+  const y0 = Math.max(0, camY - vh / 2 / camS), y1 = Math.min(WORLD, camY + vh / 2 / camS);
+  ctx.beginPath();
+  for (let x = Math.floor(x0 / step) * step; x <= x1; x += step) { ctx.moveTo(x, y0); ctx.lineTo(x, y1); }
+  for (let y = Math.floor(y0 / step) * step; y <= y1; y += step) { ctx.moveTo(x0, y); ctx.lineTo(x1, y); }
+  ctx.stroke();
+  ctx.strokeStyle = '#aeb4a9'; ctx.lineWidth = 4; ctx.strokeRect(0, 0, WORLD, WORLD);
+
+  /* blood stains */
+  for (const s of stains) {
+    ctx.globalAlpha = Math.min(.5, s.life * .18);
+    ctx.fillStyle = '#8e1c1c';
+    ctx.beginPath(); ctx.ellipse(s.x, s.y, s.r, s.r * .6, 0, 0, 6.29); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  /* fountains */
+  for (const f of FOUNTS) {
+    const fr = FOUNT_R * (0.97 + 0.03 * Math.sin(tSim * 2));
+    ctx.beginPath(); ctx.arc(f.x, f.y, fr, 0, 6.29);
+    ctx.fillStyle = '#57a7d410'; ctx.fill();
+    ctx.strokeStyle = '#57a7d466'; ctx.lineWidth = 2;
+    ctx.setLineDash([9, 9]); ctx.stroke(); ctx.setLineDash([]);
+    ctx.beginPath(); ctx.arc(f.x, f.y, 20, 0, 6.29);
+    ctx.fillStyle = '#ffffff'; ctx.fill();
+    ctx.strokeStyle = '#4f9cc7'; ctx.lineWidth = 2.5; ctx.stroke();
+    ctx.fillStyle = '#2eaf62';
+    ctx.fillRect(f.x - 9, f.y - 3.5, 18, 7); ctx.fillRect(f.x - 3.5, f.y - 9, 7, 18);
+  }
+
+  /* AoR circles */
+  for (const p of players) {
+    if (!p.alive) continue;
+    const R = aorR(p);
+    ctx.beginPath(); ctx.arc(p.x, p.y, R, 0, 6.29);
+    ctx.fillStyle = p.color + '0d'; ctx.fill();
+    ctx.strokeStyle = p.color + (p === me ? '99' : '55');
+    ctx.lineWidth = p === me ? 2.5 : 1.5;
+    ctx.stroke();
+  }
+
+  /* coins */
+  for (const c of coins) {
+    ctx.fillStyle = '#e8b425'; ctx.strokeStyle = '#9c7208'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(c.x, c.y, 11, 0, 6.29); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#7a5a06'; ctx.font = '800 11px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText('$', c.x, c.y + 4);
+    ctx.fillStyle = '#7d6a1e'; ctx.font = '700 11px sans-serif';
+    ctx.fillText(c.amt + '$', c.x, c.y + 26);
+  }
+
+  /* soldiers */
+  for (const s of soldiers) {
+    if (s.dead) continue;
+    const col = s.owner >= 0 ? players[s.owner].color : null;
+    stickman(s.x, s.y, 1, col, s.face, s.ph, s.tgt != null, WPN[s.type]);
+    if (s.burnUntil > tSim) { ctx.fillStyle = '#f97316'; ctx.beginPath(); ctx.arc(s.x + 6, s.y - 27, 2.6, 0, 6.29); ctx.fill(); }
+    if (s.slowUntil > tSim) { ctx.strokeStyle = '#38bdf8aa'; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(s.x, s.y + 2, 11, 5.5, 0, 0, 6.29); ctx.stroke(); }
+    if (s.owner < 0) {
+      const st = STYPES[s.type];
+      ctx.fillStyle = TIER_COL[st.tier]; ctx.font = '700 11px sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText(st.price + '$', s.x, s.y + 18);
+      let lead = null, lv = 0;
+      for (const k in s.prog) if (s.prog[k] > lv) { lv = s.prog[k]; lead = +k; }
+      if (lead !== null && lv > .03) {
+        ctx.fillStyle = '#d5d8d2'; ctx.fillRect(s.x - 14, s.y - 40, 28, 5);
+        ctx.fillStyle = players[lead].color; ctx.fillRect(s.x - 14, s.y - 40, 28 * Math.min(1, lv), 5);
+      }
+    } else if (s.hp < s.maxHp) {
+      ctx.fillStyle = '#00000022'; ctx.fillRect(s.x - 11, s.y - 38, 22, 3.5);
+      ctx.fillStyle = '#e5484d'; ctx.fillRect(s.x - 11, s.y - 38, 22 * s.hp / s.maxHp, 3.5);
+    }
+  }
+
+  /* heroes */
+  for (const p of players) {
+    if (!p.alive) continue;
+    stickman(p.x, p.y, 1.4, p.color, p.face, p.ph, p.tgt != null, HWPN[p.cls]);
+    if (p.burnUntil > tSim) { ctx.fillStyle = '#f97316'; ctx.beginPath(); ctx.arc(p.x + 9, p.y - 37, 3.2, 0, 6.29); ctx.fill(); }
+    if (p.slowUntil > tSim) { ctx.strokeStyle = '#38bdf8aa'; ctx.lineWidth = 2.4; ctx.beginPath(); ctx.ellipse(p.x, p.y + 3, 15, 7.5, 0, 0, 6.29); ctx.stroke(); }
+    ctx.fillStyle = '#00000022'; ctx.fillRect(p.x - 20, p.y - 56, 40, 5);
+    ctx.fillStyle = p.color; ctx.fillRect(p.x - 20, p.y - 56, 40 * Math.max(0, p.hp) / H_HP, 5);
+    ctx.font = '800 12px sans-serif'; ctx.textAlign = 'center';
+    ctx.lineWidth = 3; ctx.strokeStyle = '#ffffffcc'; ctx.strokeText(p.name, p.x, p.y - 62);
+    ctx.fillStyle = p.color; ctx.fillText(p.name, p.x, p.y - 62);
+  }
+
+  /* bullets — each kind gets its own show */
+  for (const b of bullets) {
+    const d = Math.hypot(b.tgt.x - b.x, (b.tgt.y - 12) - b.y) || 1;
+    const ux = (b.tgt.x - b.x) / d, uy = ((b.tgt.y - 12) - b.y) / d;
+    if (b.kind === 'spark') {
+      /* living lightning bolt from caster to bolt head */
+      const bdx = b.x - b.sx, bdy = b.y - b.sy, bm = Math.hypot(bdx, bdy) || 1;
+      const nx = -bdy / bm, ny = bdx / bm;
+      for (let pass = 0; pass < 2; pass++) {
+        ctx.strokeStyle = pass ? '#fde047' : '#eab308';
+        ctx.lineWidth = pass ? 1.8 : 5; ctx.globalAlpha = pass ? .95 : .3; ctx.lineJoin = 'round';
+        ctx.beginPath(); ctx.moveTo(b.sx, b.sy);
+        for (let k = 1; k < 6; k++) {
+          const t = k / 6, j = (vrnd() * 2 - 1) * 8;
+          ctx.lineTo(b.sx + bdx * t + nx * j, b.sy + bdy * t + ny * j);
+        }
+        ctx.lineTo(b.x, b.y); ctx.stroke();
+      }
+      ctx.globalAlpha = 1; ctx.fillStyle = '#fffbeb';
+      ctx.beginPath(); ctx.arc(b.x, b.y, 3.2, 0, 6.29); ctx.fill();
+    } else if (b.kind === 'fire') {
+      ctx.globalAlpha = .2; ctx.fillStyle = '#f97316';
+      ctx.beginPath(); ctx.arc(b.x, b.y, 9, 0, 6.29); ctx.fill();
+      ctx.globalAlpha = .5;
+      ctx.beginPath(); ctx.arc(b.x, b.y, 5.5, 0, 6.29); ctx.fill();
+      ctx.globalAlpha = 1; ctx.fillStyle = '#fde047';
+      ctx.beginPath(); ctx.arc(b.x, b.y, 2.8, 0, 6.29); ctx.fill();
+      if (parts.length < 500) parts.push({ x: b.x - ux * 6 + (vrnd() * 6 - 3), y: b.y - uy * 6 + (vrnd() * 6 - 3), vx: 0, vy: -20, life: .22, col: '#fb923c', r: 2.4, g: 0 });
+    } else if (b.kind === 'ice') {
+      ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(Math.atan2(uy, ux) + .785);
+      ctx.globalAlpha = .35; ctx.fillStyle = '#7dd3fc'; ctx.fillRect(-6, -6, 12, 12);
+      ctx.globalAlpha = 1; ctx.fillStyle = '#e0f2fe'; ctx.fillRect(-3.2, -3.2, 6.4, 6.4);
+      ctx.restore();
+      if (parts.length < 500 && vrnd() < .5) parts.push({ x: b.x, y: b.y, vx: (vrnd() * 40 - 20), vy: (vrnd() * 40 - 20), life: .3, col: '#bae6fd', r: 1.5, g: 0 });
+    } else if (b.kind === 'arrow') {
+      ctx.strokeStyle = '#8b5a2b'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(b.x - ux * 13, b.y - uy * 13); ctx.lineTo(b.x, b.y); ctx.stroke();
+      ctx.strokeStyle = '#e7e5e4'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(b.x - ux * 3, b.y - uy * 3); ctx.lineTo(b.x + ux * 2, b.y + uy * 2); ctx.stroke();
+    } else if (b.kind === 'bomb') {
+      ctx.fillStyle = '#33352f';
+      ctx.beginPath(); ctx.arc(b.x, b.y, 4, 0, 6.29); ctx.fill();
+      ctx.fillStyle = vrnd() < .5 ? '#fde047' : '#f97316';
+      ctx.beginPath(); ctx.arc(b.x + 2, b.y - 4.5, 1.6, 0, 6.29); ctx.fill();
+    } else if (b.kind === 'bone') {
+      ctx.globalAlpha = .3; ctx.strokeStyle = '#e2e8f0'; ctx.lineWidth = 4;
+      ctx.beginPath(); ctx.moveTo(b.x - ux * 10, b.y - uy * 10); ctx.lineTo(b.x, b.y); ctx.stroke();
+      ctx.globalAlpha = 1; ctx.fillStyle = '#f8fafc';
+      ctx.beginPath(); ctx.arc(b.x, b.y, 3.4, 0, 6.29); ctx.fill();
+    } else if (b.kind === 'snipe') {
+      /* railgun: full-path trail from the rifle to the round */
+      ctx.globalAlpha = .28; ctx.strokeStyle = b.color; ctx.lineWidth = 3.5;
+      ctx.beginPath(); ctx.moveTo(b.sx, b.sy); ctx.lineTo(b.x, b.y); ctx.stroke();
+      ctx.globalAlpha = .95; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.6;
+      ctx.beginPath(); ctx.moveTo(b.x - ux * 24, b.y - uy * 24); ctx.lineTo(b.x, b.y); ctx.stroke();
+      ctx.fillStyle = '#fffbeb';
+      ctx.beginPath(); ctx.arc(b.x, b.y, 2.4, 0, 6.29); ctx.fill();
+    } else {  /* tracer */
+      ctx.globalAlpha = .4; ctx.strokeStyle = b.color; ctx.lineWidth = 4;
+      ctx.beginPath(); ctx.moveTo(b.x - ux * 15, b.y - uy * 15); ctx.lineTo(b.x, b.y); ctx.stroke();
+      ctx.globalAlpha = 1; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.7;
+      ctx.beginPath(); ctx.moveTo(b.x - ux * 10, b.y - uy * 10); ctx.lineTo(b.x, b.y); ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  /* lingering sniper beams */
+  for (const bm of beams) {
+    const t = bm.age / bm.max;
+    ctx.globalAlpha = (1 - t) * .45;
+    ctx.strokeStyle = bm.col; ctx.lineWidth = 3 * (1 - t) + .5;
+    ctx.beginPath(); ctx.moveTo(bm.x1, bm.y1); ctx.lineTo(bm.x2, bm.y2); ctx.stroke();
+    ctx.globalAlpha = (1 - t) * .8;
+    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(bm.x1, bm.y1); ctx.lineTo(bm.x2, bm.y2); ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+
+  /* impact rings */
+  for (const im of impacts) {
+    const t = im.age / im.max;
+    ctx.globalAlpha = (1 - t) * .9;
+    ctx.strokeStyle = im.col; ctx.lineWidth = 3.5 * (1 - t) + 1;
+    ctx.beginPath(); ctx.arc(im.x, im.y, im.r0 + (im.r1 - im.r0) * Math.sqrt(t), 0, 6.29); ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+
+  /* particles */
+  for (const q of parts) {
+    ctx.globalAlpha = Math.min(1, q.life * 3);
+    ctx.fillStyle = q.col || '#b02525';
+    ctx.beginPath(); ctx.arc(q.x, q.y, q.r || 2.4, 0, 6.29); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  /* battle-royale zone: red tint outside + border ring */
+  ctx.beginPath();
+  ctx.rect(-600, -600, WORLD + 1200, WORLD + 1200);
+  ctx.arc(ZONE_C.x, ZONE_C.y, zoneR, 0, 6.29, true);
+  ctx.fillStyle = 'rgba(214,58,58,.13)'; ctx.fill();
+  ctx.beginPath(); ctx.arc(ZONE_C.x, ZONE_C.y, zoneR, 0, 6.29);
+  ctx.strokeStyle = 'rgba(214,58,58,.75)'; ctx.lineWidth = 3.5; ctx.stroke();
+
+  /* offscreen pointer to the nearest idle soldier */
+  if (me.alive) {
+    const ni = nearestIdle(me);
+    if (ni) {
+      const lim = Math.min(vw, vh) / (2 * camS) - 60;
+      const d = dist(me, ni);
+      if (d > lim) {
+        const ux = (ni.x - me.x) / d, uy = (ni.y - me.y) / d;
+        const ax = me.x + ux * lim, ay = me.y + uy * lim;
+        ctx.save(); ctx.translate(ax, ay); ctx.rotate(Math.atan2(uy, ux));
+        ctx.fillStyle = '#a0a69c';
+        ctx.beginPath(); ctx.moveTo(11, 0); ctx.lineTo(-6, -8); ctx.lineTo(-6, 8); ctx.closePath(); ctx.fill();
+        ctx.restore();
+        ctx.fillStyle = '#8a9086'; ctx.font = '700 11px sans-serif'; ctx.textAlign = 'center';
+        ctx.fillText(STYPES[ni.type].price + '$', ax - ux * 20, ay - uy * 20 + 4);
+      }
+    }
+  }
+
+  /* floats */
+  ctx.font = '800 13px sans-serif'; ctx.textAlign = 'center';
+  for (const f of floats) {
+    ctx.globalAlpha = Math.min(1, f.life * 2);
+    ctx.lineWidth = 3; ctx.strokeStyle = '#ffffffcc'; ctx.strokeText(f.txt, f.x, f.y);
+    ctx.fillStyle = f.color; ctx.fillText(f.txt, f.x, f.y);
+  }
+  ctx.globalAlpha = 1;
+
+  /* minimap: me bright, enemies faded */
+  const MM = 112, mmx = vw - MM - 12, mmy = lbBottom + 8;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.fillStyle = 'rgba(255,255,255,.82)'; ctx.strokeStyle = '#d8dbd4'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.roundRect(mmx, mmy, MM, MM, 10); ctx.fill(); ctx.stroke();
+  const mk = (MM - 10) / WORLD, mox = mmx + 5, moy = mmy + 5;
+  for (const f of FOUNTS) {
+    ctx.fillStyle = '#57a7d4'; ctx.globalAlpha = .45;
+    ctx.beginPath(); ctx.arc(mox + f.x * mk, moy + f.y * mk, 2, 0, 6.29); ctx.fill();
+  }
+  for (const p of players) {
+    if (!p.alive || p === me) continue;
+    ctx.fillStyle = p.color; ctx.globalAlpha = .3;
+    ctx.beginPath(); ctx.arc(mox + p.x * mk, moy + p.y * mk, 2.6, 0, 6.29); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  if (me.alive) {
+    ctx.fillStyle = me.color;
+    ctx.beginPath(); ctx.arc(mox + me.x * mk, moy + me.y * mk, 4, 0, 6.29); ctx.fill();
+    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.5; ctx.stroke();
+  }
+  ctx.strokeStyle = 'rgba(214,58,58,.8)'; ctx.lineWidth = 1.3;
+  ctx.beginPath(); ctx.arc(mox + ZONE_C.x * mk, moy + ZONE_C.y * mk, zoneR * mk, 0, 6.29); ctx.stroke();
+}
+
+/* stickman: rgs_dev-vari — beyaz kafa, ince siyah uzuvlar, takım rengi zemin halkası */
+function stickman(x, y, sc, teamColor, face, ph, aiming, wpn = 'pistol') {
+  ctx.save(); ctx.translate(x, y); ctx.scale(sc, sc);
+  /* team ring on ground */
+  ctx.fillStyle = teamColor ? teamColor + 'cc' : '#b7bcb3aa';
+  ctx.beginPath(); ctx.ellipse(0, 2, 9, 4.5, 0, 0, 6.29); ctx.fill();
+  const sw = Math.sin(ph) * 4;
+  ctx.strokeStyle = teamColor ? '#22261f' : '#7d837a';
+  ctx.lineCap = 'round'; ctx.lineWidth = 2;
+  /* legs */
+  ctx.beginPath();
+  ctx.moveTo(0, -8); ctx.lineTo(-3 + sw * .5, 1);
+  ctx.moveTo(0, -8); ctx.lineTo(3 - sw * .5, 1);
+  /* body */
+  ctx.moveTo(0, -8); ctx.lineTo(0, -16);
+  ctx.stroke();
+  /* arms */
+  const fx = Math.cos(face), fy = Math.sin(face);
+  let hx, hy;
+  if (aiming) {
+    ctx.beginPath(); ctx.moveTo(0, -14); ctx.lineTo(fx * 8, -14 + fy * 4); ctx.stroke();
+    hx = fx * 8; hy = -14 + fy * 4;
+  } else {
+    ctx.beginPath();
+    ctx.moveTo(0, -14); ctx.lineTo(-4, -7 + sw * .3);
+    ctx.moveTo(0, -14); ctx.lineTo(4, -7 - sw * .3);
+    ctx.stroke();
+    hx = 4; hy = -7 - sw * .3;
+  }
+  /* weapon by type */
+  if (wpn.startsWith('staff')) {
+    const c = wpn.slice(5);
+    ctx.strokeStyle = '#7a6a52'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(hx, hy + 4); ctx.lineTo(hx + fx * 3, hy - 9); ctx.stroke();
+    const tx2 = hx + fx * 3, ty2 = hy - 11;
+    if (c === '#f97316') {          /* fire: flame tip */
+      ctx.fillStyle = '#f97316'; ctx.beginPath(); ctx.arc(tx2, ty2, 2.8, 0, 6.29); ctx.fill();
+      ctx.fillStyle = '#fde047'; ctx.beginPath(); ctx.arc(tx2, ty2 - .6, 1.4, 0, 6.29); ctx.fill();
+    } else if (c === '#38bdf8') {   /* ice: crystal tip */
+      ctx.save(); ctx.translate(tx2, ty2); ctx.rotate(.785);
+      ctx.fillStyle = '#38bdf8'; ctx.fillRect(-2.6, -2.6, 5.2, 5.2);
+      ctx.fillStyle = '#e0f2fe'; ctx.fillRect(-1.1, -1.1, 2.2, 2.2);
+      ctx.restore();
+    } else if (c === '#2eaf62') {   /* heal: cross tip */
+      ctx.fillStyle = '#2eaf62';
+      ctx.fillRect(tx2 - 3, ty2 - 1, 6, 2); ctx.fillRect(tx2 - 1, ty2 - 3, 2, 6);
+    } else {
+      ctx.fillStyle = c; ctx.beginPath(); ctx.arc(tx2, ty2, 2.4, 0, 6.29); ctx.fill();
+    }
+  } else if (wpn === 'bonestaff') { /* skull staff */
+    ctx.strokeStyle = '#7a6a52'; ctx.lineWidth = 2.2;
+    ctx.beginPath(); ctx.moveTo(hx, hy + 5); ctx.lineTo(hx + fx * 2, hy - 10); ctx.stroke();
+    ctx.fillStyle = '#f1f5f9'; ctx.strokeStyle = '#94a3b8'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(hx + fx * 2, hy - 12.5, 3.4, 0, 6.29); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#1f2937';
+    ctx.beginPath();
+    ctx.arc(hx + fx * 2 - 1.3, hy - 13, .9, 0, 6.29);
+    ctx.arc(hx + fx * 2 + 1.3, hy - 13, .9, 0, 6.29); ctx.fill();
+  } else if (wpn === 'stormstaff') { /* crackling storm staff */
+    ctx.strokeStyle = '#7a6a52'; ctx.lineWidth = 2.2;
+    ctx.beginPath(); ctx.moveTo(hx, hy + 5); ctx.lineTo(hx + fx * 2, hy - 10); ctx.stroke();
+    const tx2 = hx + fx * 2;
+    ctx.globalAlpha = .35; ctx.fillStyle = '#fde047';
+    ctx.beginPath(); ctx.arc(tx2, hy - 12.5, 4.6, 0, 6.29); ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = '#eab308'; ctx.lineWidth = 1.8; ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.moveTo(tx2 - 2, hy - 16); ctx.lineTo(tx2 + 1, hy - 13); ctx.lineTo(tx2 - 1, hy - 12.5); ctx.lineTo(tx2 + 2, hy - 9.5);
+    ctx.stroke();
+  } else if (wpn === 'sniper') {    /* scoped long rifle */
+    ctx.strokeStyle = '#6b4f2f'; ctx.lineWidth = 3.2;
+    ctx.beginPath(); ctx.moveTo(hx - fx * 4, hy + 2); ctx.lineTo(hx, hy); ctx.stroke();
+    ctx.strokeStyle = '#2f3230'; ctx.lineWidth = 2.6;
+    ctx.beginPath(); ctx.moveTo(hx - fx, hy); ctx.lineTo(hx + fx * 13, hy + fy * 5); ctx.stroke();
+    ctx.fillStyle = '#2f3230';
+    ctx.beginPath(); ctx.arc(hx + fx * 4.5, hy - 2.8 + fy * 2, 1.7, 0, 6.29); ctx.fill();
+  } else if (wpn === 'bow') {
+    ctx.strokeStyle = '#8b5a2b'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(hx, hy, 5.5, face - 1.15, face + 1.15); ctx.stroke();
+    ctx.strokeStyle = '#d6d3d1'; ctx.lineWidth = .9;
+    ctx.beginPath();
+    ctx.moveTo(hx + Math.cos(face - 1.15) * 5.5, hy + Math.sin(face - 1.15) * 5.5);
+    ctx.lineTo(hx + Math.cos(face + 1.15) * 5.5, hy + Math.sin(face + 1.15) * 5.5);
+    ctx.stroke();
+  } else if (wpn === 'bomb') {
+    ctx.fillStyle = '#33352f';
+    ctx.beginPath(); ctx.arc(hx + fx * 3, hy, 3, 0, 6.29); ctx.fill();
+    ctx.strokeStyle = '#c9880a'; ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.moveTo(hx + fx * 3 + 1, hy - 3); ctx.lineTo(hx + fx * 3 + 3, hy - 5.5); ctx.stroke();
+  } else if (wpn === 'sling') {
+    ctx.strokeStyle = '#6b5844'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(hx + fx * 4, hy - 5); ctx.stroke();
+    ctx.fillStyle = '#6b7264';
+    ctx.beginPath(); ctx.arc(hx + fx * 4, hy - 6, 1.8, 0, 6.29); ctx.fill();
+  } else {  /* pistol */
+    ctx.strokeStyle = '#3a3d36'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(hx + fx * 4.5, hy + fy * 2); ctx.stroke();
+  }
+  /* head */
+  ctx.fillStyle = '#ffffff';
+  ctx.strokeStyle = teamColor ? '#22261f' : '#7d837a'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(0, -21.5, 5.5, 0, 6.29); ctx.fill(); ctx.stroke();
+  /* face dot(s) toward facing */
+  ctx.fillStyle = '#22261f';
+  ctx.beginPath(); ctx.arc(fx * 2.4 - 1, -22.5, .9, 0, 6.29); ctx.arc(fx * 2.4 + 1.6, -22.5, .9, 0, 6.29); ctx.fill();
+  /* team scarf */
+  if (teamColor) { ctx.strokeStyle = teamColor; ctx.lineWidth = 2.4; ctx.beginPath(); ctx.moveTo(-3, -16); ctx.lineTo(3, -16); ctx.stroke(); }
+  ctx.restore();
+}
+
+/* ---------- HUD ---------- */
+const hWallet = document.getElementById('hWallet'), hArmy = document.getElementById('hArmy'), lbEl = document.getElementById('lb');
+let hudClock = 0, lbBottom = 196;
+function hud(dt) {
+  hudClock -= dt; if (hudClock > 0) return;
+  hudClock = .25;
+  hWallet.textContent = me.wallet + '$';
+  hArmy.textContent = me.army;
+  const rows = [...players].sort((a, b) => (b.alive - a.alive) || (power(b) - power(a)));
+  lbEl.innerHTML = rows.map(p =>
+    `<div class="row${p.alive ? '' : ' dead'}"><span class="dot" style="background:${p.color}"></span><span class="n">${p.name}</span><b>${p.alive ? p.army : '☠'}</b></div>`
+  ).join('');
+  lbBottom = lbEl.getBoundingClientRect().bottom;
+  const zEl = document.getElementById('zone');
+  if (zoneR > zoneTarget + 2) { zEl.textContent = '⚠ Bölge küçülüyor!'; zEl.classList.remove('calm'); }
+  else if (zoneStep < ZONE_STEPS) { zEl.textContent = 'Bölge: ' + Math.max(0, Math.ceil(nextShrink - tSim)) + 's'; zEl.classList.add('calm'); }
+  else { zEl.textContent = 'Son bölge'; zEl.classList.remove('calm'); }
+}
+function showOver(won) {
+  inputFreeze = true; me.mv = { x: 0, y: 0 };
+  const el = document.getElementById('over');
+  document.getElementById('ovIco').textContent = won ? '🏆' : '💀';
+  document.getElementById('ovTitle').textContent = won ? 'Zafer!' : 'Elendin';
+  document.getElementById('ovSub').textContent = won
+    ? 'Son kalan sensin.'
+    : 'Sıralaman: #' + (10 - deadOrder.indexOf(me.i)) + (winner ? ' · Kazanan: ' + winner.name : '');
+  document.getElementById('ovWatch').style.display = won ? 'none' : 'block';
+  el.classList.add('on');
+}
+document.getElementById('ovWatch').onclick = () => document.getElementById('over').classList.remove('on');
+setTimeout(() => document.getElementById('hint').classList.add('gone'), 6500);
+
+/* ---------- main loop ---------- */
+const STEP = 1 / 60;
+let last = performance.now();
+let started = false;                     // gated by the hero pick screen
+function pickHero(cls) {
+  me.cls = cls; started = true;
+  document.getElementById('pick').style.display = 'none';
+}
+function frame(now) {
+  /* one variable-dt sim per rendered frame: no fixed-step remainder, no stutter */
+  const dt = Math.min(.033, (now - last) / 1000); last = now;
+  keyMove();
+  if (started) sim(dt);
+  draw(dt); hud(dt);
+  requestAnimationFrame(frame);
+}
+
+/* ---------- test drivers ---------- */
+function steps(sec) { for (let i = 0, n = Math.round(sec * 60); i < n; i++) sim(STEP); }
+function grant(p, n, type = 'sapanci') { for (let i = 0; i < n; i++) { const o = slotOffset(p.slotSeq); spawnSoldier(p.i, p.x + o.x, p.y + o.y, type); } }
+function nearestIdle(p) { let b = null, bd = 1e9; for (const s of soldiers) { if (s.owner !== -1) continue; const d = dist(p, s); if (d < bd) { bd = d; b = s; } } return b; }
+
+if (TEST) {
+  aiFreeze = true; inputFreeze = true;
+  started = true;
+  me.cls = Q.get('hero') || 'nisanci';
+  document.getElementById('pick').style.display = 'none';
+  const sc = Q.get('sc') || TEST;
+  const idle0 = soldiers.filter(s => s.owner === -1).length;
+  if (sc === 'start') {
+    document.title = `T start p=${players.length} idle=${idle0} wallet=${me.wallet}`;
+  } else if (sc === 'pursue') {
+    const s = nearestIdle(me); me.x = s.x + 40; me.y = s.y;
+    steps(6);
+    document.title = `T pursue wallet=${me.wallet} army=${me.army} aor=${Math.round(aorR(me))}`;
+  } else if (sc === 'nomoney') {
+    me.wallet = 3;
+    const s = nearestIdle(me); me.x = s.x + 40; me.y = s.y;
+    steps(6);
+    document.title = `T nomoney wallet=${me.wallet} army=${me.army}`;
+  } else if (sc === 'battle') {
+    const b = players[1];
+    me.x = 1200; me.y = 1400; b.x = 1200; b.y = 1280;
+    grant(me, 4); grant(b, 2);
+    steps(10);
+    document.title = `T battle myArmy=${me.army} botArmy=${b.army} botAlive=${b.alive} blood=${bloodCount} myHp=${me.hp}`;
+  } else if (sc === 'death') {
+    const b = players[1];
+    me.x = 1200; me.y = 1380; b.x = 1200; b.y = 1255; b.hp = 4; b.wallet = 20;
+    grant(me, 6); grant(b, 2);
+    steps(14);
+    const idleNow = soldiers.filter(s => s.owner === -1).length;
+    document.title = `T death botAlive=${b.alive} coins=${coins.length} amt=${coins[0] ? coins[0].amt : 0} idleDelta=${idleNow - idle0}`;
+  } else if (sc === 'loot') {
+    coins.push({ x: me.x + 20, y: me.y, amt: 20 });
+    const w0 = me.wallet; me.mv = { x: 1, y: 0 };
+    steps(1); me.mv = { x: 0, y: 0 };
+    document.title = `T loot before=${w0} after=${me.wallet}`;
+  } else if (sc === 'win') {
+    for (let i = 2; i < 10; i++) eliminate(players[i], true);
+    const b = players[1];
+    me.x = 1200; me.y = 1380; b.x = 1200; b.y = 1270; b.hp = 3;
+    grant(me, 4);
+    steps(12);
+    document.title = `T win over=${over} winner=${winner ? winner.name : '-'} alive=${players.filter(p => p.alive).length}`;
+  } else if (sc === 'follow') {
+    /* stutter probe: hero walks right, count frames where a follower's x froze */
+    grant(me, 3, 'sapanci');
+    steps(2);
+    me.mv = { x: 1, y: 0 };
+    const mine = soldiers.filter(s => s.owner === 0);
+    let stalls = 0, frames = 0;
+    for (let i = 0; i < 120; i++) {
+      const px = mine.map(s => s.x);
+      sim(STEP);
+      for (let k = 0; k < mine.length; k++) { frames++; if (Math.abs(mine[k].x - px[k]) < .01) stalls++; }
+    }
+    me.mv = { x: 0, y: 0 };
+    document.title = `T follow stalls=${stalls}/${frames}`;
+  } else if (sc === 'cls') {
+    me.cls = 'nisanci'; const snipAor = Math.round(aorR(me));
+    me.cls = 'kemiklordu'; const w0 = me.wallet;
+    const b = players[1]; grant(b, 1, 'sapanci');
+    killSoldier(soldiers[soldiers.length - 1], 0);
+    document.title = `T cls snipAor=${snipAor} boneGain=${me.wallet - w0}`;
+  } else if (sc === 'fx') {
+    /* one of every projectile mid-flight for the screenshot */
+    grant(me, 1, 'atesbuyucusu'); grant(me, 1, 'buzbuyucusu'); grant(me, 1, 'okcu');
+    grant(me, 1, 'sapanci'); grant(me, 1, 'tabancaci'); grant(me, 1, 'bombaci');
+    const b = players[1]; b.x = me.x; b.y = me.y - 190;
+    grant(b, 6, 'sapanci');
+    let sx = -75;
+    for (const s of soldiers) if (s.owner === 1) { s.x = me.x + sx; s.y = me.y - 130; sx += 30; }
+    me.fireCd = 0;
+    for (const s of soldiers) if (s.owner === 0) s.fireCd = 0;
+    steps(.15);
+    document.title = `T fx bullets=${bullets.length}`;
+  } else if (sc === 'heal2') {
+    grant(me, 1, 'sapanci');
+    const w = soldiers[soldiers.length - 1]; w.hp = 1;
+    grant(me, 1, 'sifaci');
+    steps(4);
+    document.title = `T heal2 hp=${w.hp}/${w.maxHp}`;
+  } else if (sc === 'bomb') {
+    grant(me, 1, 'bombaci');
+    const bmb = soldiers[soldiers.length - 1];
+    const b = players[1]; b.x = me.x + 40; b.y = me.y;
+    grant(b, 2, 'sapanci');
+    const e2 = soldiers[soldiers.length - 1], e1 = soldiers[soldiers.length - 2];
+    e1.x = bmb.x + 15; e1.y = bmb.y; e2.x = bmb.x - 15; e2.y = bmb.y;
+    killSoldier(bmb);
+    document.title = `T bomb e1hp=${e1.hp} e2hp=${e2.hp}`;
+  } else if (sc === 'chain') {
+    const b = players[1]; b.x = me.x + 65; b.y = me.y;
+    grant(b, 3, 'sapanci');
+    for (const s of soldiers) if (s.owner === 1) { s.x = me.x + rr(45, 70); s.y = me.y + rr(-30, 30); }
+    me.fireCd = 0;
+    steps(.6);
+    const dmg = soldiers.filter(s => s.owner === 1 && s.hp < s.maxHp).length + (b.hp < H_HP ? 1 : 0);
+    const shocked = soldiers.some(s => s.owner === 1 && s.slowUntil > 0) || b.slowUntil > 0;
+    document.title = `T chain cls=${me.cls} damagedUnits=${dmg} shocked=${shocked}`;
+  } else if (sc === 'bone') {
+    grant(me, 5, 'sapanci');
+    const b = players[1]; b.x = me.x + 70; b.y = me.y;
+    grant(b, 3, 'sapanci');
+    steps(8);
+    document.title = `T bone cls=${me.cls} kills=${me.kills} army=${me.army}`;
+  } else if (sc === 'slow') {
+    const b = players[1]; b.x = me.x + 60; b.y = me.y;
+    grant(b, 1, 'buzbuyucusu');
+    steps(3);
+    document.title = `T slow slowed=${me.slowUntil > tSim}`;
+  } else if (sc === 'mix') {
+    const tally = { c: 0, r: 0, l: 0 };
+    for (const s of soldiers) if (s.owner === -1) tally[['c', 'r', 'l'][STYPES[s.type].tier]]++;
+    document.title = `T mix c=${tally.c} r=${tally.r} l=${tally.l}`;
+  } else if (sc === 'zone') {
+    steps(31);                                   // first shrink triggers at t=30
+    const r1 = Math.round(zoneR);
+    me.x = 150; me.y = 150;                      // far outside
+    const hp0 = me.hp;
+    steps(5);
+    document.title = `T zone step=${zoneStep} r=${r1} target=${Math.round(zoneTarget)} hpDrop=${hp0 - me.hp}`;
+  } else if (sc === 'zoneend') {
+    steps(150);                                  // frozen bots at spawn ring die to the zone
+    document.title = `T zoneend t=${Math.round(tSim)} over=${over} alive=${players.filter(p => p.alive).length} zoneR=${Math.round(zoneR)}`;
+  } else if (sc === 'fount') {
+    me.hp = 8; me.x = FOUNTS[0].x + 30; me.y = FOUNTS[0].y;
+    const far = players[1]; far.hp = 8;             // wounded but away from any fountain
+    steps(9);
+    document.title = `T fount hp=${me.hp} farHp=${far.hp} spd10=${Math.round(heroSpd({ army: 10 }))} spd0=${Math.round(heroSpd({ army: 0 }))}`;
+  } else if (sc === 'eco') {
+    /* passive income + idle respawn + kill bounty in isolation */
+    me.wallet = 0;
+    let rm = 0;
+    for (let i = soldiers.length - 1; i >= 0 && rm < 30; i--) if (soldiers[i].owner === -1) { soldiers.splice(i, 1); rm++; }
+    const idleA = soldiers.filter(s => s.owner === -1).length;
+    const b = players[1];
+    me.x = 1200; me.y = 1330; b.x = 1200; b.y = 1210;
+    grant(me, 4); grant(b, 2);
+    steps(30);
+    const idleB = soldiers.filter(s => s.owner === -1).length;
+    document.title = `T eco wallet=${me.wallet} idleBefore=${idleA} idleAfter=${idleB} botArmy=${b.army}`;
+  } else if (sc === 'auto') {
+    /* full bot match: human idles, bots play — deadend/finish probe */
+    aiFreeze = false;
+    const secs = +Q.get('secs') || 300;
+    steps(secs);
+    const alive = players.filter(p => p.alive).length;
+    document.title = `T auto t=${Math.round(tSim)} over=${over} alive=${alive} winner=${winner ? winner.name : '-'} coins=${coins.length} idle=${soldiers.filter(s => s.owner === -1).length}`;
+  } else if (sc === 'demo') {
+    /* mid-game look for screenshots: armies + a fight + coin */
+    grant(me, 5);
+    const b = players[1]; b.x = me.x + 260; b.y = me.y - 120; grant(b, 3);
+    coins.push({ x: me.x - 90, y: me.y + 80, amt: 15 });
+    steps(2.5);
+    document.title = `T demo myArmy=${me.army} botArmy=${b.army}`;
+  }
+  camSnap(); hud(1); draw();
+} else {
+  requestAnimationFrame(frame);
+}
+</script>
+</body>
+</html>
