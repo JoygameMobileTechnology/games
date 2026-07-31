@@ -1387,6 +1387,11 @@
     set(key, val) { try { localStorage.setItem(key, val); } catch { /* sandboxed */ } }
   };
   const inb = (r, c) => r >= 0 && r < SIZE && c >= 0 && c < SIZE;
+  // spawn odds: 80% -> 2, 15% -> 4, 5% -> 8
+  const rollSpawnValue = () => {
+    const r = Math.random();
+    return r < 0.8 ? 2 : r < 0.95 ? 4 : 8;
+  };
 
   /* ---------- Board ---------- */
 
@@ -1483,7 +1488,7 @@
           if (!m[r][c]) empty.push([r, c]);
       if (!empty.length) return;
       const [r, c] = empty[(Math.random() * empty.length) | 0];
-      this.createTile(Math.random() < 0.9 ? 2 : 4, r, c);
+      this.createTile(rollSpawnValue(), r, c);
     }
 
     movesAvailable() {
@@ -2075,8 +2080,9 @@
     hop();
   }
 
-  /* Anti-abuse: before the roulette, every empty cell fills with a 2 in a
-     quick one-by-one cascade — an emptied board can't guarantee a big bonus. */
+  /* Anti-abuse: before the roulette, every empty cell fills with a rolled
+     tile (same 80/15/5 odds) in a quick one-by-one cascade — an emptied
+     board can't guarantee a big bonus. */
   function fillEmpty(game, cb) {
     const step = () => {
       if (state !== 'bonus') { cb(); return; }
@@ -2087,7 +2093,7 @@
           if (!m[r][c]) empty.push([r, c]);
       if (!empty.length) { setTimeout(cb, 150); return; }
       const [r, c] = empty[(Math.random() * empty.length) | 0];
-      game.createTile(2, r, c);
+      game.createTile(rollSpawnValue(), r, c);
       setTimeout(step, 60);
     };
     step();
