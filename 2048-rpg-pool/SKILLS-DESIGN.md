@@ -1,8 +1,9 @@
-# Skill Sistemi — Tasarım (DONDURULDU, implemente edilmedi)
+# Skill Sistemi — Tasarım (İMPLEMENTE EDİLDİ)
 
-> Durum (2026-07-30): Savaş görselleri deck kahramanlarına bağlı ama statlar hâlâ
-> generic `UNITS[value]` tablosundan geliyor; hiçbir yetenek çalışmıyor (Kemik Lordu
-> çağırmıyor, Şifacı normal saldırıyor vs.). Bu doküman implementasyona hazır tam spec'tir.
+> Durum (2026-07-31): Bu spec `index.html`'e birebir implemente edildi. Statlar
+> hero `st`'den (spd/rng dahil), yetenekler `SKILLS` haritasından geliyor;
+> `?test=sim&sc=basic|heal|summon|chain|golge|taunt` senaryoları geçiyor.
+> `UNITS[value]` yalnız görsel boyut (size/px) için kaldı.
 > Kaynak dosya: `index.html` — savaş sim bölümü `/* ---------- Arena battle simulation ---------- */`.
 
 ## 1) `CHARS[].st` genişletmesi (spd/rng eklenecek)
@@ -41,7 +42,7 @@ const SKILLS = {
   buzbuyucusu: { slow: { factor: .6, dur: 2 } }, // hız ve saldırı hızı ×.6
   sifaci: { healer: { amount: 4 } },        // saldırmaz; menzildeki en yaralı dosta per başına +4
   berserker: { rage: { at: .5, perMul: .625, spdMul: 1.3 } },
-  golge: { infiltrate: true, firstHitMul: 3 }, // spawn'da en UZAK düşmanı kilitle (ölünce yenisi)
+  golge: { infiltrate: true, firstHitMul: 3, stealth: 3 }, // en UZAK düşmanı kilitle; ~0.7s sonra arkasına blink; ilk 3s görünmez (hasar verir, hedeflenemez — alan hasarı yine çarpar)
   nisanci: { sniper: true },                // hedef = en yüksek HP'li düşman
   dev: { splash: 20, spawnShock: { r: 60, push: 26 } },
   kemiklordu: { onKillSummon: 'caylak' },   // öldürdüğü düşman yerinde iskelet (caylak statlı) doğar

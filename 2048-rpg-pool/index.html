@@ -206,6 +206,24 @@
     from { scale: .3; opacity: 1; }
     to { scale: 1.6; opacity: 0; }
   }
+  .ftxt {
+    position: absolute;
+    z-index: 5;
+    translate: -50% -100%;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 900;
+    pointer-events: none;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, .65);
+    animation: ftup .65s ease-out forwards;
+  }
+  @keyframes ftup {
+    to { transform: translateY(-16px); opacity: 0; }
+  }
+  .unit.rage .g svg { filter: drop-shadow(0 0 5px #F0605C) saturate(1.35); }
+  .unit.stealth { opacity: .42; }
+  .unit.stealth .g svg { filter: saturate(.5) brightness(1.15); }
+  .unit.stunned { filter: grayscale(.45) brightness(.85); }
 
   /* ---------- Boards column (right 3/4) ---------- */
   .boards-col {
@@ -522,6 +540,152 @@
     );
   }
   .bonus-hl.lock { animation: pop .3s ease; }
+
+  /* ---------- Build-phase skills ---------- */
+  .skillbar {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    padding: 1px 0 2px;
+  }
+  .skillbtn {
+    position: relative;
+    width: 52px;
+    height: 52px;
+    border-radius: 15px;
+    border: 1px solid var(--line);
+    background: linear-gradient(180deg, #1D2647, #131A30);
+    color: #8E9AC0;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    overflow: hidden;
+    font-family: inherit;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .08), 0 3px 8px rgba(0, 0, 0, .4);
+  }
+  .skillbtn svg { width: 29px; height: 29px; }
+  .skillbtn .ssweep {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: conic-gradient(rgba(5, 8, 18, .74) calc(var(--p, 0) * 1%), transparent 0);
+  }
+  .skillbtn .scd {
+    position: absolute;
+    inset: auto 0 3px;
+    text-align: center;
+    font-size: 10px;
+    font-weight: 800;
+    color: #fff;
+    text-shadow: 0 1px 2px #000;
+    font-variant-numeric: tabular-nums;
+    pointer-events: none;
+  }
+  .skillbtn.ready {
+    color: var(--gold-hi);
+    border-color: color-mix(in srgb, var(--gold) 65%, transparent);
+    animation: skpulse 1.6s ease-in-out infinite;
+  }
+  .skillbtn.ready .ssweep { display: none; }
+  @keyframes skpulse {
+    50% { box-shadow: 0 0 16px rgba(247, 190, 42, .5), inset 0 1px 0 rgba(255, 255, 255, .12); }
+  }
+  .skillbtn:active { transform: translateY(1px); }
+  .skillbtn.deny { animation: deny .22s ease; }
+  .skillbtn:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+  /* board-space cell effects share the tile position formula */
+  .cellfx {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: var(--cs);
+    height: var(--cs);
+    pointer-events: none;
+    transform: translate(
+      calc(var(--gap) + var(--c) * (var(--cs) + var(--gap))),
+      calc(var(--gap) + var(--r) * (var(--cs) + var(--gap)))
+    );
+  }
+  .dropshadow {
+    z-index: 7;
+    border-radius: 50%;
+    background: radial-gradient(ellipse 62% 42% at 50% 62%, rgba(0, 0, 0, .5), transparent 72%);
+    scale: .35;
+    opacity: 0;
+    transition: scale .55s cubic-bezier(.55, 0, .85, .4), opacity .2s;
+  }
+  .dropshadow.on { scale: 1; opacity: 1; }
+  .drop { z-index: 9; }
+  .drop .dz {
+    width: 100%;
+    height: 100%;
+    translate: 0 -140px;
+    opacity: 0;
+    transition: translate .55s cubic-bezier(.55, 0, .85, .4), opacity .1s ease .05s;
+  }
+  .drop.fall .dz { translate: 0 0; opacity: 1; }
+  .dz svg {
+    display: block;
+    width: 84%;
+    height: 84%;
+    margin: 8% auto 0;
+    filter: drop-shadow(0 3px 4px rgba(0, 0, 0, .5));
+  }
+  .bfx {
+    z-index: 9;
+    border-radius: 50%;
+    background: radial-gradient(circle, #fff 0 12%, var(--bc, #F08C1B) 38%, transparent 72%);
+    animation: burstfx2 .4s ease-out forwards;
+  }
+  @keyframes burstfx2 {
+    from { scale: .3; opacity: 1; }
+    to { scale: 1.8; opacity: 0; }
+  }
+  .board.shake { animation: bshake .32s; }
+  @keyframes bshake {
+    25% { translate: 3px 1px; }
+    50% { translate: -3px -2px; }
+    75% { translate: 2px -1px; }
+  }
+  .tile.pinned { filter: brightness(.6) saturate(.7); }
+  .tile .pinspear {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    pointer-events: none;
+  }
+  .pinspear svg {
+    width: 72%;
+    height: 72%;
+    rotate: -8deg;
+    filter: drop-shadow(0 2px 3px rgba(0, 0, 0, .55));
+    animation: spearin .18s cubic-bezier(.2, 2, .4, 1);
+  }
+  @keyframes spearin {
+    from { scale: 1.7; opacity: .4; }
+  }
+  /* mystery: opponent tiles flip into anonymous "?" chips */
+  .board.mystery .tile {
+    color: transparent;
+    background: linear-gradient(180deg, #3A4666, #262F4A);
+    box-shadow: none;
+    animation: mystflip .35s ease;
+  }
+  .board.mystery .tile::before {
+    content: '?';
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    color: #C9CFDA;
+    font-weight: 800;
+    font-size: calc(var(--cs) * .42);
+  }
+  @keyframes mystflip {
+    50% { scale: .08 1; }
+  }
   .fight-splash {
     position: absolute;
     inset: 0;
@@ -1249,7 +1413,9 @@
     .unit.born, .unit.hurt .g, .splat, .bonus-hl.lock { animation: none; }
     .sheet, .scrim, .dslot, .dock button, .toast { transition: none; }
     .mm-av.unknown, .mm-card.reveal, .mm-mini.q { animation: none; }
-    .unit.atk .wpn, .unit.atk .g svg, .impact { animation: none; }
+    .unit.atk .wpn, .unit.atk .g svg, .impact, .ftxt { animation: none; }
+    .skillbtn.ready, .bfx, .board.shake, .pinspear svg, .board.mystery .tile { animation: none; }
+    .drop .dz, .dropshadow { transition: none; }
     .overlay { transition: none; }
   }
 </style>
@@ -1262,6 +1428,20 @@
       <div class="m2timer" id="m2TimerSlot"><span class="timer" id="timer">0:45</span></div>
       <div class="m2meter" id="m2Meter"></div>
       <div class="board me" id="meBoard"></div>
+      <div class="skillbar" id="skillBar">
+        <button class="skillbtn" data-s="spear" aria-label="Mızrak">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M5 20 L16.5 8.5" stroke="#8B6844" stroke-width="2.4" stroke-linecap="round"/><path d="M15 5.5 L20.5 3.5 L18.5 9 z" fill="#C9CFDA" stroke="#2A2A2A" stroke-width="1.2"/></svg>
+          <i class="ssweep"></i><span class="scd"></span>
+        </button>
+        <button class="skillbtn" data-s="fire" aria-label="Ateş Topu">
+          <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="14" r="6.6" fill="#F08C1B" stroke="#C25A10" stroke-width="1.4"/><circle cx="12" cy="14" r="3" fill="#FFE082"/><path d="M8.5 3 Q10 7.5 9.5 9.2 M15.5 3.5 Q14.6 6.8 14.9 8.6" stroke="#F08C1B" stroke-width="2" stroke-linecap="round"/></svg>
+          <i class="ssweep"></i><span class="scd"></span>
+        </button>
+        <button class="skillbtn" data-s="mystery" aria-label="Gizem">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M8 9 q0 -4 4 -4 q4 0 4 3.4 q0 2.2 -2.2 3.2 q-1.6 .8 -1.6 2.4 v.6" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="19.2" r="1.6" fill="currentColor"/></svg>
+          <i class="ssweep"></i><span class="scd"></span>
+        </button>
+      </div>
       <div class="bname">Sen</div>
     </div>
     <div class="m2f" id="m2Fight" hidden>
@@ -1438,12 +1618,12 @@
     gridValues() {
       // Firing (pinned) tiles occupy their cell but can't move or merge — mark -1 as opaque blocker.
       const g = Array.from({ length: SIZE }, () => Array(SIZE).fill(0));
-      for (const t of this.tiles.values()) g[t.r][t.c] = t.firing ? -1 : t.value;
+      for (const t of this.tiles.values()) g[t.r][t.c] = (t.firing || t.pinned) ? -1 : t.value;
       return g;
     }
 
     liveTiles() {
-      return [...this.tiles.values()].filter(t => !t.firing);
+      return [...this.tiles.values()].filter(t => !t.firing && !t.pinned);
     }
 
     setPos(el, r, c) {
@@ -1470,7 +1650,7 @@
         el.classList.remove(e.animationName === 'pop' ? 'pop' : e.animationName === 'deny' ? 'deny' : 'spawn');
       });
       this.tilesEl.appendChild(el);
-      const t = { id: this.nextId++, value, r, c, el, firing: false };
+      const t = { id: this.nextId++, value, r, c, el, firing: false, pinned: false };
       this.tiles.set(t.id, t);
       return t;
     }
@@ -1497,11 +1677,11 @@
         for (let c = 0; c < SIZE; c++) {
           const t = m[r][c];
           if (!t) return true;
-          if (t.firing) continue;
+          if (t.firing || t.pinned) continue;
           const right = inb(r, c + 1) ? m[r][c + 1] : null;
-          if (right && !right.firing && right.value === t.value) return true;
+          if (right && !right.firing && !right.pinned && right.value === t.value) return true;
           const down = inb(r + 1, c) ? m[r + 1][c] : null;
-          if (down && !down.firing && down.value === t.value) return true;
+          if (down && !down.firing && !down.pinned && down.value === t.value) return true;
         }
       }
       return false;
@@ -1537,12 +1717,12 @@
       for (const r of rows) {
         for (const c of cols) {
           const t = m[r][c];
-          if (!t || t.firing) continue;
+          if (!t || t.firing || t.pinned) continue;
           let nr = r, nc = c;
           let tr = r + dr, tc = c + dc;
           while (inb(tr, tc) && !m[tr][tc]) { nr = tr; nc = tc; tr += dr; tc += dc; }
           const target = inb(tr, tc) ? m[tr][tc] : null;
-          if (target && !target.firing && target.value === t.value && !mergedIds.has(target.id)) {
+          if (target && !target.firing && !target.pinned && target.value === t.value && !mergedIds.has(target.id)) {
             m[r][c] = null;
             mergedIds.add(target.id);
             t.r = target.r; t.c = target.c;
@@ -1657,11 +1837,26 @@
   /* ---------- Arena battle simulation ---------- */
 
   let units = [];
+  let tSim = 0;
 
-  function spawnUnit(side, value, x, y) {
+  const skillOf = u => SKILLS[u.hero.id] || {};
+  const hidden = v => v.stealthUntil > tSim; // stealthed: deals damage, can't be targeted
+
+  function floatText(x, y, txt, color) {
+    const f = document.createElement('span');
+    f.className = 'ftxt';
+    f.textContent = txt;
+    f.style.left = x + 'px';
+    f.style.top = y + 'px';
+    if (color) f.style.color = color;
+    laneEl.appendChild(f);
+    setTimeout(() => f.remove(), 700);
+  }
+
+  function spawnUnit(side, value, x, y, heroOverride) {
     const spec = UNITS[value];
-
-    const hero = heroFor(side, value);
+    const hero = heroOverride || heroFor(side, value);
+    const st = hero.st;
     const px = Math.round(spec.px * 1.3);
     const el = document.createElement('div');
     el.className = 'unit born ' + side + ' fx-' + ((FX[hero.id] || {}).anim || 'punch');
@@ -1674,7 +1869,16 @@
 
     const u = {
       side, spec, hero,
-      hp: spec.hp,
+      hp: st.hp, maxHp: st.hp,
+      dmg: st.dmg, per: st.per,
+      speed: st.spd || spec.speed,
+      range: st.rng || 16,
+      ranged: !!(st.rng && (FX[hero.id] || {}).proj),
+      hitSet: new WeakSet(),
+      shots: 0,
+      blinked: false,
+      blinkAt: tSim + 0.7,
+      stealthUntil: (SKILLS[hero.id] || {}).stealth ? tSim + SKILLS[hero.id].stealth : 0,
       x, y,
       cd: 0.4,
       dead: false,
@@ -1683,6 +1887,21 @@
     };
     el.style.transform = `translate(${x}px, ${y}px) translate(-50%, -50%)`;
     units.push(u);
+
+    // Dev: landing shockwave shoves nearby enemies back
+    const sk = skillOf(u);
+    if (sk.spawnShock && inCombat()) {
+      impactFx(x, y, 'stone');
+      for (const v of units) {
+        if (v.dead || v.side === side || v === u) continue;
+        const d = Math.hypot(v.x - x, v.y - y);
+        if (d > 0 && d < sk.spawnShock.r) {
+          v.x += (v.x - x) / d * sk.spawnShock.push;
+          v.y += (v.y - y) / d * sk.spawnShock.push;
+        }
+      }
+    }
+    return u;
   }
 
   function bloodSplat(x, y, size) {
@@ -1698,19 +1917,61 @@
     setTimeout(() => s.remove(), 2100);
   }
 
-  function killUnit(u) {
+  function killUnit(u, src) {
     u.dead = true;
     bloodSplat(u.x, u.y, u.spec.size);
     u.el.remove();
+    const sk = skillOf(u);
+    // Bombacı: goes out with a bang
+    if (sk.deathBlast && inCombat()) {
+      impactFx(u.x, u.y, 'bomb');
+      for (const v of units) {
+        if (v.dead || v.side === u.side) continue;
+        if (Math.hypot(v.x - u.x, v.y - u.y) <= sk.deathBlast.r) hurtUnit(v, sk.deathBlast.dmg, null);
+      }
+    }
+    // Kemik Lordu: harvests the fallen into a skeleton
+    if (src && !src.dead && skillOf(src).onKillSummon) {
+      spawnUnit(src.side, 2, u.x, u.y, CHARS.find(c => c.id === skillOf(src).onKillSummon));
+      floatText(u.x, u.y - 14, '☠', '#9BE07E');
+    }
   }
 
-  function hurtUnit(u, dmg) {
+  function hurtUnit(u, dmg, src) {
+    if (u.dead) return;
     u.hp -= dmg;
     u.el.classList.remove('hurt');
     void u.el.offsetWidth;
     u.el.classList.add('hurt');
-    u.hpEl.style.width = Math.max(0, u.hp / u.spec.hp * 100) + '%';
-    if (u.hp <= 0) killUnit(u);
+    u.hpEl.style.width = Math.max(0, u.hp / u.maxHp * 100) + '%';
+    if (u.hp <= 0) killUnit(u, src);
+  }
+
+  /* rider effects (burn/slow/stun/knockback) + dodge, then the damage itself */
+  function dealDmg(u, t, dmg) {
+    if (t.dead) return;
+    const tsk = skillOf(t);
+    if (tsk.dodge && Math.random() < tsk.dodge) {
+      floatText(t.x, t.y - 12, 'miss', '#B9C4D6');
+      return;
+    }
+    const sk = skillOf(u);
+    if (sk.burn) { t.burnUntil = tSim + sk.burn.dur; t.burnDps = sk.burn.dps; }
+    if (sk.slow && !(t.slowUntil > tSim)) {
+      t.slowUntil = tSim + sk.slow.dur;
+      t.slowF = sk.slow.factor;
+      floatText(t.x, t.y - 12, '❄', '#7FD4F5');
+    }
+    if (sk.stunChance && Math.random() < sk.stunChance) {
+      t.stunUntil = tSim + sk.stunDur;
+      floatText(t.x, t.y - 12, '✦', '#FFD34D');
+    }
+    if (sk.knockback) {
+      const d = Math.hypot(t.x - u.x, t.y - u.y) || 1;
+      t.x += (t.x - u.x) / d * sk.knockback;
+      t.y += (t.y - u.y) / d * sk.knockback;
+    }
+    hurtUnit(t, dmg, u);
   }
 
   const PROJ_AIM = { arrow: 1, bullet: 1, tracer: 1, iceshard: 1 }; // point along the flight
@@ -1750,40 +2011,165 @@
     u.el.classList.add('atk');
   }
 
-  function attack(u, target) {
+  const enemiesNear = (u, x, y, skip) => units
+    .filter(v => !v.dead && v.side !== u.side && v !== skip && !hidden(v))
+    .sort((a, b) => Math.hypot(a.x - x, a.y - y) - Math.hypot(b.x - x, b.y - y));
+
+  function attack(u, t) {
     atkFx(u);
-    if (u.spec.ranged) shootProj(u.x, u.y, target.x, target.y, (FX[u.hero.id] || {}).proj);
-    if (u.spec.splash) {
+    const sk = skillOf(u);
+    if (u.ranged) shootProj(u.x, u.y, t.x, t.y, (FX[u.hero.id] || {}).proj);
+    u.shots++;
+
+    let dmg = u.dmg;
+    if (sk.firstHitMul && !u.hitSet.has(t)) { dmg *= sk.firstHitMul; u.hitSet.add(t); }
+    if (sk.ramp) {
+      u.stacks = u.lastT === t ? Math.min(sk.ramp.max, (u.stacks || 0) + 1) : 0;
+      u.lastT = t;
+      dmg = Math.round(dmg * (1 + sk.ramp.step * u.stacks));
+    }
+
+    if (sk.splash) {
       for (const v of units) {
         if (v.dead || v.side === u.side) continue;
-        if (Math.hypot(v.x - target.x, v.y - target.y) <= u.spec.splash) hurtUnit(v, u.spec.dmg);
+        if (Math.hypot(v.x - t.x, v.y - t.y) <= sk.splash) dealDmg(u, v, dmg);
       }
     } else {
-      hurtUnit(target, u.spec.dmg);
+      dealDmg(u, t, dmg);
+    }
+
+    // Yıldırım: arcs to the two enemies closest to the primary target
+    if (sk.chain) {
+      enemiesNear(u, t.x, t.y, t).slice(0, sk.chain.length - 1).forEach((v, i) => {
+        shootProj(t.x, t.y, v.x, v.y, 'spark');
+        dealDmg(u, v, Math.max(1, Math.round(u.dmg * sk.chain[i + 1])));
+      });
+    }
+    // Okçu: every Nth arrow passes through to the enemy behind the target
+    if (sk.pierce && u.shots % sk.pierce === 0) {
+      const v2 = enemiesNear(u, t.x, t.y, t)[0];
+      if (v2) { shootProj(t.x, t.y, v2.x, v2.y, 'arrow'); dealDmg(u, v2, dmg); }
     }
   }
 
   function simulate(dt) {
+    tSim += dt;
     const laneW = laneEl.clientWidth, laneH = laneEl.clientHeight;
 
     for (const u of units) {
       if (u.dead) continue;
-      u.cd -= dt;
+      const sk = skillOf(u);
 
-      // nearest living enemy, freeform across the whole lane
-      let nearest = null, nd = Infinity;
-      for (const v of units) {
-        if (v.dead || v.side === u.side) continue;
-        const d = Math.hypot(v.x - u.x, v.y - u.y);
-        if (d < nd) { nd = d; nearest = v; }
+      // burn damage over time
+      if (u.burnUntil > tSim) {
+        u.burnAcc = (u.burnAcc || 0) + (u.burnDps || 1) * dt;
+        if (u.burnAcc >= 1) { u.burnAcc -= 1; hurtUnit(u, 1, null); }
+        if (u.dead) continue;
       }
 
+      // stunned: frozen in place
+      const stunned = u.stunUntil > tSim;
+      u.el.classList.toggle('stunned', stunned);
+      if (stunned) continue;
+
+      // effective speed / attack period (slow + rage)
+      const raging = sk.rage && u.hp <= u.maxHp * sk.rage.at;
+      u.el.classList.toggle('rage', !!raging);
+      if (sk.stealth) u.el.classList.toggle('stealth', hidden(u));
+      let spd = u.speed, per = u.per;
+      if (u.slowUntil > tSim) { spd *= u.slowF; per /= u.slowF; }
+      if (raging) { per *= sk.rage.perMul; spd *= sk.rage.spdMul; }
+
+      u.cd -= dt;
+
+      // Şifacı: tends the most wounded ally, never fights
+      if (sk.healer) {
+        let target = null, worst = 0, nearAlly = null, nad = Infinity;
+        for (const v of units) {
+          if (v.dead || v.side !== u.side || v === u) continue;
+          const d = Math.hypot(v.x - u.x, v.y - u.y);
+          if (d < nad) { nad = d; nearAlly = v; }
+          const miss = v.maxHp - v.hp;
+          if (miss > worst) { worst = miss; target = v; }
+        }
+        if (target) {
+          const d = Math.hypot(target.x - u.x, target.y - u.y);
+          if (d <= u.range) {
+            if (u.cd <= 0) {
+              u.cd = per;
+              atkFx(u);
+              shootProj(u.x, u.y, target.x, target.y, 'holy');
+              target.hp = Math.min(target.maxHp, target.hp + sk.healer.amount);
+              target.hpEl.style.width = (target.hp / target.maxHp * 100) + '%';
+              floatText(target.x, target.y - 14, '+' + sk.healer.amount, '#46BD8A');
+            }
+          } else {
+            const s = spd * dt / d;
+            u.x += (target.x - u.x) * s;
+            u.y += (target.y - u.y) * s;
+          }
+        } else if (nearAlly && nad > 46) {
+          const s = spd * dt / nad;
+          u.x += (nearAlly.x - u.x) * s;
+          u.y += (nearAlly.y - u.y) * s;
+        }
+        continue;
+      }
+
+      // target selection: infiltrator locks the farthest, sniper the beefiest,
+      // everyone else the nearest (taunt pulls that choice toward the tank)
+      let nearest = null, nd = Infinity;
+      if (sk.infiltrate) {
+        if (!u.lock || u.lock.dead) {
+          let fd = -1;
+          for (const v of units) {
+            if (v.dead || v.side === u.side || hidden(v)) continue;
+            const d = Math.hypot(v.x - u.x, v.y - u.y);
+            if (d > fd) { fd = d; u.lock = v; }
+          }
+        }
+        // shadow-step: shortly after the fight starts, blink BEHIND the target
+        if (!u.blinked && u.lock && !u.lock.dead && tSim >= u.blinkAt) {
+          const t = u.lock;
+          if (Math.hypot(t.x - u.x, t.y - u.y) > 70) {
+            impactFx(u.x, u.y, 'stone');
+            u.x = Math.min(laneW - 10, Math.max(10, t.x + (Math.random() * 16 - 8)));
+            u.y = Math.min(laneH - 10, Math.max(10, t.y + (u.side === 'me' ? -26 : 26)));
+            impactFx(u.x, u.y, 'stone');
+          }
+          u.blinked = true;
+        }
+        if (u.lock && !u.lock.dead) nearest = u.lock;
+      } else if (sk.sniper) {
+        let hi = -1;
+        for (const v of units) {
+          if (v.dead || v.side === u.side || hidden(v)) continue;
+          if (v.hp > hi) { hi = v.hp; nearest = v; }
+        }
+      } else {
+        let best = Infinity;
+        for (const v of units) {
+          if (v.dead || v.side === u.side || hidden(v)) continue;
+          let d = Math.hypot(v.x - u.x, v.y - u.y);
+          const vsk = skillOf(v);
+          if (vsk.taunt && d < vsk.taunt) d *= .3;
+          if (d < best) { best = d; nearest = v; }
+        }
+      }
+      if (nearest) nd = Math.hypot(nearest.x - u.x, nearest.y - u.y);
+
       if (nearest) {
-        const eff = u.spec.range + (u.spec.size + nearest.spec.size) / 4;
+        const eff = u.range + (u.spec.size + nearest.spec.size) / 4;
         if (nd <= eff) {
-          if (u.cd <= 0) { u.cd = u.spec.per; attack(u, nearest); }
+          if (u.cd <= 0) { u.cd = per; attack(u, nearest); }
+          // Tabancacı: keeps backing away while firing
+          if (sk.kite && nd < sk.kite && nd > 0) {
+            const s = spd * dt / nd;
+            u.x -= (nearest.x - u.x) * s;
+            u.y -= (nearest.y - u.y) * s;
+          }
         } else {
-          const s = u.spec.speed * dt / nd;
+          const s = spd * dt / nd;
           u.x += (nearest.x - u.x) * s;
           u.y += (nearest.y - u.y) * s;
         }
@@ -1850,6 +2236,148 @@
       if (state === 'build' || state === 'bonus' || state === 'fightsplash') bankUnit(side, value);
     }, DEPLOY_CAST_MS);
   }
+
+  /* ---------- Build-phase skills (player -> AI board) ---------- */
+
+  const SPEAR_DROP = `<svg viewBox="0 0 24 24" fill="none"><path d="M12 2 L12 16" stroke="#8B6844" stroke-width="2.4" stroke-linecap="round"/><path d="M9.5 15 L12 21.5 L14.5 15 z" fill="#C9CFDA" stroke="#2A2A2A" stroke-width="1.2"/><path d="M9.8 3.5 L12 6 L14.2 3.5" stroke="#C0392B" stroke-width="1.6" stroke-linecap="round"/></svg>`;
+  const FIRE_DROP = `<svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="15" r="6.6" fill="#F08C1B" stroke="#C25A10" stroke-width="1.4"/><circle cx="12" cy="15" r="3.2" fill="#FFE082"/><path d="M8.5 3 Q10 8 9.5 9.5 M15.5 3.5 Q14.5 7 14.8 9" stroke="#F08C1B" stroke-width="2" stroke-linecap="round"/></svg>`;
+
+  const SKILLS2048 = { spear: { cd: 10 }, fire: { cd: 15 }, mystery: { cd: 20 } };
+  const skillReady = {};
+  let skillTimer = null, mystTimer = null, aiMystery = false;
+
+  function updateSkillBar() {
+    const now = performance.now();
+    for (const b of $('skillBar').children) {
+      const k = b.dataset.s;
+      const rem = (skillReady[k] - now) / 1000;
+      const ready = rem <= 0 && state === 'build';
+      b.classList.toggle('ready', ready);
+      b.style.setProperty('--p', rem > 0 ? Math.min(100, rem / SKILLS2048[k].cd * 100) : 0);
+      b.querySelector('.scd').textContent = state === 'build' && rem > 0 ? Math.ceil(rem) : '';
+    }
+  }
+
+  function resetSkills() {
+    const now = performance.now();
+    for (const k in SKILLS2048) skillReady[k] = now + SKILLS2048[k].cd * 1000;
+    aiMystery = false;
+    clearTimeout(mystTimer);
+    $('aiBoard').classList.remove('mystery');
+    clearInterval(skillTimer);
+    skillTimer = setInterval(updateSkillBar, 100);
+    updateSkillBar();
+  }
+
+  const setCellVars = (el, r, c) => {
+    el.style.setProperty('--r', r);
+    el.style.setProperty('--c', c);
+  };
+
+  function cellBurst(boardRoot, r, c, color) {
+    const b = document.createElement('div');
+    b.className = 'cellfx bfx';
+    setCellVars(b, r, c);
+    b.style.setProperty('--bc', color);
+    boardRoot.appendChild(b);
+    setTimeout(() => b.remove(), 450);
+  }
+
+  /* telegraphed fall: shadow grows on the target cell while the payload drops */
+  function dropOn(boardRoot, r, c, svg, onHit) {
+    const sh = document.createElement('div');
+    sh.className = 'cellfx dropshadow';
+    setCellVars(sh, r, c);
+    boardRoot.appendChild(sh);
+    const d = document.createElement('div');
+    d.className = 'cellfx drop';
+    d.innerHTML = `<div class="dz">${svg}</div>`;
+    setCellVars(d, r, c);
+    boardRoot.appendChild(d);
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      d.classList.add('fall');
+      sh.classList.add('on');
+    }));
+    setTimeout(() => { sh.remove(); d.remove(); onHit(); }, 640);
+  }
+
+  function pinTile(game, tile, ms) {
+    tile.pinned = true;
+    tile.el.classList.add('pinned');
+    const sp = document.createElement('span');
+    sp.className = 'pinspear';
+    sp.innerHTML = SPEAR_DROP;
+    tile.el.appendChild(sp);
+    game.updateLock();
+    setTimeout(() => {
+      tile.pinned = false;
+      tile.el.classList.remove('pinned');
+      sp.remove();
+      if (game.tiles.has(tile.id)) game.updateLock();
+    }, ms);
+  }
+
+  function pickAiCell() {
+    const live = ai.liveTiles();
+    if (live.length) {
+      const t = live[(Math.random() * live.length) | 0];
+      return { r: t.r, c: t.c };
+    }
+    return { r: (Math.random() * SIZE) | 0, c: (Math.random() * SIZE) | 0 };
+  }
+
+  function castSpear() {
+    const { r, c } = pickAiCell();
+    dropOn($('aiBoard'), r, c, SPEAR_DROP, () => {
+      const hit = ai.matrix()[r][c];
+      if (hit && !hit.firing && !hit.pinned) {
+        cellBurst($('aiBoard'), r, c, '#B9C4D6');
+        pinTile(ai, hit, 5000);
+      } else {
+        cellBurst($('aiBoard'), r, c, 'rgba(154, 163, 178, .55)'); // wasted
+      }
+    });
+  }
+
+  function castFire() {
+    const { r, c } = pickAiCell();
+    dropOn($('aiBoard'), r, c, FIRE_DROP, () => {
+      const bd = $('aiBoard');
+      cellBurst(bd, r, c, '#F08C1B');
+      bd.classList.remove('shake');
+      void bd.offsetWidth;
+      bd.classList.add('shake');
+      const hit = ai.matrix()[r][c];
+      if (hit && !hit.firing) ai.deleteTile(hit); // wasted on an empty cell
+    });
+  }
+
+  function castMystery() {
+    aiMystery = true;
+    $('aiBoard').classList.add('mystery');
+    clearTimeout(mystTimer);
+    mystTimer = setTimeout(() => {
+      aiMystery = false;
+      $('aiBoard').classList.remove('mystery');
+    }, 5000);
+  }
+
+  const SKILL_CAST = { spear: castSpear, fire: castFire, mystery: castMystery };
+
+  $('skillBar').addEventListener('click', e => {
+    const b = e.target.closest('.skillbtn');
+    if (!b) return;
+    const k = b.dataset.s;
+    if (state !== 'build' || performance.now() < skillReady[k]) {
+      b.classList.remove('deny');
+      void b.offsetWidth;
+      b.classList.add('deny');
+      return;
+    }
+    skillReady[k] = performance.now() + SKILLS2048[k].cd * 1000;
+    updateSkillBar();
+    SKILL_CAST[k]();
+  });
 
   /* ---------- Match controller ---------- */
 
@@ -2038,6 +2566,7 @@
     aiTally.high = 0;
     initPool();
     state = 'build';
+    resetSkills();
     startClock(BUILD_MS, beginBonusRound);
     aiTick();
   }
@@ -2046,7 +2575,7 @@
      boards, slows down and lands on a random one — that unit joins for free. */
   function rouletteFor(game, side, boardRoot, cb) {
     // bonus ignores the shared pool: any unit-producing tile can win
-    const elig = [...game.tiles.values()].filter(t => !t.firing && UNITS[t.value]);
+    const elig = [...game.tiles.values()].filter(t => !t.firing && !t.pinned && UNITS[t.value]);
     if (!elig.length) { cb(); return; }
     const winner = elig[(Math.random() * elig.length) | 0];
 
@@ -2103,6 +2632,8 @@
     state = 'bonus';
     clearInterval(clockTimer);
     clearTimeout(aiTimer);
+    clearInterval(skillTimer);
+    updateSkillBar();
     let filled = 0;
     const afterFill = () => { if (++filled === 2) startRoulettes(); };
     fillEmpty(me, afterFill);
@@ -2175,6 +2706,11 @@
 
   function aiAct() {
     if (ai.busy) return;
+    if (aiMystery) { // blinded: fumbles a random move, can't deploy
+      const d = pickRandom(ai.gridValues());
+      if (d) ai.move(d[0], d[1]);
+      return;
+    }
     const live = ai.liveTiles();
     if (!live.length) return;
     const eligible = live.filter(t => UNITS[t.value] && pool[t.value] > 0);
@@ -2245,7 +2781,7 @@
   function tryDeploy(el) {
     if (state !== 'build' || me.busy) return;
     const tile = me.tileByEl(el);
-    if (!tile || tile.firing) return;
+    if (!tile || tile.firing || tile.pinned) return;
     const poolOut = !(pool[tile.value] > 0);
     if (!UNITS[tile.value] || poolOut || me.liveTiles().length <= 1) {
       denyTile(tile);
@@ -2379,80 +2915,80 @@
   </g>`;
 
   const CHARS = [
-  { id: 'caylak', v: 2, name: 'Çaylak', arch: 'Vurucu', st: { hp: 3, dmg: 1, per: 1.25 },
+  { id: 'caylak', v: 2, name: 'Çaylak', arch: 'Vurucu', st: { hp: 3, dmg: 1, per: 1.25, spd: 45 },
     svg: () => fig({ brow: 'angry', mouth: 'smile', armL: 'M58 88 L46 84', armR: 'M68 88 L82 84',
       post: `<circle cx="44" cy="83" r="4.4" fill="${INK}"/><circle cx="84" cy="83" r="4.4" fill="${INK}"/>` }) },
-  { id: 'sopali', v: 2, name: 'Sopalı', arch: 'Kontrol', st: { hp: 4, dmg: 2, per: 1.6 },
+  { id: 'sopali', v: 2, name: 'Sopalı', arch: 'Kontrol', st: { hp: 4, dmg: 2, per: 1.6, spd: 38 },
     svg: () => fig({ brow: 'uneven', mouth: 'smirk', armR: 'M68 88 L82 96',
       wpn: `<path d="M82 98 L106 66" stroke="${OUT}" stroke-width="13" stroke-linecap="round"/>
              <path d="M82 98 L106 66" stroke="${WOOD}" stroke-width="9.5" stroke-linecap="round"/>
              <path d="M96 82 L101 86" stroke="#5F4225" stroke-width="2.8" stroke-linecap="round"/>` }) },
-  { id: 'sapanci', v: 2, name: 'Sapancı', arch: 'Menzilli', st: { hp: 2, dmg: 1, per: 1.4 },
+  { id: 'sapanci', v: 2, name: 'Sapancı', arch: 'Menzilli', st: { hp: 2, dmg: 1, per: 1.4, spd: 42, rng: 55 },
     svg: () => fig({ brow: 'angry', mouth: 'o', armR: 'M68 88 L86 82',
       wpn: `<path d="M90 84 L90 72 M90 75 L81 61 M90 75 L99 61" stroke="${WOOD}" stroke-width="5" stroke-linecap="round"/>
              <path d="M81 60 Q90 68 99 60" stroke="#4A4A4A" stroke-width="2.2" fill="none"/>
              <circle cx="90" cy="65" r="3" fill="#7A8699"/>` }) },
-  { id: 'asker', v: 4, name: 'Asker', arch: 'Vurucu', st: { hp: 7, dmg: 2, per: 1.0 },
+  { id: 'asker', v: 4, name: 'Asker', arch: 'Vurucu', st: { hp: 7, dmg: 2, per: 1.0, spd: 45 },
     svg: () => fig({ brow: 'angry', mouth: 'line', armR: 'M68 88 L84 94', wpn: swordP('translate(86 96) rotate(34) scale(1.35)') }) },
-  { id: 'mizrakci', v: 4, name: 'Mızrakçı', arch: 'Menzil-vurucu', st: { hp: 6, dmg: 2, per: 1.2 },
+  { id: 'mizrakci', v: 4, name: 'Mızrakçı', arch: 'Menzil-vurucu', st: { hp: 6, dmg: 2, per: 1.2, spd: 45, rng: 30 },
     svg: () => fig({ brow: 'fierce', mouth: 'frown', armR: 'M68 88 L84 80', armL: 'M58 88 L72 98',
       wpn: `<path d="M64 116 L112 48" stroke="${OUT}" stroke-width="6.6" stroke-linecap="round"/>
              <path d="M64 116 L112 48" stroke="${WOOD}" stroke-width="4" stroke-linecap="round"/>
              <path d="M109 50 L116 34 L123 47 z" fill="${METAL}" stroke="${OUT}" stroke-width="2.8"/>` }) },
-  { id: 'hancerci', v: 4, name: 'Hançerci', arch: 'Çevik', st: { hp: 5, dmg: 1, per: 0.45 },
+  { id: 'hancerci', v: 4, name: 'Hançerci', arch: 'Çevik', st: { hp: 5, dmg: 1, per: 0.45, spd: 55 },
     svg: () => fig({ brow: 'fierce', mouth: 'smirk', armL: 'M58 88 L42 94', armR: 'M68 88 L86 94',
       wpn: `<path d="M40 94 L26 80 z" stroke="${OUT}" stroke-width="9" stroke-linecap="round"/>
              <path d="M40 94 L27 81" stroke="${METAL}" stroke-width="5" stroke-linecap="round"/>
              <path d="M88 94 L102 80 z" stroke="${OUT}" stroke-width="9" stroke-linecap="round"/>
              <path d="M88 94 L101 81" stroke="${METAL}" stroke-width="5" stroke-linecap="round"/>` }) },
-  { id: 'okcu', v: 8, name: 'Okçu', arch: 'Menzilli', st: { hp: 7, dmg: 1, per: 1.0 },
+  { id: 'okcu', v: 8, name: 'Okçu', arch: 'Menzilli', st: { hp: 7, dmg: 1, per: 1.0, spd: 45, rng: 75 },
     svg: () => fig({ brow: 'calm', mouth: 'short', armR: 'M68 88 L92 86', armL: 'M58 88 L76 87',
       wpn: `<path d="M94 54 A30 30 0 0 1 94 118" stroke="${WOOD}" stroke-width="5" stroke-linecap="round" fill="none"/>
              <path d="M94 54 L94 118" stroke="#4A4A4A" stroke-width="2"/>
              <path d="M68 86 L116 86" stroke="${WOOD}" stroke-width="3" stroke-linecap="round"/>
              <path d="M116 86 L108 81 M116 86 L108 91" stroke="${DMETAL}" stroke-width="3" stroke-linecap="round"/>` }) },
-  { id: 'tabancaci', v: 8, name: 'Tabancacı', arch: 'Çevik-menzilli', st: { hp: 6, dmg: 1, per: 0.8 },
+  { id: 'tabancaci', v: 8, name: 'Tabancacı', arch: 'Çevik-menzilli', st: { hp: 6, dmg: 1, per: 0.8, spd: 50, rng: 65 },
     svg: () => fig({ brow: 'uneven', mouth: 'pick', armR: 'M68 88 L88 88',
       wpn: `<rect x="88" y="82" width="24" height="8" rx="2" fill="#AEB6C4" stroke="${OUT}" stroke-width="2.8"/>
              <rect x="90" y="90" width="7" height="11" rx="2.2" fill="#D96E2C" stroke="${OUT}" stroke-width="2.6" transform="rotate(10 93 95)"/>` }) },
-  { id: 'bombaci', v: 8, name: 'Bombacı', arch: 'Alan', st: { hp: 8, dmg: 2, per: 1.8 },
+  { id: 'bombaci', v: 8, name: 'Bombacı', arch: 'Alan', st: { hp: 8, dmg: 2, per: 1.8, spd: 40, rng: 60 },
     svg: () => fig({ brow: 'worried', mouth: 'wavy', armR: 'M68 88 L88 82',
       wpn: `<circle cx="98" cy="78" r="11" fill="#3A404A" stroke="#17191C" stroke-width="3"/>
              <rect x="94.5" y="63.5" width="7" height="5" rx="1.6" fill="#5A6270"/>
              <path d="M98 63 Q103 55 109 57" stroke="#6E4E2E" stroke-width="2.6" fill="none"/>
              <path d="M109 51 l2.5 4 4-1.5 -1.5 4 4 2.5 -4 1.5 0 4 -4-2.5 -4 2.5 1.5-5 z" fill="#F7B816"/>` }) },
-  { id: 'sovalye', v: 16, name: 'Şövalye', arch: 'Tank', st: { hp: 32, dmg: 6, per: 1.25 },
+  { id: 'sovalye', v: 16, name: 'Şövalye', arch: 'Tank', st: { hp: 32, dmg: 6, per: 1.25, spd: 30 },
     svg: () => fig({ brow: 'angry', mouth: 'grit', armR: 'M68 88 L84 94', armL: 'M58 88 L44 92',
       wpn: swordP('translate(86 96) rotate(36) scale(1.3)'),
       post: `<path d="M28 84 h24 v16 q0 12 -12 15 q-12 -3 -12 -15 z" fill="${METAL}" stroke="${OUT}" stroke-width="3.2"/>
              <path d="M40 88 v22 M31 96 h18" stroke="${DMETAL}" stroke-width="3" stroke-linecap="round"/>
              <path d="M40 30 A27 25 0 0 1 88 30 L86 40 L42 40 z" fill="#AEB6C4" stroke="${OUT}" stroke-width="3.4"/>
              <rect x="60" y="24" width="7" height="4" rx="2" fill="#EE7A28"/>` }) },
-  { id: 'balyozcu', v: 16, name: 'Balyozcu', arch: 'Kontrol-vurucu', st: { hp: 24, dmg: 9, per: 1.7 },
+  { id: 'balyozcu', v: 16, name: 'Balyozcu', arch: 'Kontrol-vurucu', st: { hp: 24, dmg: 9, per: 1.7, spd: 28 },
     svg: () => fig({ brow: 'heavy', mouth: 'shout', armL: 'M58 88 L76 84', armR: 'M68 88 L84 82',
       wpn: `<path d="M74 100 L108 56" stroke="${OUT}" stroke-width="7" stroke-linecap="round"/>
              <path d="M74 100 L108 56" stroke="${WOOD}" stroke-width="4.4" stroke-linecap="round"/>
              <rect x="96" y="38" width="28" height="19" rx="3.4" fill="#9AA3B2" stroke="${OUT}" stroke-width="3.2" transform="rotate(-38 110 47)"/>` }) },
-  { id: 'duellocu', v: 16, name: 'Düellocu', arch: 'Çevik-vurucu', st: { hp: 20, dmg: 5, per: 0.9 },
+  { id: 'duellocu', v: 16, name: 'Düellocu', arch: 'Çevik-vurucu', st: { hp: 20, dmg: 5, per: 0.9, spd: 40 },
     svg: () => fig({ brow: 'uneven', mouth: 'mstache', armR: 'M68 88 L88 90',
       wpn: `<path d="M92 90 L126 82" stroke="${OUT}" stroke-width="5" stroke-linecap="round"/>
              <path d="M92 90 L124 82.5" stroke="${METAL}" stroke-width="2.8" stroke-linecap="round"/>
              <circle cx="91" cy="90" r="5.4" fill="${DMETAL}" stroke="${OUT}" stroke-width="2.4"/>` }) },
-  { id: 'atesbuyucusu', v: 32, name: 'Ateş Büyücüsü', arch: 'Alan', st: { hp: 16, dmg: 5, per: 1.7 },
+  { id: 'atesbuyucusu', v: 32, name: 'Ateş Büyücüsü', arch: 'Alan', st: { hp: 16, dmg: 5, per: 1.7, spd: 30, rng: 75 },
     svg: () => fig({ brow: 'fierce', mouth: 'shout', armR: 'M68 88 L88 92',
       wpn: `<path d="M92 112 L100 52" stroke="${OUT}" stroke-width="6.6" stroke-linecap="round"/>
              <path d="M92 112 L100 52" stroke="${WOOD}" stroke-width="4.2" stroke-linecap="round"/>
              <path d="M100 52 q-12 -10 -2 -26 q3 10 9 13 q4 -6 3 -12 q11 12 -1 25 q-4 4 -9 0 z" fill="#F08C1B" stroke="#C25A10" stroke-width="2.8"/>
              <circle cx="102" cy="41" r="4" fill="#FFCE54"/>
              <circle cx="115" cy="58" r="2.2" fill="#F08C1B"/><circle cx="88" cy="42" r="1.8" fill="#F08C1B"/>` }) },
-  { id: 'buzbuyucusu', v: 32, name: 'Buz Büyücüsü', arch: 'Kontrol', st: { hp: 16, dmg: 4, per: 1.5 },
+  { id: 'buzbuyucusu', v: 32, name: 'Buz Büyücüsü', arch: 'Kontrol', st: { hp: 16, dmg: 4, per: 1.5, spd: 30, rng: 75 },
     svg: () => fig({ brow: 'calm', mouth: 'line', armR: 'M68 88 L88 92',
       wpn: `<path d="M92 112 L100 52" stroke="${OUT}" stroke-width="6.6" stroke-linecap="round"/>
              <path d="M92 112 L100 52" stroke="${WOOD}" stroke-width="4.2" stroke-linecap="round"/>
              <path d="M100 52 L109 38 L118 52 L109 66 z" fill="#7FD4F5" stroke="#2A6E8E" stroke-width="3"/>
              <path d="M109 42 L109 62" stroke="#C9EEFC" stroke-width="2.6"/>
              <circle cx="122" cy="64" r="2.2" fill="#7FD4F5"/><circle cx="94" cy="40" r="2" fill="#7FD4F5"/>` }) },
-  { id: 'sifaci', v: 32, name: 'Şifacı', arch: 'Destek', st: { hp: 18, dmg: 0, per: 1.0 },
+  { id: 'sifaci', v: 32, name: 'Şifacı', arch: 'Destek', st: { hp: 18, dmg: 0, per: 1.0, spd: 32, rng: 70 },
     svg: () => fig({ brow: 'calm', mouth: 'smile', armR: 'M68 88 L88 92',
       wpn: `<path d="M92 112 L98 54" stroke="${OUT}" stroke-width="6.6" stroke-linecap="round"/>
             <path d="M92 112 L98 54" stroke="${WOOD}" stroke-width="4.2" stroke-linecap="round"/>
@@ -2460,14 +2996,14 @@
             <rect x="87" y="41" width="23" height="8" rx="3" fill="#F0B429" stroke="#8A6410" stroke-width="2.8"/>`,
       post: `<path d="M28 68 h10 M33 63 v10" stroke="#46BD8A" stroke-width="3.4" stroke-linecap="round"/>
              <path d="M112 78 h8 M116 74 v8" stroke="#46BD8A" stroke-width="3" stroke-linecap="round"/>` }) },
-  { id: 'berserker', v: 64, name: 'Berserker', arch: 'Vurucu', st: { hp: 50, dmg: 14, per: 0.85 },
+  { id: 'berserker', v: 64, name: 'Berserker', arch: 'Vurucu', st: { hp: 50, dmg: 14, per: 0.85, spd: 68 },
     svg: () => fig({ brow: 'fierce', mouth: 'fang', armR: 'M68 88 L84 92',
       wpn: `<path d="M84 96 L108 58" stroke="${OUT}" stroke-width="7" stroke-linecap="round"/>
             <path d="M84 96 L108 58" stroke="${WOOD}" stroke-width="4.6" stroke-linecap="round"/>
             <path d="M102 42 q20 5 16 28 l-15 -4 q3 -13 -4 -21 z" fill="#B9C4D6" stroke="${OUT}" stroke-width="3.2"/>`,
       post: `<path d="M38 44 Q64 35 90 44" stroke="#C0392B" stroke-width="5.5" fill="none" stroke-linecap="round"/>
              <path d="M38 44 L32 52 M38 44 L30 45" stroke="#C0392B" stroke-width="3.4" stroke-linecap="round"/>` }) },
-  { id: 'golge', v: 64, name: 'Gölge', arch: 'Suikastçı', st: { hp: 30, dmg: 16, per: 0.9 },
+  { id: 'golge', v: 64, name: 'Gölge', arch: 'Suikastçı', st: { hp: 30, dmg: 16, per: 0.9, spd: 75 },
     svg: () => fig({ face: 'mask', brow: 'fierce',
       armL: 'M58 88 L44 90', armR: 'M68 88 L82 90',
       legL: 'M60 100 L52 105 L46 112', legR: 'M66 100 L72 106 L78 112',
@@ -2477,26 +3013,26 @@
              <path d="M40 92 L25 79" stroke="${METAL}" stroke-width="4.6" stroke-linecap="round"/>
              <path d="M86 92 L102 78 z" stroke="${OUT}" stroke-width="8.5" stroke-linecap="round"/>
              <path d="M86 92 L101 79" stroke="${METAL}" stroke-width="4.6" stroke-linecap="round"/>` }) },
-  { id: 'nisanci', v: 64, name: 'Keskin Nişancı', arch: 'Menzilli', st: { hp: 22, dmg: 24, per: 2.6 },
+  { id: 'nisanci', v: 64, name: 'Keskin Nişancı', arch: 'Menzilli', st: { hp: 22, dmg: 24, per: 2.6, spd: 24, rng: 999 },
     svg: () => fig({ brow: 'calm', mouth: 'line', squint: true, armR: 'M68 88 L88 88', armL: 'M58 88 L78 92',
       wpn: `<rect x="62" y="86" width="40" height="7" rx="2.4" fill="#6E7686" stroke="${OUT}" stroke-width="2.8"/>
              <rect x="102" y="87.6" width="28" height="4" rx="2" fill="#4A515E" stroke="${OUT}" stroke-width="2.2"/>
              <rect x="52" y="88" width="11" height="10" rx="2.8" fill="${WOOD}" stroke="${OUT}" stroke-width="2.6" transform="rotate(14 57 92)"/>
              <rect x="76" y="78" width="11" height="5.6" rx="2.4" fill="#3A404A" stroke="${OUT}" stroke-width="2.2"/>` }) },
-  { id: 'dev', v: 128, name: 'Dev', arch: 'Tank-alan', st: { hp: 90, dmg: 18, per: 2.0 },
+  { id: 'dev', v: 128, name: 'Dev', arch: 'Tank-alan', st: { hp: 90, dmg: 18, per: 2.0, spd: 22 },
     svg: () => fig({ brow: 'heavy', mouth: 'wide', tf: 'translate(-8 -9) scale(1.14)', fill: '#E3E7EE', torsoFill: '#D4DAE4', torsoW: 17, limb: 6.5,
       armL: 'M56 88 L42 96', armR: 'M70 88 L84 96',
       post: `<circle cx="40" cy="97" r="6" fill="#B9C4D6" stroke="${INK}" stroke-width="3.4"/>
              <circle cx="86" cy="97" r="6" fill="#B9C4D6" stroke="${INK}" stroke-width="3.4"/>
              <path d="M46 32 l6 7 M84 34 l-5 6" stroke="#5A6579" stroke-width="2.6" stroke-linecap="round"/>` }) },
-  { id: 'kemiklordu', v: 128, name: 'Kemik Lordu', arch: 'Çağırıcı', st: { hp: 60, dmg: 10, per: 1.4 },
+  { id: 'kemiklordu', v: 128, name: 'Kemik Lordu', arch: 'Çağırıcı', st: { hp: 60, dmg: 10, per: 1.4, spd: 26, rng: 70 },
     svg: () => fig({ face: 'skull', fill: '#F2F0E9', armR: 'M68 88 L88 92',
       wpn: `<path d="M92 112 L98 50" stroke="#2E2A20" stroke-width="6.6" stroke-linecap="round"/>
             <path d="M92 112 L98 50" stroke="#4A4438" stroke-width="4.2" stroke-linecap="round"/>
             <circle cx="99" cy="42" r="10" fill="#9BE07E" stroke="#3E7A2E" stroke-width="3"/>
             <circle cx="95.5" cy="40" r="2.2" fill="#2E5A22"/><circle cx="102.5" cy="40" r="2.2" fill="#2E5A22"/>`,
       post: `<path d="M53 27 L58 15 L63 23 L67 12 L72 23 L78 15 L82 28" fill="none" stroke="#F0B429" stroke-width="4.4" stroke-linejoin="round"/>` }) },
-  { id: 'yildirim', v: 128, name: 'Yıldırım Hükümdarı', arch: 'Alan', st: { hp: 55, dmg: 14, per: 1.6 },
+  { id: 'yildirim', v: 128, name: 'Yıldırım Hükümdarı', arch: 'Alan', st: { hp: 55, dmg: 14, per: 1.6, spd: 28, rng: 75 },
     svg: () => fig({ brow: 'fierce', mouth: 'jagged', armR: 'M68 88 L88 92',
       pre: `<path d="M50 22 L46 12 M62 19 L61 8 M75 20 L79 10" stroke="${INK}" stroke-width="3.6" stroke-linecap="round"/>`,
       wpn: `<path d="M92 112 L98 54" stroke="#3A414E" stroke-width="6.6" stroke-linecap="round"/>
@@ -2528,6 +3064,31 @@
     dev: { anim: 'punch' },
     kemiklordu: { anim: 'cast', proj: 'boneorb' },
     yildirim: { anim: 'cast', proj: 'spark' },
+  };
+
+  /* hero abilities — consumed by the battle sim (see SKILLS-DESIGN.md) */
+  const SKILLS = {
+    caylak: {},
+    sopali: { stunChance: .15, stunDur: .5 },
+    sapanci: { knockback: 6 },
+    asker: {},
+    mizrakci: { firstHitMul: 2 },
+    hancerci: { dodge: .2 },
+    okcu: { pierce: 3 },
+    tabancaci: { kite: 34 },
+    bombaci: { splash: 18, deathBlast: { dmg: 4, r: 30 } },
+    sovalye: { taunt: 60 },
+    balyozcu: { stunChance: .3, stunDur: 1, knockback: 4 },
+    duellocu: { ramp: { step: .25, max: 3 } },
+    atesbuyucusu: { splash: 26, burn: { dps: 1, dur: 2 } },
+    buzbuyucusu: { slow: { factor: .6, dur: 2 } },
+    sifaci: { healer: { amount: 4 } },
+    berserker: { rage: { at: .5, perMul: .625, spdMul: 1.3 } },
+    golge: { infiltrate: true, firstHitMul: 3, stealth: 3 },
+    nisanci: { sniper: true },
+    dev: { splash: 20, spawnShock: { r: 60, push: 26 } },
+    kemiklordu: { onKillSummon: 'caylak' },
+    yildirim: { chain: [1, .65, .35] },
   };
 
   /* ---------- Inventory + level ---------- */
@@ -2912,13 +3473,109 @@
     beginCountdown();
     setTimeout(() => { for (const v of [2, 4]) { pool[v] = 0; renderPool(v); } }, 4200);
   }
+  if (testMode === 'sk') {
+    menuEl.hidden = true;
+    layoutBuild();
+    me.reset();
+    ai.reset();
+    state = 'build';
+    resetSkills();
+    clearTimeout(aiTimer);
+    for (const t of [...ai.tiles.values()]) { ai.tiles.delete(t.id); t.el.remove(); }
+    const tt = ai.createTile(2, 0, 0);
+    for (const k in SKILLS2048) skillReady[k] = 0;
+    updateSkillBar();
+    const sc2 = Q.get('sc') || 'spearhit';
+    if (sc2 === 'spearhit') {
+      castSpear();
+      setTimeout(() => { document.title = 'SK spearhit pinned=' + tt.pinned; }, 900);
+      setTimeout(() => { document.title += ' unpin=' + !tt.pinned; }, 6200);
+    } else if (sc2 === 'spearmiss') {
+      castSpear();
+      setTimeout(() => {
+        ai.move(0, 1);
+        setTimeout(() => {
+          const s = ai.matrix()[0][0];
+          if (s) { ai.tiles.delete(s.id); s.el.remove(); }
+        }, 160);
+      }, 200);
+      setTimeout(() => {
+        document.title = 'SK spearmiss pinnedAny=' + [...ai.tiles.values()].some(t => t.pinned);
+      }, 900);
+    } else if (sc2 === 'firehit') {
+      castFire();
+      setTimeout(() => { document.title = 'SK firehit tiles=' + ai.tiles.size; }, 1200);
+    } else if (sc2 === 'spearblock') {
+      const t2 = ai.createTile(2, 0, 1);
+      pinTile(ai, tt, 5000);
+      ai.move(0, -1);
+      setTimeout(() => {
+        const m = ai.matrix();
+        document.title = 'SK spearblock keep=' + (m[0][0] === tt && !tt.firing) +
+          ' t2stay=' + (m[0][1] === t2) +
+          ' count=' + ai.tiles.size +
+          ' aiCanUse=' + ai.liveTiles().includes(tt);
+      }, 400);
+    } else if (sc2 === 'myst') {
+      castMystery();
+      setTimeout(() => { document.title = 'SK myst on=' + aiMystery; }, 300);
+      setTimeout(() => { document.title += ' off=' + !aiMystery; }, 5600);
+    }
+  }
   if (testMode === 'sim') {
+    menuEl.hidden = true;
     layoutFight();
     state = 'fight';
-    spawnUnit('me', 4, 100, 500);
-    spawnUnit('ai', 4, 120, 60);
-    for (let i = 0; i < 500; i++) simulate(1 / 60);
-    document.title = 'SIM ' + units.map(u => u.side + ':' + Math.round(u.x) + ',' + Math.round(u.y) + ',hp' + u.hp).join(' | ');
+    const sc = Q.get('sc') || 'basic';
+    const H = id => CHARS.find(c => c.id === id);
+    const step = n => { for (let i = 0; i < n; i++) simulate(1 / 60); };
+    let out = '';
+    if (sc === 'basic') {
+      spawnUnit('me', 4, 100, 500, H('asker'));
+      spawnUnit('ai', 4, 120, 60, H('asker'));
+      step(600);
+      out = units.filter(u => !u.dead).map(u => `${u.side}:${Math.round(u.x)},${Math.round(u.y)},hp${u.hp}`).join(' | ');
+    } else if (sc === 'heal') {
+      const ally = spawnUnit('me', 16, 100, 480, H('sovalye'));
+      ally.hp = 5;
+      spawnUnit('me', 32, 140, 500, H('sifaci'));
+      step(240);
+      out = 'ally hp=' + ally.hp;
+    } else if (sc === 'summon') {
+      spawnUnit('me', 128, 100, 300, H('kemiklordu'));
+      spawnUnit('ai', 2, 130, 300, H('caylak'));
+      step(300);
+      out = 'alive=' + units.filter(u => !u.dead).length +
+            ' skel=' + units.filter(u => !u.dead && u.side === 'me' && u.hero.id === 'caylak').length;
+    } else if (sc === 'chain') {
+      spawnUnit('me', 128, 100, 300, H('yildirim'));
+      const foes = [[130, 280], [150, 300], [140, 320]].map(p => spawnUnit('ai', 16, p[0], p[1], H('sovalye')));
+      step(140);
+      out = 'hp=' + foes.map(v => v.hp).join(',');
+    } else if (sc === 'golge') {
+      const g = spawnUnit('me', 64, 100, 500, H('golge'));
+      spawnUnit('ai', 2, 110, 480, H('caylak'));
+      const far = spawnUnit('ai', 2, 300, 80, H('caylak'));
+      step(10);
+      const locked = g.lock === far;
+      step(48);
+      out = 'lockfar=' + locked + ' blinkdist=' + Math.round(Math.hypot(g.x - far.x, g.y - far.y));
+    } else if (sc === 'stealth') {
+      const g = spawnUnit('me', 64, 120, 300, H('golge'));
+      const e1 = spawnUnit('ai', 128, 135, 300, H('dev'));
+      step(150);
+      const untouched = g.hp === g.maxHp;
+      const dealt = e1.hp < e1.maxHp || e1.dead;
+      step(120);
+      out = 'nodmg3s=' + untouched + ' dealt=' + dealt + ' hitAfter=' + (g.hp < g.maxHp);
+    } else if (sc === 'taunt') {
+      spawnUnit('me', 4, 100, 300, H('asker'));
+      const tank = spawnUnit('ai', 16, 130, 260, H('sovalye'));
+      const squish = spawnUnit('ai', 2, 108, 270, H('caylak'));
+      step(220);
+      out = 'tankhp=' + tank.hp + ' squishhp=' + squish.hp;
+    }
+    document.title = 'SIM ' + sc + ' :: ' + out;
   }
   if (testMode === 'fxdemo') {
     menuEl.hidden = true;
