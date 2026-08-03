@@ -18,7 +18,8 @@
     -webkit-tap-highlight-color:transparent;
     overscroll-behavior:none;
   }
-  canvas { display:block; width:100vw; height:100vh; }
+  :root { --sat: env(safe-area-inset-top); --sab: env(safe-area-inset-bottom); }
+  canvas { display:block; position:fixed; inset:0 auto auto 0; }
 </style>
 </head>
 <body>
@@ -155,20 +156,32 @@ function buzz(ms){ if (navigator.vibrate) try{ navigator.vibrate(ms); }catch(e){
 // ---------- layout & sprites ----------
 function resize() {
   DPR = Math.min(window.devicePixelRatio || 1, 2.5);
+  // visualViewport is the truth on mobile — 100vh lies when browser bars hide
   W = window.innerWidth; H = window.innerHeight;
+  if (window.visualViewport) {
+    W = Math.round(window.visualViewport.width);
+    H = Math.round(window.visualViewport.height);
+  }
+  canvas.style.width = W + 'px';
+  canvas.style.height = H + 'px';
   canvas.width = W*DPR; canvas.height = H*DPR;
   ctx.setTransform(DPR,0,0,DPR,0,0);
 
+  // keep clear of the notch and the home indicator
+  const cs = getComputedStyle(document.documentElement);
+  const safeTop = parseFloat(cs.getPropertyValue('--sat')) || 0;
+  const safeBot = parseFloat(cs.getPropertyValue('--sab')) || 0;
+
   const hudH = 56, barH = 64, pad = 10;
-  const cell = Math.floor(Math.min((W*0.78)/COLS, (H - hudH - 190 - barH - pad*2) / ROWS, 44));
+  const cell = Math.floor(Math.min((W*0.78)/COLS, (H - safeTop - safeBot - hudH - 190 - barH - pad*2) / ROWS, 44));
   const boardW = cell*COLS, boardH = cell*ROWS;
   L = {
     cell, boardW, boardH,
     boardX: (W-boardW)/2,
-    boardY: H - boardH - barH - pad,
-    hudH, barH,
+    boardY: H - boardH - barH - pad - safeBot,
+    hudH, barH, top: safeTop, bot: safeBot,
   };
-  L.arenaTop = hudH + 8;
+  L.arenaTop = safeTop + hudH + 8;
   L.arenaBot = L.boardY - 44;
   // booster bar at the bottom
   const bw = 52, gap = 12, tw = bw*4 + gap*3;
@@ -177,8 +190,8 @@ function resize() {
     { key:'tnt',    icon:'tnt'    },
     { key:'light',  icon:'light'  },
     { key:'paint',  icon:'paint'  },
-  ].map((b, i) => ({ ...b, x: W/2 - tw/2 + i*(bw+gap), y: H - barH + 6, w: bw, h: barH - 16 }));
-  L.panel = { x: W/2 - tw/2 - 16, y: H - barH, w: tw + 32, h: barH - 8 };
+  ].map((b, i) => ({ ...b, x: W/2 - tw/2 + i*(bw+gap), y: H - safeBot - barH + 6, w: bw, h: barH - 16 }));
+  L.panel = { x: W/2 - tw/2 - 16, y: H - safeBot - barH, w: tw + 32, h: barH - 8 };
   makeTileSprites();
   layoutFigure();
   if (grid.length) for (let r=0;r<ROWS;r++) for (let c=0;c<COLS;c++) {
@@ -510,7 +523,7 @@ function killVoxel(v, mult, idx) {
     score += 50 * level;
     const bk = ['rocket','tnt','light','paint'][(Math.random()*4)|0];
     boosters[bk]++;
-    addFloat(W/2, H - L.barH - 8, '+1 ' + {rocket:'ROCKET', tnt:'TNT', light:'LIGHT BALL', paint:'PAINT'}[bk], '#7ee88f', 0.9);
+    addFloat(W/2, L.panel.y - 10, '+1 ' + {rocket:'ROCKET', tnt:'TNT', light:'LIGHT BALL', paint:'PAINT'}[bk], '#7ee88f', 0.9);
     addFloat(W/2, fig.cy, fig.name + ' CLEAR!', '#ffd45e', 1.6);
     snd.clear();
     buzz([40,40,80]);
@@ -1050,6 +1063,15 @@ function addFloat(x, y, text, color, scale=1) {
 }
 
 // ---------- input ----------
+// map a pointer event to game coordinates — immune to any CSS/viewport scaling
+function evtPos(e) {
+  const r = canvas.getBoundingClientRect();
+  return {
+    x: (e.clientX - r.left) * (W / (r.width || W)),
+    y: (e.clientY - r.top) * (H / (r.height || H)),
+  };
+}
+
 function cellAt(px, py) {
   const c = Math.floor((px - L.boardX) / L.cell);
   const r = Math.floor((py - L.boardY) / L.cell);
@@ -1060,7 +1082,7 @@ function cellAt(px, py) {
 canvas.addEventListener('pointerdown', e => {
   e.preventDefault();
   audio();
-  const x = e.clientX, y = e.clientY;
+  const { x, y } = evtPos(e);
   if (state === 'menu') { startGame(); return; }
   if (state === 'over') {
     if (lastT - overAt > 700) startGame();
@@ -1074,7 +1096,7 @@ canvas.addEventListener('pointerdown', e => {
     paintPick = false;          // tap anywhere else cancels
     return;
   }
-  if (x > W-44 && y < 48) { soundOn = !soundOn; beep(660,0.06); return; }
+  if (x > W-44 && y < L.top + 48) { soundOn = !soundOn; beep(660,0.06); return; }
   // booster bar
   if (L.btns && (state === 'ready' || state === 'resolve') && timeLeft > 0) {
     for (const b of L.btns) {
@@ -1098,9 +1120,10 @@ canvas.addEventListener('pointerdown', e => {
 });
 
 canvas.addEventListener('pointermove', e => {
+  const p = evtPos(e);
   if (rotDrag && fig) {
-    const dx = e.clientX - rotDrag.x, dy = e.clientY - rotDrag.y;
-    rotDrag.x = e.clientX; rotDrag.y = e.clientY;
+    const dx = p.x - rotDrag.x, dy = p.y - rotDrag.y;
+    rotDrag.x = p.x; rotDrag.y = p.y;
     // negative sign: the face under your finger follows the drag direction
     rotateBasis(fig.R, {x:0,y:1,z:0}, -dx * 0.012);
     rotateBasis(fig.R, {x:1,y:0,z:0}, dy * 0.012);
@@ -1110,7 +1133,7 @@ canvas.addEventListener('pointermove', e => {
     return;
   }
   if (!dragStart || (state !== 'ready' && state !== 'resolve')) return;
-  const dx = e.clientX - dragStart.x, dy = e.clientY - dragStart.y;
+  const dx = p.x - dragStart.x, dy = p.y - dragStart.y;
   const th = L.cell * 0.35;
   if (Math.abs(dx) < th && Math.abs(dy) < th) return;
   const {r,c} = dragStart.cell;
@@ -1139,6 +1162,8 @@ canvas.addEventListener('pointerup', () => {
   if (rotDrag) { rotDrag = null; if (fig) fig.autoT = 0; }
 });
 window.addEventListener('resize', resize);
+window.addEventListener('orientationchange', () => setTimeout(resize, 120));
+if (window.visualViewport) window.visualViewport.addEventListener('resize', resize);
 
 // ---------- game flow ----------
 function gameOver() {
@@ -1191,7 +1216,7 @@ function update(dt) {
       spawnFigure(level-1);
       timeLeft = GAME_TIME;
       timerFlash = 1;
-      addFloat(W/2, 62, ((GAME_TIME/60)|0) + ':' + String(GAME_TIME%60).padStart(2,'0'), '#7ee88f', 1.15);
+      addFloat(W/2, L.top + 62, ((GAME_TIME/60)|0) + ':' + String(GAME_TIME%60).padStart(2,'0'), '#7ee88f', 1.15);
       addFloat(W/2, L.arenaTop + 30, 'LEVEL ' + level, '#6fd2ff', 1.2);
     }
   }
@@ -1440,17 +1465,17 @@ function drawHUD() {
   ctx.textAlign = 'left';
   ctx.font = '700 11px -apple-system, system-ui, sans-serif';
   ctx.fillStyle = '#8f9bc4';
-  ctx.fillText('LEVEL ' + level, 14, 21);
+  ctx.fillText('LEVEL ' + level, 14, L.top + 21);
   ctx.fillStyle = '#fff';
   ctx.font = '800 16px -apple-system, system-ui, sans-serif';
-  ctx.fillText(score.toLocaleString(), 14, 38);
+  ctx.fillText(score.toLocaleString(), 14, L.top + 38);
   ctx.textAlign = 'right';
   ctx.font = '600 16px sans-serif';
   ctx.fillStyle = soundOn ? '#8f9bc4' : '#4a5273';
-  ctx.fillText('♪', W-16, 30);
+  ctx.fillText('♪', W-16, L.top + 30);
   if (!soundOn) {
     ctx.strokeStyle = '#4a5273'; ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.moveTo(W-26, 38); ctx.lineTo(W-10, 21); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(W-26, L.top + 38); ctx.lineTo(W-10, L.top + 21); ctx.stroke();
   }
 }
 
@@ -1633,7 +1658,7 @@ function drawFigure() {
 
 function drawTimer() {
   if (!L.cell) return;
-  const cx = W/2, cy = 30;
+  const cx = W/2, cy = L.top + 30;
   const frac = Math.max(0, Math.min(1, timeLeft / GAME_TIME));
   const low = timeLeft > 0 && timeLeft <= 10.5;
   const mid = timeLeft <= 30.5;
