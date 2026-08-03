@@ -1,0 +1,1943 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#10132b">
+<title>Match Flow</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body {
+    width:100%; height:100%;
+    overflow:hidden;
+    background:#10132b;
+    touch-action:none;
+    -webkit-user-select:none; user-select:none;
+    -webkit-tap-highlight-color:transparent;
+    overscroll-behavior:none;
+  }
+  canvas { display:block; width:100vw; height:100vh; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<script>
+'use strict';
+
+// ============================================================
+// PIXEL QUEST — a rotating 3D voxel figure on top, match-3
+// below. Matched blocks arc up and blast same-colored voxels
+// anywhere on the figure. Limited moves per figure.
+// ============================================================
+
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+
+const COLS = 7, ROWS = 7;
+const TYPES = ['R','Y','G','B','P'];
+const TILE_COLORS = {
+  R:['#ff6d7e','#f2384f'],
+  Y:['#ffd45e','#f5a623'],
+  G:['#69dd7a','#31b64c'],
+  B:['#55c8ff','#2596e8'],
+  P:['#c08bff','#9a55f0'],
+};
+const RGB = {};
+for (const t of TYPES) {
+  const h = s => [parseInt(s.slice(1,3),16), parseInt(s.slice(3,5),16), parseInt(s.slice(5,7),16)];
+  RGB[t] = { light: h(TILE_COLORS[t][0]), dark: h(TILE_COLORS[t][1]) };
+}
+
+const TILT = 0.5;              // camera tilt (look slightly down)
+const SPIN = 0.45;             // auto-rotation rad/s
+const GAME_TIME = 120;         // seconds per level — resets on every new figure
+
+// ---------- 3D voxel figures (same-size cubes) ----------
+function genVoxels(gen) {
+  const list = [];
+  gen((x,y,z,color) => list.push({ ix:x, iy:y, iz:z, color }));
+  return list;
+}
+const VOXFIGS = [
+  { name:'CUBE', gen(add){
+    for (let y=0;y<6;y++) for (let x=0;x<6;x++) for (let z=0;z<6;z++)
+      add(x,y,z, TYPES[y%5]);
+  }},
+  { name:'SPHERE', gen(add){
+    for (let y=-3;y<=3;y++) for (let x=-3;x<=3;x++) for (let z=-3;z<=3;z++)
+      if (x*x+y*y+z*z <= 11.5) add(x,y,z, TYPES[(y+3)%5]);
+  }},
+  { name:'PYRAMID', gen(add){
+    const pal = ['B','R','Y','G','P'];
+    for (let h=0;h<5;h++) for (let x=-h;x<=h;x++) for (let z=-h;z<=h;z++)
+      add(x, h-2, z, pal[h]);
+  }},
+  { name:'DIAMOND', gen(add){
+    for (let y=-4;y<=4;y++) for (let x=-4;x<=4;x++) for (let z=-4;z<=4;z++)
+      if (Math.abs(x)+Math.abs(y)+Math.abs(z) <= 4)
+        add(x,y,z, TYPES[(y+4)%5]);
+  }},
+  { name:'RING', gen(add){
+    for (let y=-2;y<=2;y++) for (let x=-5;x<=5;x++) for (let z=-5;z<=5;z++) {
+      const rr = Math.hypot(x,z);
+      if ((rr-3.6)*(rr-3.6) + (y*0.8)*(y*0.8) <= 1.7) {
+        const seg = Math.floor(((Math.atan2(z,x)+Math.PI) / (Math.PI*2)) * 5) % 5;
+        add(x,y,z, TYPES[seg]);
+      }
+    }
+  }},
+];
+
+// ---------- state ----------
+let W=0, H=0, DPR=1;
+let L = {};
+let tileSprites = {};
+let grid = [];
+let state = 'menu';            // menu | ready | swap | resolve | over
+let sub = '', subT = 0;
+let combo = 1;
+let selected = null;
+const pendingSwaps = [];       // concurrent swaps — unrelated cells stay playable
+let dragStart = null;          // board swipe
+let rotDrag = null;            // figure rotate drag
+let shake = 0;
+let soundOn = true;
+let lastT = 0;
+
+let fig = null;
+let level = 1;
+let clearT = 0;
+let timeLeft = 0;
+let timerFlash = 0;            // green pulse on the timer pill when time is granted
+let overAt = 0;
+let score = 0;
+let best = +(localStorage.getItem('pq_best') || 0);
+
+const particles = [];
+const floats = [];
+const shots = [];
+const debris = [];
+const flyers = [];
+const orbs = [];               // swarm: matched colors orbit the figure until visible
+let fireCd = 0, fireIdx = 0;
+let boosters = { rocket: 0, tnt: 0, light: 0, paint: 0 };   // bottom-bar power-up charges
+let paintPick = false;         // paint booster: waiting for the player to pick a color
+let lastSwap = null;           // where the last swap happened (power-up spawn spot)
+
+// ---------- audio ----------
+let AC = null;
+function audio() {
+  if (!AC) { try { AC = new (window.AudioContext||window.webkitAudioContext)(); } catch(e){} }
+  if (AC && AC.state === 'suspended') AC.resume();
+}
+function beep(freq, dur=0.08, type='triangle', vol=0.15, slide=0) {
+  if (!soundOn || !AC) return;
+  const t = AC.currentTime;
+  const o = AC.createOscillator(), g = AC.createGain();
+  o.type = type; o.frequency.setValueAtTime(freq, t);
+  if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(30, freq+slide), t+dur);
+  g.gain.setValueAtTime(vol, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t+dur);
+  o.connect(g); g.connect(AC.destination);
+  o.start(t); o.stop(t+dur+0.02);
+}
+const snd = {
+  pop:(i)=>beep(340*Math.pow(1.1, i), 0.08, 'triangle', 0.14),
+  hit:(i)=>beep(600*Math.pow(1.05, i%8), 0.06, 'square', 0.08, 120),
+  swap:()=>beep(220, 0.05, 'sine', 0.1, 80),
+  bad:()=>beep(140, 0.12, 'sawtooth', 0.08, -40),
+  clear:()=>{ [440,554,659,880,1108].forEach((f,i)=>setTimeout(()=>beep(f,0.16,'triangle',0.14), i*80)); },
+};
+function buzz(ms){ if (navigator.vibrate) try{ navigator.vibrate(ms); }catch(e){} }
+
+// ---------- layout & sprites ----------
+function resize() {
+  DPR = Math.min(window.devicePixelRatio || 1, 2.5);
+  W = window.innerWidth; H = window.innerHeight;
+  canvas.width = W*DPR; canvas.height = H*DPR;
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+
+  const hudH = 56, barH = 64, pad = 10;
+  const cell = Math.floor(Math.min((W*0.78)/COLS, (H - hudH - 190 - barH - pad*2) / ROWS, 44));
+  const boardW = cell*COLS, boardH = cell*ROWS;
+  L = {
+    cell, boardW, boardH,
+    boardX: (W-boardW)/2,
+    boardY: H - boardH - barH - pad,
+    hudH, barH,
+  };
+  L.arenaTop = hudH + 8;
+  L.arenaBot = L.boardY - 44;
+  // booster bar at the bottom
+  const bw = 52, gap = 12, tw = bw*4 + gap*3;
+  L.btns = [
+    { key:'rocket', icon:'rocketH' },
+    { key:'tnt',    icon:'tnt'    },
+    { key:'light',  icon:'light'  },
+    { key:'paint',  icon:'paint'  },
+  ].map((b, i) => ({ ...b, x: W/2 - tw/2 + i*(bw+gap), y: H - barH + 6, w: bw, h: barH - 16 }));
+  L.panel = { x: W/2 - tw/2 - 16, y: H - barH, w: tw + 32, h: barH - 8 };
+  makeTileSprites();
+  layoutFigure();
+  if (grid.length) for (let r=0;r<ROWS;r++) for (let c=0;c<COLS;c++) {
+    const g = grid[r]?.[c];
+    if (!g) continue;
+    g.x = cellX(c); g.ty = cellY(r);
+    if (!g.falling) g.y = g.ty;
+  }
+}
+
+function cellX(c){ return L.boardX + c*L.cell + L.cell/2; }
+function cellY(r){ return L.boardY + r*L.cell + L.cell/2; }
+
+function rrect(c, x, y, w, h, r) {
+  c.beginPath();
+  c.moveTo(x+r, y);
+  c.arcTo(x+w, y, x+w, y+h, r);
+  c.arcTo(x+w, y+h, x, y+h, r);
+  c.arcTo(x, y+h, x, y, r);
+  c.arcTo(x, y, x+w, y, r);
+  c.closePath();
+}
+
+function makeTileSprites() {
+  tileSprites = {};
+  const size = Math.ceil(L.cell * DPR);
+  for (const t of TYPES) {
+    const cv = document.createElement('canvas');
+    cv.width = cv.height = size;
+    const c = cv.getContext('2d');
+    c.scale(DPR, DPR);
+    const s = L.cell, m = s*0.06, w = s - m*2, rad = s*0.24;
+    c.fillStyle = 'rgba(0,0,0,0.28)';
+    rrect(c, m, m + s*0.05, w, w, rad); c.fill();
+    const gr = c.createLinearGradient(0, m, 0, m+w);
+    gr.addColorStop(0, TILE_COLORS[t][0]);
+    gr.addColorStop(1, TILE_COLORS[t][1]);
+    c.fillStyle = gr;
+    rrect(c, m, m, w, w, rad); c.fill();
+    const gl = c.createLinearGradient(0, m, 0, m + w*0.5);
+    gl.addColorStop(0, 'rgba(255,255,255,0.42)');
+    gl.addColorStop(1, 'rgba(255,255,255,0.02)');
+    c.fillStyle = gl;
+    rrect(c, m + w*0.08, m + w*0.05, w*0.84, w*0.42, rad*0.8); c.fill();
+    c.fillStyle = 'rgba(255,255,255,0.85)';
+    c.beginPath(); c.arc(m + w*0.24, m + w*0.24, w*0.06, 0, 7); c.fill();
+    tileSprites[t] = cv;
+  }
+}
+
+// ---------- 3D figure ----------
+function spawnFigure(idx) {
+  const def = VOXFIGS[idx % VOXFIGS.length];
+  const voxels = genVoxels(def.gen);
+  // center the grid coords
+  let mn = [1e9,1e9,1e9], mx = [-1e9,-1e9,-1e9];
+  for (const v of voxels) {
+    mn[0]=Math.min(mn[0],v.ix); mx[0]=Math.max(mx[0],v.ix);
+    mn[1]=Math.min(mn[1],v.iy); mx[1]=Math.max(mx[1],v.iy);
+    mn[2]=Math.min(mn[2],v.iz); mx[2]=Math.max(mx[2],v.iz);
+  }
+  const c0 = [(mn[0]+mx[0])/2, (mn[1]+mx[1])/2, (mn[2]+mx[2])/2];
+  const map = {};
+  let radius = 0;
+  for (const v of voxels) {
+    v.x = v.ix - c0[0]; v.y = v.iy - c0[1]; v.z = v.iz - c0[2];
+    v.alive = true; v.reserved = false;
+    v.scale = 0; v.spawnD = (v.ix + v.iy + v.iz - mn[0] - mn[1] - mn[2]) * 0.03;
+    map[v.ix+','+v.iy+','+v.iz] = v;
+    radius = Math.max(radius, Math.hypot(v.x, v.y, v.z));
+  }
+  // shell depths: peel the figure like an onion (0 = surface, growing inward)
+  const remaining = new Set(voxels.map(v => v.ix+','+v.iy+','+v.iz));
+  let d = 0;
+  while (remaining.size) {
+    const shell = [];
+    for (const key of remaining) {
+      const v = map[key];
+      for (const [dx,dy,dz] of NEIGH) {
+        if (!remaining.has((v.ix+dx)+','+(v.iy+dy)+','+(v.iz+dz))) { shell.push(key); break; }
+      }
+    }
+    if (!shell.length) { for (const key of remaining) map[key].depth = d; break; }
+    for (const key of shell) { remaining.delete(key); map[key].depth = d; }
+    d++;
+  }
+  // one color per layer, palette rotates each level
+  const layers = 1 + Math.max(...voxels.map(v => v.depth));
+  const layerColor = [], layerTotal = [];
+  for (let i=0;i<layers;i++) { layerColor[i] = TYPES[(i + idx) % 5]; layerTotal[i] = 0; }
+  for (const v of voxels) { v.color = layerColor[v.depth]; layerTotal[v.depth]++; }
+  const colorLeft = {};
+  for (const v of voxels) colorLeft[v.color] = (colorLeft[v.color]||0) + 1;
+  fig = {
+    name: def.name, voxels, map, c0,
+    total: voxels.length, remaining: voxels.length,
+    layerColor, layerTotal, layerLeft: layerTotal.slice(), colorLeft,
+    radius: radius + 0.87,
+    R: initBasis(0.6, TILT),
+    velX: 0, velY: 0, autoT: 99,
+  };
+  layoutFigure();
+}
+
+// a voxel can only be shot once it's on the exposed surface
+function isExposed(v) {
+  for (const [dx,dy,dz] of NEIGH) {
+    const nb = fig.map[(v.ix+dx)+','+(v.iy+dy)+','+(v.iz+dz)];
+    if (!nb || !nb.alive) return true;
+  }
+  return false;
+}
+
+function layoutFigure() {
+  if (!fig || !L.cell) return;
+  const aw = W - 24, ah = L.arenaBot - L.arenaTop - 8;
+  fig.s = Math.min(aw / (fig.radius*2.3), ah / (fig.radius*2.3), 34);
+  fig.cx = W/2;
+  fig.cy = L.arenaTop + (L.arenaBot - L.arenaTop)/2;
+}
+
+function initBasis(rotY, tilt) {
+  const cy = Math.cos(rotY), sy = Math.sin(rotY);
+  const cx = Math.cos(tilt), sx = Math.sin(tilt);
+  return {
+    ex: { x: cy,  y: sy*sx,  z: -sy*cx },
+    ey: { x: 0,   y: cx,     z: sx     },
+    ez: { x: sy,  y: -cy*sx, z: cy*cx  },
+  };
+}
+
+// rotate the whole basis around a fixed screen-space axis (trackball style)
+function rotateBasis(R, ax, ang) {
+  const c = Math.cos(ang), s = Math.sin(ang), ic = 1 - c;
+  const rot = v => {
+    const d = ax.x*v.x + ax.y*v.y + ax.z*v.z;
+    return {
+      x: v.x*c + (ax.y*v.z - ax.z*v.y)*s + ax.x*d*ic,
+      y: v.y*c + (ax.z*v.x - ax.x*v.z)*s + ax.y*d*ic,
+      z: v.z*c + (ax.x*v.y - ax.y*v.x)*s + ax.z*d*ic,
+    };
+  };
+  R.ex = rot(R.ex); R.ey = rot(R.ey); R.ez = rot(R.ez);
+}
+
+// keep the basis orthonormal despite accumulated float error
+function orthonorm(R) {
+  const n = v => { const l = Math.hypot(v.x, v.y, v.z) || 1; return { x:v.x/l, y:v.y/l, z:v.z/l }; };
+  R.ex = n(R.ex);
+  const d = R.ey.x*R.ex.x + R.ey.y*R.ex.y + R.ey.z*R.ex.z;
+  R.ey = n({ x: R.ey.x - d*R.ex.x, y: R.ey.y - d*R.ex.y, z: R.ey.z - d*R.ex.z });
+  R.ez = {
+    x: R.ex.y*R.ey.z - R.ex.z*R.ey.y,
+    y: R.ex.z*R.ey.x - R.ex.x*R.ey.z,
+    z: R.ex.x*R.ey.y - R.ex.y*R.ey.x,
+  };
+}
+
+function worldOf(v) {
+  const { ex, ey, ez } = fig.R;
+  return {
+    x: ex.x*v.x + ey.x*v.y + ez.x*v.z,
+    y: ex.y*v.x + ey.y*v.y + ez.y*v.z,
+    z: ex.z*v.x + ey.z*v.y + ez.z*v.z,
+  };
+}
+
+const PERSP = 0.06;
+const CAMZ = 1/PERSP;          // camera sits at z = -CAMZ in figure space
+
+function P(w) {
+  const k = 1 / (1 + w.z*PERSP);
+  return { x: fig.cx + w.x*fig.s*k, y: fig.cy + w.y*fig.s*k, k };
+}
+
+function voxPos(v) { return P(worldOf(v)); }
+
+function updateFigure(dt) {
+  if (!fig) return;
+  if (!rotDrag) {
+    fig.velX *= Math.exp(-dt*3);
+    fig.velY *= Math.exp(-dt*3);
+    fig.autoT += dt;
+    // orientation stays where the drag left it; auto-spin around the
+    // global Y axis eases back in over a couple of seconds
+    const r = Math.max(0, Math.min(1, (fig.autoT - 0.6) / 2.5));
+    const auto = SPIN * r*r*(3-2*r);
+    rotateBasis(fig.R, {x:0,y:1,z:0}, (auto + fig.velY) * dt);
+    if (Math.abs(fig.velX) > 0.0002) rotateBasis(fig.R, {x:1,y:0,z:0}, fig.velX * dt);
+    orthonorm(fig.R);
+  }
+  for (const v of fig.voxels) {
+    if (!v.alive) continue;
+    if (v.spawnD > 0) v.spawnD -= dt;
+    else v.scale += (1 - v.scale) * Math.min(1, dt*9);
+  }
+}
+
+// how squarely the voxel's best OPEN face points at the camera (0 = not visible),
+// measured along the actual view ray from the camera to this voxel
+function facingCam(v) {
+  const axes = [fig.R.ex, fig.R.ey, fig.R.ez];
+  const w = worldOf(v);
+  const wz = w.z + CAMZ;
+  const il = 1 / (Math.hypot(w.x, w.y, wz) || 1);
+  let best = 0;
+  for (let a=0;a<3;a++) for (const sgn of [1,-1]) {
+    const n = axes[a];
+    const f = -(n.x*w.x + n.y*w.y + n.z*wz) * sgn * il;
+    if (f <= best) continue;                     // not better / turned away
+    const dxyz = NEIGH[a*2 + (sgn===1?0:1)];
+    const nb = fig.map[(v.ix+dxyz[0])+','+(v.iy+dxyz[1])+','+(v.iz+dxyz[2])];
+    if (!nb || !nb.alive) best = f;              // open face, looking at us
+  }
+  return best;
+}
+
+// raycast: march from the voxel toward the camera through the voxel grid —
+// true only if no other living voxel blocks the straight line of sight
+function lineOfSight(v, off) {
+  const { ex, ey, ez } = fig.R;
+  // camera position expressed in the figure's local (grid) space
+  const camx = -CAMZ*ex.z, camy = -CAMZ*ey.z, camz = -CAMZ*ez.z;
+  const sx = v.x + (off ? off.x : 0), sy = v.y + (off ? off.y : 0), sz = v.z + (off ? off.z : 0);
+  let dx = camx - sx, dy = camy - sy, dz = camz - sz;
+  const dist = Math.hypot(dx, dy, dz) || 1;
+  dx /= dist; dy /= dist; dz /= dist;
+  const c0 = fig.c0, lim = fig.radius + 1;
+  const maxT = Math.min(dist, fig.radius * 2 + 2);
+  for (let t = 0.45; t < maxT; t += 0.35) {
+    const px = sx + dx*t, py = sy + dy*t, pz = sz + dz*t;
+    if (px*px + py*py + pz*pz > lim*lim) return true;   // left the figure
+    const nb = fig.map[Math.round(px + c0[0]) + ',' + Math.round(py + c0[1]) + ',' + Math.round(pz + c0[2])];
+    if (nb && nb.alive && nb !== v) return false;
+  }
+  return true;
+}
+
+// does the player see ANY part of this voxel at the current angle?
+// (generous test used by the paint booster: every open face is tried,
+// with the sight ray cast from that face's center)
+function paintVisible(v) {
+  const axes = [fig.R.ex, fig.R.ey, fig.R.ez];
+  const w = worldOf(v);
+  const wz = w.z + CAMZ;
+  for (let a=0;a<3;a++) for (const sgn of [1,-1]) {
+    const n = axes[a];
+    if (-(n.x*w.x + n.y*w.y + n.z*wz) * sgn <= 0.02) continue;   // faces away
+    const dxyz = NEIGH[a*2 + (sgn===1?0:1)];
+    const nb = fig.map[(v.ix+dxyz[0])+','+(v.iy+dxyz[1])+','+(v.iz+dxyz[2])];
+    if (nb && nb.alive) continue;                                // buried face
+    if (lineOfSight(v, { x: dxyz[0]*0.6, y: dxyz[1]*0.6, z: dxyz[2]*0.6 })) return true;
+  }
+  return false;
+}
+
+function isVisible(v) { return facingCam(v) > 0.35 && lineOfSight(v); }
+
+// pick a voxel to attack: SAME color only, and only if we can clearly SEE it.
+// Squarely camera-facing faces are strongly preferred, so shots land where
+// the player is actually looking — buried layers and back/edge-on faces wait.
+function pickTarget(color) {
+  if (!fig || fig.remaining <= 0) return null;
+  const pool = [];
+  let sum = 0;
+  for (const v of fig.voxels) {
+    if (!v.alive || v.reserved || v.color !== color) continue;
+    const f = facingCam(v);
+    if (f < 0.35) continue;
+    if (!lineOfSight(v)) continue;   // must be genuinely unobstructed on screen
+    const w = f*f;
+    pool.push({ v, w }); sum += w;
+  }
+  if (!pool.length) return null;
+  let pick = Math.random() * sum;
+  for (const p of pool) {
+    pick -= p.w;
+    if (pick <= 0) { p.v.reserved = true; return p.v; }
+  }
+  const v = pool[pool.length-1].v;
+  v.reserved = true;
+  return v;
+}
+
+function swarmCount(color) {
+  let n = 0;
+  for (const o of orbs) if (o.color === color) n++;
+  for (const s of shots) if (s.color === color) n++;
+  return n;
+}
+
+// wide circular orbit around the figure — always outside its silhouette,
+// so the swarm never covers the object
+function orbitRadius() {
+  return Math.min(fig.s * fig.radius + 18, W/2 - 12, (L.arenaBot - L.arenaTop)/2 - 4);
+}
+
+function orbitPos(o) {
+  const r = orbitRadius() + Math.sin(o.bob + lastT/400) * 3;
+  return {
+    x: fig.cx + Math.cos(o.ang) * r,
+    y: fig.cy + Math.sin(o.ang) * r * 0.94,
+  };
+}
+
+function killVoxel(v, mult, idx) {
+  if (!v.alive) return;
+  v.alive = false;
+  fig.remaining--;
+  if (fig.layerLeft) fig.layerLeft[v.depth]--;
+  if (fig.colorLeft) fig.colorLeft[v.color]--;
+  score += Math.round(10 * mult);
+  const p = voxPos(v);
+  burst(p.x, p.y, TILE_COLORS[v.color][0], 6);
+  // voxel flies off outward from the figure center
+  const ang = Math.atan2(p.y - fig.cy, p.x - fig.cx) + (Math.random()-0.5)*0.6;
+  const sp = 90 + Math.random()*140;
+  debris.push({
+    x: p.x, y: p.y, color: v.color, s: fig.s * p.k,
+    vx: Math.cos(ang)*sp,
+    vy: Math.sin(ang)*sp - 140,
+    rot: 0, vr: (Math.random()-0.5)*12,
+    t: 0, life: 0.9,
+  });
+  if (idx < 12) snd.hit(idx);
+  shake = Math.min(6, shake + 0.6);
+  fig.velY += (Math.random()-0.5)*0.7;     // little kick on hit
+  if (fig.remaining <= 0) {
+    score += 50 * level;
+    const bk = ['rocket','tnt','light','paint'][(Math.random()*4)|0];
+    boosters[bk]++;
+    addFloat(W/2, H - L.barH - 8, '+1 ' + {rocket:'ROCKET', tnt:'TNT', light:'LIGHT BALL', paint:'PAINT'}[bk], '#7ee88f', 0.9);
+    addFloat(W/2, fig.cy, fig.name + ' CLEAR!', '#ffd45e', 1.6);
+    snd.clear();
+    buzz([40,40,80]);
+    clearT = 0.9;
+    if (score > best) { best = score; localStorage.setItem('pq_best', best); }
+  }
+}
+
+// a shot chips off a same-color chunk: the target plus its matching neighbors
+function hitVoxel(shot) {
+  const v = shot.target;
+  killVoxel(v, shot.mult, shot.idx);
+  for (const [dx,dy,dz] of NEIGH) {
+    const nb = fig.map[(v.ix+dx)+','+(v.iy+dy)+','+(v.iz+dz)];
+    if (nb && nb.alive && !nb.reserved && nb.color === v.color)
+      killVoxel(nb, shot.mult, shot.idx);
+  }
+}
+
+// propeller flyer: any color, but always focuses on the OUTERMOST remaining
+// shell — aiming at the middle of what the player is currently looking at,
+// and widening its search ring step by step when the middle is already empty
+function pickAnyVoxel() {
+  if (!fig || fig.remaining <= 0) return null;
+  let minD = Infinity;
+  const pool = [];
+  for (const v of fig.voxels) {
+    if (!v.alive || v.reserved || !isExposed(v)) continue;
+    if (v.depth < minD) { minD = v.depth; pool.length = 0; }
+    if (v.depth === minD) pool.push(v);
+  }
+  if (!pool.length) return null;
+  // rank by distance from the view axis, camera-facing half first
+  const scored = pool.map(v => {
+    const w = worldOf(v);
+    return { v, back: w.z < 0 ? 0 : 1, r: Math.hypot(w.x, w.y) };
+  });
+  scored.sort((p, q) => p.back - q.back || p.r - q.r);
+  // random pick inside the tightest occupied ring (slight spread feels natural)
+  const ring = scored.filter(s => s.back === scored[0].back && s.r <= scored[0].r + 1.5);
+  const v = ring[(Math.random()*ring.length)|0].v;
+  v.reserved = true;
+  return v;
+}
+
+function launchFlyer(x, y, strength, delay=0) {
+  flyers.push({ x, y, sx:x, sy:y, t:-delay, rot:0, target:null, strength });
+}
+
+function flyerBlast(f) {
+  const v = f.target;
+  if (!fig || !v) return;
+  const p = voxPos(v);
+  burst(p.x, p.y, '#7ee0ff', 10);
+  let idx = 0;
+  if (f.strength === 'wipe') {
+    const col = v.color;
+    for (const w of fig.voxels) if (w.alive && w.color === col) killVoxel(w, 1.5, idx++);
+  } else {
+    const R = f.strength || 1;   // manhattan radius on the voxel grid
+    for (const w of fig.voxels) {
+      if (!w.alive) continue;
+      if (Math.abs(w.ix-v.ix) + Math.abs(w.iy-v.iy) + Math.abs(w.iz-v.iz) <= R)
+        killVoxel(w, 1.2, idx++);
+    }
+  }
+  shake = Math.min(10, shake + 2.5);
+  buzz(20);
+}
+
+// ---------- board logic ----------
+function randType(){ return TYPES[(Math.random()*TYPES.length)|0]; }
+
+function makeGem(type, r, c) {
+  return { type, power:null, x:cellX(c), y:cellY(r), ty:cellY(r), vy:0, falling:false, pop:false, popT:0, scale:1, bounced:false, swapping:false };
+}
+
+// a gem only takes part in matching while it's sitting still
+function mtype(g) {
+  return (g && g.type && !g.pop && !g.falling && !g.swapping) ? g.type : null;
+}
+
+function fillBoard() {
+  do {
+    grid = [];
+    for (let r=0;r<ROWS;r++) {
+      grid[r] = [];
+      for (let c=0;c<COLS;c++) {
+        let t;
+        do { t = randType(); }
+        while (
+          (c>=2 && grid[r][c-1].type===t && grid[r][c-2].type===t) ||
+          (r>=2 && grid[r-1][c].type===t && grid[r-2][c].type===t) ||
+          (r>=1 && c>=1 && grid[r-1][c].type===t && grid[r][c-1].type===t && grid[r-1][c-1].type===t)
+        );
+        grid[r][c] = makeGem(t, r, c);
+      }
+    }
+  } while (!hasMoves());
+}
+
+function findMatches() {
+  const cells = new Set();
+  const scan = (getGem, outer, inner, mark) => {
+    for (let a=0;a<outer;a++) {
+      let run = 1;
+      for (let b=1;b<=inner;b++) {
+        const cur = b<inner ? mtype(getGem(a,b)) : null;
+        const prev = mtype(getGem(a,b-1));
+        if (cur && prev && cur===prev) run++;
+        else {
+          if (run>=3 && prev) for (let k=b-run;k<b;k++) mark(a,k);
+          run = 1;
+        }
+      }
+    }
+  };
+  scan((r,c)=>grid[r][c], ROWS, COLS, (r,c)=>cells.add(r+','+c));
+  scan((c,r)=>grid[r][c], COLS, ROWS, (c,r)=>cells.add(r+','+c));
+  // 2x2 squares also match (T/L shapes fall out of the straight scans)
+  for (let r=0;r<ROWS-1;r++) for (let c=0;c<COLS-1;c++) {
+    const t = mtype(grid[r][c]);
+    if (t &&
+        mtype(grid[r][c+1])===t &&
+        mtype(grid[r+1][c])===t &&
+        mtype(grid[r+1][c+1])===t) {
+      cells.add(r+','+c); cells.add(r+','+(c+1));
+      cells.add((r+1)+','+c); cells.add((r+1)+','+(c+1));
+    }
+  }
+  return cells;
+}
+
+function commonColor() {
+  const count = {};
+  let bestT = TYPES[0], bestN = 0;
+  for (let r=0;r<ROWS;r++) for (let c=0;c<COLS;c++) {
+    const g = grid[r][c];
+    if (!g || !g.type) continue;
+    count[g.type] = (count[g.type]||0) + 1;
+    if (count[g.type] > bestN) { bestN = count[g.type]; bestT = g.type; }
+  }
+  return bestT;
+}
+
+// like findMatches, but also decides which power-ups the matches create:
+// 4 in a line -> rocket, T/L intersection -> TNT, 2x2 -> propeller, 5+ -> light ball
+function findMatchGroups() {
+  const runs = [];
+  for (let r=0;r<ROWS;r++) {
+    let run = 1;
+    for (let c=1;c<=COLS;c++) {
+      const cur = c<COLS ? mtype(grid[r][c]) : null, prev = mtype(grid[r][c-1]);
+      if (cur && prev && cur===prev) run++;
+      else {
+        if (run>=3 && prev) { const arr=[]; for (let k=c-run;k<c;k++) arr.push({r,c:k}); runs.push({cells:arr, dir:'h', len:run}); }
+        run = 1;
+      }
+    }
+  }
+  for (let c=0;c<COLS;c++) {
+    let run = 1;
+    for (let r=1;r<=ROWS;r++) {
+      const cur = r<ROWS ? mtype(grid[r][c]) : null, prev = mtype(grid[r-1][c]);
+      if (cur && prev && cur===prev) run++;
+      else {
+        if (run>=3 && prev) { const arr=[]; for (let k=r-run;k<r;k++) arr.push({r:k,c}); runs.push({cells:arr, dir:'v', len:run}); }
+        run = 1;
+      }
+    }
+  }
+  const cells = new Set();
+  for (const run of runs) for (const p of run.cells) cells.add(p.r+','+p.c);
+  const squares = [];
+  for (let r=0;r<ROWS-1;r++) for (let c=0;c<COLS-1;c++) {
+    const t = mtype(grid[r][c]);
+    if (t &&
+        mtype(grid[r][c+1])===t &&
+        mtype(grid[r+1][c])===t &&
+        mtype(grid[r+1][c+1])===t) {
+      const sq = [{r,c},{r,c:c+1},{r:r+1,c},{r:r+1,c:c+1}];
+      squares.push(sq);
+      for (const p of sq) cells.add(p.r+','+p.c);
+    }
+  }
+
+  const spawns = [], taken = new Set();
+  const pick = arr => {
+    if (lastSwap) for (const s of lastSwap)
+      for (const p of arr) if (p.r===s.r && p.c===s.c && !taken.has(p.r+','+p.c)) return p;
+    for (const p of [arr[arr.length>>1], ...arr]) if (!taken.has(p.r+','+p.c)) return p;
+    return null;
+  };
+  const spawn = (arr, power) => {
+    const p = pick(arr);
+    if (p) { spawns.push({ r:p.r, c:p.c, power }); taken.add(p.r+','+p.c); }
+  };
+  for (const run of runs) if (run.len>=5) { run.used = true; spawn(run.cells, 'light'); }
+  for (const h of runs) {
+    if (h.dir!=='h' || h.used) continue;
+    for (const v of runs) {
+      if (v.dir!=='v' || v.used) continue;
+      const shared = h.cells.find(p => v.cells.some(q => q.r===p.r && q.c===p.c));
+      if (shared) { h.used = v.used = true; spawn([shared], 'tnt'); break; }
+    }
+  }
+  for (const run of runs) if (!run.used && run.len===4)
+    spawn(run.cells, run.dir==='h' ? 'rocketH' : 'rocketV');
+  const runCells = new Set();
+  for (const run of runs) for (const p of run.cells) runCells.add(p.r+','+p.c);
+  for (const sq of squares) {
+    if (sq.some(p => runCells.has(p.r+','+p.c) || taken.has(p.r+','+p.c))) continue;
+    spawn(sq, 'prop');
+    for (const p of sq) taken.add(p.r+','+p.c);
+  }
+  return { cells, spawns };
+}
+
+// expand power-up activations (chain reactions included) into a set of board cells
+function detonate(seeds, colorHint, pre) {
+  const acc = new Set(), done = new Set(), q = [];
+  let hint = colorHint || null;
+  const push = (r, c) => {
+    if (r<0||r>=ROWS||c<0||c>=COLS) return;
+    const g = grid[r][c];
+    if (!g || g.pop || g.swapping) return;
+    const k = r+','+c;
+    acc.add(k);
+    if (g.power && !done.has(k)) q.push({r,c});
+  };
+  if (pre && pre.done) for (const p of pre.done) { done.add(p.r+','+p.c); acc.add(p.r+','+p.c); }
+  if (pre && pre.include) for (const p of pre.include) push(p.r, p.c);
+  for (const s of seeds) q.push({ r:s.r, c:s.c });
+  while (q.length) {
+    const {r, c} = q.shift();
+    const k = r+','+c;
+    if (done.has(k)) continue;
+    done.add(k); acc.add(k);
+    const g = grid[r][c];
+    if (!g || !g.power) continue;
+    if (g.power === 'rocketH') { for (let c2=0;c2<COLS;c2++) push(r, c2); }
+    else if (g.power === 'rocketV') { for (let r2=0;r2<ROWS;r2++) push(r2, c); }
+    else if (g.power === 'tnt') {
+      for (let dr=-2;dr<=2;dr++) for (let dc=-2;dc<=2;dc++) push(r+dr, c+dc);
+      shake = Math.min(10, shake + 4);
+    }
+    else if (g.power === 'light') {
+      const col = hint || commonColor();
+      hint = null;
+      for (let r2=0;r2<ROWS;r2++) for (let c2=0;c2<COLS;c2++)
+        if (grid[r2][c2] && grid[r2][c2].type === col) push(r2, c2);
+      shake = Math.min(10, shake + 3);
+    }
+    else if (g.power === 'prop') { launchFlyer(g.x, g.y, 1, q.length*0.06); }
+  }
+  return acc;
+}
+
+// two power-ups swapped into each other
+function comboDetonate(a, b) {
+  const gA = grid[a.r][a.c], gB = grid[b.r][b.c];
+  const P = [gA.power, gB.power];
+  const has = t => P.includes(t);
+  const nRockets = P.filter(p => p==='rocketH' || p==='rocketV').length;
+  const include = [], seeds = [];
+  addFloat(gB.x, gB.y - 20, 'MERGE!', '#ffd45e', 1.25);
+
+  if (has('light') && P[0]===P[1]) {                        // light + light: whole board
+    for (let r=0;r<ROWS;r++) for (let c=0;c<COLS;c++) include.push({r,c});
+    shake = Math.min(12, shake + 8);
+  } else if (has('light') && (nRockets || has('tnt'))) {    // light + rocket/tnt: convert a color
+    const pw = has('tnt') ? 'tnt' : (Math.random()<0.5 ? 'rocketH' : 'rocketV');
+    const col = commonColor();
+    for (let r=0;r<ROWS;r++) for (let c=0;c<COLS;c++) {
+      const g = grid[r][c];
+      if (g && g.type === col) { g.power = pw; g.type = null; seeds.push({r,c}); }
+    }
+  } else if (has('light') && has('prop')) {                 // flyer wipes a whole voxel color
+    launchFlyer(gB.x, gB.y, 'wipe', 0);
+  } else if (has('prop') && P[0]===P[1]) {                  // triple flyer
+    for (let i=0;i<3;i++) launchFlyer(gB.x, gB.y, 1, i*0.16);
+  } else if (has('prop')) {                                 // prop + rocket/tnt: bigger figure blast
+    launchFlyer(gB.x, gB.y, has('tnt') ? 3 : 2, 0);
+  } else if (has('tnt') && P[0]===P[1]) {                   // tnt + tnt: 7x7
+    for (let dr=-3;dr<=3;dr++) for (let dc=-3;dc<=3;dc++) include.push({r:b.r+dr, c:b.c+dc});
+    shake = Math.min(12, shake + 8);
+  } else if (has('tnt')) {                                  // tnt + rocket: 3 rows + 3 cols
+    for (let d=-1;d<=1;d++) {
+      for (let c=0;c<COLS;c++) include.push({r:b.r+d, c});
+      for (let r=0;r<ROWS;r++) include.push({r, c:b.c+d});
+    }
+    shake = Math.min(12, shake + 7);
+  } else {                                                  // rocket + rocket: cross
+    for (let c=0;c<COLS;c++) include.push({r:b.r, c});
+    for (let r=0;r<ROWS;r++) include.push({r, c:b.c});
+  }
+  buzz(30);
+  startPop(detonate(seeds, null, { done:[a, b], include }));
+}
+
+function swapCells(a, b) {
+  const t = grid[a.r][a.c];
+  grid[a.r][a.c] = grid[b.r][b.c];
+  grid[b.r][b.c] = t;
+}
+
+function wouldMatch(a, b) {
+  swapCells(a, b);
+  const m = findMatches().size > 0;
+  swapCells(a, b);
+  return m;
+}
+
+function hasMoves() {
+  for (let r=0;r<ROWS;r++) for (let c=0;c<COLS;c++) {
+    if (grid[r][c] && grid[r][c].power) return true;
+    if (c<COLS-1 && wouldMatch({r,c},{r,c:c+1})) return true;
+    if (r<ROWS-1 && wouldMatch({r,c},{r:r+1,c})) return true;
+  }
+  return false;
+}
+
+function shuffleBoard() {
+  addFloat(W/2, L.boardY + L.boardH/2, 'SHUFFLE!', '#ffd45e', 1.3);
+  const types = [];
+  for (let r=0;r<ROWS;r++) for (let c=0;c<COLS;c++) types.push(grid[r][c].type);
+  let ok = false, guard = 0;
+  while (!ok && guard++ < 200) {
+    for (let i=types.length-1;i>0;i--) { const j=(Math.random()*(i+1))|0; [types[i],types[j]]=[types[j],types[i]]; }
+    let i=0;
+    for (let r=0;r<ROWS;r++) for (let c=0;c<COLS;c++) grid[r][c].type = types[i++];
+    ok = findMatches().size===0 && hasMoves();
+  }
+  if (!ok) fillBoard();
+  for (let r=0;r<ROWS;r++) for (let c=0;c<COLS;c++) grid[r][c].scale = 0.2;
+}
+
+// ---------- resolve flow ----------
+// bottom-bar booster: drops that power-up onto a random normal tile
+// (paint instead pauses the game and asks for a color)
+function useBooster(key) {
+  if (!boosters[key] || boosters[key] <= 0) { snd.bad(); return; }
+  if (key === 'paint') {
+    paintPick = true;
+    beep(600, 0.05, 'sine', 0.1);
+    return;
+  }
+  const pool = [];
+  for (let r=0;r<ROWS;r++) for (let c=0;c<COLS;c++) {
+    const g = grid[r][c];
+    if (g && g.type && !g.power && !g.pop && !g.falling && !g.swapping) pool.push({r,c});
+  }
+  if (!pool.length) return;
+  boosters[key]--;
+  const {r,c} = pool[(Math.random()*pool.length)|0];
+  const g = grid[r][c];
+  g.power = key === 'rocket' ? (Math.random()<0.5 ? 'rocketH' : 'rocketV') : key;
+  g.type = null; g.scale = 0.25;
+  burst(g.x, g.y, '#ffffff', 10);
+  addFloat(g.x, g.y - 8, {rocket:'ROCKET', tnt:'TNT', light:'LIGHT BALL'}[key], '#ffd45e', 0.9);
+  beep(700, 0.07, 'triangle', 0.12, 150);
+  buzz(15);
+}
+
+// paint booster: pauses the game, then recolors every cube currently in view
+function paintChips() {
+  const s = 44, gap = 12, tw = TYPES.length*s + (TYPES.length-1)*gap;
+  return TYPES.map((t, i) => ({ t, x: W/2 - tw/2 + i*(s+gap), y: H*0.44, w: s, h: s }));
+}
+
+function applyPaint(color) {
+  paintPick = false;
+  if (!fig || boosters.paint <= 0) return;
+  let n = 0;
+  for (const v of fig.voxels) {
+    if (!v.alive || v.color === color) continue;
+    if (paintVisible(v)) {
+      fig.colorLeft[v.color]--;
+      fig.colorLeft[color] = (fig.colorLeft[color]||0) + 1;
+      v.color = color;
+      v.scale = 0.55;              // little pop as the paint lands
+      n++;
+    }
+  }
+  if (!n) { snd.bad(); return; }
+  boosters.paint--;
+  burst(fig.cx, fig.cy, TILE_COLORS[color][0], 26);
+  addFloat(fig.cx, fig.cy, 'PAINTED ' + n, TILE_COLORS[color][0], 1.25);
+  beep(880, 0.12, 'triangle', 0.14, 220);
+  buzz(20);
+  shake = Math.min(8, shake + 3);
+}
+
+// a column is locked while anything in it pops, falls or swaps —
+// swaps in unrelated columns are allowed to run concurrently
+function colBusy(c) {
+  for (let r=0;r<ROWS;r++) {
+    const g = grid[r][c];
+    if (!g || g.pop || g.falling || g.swapping) return true;
+  }
+  return false;
+}
+
+function tryMove(a, b) {
+  if ((state !== 'ready' && state !== 'resolve') || timeLeft <= 0) return;
+  selected = null;
+  if (colBusy(a.c) || colBusy(b.c)) { snd.bad(); return; }
+  const ga = grid[a.r][a.c], gb = grid[b.r][b.c];
+  let action = null;
+  if (ga.power && gb.power) action = 'combo';
+  else if (ga.power || gb.power) action = 'power';
+  ga.swapping = gb.swapping = true;
+  pendingSwaps.push({ a, b, t:0, back:false, action });
+  snd.swap();
+}
+
+function startPop(cells, spawns) {
+  // matched cells that become a power-up don't pop — they transform
+  if (spawns) for (const sp of spawns) {
+    cells.delete(sp.r+','+sp.c);
+    const g = grid[sp.r][sp.c];
+    if (!g || g.swapping) continue;
+    g.power = sp.power; g.type = null;
+    g.pop = false; g.scale = 0.25;
+    burst(g.x, g.y, '#ffffff', 8);
+    addFloat(g.x, g.y - 8,
+      {rocketH:'ROCKET', rocketV:'ROCKET', tnt:'TNT', prop:'PROPELLER', light:'LIGHT BALL'}[sp.power],
+      '#ffd45e', 0.85);
+  }
+  const mult = 1 + (combo-1)*0.5;
+  let i = 0;
+  for (const key of cells) {
+    const [r,c] = key.split(',').map(Number);
+    const g = grid[r][c];
+    if (!g || g.pop || g.swapping) continue;
+    g.pop = true; g.popT = 0;
+    burst(g.x, g.y, g.type ? TILE_COLORS[g.type][0] : '#ffffff', 5);
+    if (i < 6) snd.pop(combo + i*0.5);
+    // matched colors join the swarm orbiting the figure — an orb only fires
+    // once a voxel of its color is actually visible (see update())
+    if (g.type && fig && (fig.colorLeft[g.type]||0) > swarmCount(g.type)) {
+      orbs.push({
+        color: g.type, mult, state: 'fly',
+        x: g.x, y: g.y, sx: g.x, sy: g.y,
+        t: -i*0.04, dur: 0.5 + Math.random()*0.2,
+        cx: g.x + (Math.random()-0.5)*180,
+        cy: g.y - 80 - Math.random()*80,
+        ang: Math.random()*Math.PI*2,
+        w: 1.0 + Math.random()*0.5,
+        bob: Math.random()*7,
+      });
+    } else if (g.type) {
+      score += 2;      // swarm already saturated for this color
+    }
+    i++;
+  }
+  score += Math.round(cells.size * 2 * mult);
+  if (combo > 1) {
+    addFloat(W/2, L.boardY - 24, 'COMBO x'+combo, '#ff8ab8', 1.15 + combo*0.1);
+    buzz(15);
+  }
+}
+
+// refill colors drift toward what the figure still needs — stronger as the
+// figure nears completion and in the final stretch of the clock
+function biasedType() {
+  if (fig && fig.remaining > 0) {
+    const useful = TYPES.filter(t => (fig.colorLeft[t]||0) > 0);
+    if (useful.length && useful.length < TYPES.length) {
+      let p = 0.25 + 0.4 * (1 - fig.remaining / fig.total);
+      if (timeLeft <= 30) p += 0.25;
+      if (Math.random() < Math.min(0.8, p)) return useful[(Math.random()*useful.length)|0];
+    }
+  }
+  return randType();
+}
+
+// gravity runs continuously; columns owned by an animating swap are deferred
+function collapseColumns() {
+  for (let c=0;c<COLS;c++) {
+    let missing = 0, swapLocked = false;
+    for (let r=0;r<ROWS;r++) {
+      const g = grid[r][c];
+      if (!g) missing++;
+      else if (g.swapping) swapLocked = true;
+    }
+    if (!missing || swapLocked) continue;
+    const col = [];
+    let topY = L.boardY;
+    for (let r=ROWS-1;r>=0;r--) {
+      const g = grid[r][c];
+      if (g) { col.push(g); topY = Math.min(topY, g.y); }
+    }
+    for (let i=0;i<missing;i++) {
+      const g = makeGem(biasedType(), 0, c);
+      g.y = Math.min(topY, L.boardY) - L.cell*(i+1) - L.cell*0.3;
+      col.push(g);
+    }
+    for (let i=0;i<ROWS;i++) {
+      const r = ROWS-1-i;
+      const g = col[i];
+      grid[r][c] = g;
+      g.ty = cellY(r);
+      if (Math.abs(g.y - g.ty) > 0.5) {
+        if (!g.falling) { g.falling = true; g.vy = 0; g.bounced = false; }
+      } else { g.y = g.ty; g.falling = false; }
+    }
+  }
+}
+
+function afterStable() {
+  const m = findMatchGroups();
+  if (m.cells.size > 0) {
+    combo++;
+    startPop(m.cells, m.spawns);
+    return;
+  }
+  lastSwap = null;
+  combo = 1;
+  if (!hasMoves()) shuffleBoard();
+  state = 'ready'; sub = '';
+}
+
+// ---------- fx ----------
+function burst(x, y, color, n) {
+  for (let i=0;i<n;i++) {
+    const a = Math.random()*Math.PI*2, sp = 60 + Math.random()*200;
+    particles.push({
+      x, y, vx:Math.cos(a)*sp, vy:Math.sin(a)*sp - 60,
+      life: 0.4 + Math.random()*0.35, t:0,
+      size: 2.5 + Math.random()*3, color,
+    });
+  }
+}
+function addFloat(x, y, text, color, scale=1) {
+  floats.push({ x, y, text, color, scale, t:0, life:1.1 });
+}
+
+// ---------- input ----------
+function cellAt(px, py) {
+  const c = Math.floor((px - L.boardX) / L.cell);
+  const r = Math.floor((py - L.boardY) / L.cell);
+  if (r<0||r>=ROWS||c<0||c>=COLS) return null;
+  return {r,c};
+}
+
+canvas.addEventListener('pointerdown', e => {
+  e.preventDefault();
+  audio();
+  const x = e.clientX, y = e.clientY;
+  if (state === 'menu') { startGame(); return; }
+  if (state === 'over') {
+    if (lastT - overAt > 700) startGame();
+    return;
+  }
+  // paint booster modal: the whole game is paused until a color is picked
+  if (paintPick) {
+    for (const ch of paintChips()) {
+      if (x >= ch.x && x <= ch.x+ch.w && y >= ch.y && y <= ch.y+ch.h) { applyPaint(ch.t); return; }
+    }
+    paintPick = false;          // tap anywhere else cancels
+    return;
+  }
+  if (x > W-44 && y < 48) { soundOn = !soundOn; beep(660,0.06); return; }
+  // booster bar
+  if (L.btns && (state === 'ready' || state === 'resolve') && timeLeft > 0) {
+    for (const b of L.btns) {
+      if (x >= b.x && x <= b.x+b.w && y >= b.y && y <= b.y+b.h) { useBooster(b.key); return; }
+    }
+  }
+  // drag on the figure area spins it (free 2-axis trackball)
+  if (y > L.arenaTop && y < L.arenaBot) { rotDrag = { x, y }; return; }
+  if ((state !== 'ready' && state !== 'resolve') || timeLeft <= 0) return;
+  const cell = cellAt(x, y);
+  if (!cell) { selected = null; return; }
+  const gsel = grid[cell.r][cell.c];
+  if (!gsel || gsel.pop || gsel.falling || gsel.swapping) { selected = null; return; }
+  if (selected && Math.abs(selected.r-cell.r)+Math.abs(selected.c-cell.c) === 1) {
+    tryMove(selected, cell);
+    return;
+  }
+  selected = cell;
+  dragStart = { x, y, cell };
+  beep(500, 0.04, 'sine', 0.06);
+});
+
+canvas.addEventListener('pointermove', e => {
+  if (rotDrag && fig) {
+    const dx = e.clientX - rotDrag.x, dy = e.clientY - rotDrag.y;
+    rotDrag.x = e.clientX; rotDrag.y = e.clientY;
+    // negative sign: the face under your finger follows the drag direction
+    rotateBasis(fig.R, {x:0,y:1,z:0}, -dx * 0.012);
+    rotateBasis(fig.R, {x:1,y:0,z:0}, dy * 0.012);
+    orthonorm(fig.R);
+    fig.velY = Math.max(-5, Math.min(5, -dx * 0.4));
+    fig.velX = Math.max(-5, Math.min(5, dy * 0.4));
+    return;
+  }
+  if (!dragStart || (state !== 'ready' && state !== 'resolve')) return;
+  const dx = e.clientX - dragStart.x, dy = e.clientY - dragStart.y;
+  const th = L.cell * 0.35;
+  if (Math.abs(dx) < th && Math.abs(dy) < th) return;
+  const {r,c} = dragStart.cell;
+  let b;
+  if (Math.abs(dx) > Math.abs(dy)) b = { r, c: c + (dx>0?1:-1) };
+  else b = { r: r + (dy>0?1:-1), c };
+  dragStart = null;
+  if (b.r<0||b.r>=ROWS||b.c<0||b.c>=COLS) return;
+  tryMove({r,c}, b);
+});
+
+canvas.addEventListener('pointerup', () => {
+  // a tap (down+up without dragging away) on a power-up sets it off
+  if (dragStart && (state === 'ready' || state === 'resolve') && timeLeft > 0) {
+    const {r, c} = dragStart.cell;
+    const g = grid[r]?.[c];
+    if (g && g.power && !g.pop && !g.falling && !g.swapping) {
+      selected = null;
+      if (state === 'ready') combo = 1;
+      state = 'resolve'; lastSwap = null;
+      startPop(detonate([{r, c}]));
+      buzz(20);
+    }
+  }
+  dragStart = null;
+  if (rotDrag) { rotDrag = null; if (fig) fig.autoT = 0; }
+});
+window.addEventListener('resize', resize);
+
+// ---------- game flow ----------
+function gameOver() {
+  state = 'over';
+  overAt = lastT;
+  selected = null;
+  paintPick = false;
+  snd.bad();
+  buzz([60,50,100]);
+  if (score > best) { best = score; localStorage.setItem('pq_best', best); }
+}
+
+function startGame() {
+  audio();
+  level = 1; score = 0; combo = 1; clearT = 0; lastSwap = null;
+  timeLeft = GAME_TIME; timerFlash = 0;
+  boosters = { rocket: 3, tnt: 2, light: 1, paint: 1 };
+  paintPick = false;
+  shots.length = 0; debris.length = 0; particles.length = 0; floats.length = 0; flyers.length = 0;
+  orbs.length = 0; fireCd = 0; pendingSwaps.length = 0;
+  spawnFigure(0);
+  fillBoard();
+  for (let r=0;r<ROWS;r++) for (let c=0;c<COLS;c++) grid[r][c].scale = 0.2;
+  state = 'ready'; sub = '';
+  beep(440, 0.1, 'triangle', 0.12, 220);
+}
+
+// ---------- update ----------
+function update(dt) {
+  shake = Math.max(0, shake - dt*20);
+  timerFlash = Math.max(0, timerFlash - dt*2);
+  updateFigure(dt);
+
+  // countdown clock (ticks in the last 10 seconds)
+  if (state !== 'over') {
+    const prev = timeLeft;
+    timeLeft = Math.max(0, timeLeft - dt);
+    const s = Math.ceil(timeLeft);
+    if (s !== Math.ceil(prev) && timeLeft > 0 && s <= 10) {
+      beep(s <= 5 ? 1320 : 990, 0.045, 'square', 0.07);
+      if (s <= 5) buzz(15);
+    }
+  }
+
+  // next figure countdown — a new level starts with a fresh clock
+  if (clearT > 0) {
+    clearT -= dt;
+    if (clearT <= 0) {
+      level++;
+      spawnFigure(level-1);
+      timeLeft = GAME_TIME;
+      timerFlash = 1;
+      addFloat(W/2, 62, ((GAME_TIME/60)|0) + ':' + String(GAME_TIME%60).padStart(2,'0'), '#7ee88f', 1.15);
+      addFloat(W/2, L.arenaTop + 30, 'LEVEL ' + level, '#6fd2ff', 1.2);
+    }
+  }
+
+  // time's up? (only once everything has settled and landed)
+  if (state === 'ready' && timeLeft <= 0 && clearT <= 0 &&
+      shots.length === 0 && flyers.length === 0 && pendingSwaps.length === 0) {
+    gameOver();
+  }
+
+  // gems
+  const G = L.cell * 38;
+  let allSettled = true;
+  for (let r=0;r<ROWS;r++) for (let c=0;c<COLS;c++) {
+    const g = grid[r]?.[c];
+    if (!g) { allSettled = false; continue; }
+    g.scale += (1 - g.scale) * Math.min(1, dt*10);
+    if (g.pop) g.popT += dt;
+    if (g.falling) {
+      allSettled = false;
+      g.vy += G*dt;
+      g.y += g.vy*dt;
+      if (g.y >= g.ty) {
+        if (!g.bounced && g.vy > L.cell*4) {
+          g.y = g.ty; g.vy = -g.vy*0.22; g.bounced = true;
+        } else {
+          g.y = g.ty; g.vy = 0; g.falling = false;
+        }
+      }
+    }
+  }
+
+  // concurrent swaps — each animates and resolves independently
+  for (let si=pendingSwaps.length-1;si>=0;si--) {
+    const ps = pendingSwaps[si];
+    ps.t += dt / 0.13;
+    const {a, b} = ps;
+    const ga = grid[a.r][a.c], gb = grid[b.r][b.c];
+    const t = Math.min(1, ps.t);
+    const e2 = 1 - (1-t)*(1-t);
+    const ax = cellX(a.c), ay = cellY(a.r), bx = cellX(b.c), by = cellY(b.r);
+    if (!ps.back) {
+      ga.x = ax + (bx-ax)*e2; ga.y = ay + (by-ay)*e2;
+      gb.x = bx + (ax-bx)*e2; gb.y = by + (ay-by)*e2;
+      if (t >= 1) {
+        ga.swapping = gb.swapping = false;
+        swapCells(a, b);
+        const m = ps.action ? null : findMatchGroups();
+        if (ps.action || m.cells.size > 0 || m.spawns.length > 0) {
+          ga.ty = by; gb.ty = ay;
+          pendingSwaps.splice(si,1);
+          if (state === 'ready') combo = 1;
+          state = 'resolve';
+          lastSwap = [a, b];
+          if (ps.action === 'combo') {
+            comboDetonate(a, b);
+          } else if (ps.action === 'power') {
+            // activate the power-up at its new cell; a light ball takes
+            // the color of the gem it was swapped with
+            const gAtA = grid[a.r][a.c], gAtB = grid[b.r][b.c];
+            const cell = gAtA.power ? a : b;
+            const other = gAtA.power ? gAtB : gAtA;
+            startPop(detonate([cell], other.type));
+          } else {
+            startPop(m.cells, m.spawns);
+          }
+        } else {
+          swapCells(a, b);                 // undo — no match after all
+          ga.swapping = gb.swapping = true;
+          ps.back = true; ps.t = 0;
+          snd.bad();
+        }
+      }
+    } else {
+      ga.x = bx + (ax-bx)*e2; ga.y = by + (ay-by)*e2;
+      gb.x = ax + (bx-ax)*e2; gb.y = ay + (by-ay)*e2;
+      if (t >= 1) {
+        ga.x = ax; ga.y = ay; ga.ty = ay;
+        gb.x = bx; gb.y = by; gb.ty = by;
+        ga.swapping = gb.swapping = false;
+        pendingSwaps.splice(si,1);
+      }
+    }
+  }
+
+  if (state === 'resolve') {
+    // pops expire per gem; gravity fills in continuously
+    let anyPop = false, anyRemoved = false;
+    for (let r=0;r<ROWS;r++) for (let c=0;c<COLS;c++) {
+      const g = grid[r][c];
+      if (g && g.pop) {
+        if (g.popT > 0.26) { grid[r][c] = null; anyRemoved = true; }
+        else anyPop = true;
+      }
+    }
+    collapseColumns();
+    if (!anyPop && !anyRemoved && allSettled && pendingSwaps.length === 0) afterStable();
+  }
+
+  // swarm orbs — fly in from the board, then orbit the figure
+  for (let i=orbs.length-1;i>=0;i--) {
+    const o = orbs[i];
+    if (o.state === 'fly') {
+      o.t += dt;
+      if (o.t < 0) continue;
+      const k = Math.min(1, o.t / o.dur), e = k*k*(3-2*k), u = 1-e;
+      const p = orbitPos(o);
+      o.x = u*u*o.sx + 2*u*e*o.cx + e*e*p.x;
+      o.y = u*u*o.sy + 2*u*e*o.cy + e*e*p.y;
+      if (Math.random() < 0.3) particles.push({
+        x:o.x, y:o.y, vx:(Math.random()-0.5)*16, vy:(Math.random()-0.5)*16,
+        life:0.22, t:0, size:2, color:TILE_COLORS[o.color][0],
+      });
+      if (k >= 1) o.state = 'orbit';
+    } else {
+      o.ang += o.w * dt;
+      const p = orbitPos(o);
+      o.x = p.x; o.y = p.y;
+      // its color is gone from the figure -> cash the orb in
+      if (fig && fig.remaining > 0 && clearT <= 0 && (fig.colorLeft[o.color]||0) <= 0) {
+        score += 5;
+        burst(o.x, o.y, TILE_COLORS[o.color][0], 5);
+        addFloat(o.x, o.y, '+5', '#c8d0ee', 0.7);
+        orbs.splice(i,1);
+      }
+    }
+  }
+
+  // swarm firing — one orb at a time, only at voxels we can actually see;
+  // rotating the figure into view is what unleashes the swarm
+  fireCd -= dt;
+  if (state !== 'over' && timeLeft > 0 && fig && fireCd <= 0) {
+    for (let i=0;i<orbs.length;i++) {
+      const o = orbs[i];
+      if (o.state !== 'orbit') continue;
+      const target = pickTarget(o.color);
+      if (!target) continue;
+      const p = voxPos(target);
+      // arc control point: pushed OUTSIDE the figure silhouette along the
+      // outward direction, so the shot wraps around and dives onto the
+      // visible face instead of appearing to fly through the object
+      const mx = (o.x + p.x)/2, my = (o.y + p.y)/2;
+      let ox = mx - fig.cx, oy = my - fig.cy;
+      const ol = Math.hypot(ox, oy) || 1;
+      const push = Math.max(0, orbitRadius() - ol) + 14 + Math.random()*22;
+      shots.push({
+        x: o.x, y: o.y, sx: o.x, sy: o.y,
+        color: o.color, target, mult: o.mult, idx: (fireIdx++)%8,
+        t: 0,
+        dur: 0.32 + Math.random()*0.1,
+        cx: mx + (ox/ol) * push,
+        cy: my + (oy/ol) * push,
+      });
+      orbs.splice(i,1);
+      fireCd = 0.07;
+      break;
+    }
+  }
+
+  // shots — bezier arc with a live endpoint (the voxel rotates with the figure)
+  for (let i=shots.length-1;i>=0;i--) {
+    const s = shots[i];
+    s.t += dt;
+    if (s.t < 0) continue;
+    const k = Math.min(1, s.t / s.dur);
+    const e = k*k*(3-2*k);
+    const p = voxPos(s.target);
+    const u = 1-e;
+    s.x = u*u*s.sx + 2*u*e*s.cx + e*e*p.x;
+    s.y = u*u*s.sy + 2*u*e*s.cy + e*e*p.y;
+    if (Math.random() < 0.7) particles.push({
+      x:s.x, y:s.y, vx:(Math.random()-0.5)*20, vy:(Math.random()-0.5)*20,
+      life:0.25, t:0, size:2.5, color:TILE_COLORS[s.color][0],
+    });
+    if (k >= 1) {
+      shots.splice(i,1);
+      if (s.target.alive) hitVoxel(s);
+      else burst(s.x, s.y, TILE_COLORS[s.color][0], 4);
+    }
+  }
+
+  // propeller flyers — spiral up to a random voxel, blast an area on arrival
+  for (let i=flyers.length-1;i>=0;i--) {
+    const f = flyers[i];
+    f.t += dt; f.rot += dt*18;
+    if (f.t < 0) continue;
+    if (!f.target) {
+      const v = pickAnyVoxel();
+      if (!v) {
+        f.idle = (f.idle||0) + dt;
+        f.y -= dt*30;
+        if (f.idle > 1.2) { burst(f.x, f.y, '#7ee0ff', 6); flyers.splice(i,1); }
+        continue;
+      }
+      f.target = v; f.t = 0; f.sx = f.x; f.sy = f.y;
+      f.dur = 0.7 + Math.random()*0.2;
+      f.cx = f.x + (Math.random()<0.5?-1:1)*(80 + Math.random()*100);
+      f.cy = Math.min(f.y, voxPos(v).y) - 80 - Math.random()*80;
+    }
+    const k = Math.min(1, f.t/f.dur), e = k*k*(3-2*k), u = 1-e;
+    const p = voxPos(f.target);
+    f.x = u*u*f.sx + 2*u*e*f.cx + e*e*p.x;
+    f.y = u*u*f.sy + 2*u*e*f.cy + e*e*p.y;
+    if (k >= 1) { flyers.splice(i,1); flyerBlast(f); }
+  }
+
+  // debris
+  for (let i=debris.length-1;i>=0;i--) {
+    const d = debris[i];
+    d.t += dt;
+    if (d.t >= d.life) { debris.splice(i,1); continue; }
+    d.vy += 700*dt;
+    d.x += d.vx*dt; d.y += d.vy*dt; d.rot += d.vr*dt;
+  }
+
+  // particles / floats
+  for (let i=particles.length-1;i>=0;i--) {
+    const p = particles[i];
+    p.t += dt;
+    if (p.t >= p.life) { particles.splice(i,1); continue; }
+    p.vy += 500*dt;
+    p.x += p.vx*dt; p.y += p.vy*dt;
+  }
+  for (let i=floats.length-1;i>=0;i--) {
+    const f = floats[i];
+    f.t += dt;
+    if (f.t >= f.life) floats.splice(i,1);
+  }
+}
+
+// ---------- draw ----------
+function drawBackground() {
+  const g = ctx.createLinearGradient(0,0,0,H);
+  g.addColorStop(0, '#1c2145');
+  g.addColorStop(1, '#0d1024');
+  ctx.fillStyle = g;
+  ctx.fillRect(0,0,W,H);
+  ctx.fillStyle = 'rgba(255,255,255,0.05)';
+  for (let i=0;i<24;i++) {
+    ctx.fillRect((i*53)%W, (i*97)%H + Math.sin(lastT/2000+i)*4, 2, 2);
+  }
+}
+
+function drawHUD() {
+  ctx.textBaseline = 'middle';
+  ctx.textAlign = 'left';
+  ctx.font = '700 11px -apple-system, system-ui, sans-serif';
+  ctx.fillStyle = '#8f9bc4';
+  ctx.fillText('LEVEL ' + level, 14, 21);
+  ctx.fillStyle = '#fff';
+  ctx.font = '800 16px -apple-system, system-ui, sans-serif';
+  ctx.fillText(score.toLocaleString(), 14, 38);
+  ctx.textAlign = 'right';
+  ctx.font = '600 16px sans-serif';
+  ctx.fillStyle = soundOn ? '#8f9bc4' : '#4a5273';
+  ctx.fillText('♪', W-16, 30);
+  if (!soundOn) {
+    ctx.strokeStyle = '#4a5273'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(W-26, 38); ctx.lineTo(W-10, 21); ctx.stroke();
+  }
+}
+
+function drawBoosterBar() {
+  if (!L.btns) return;
+  rrect(ctx, L.panel.x, L.panel.y, L.panel.w, L.panel.h, 18);
+  ctx.fillStyle = 'rgba(255,255,255,0.05)'; ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.08)'; ctx.lineWidth = 1; ctx.stroke();
+  for (const b of L.btns) {
+    const n = boosters[b.key] || 0;
+    ctx.globalAlpha = n > 0 ? 1 : 0.35;
+    drawPower({ power: b.icon }, b.x + b.w/2, b.y + b.h/2, Math.min(b.w, b.h) * 0.92);
+    ctx.globalAlpha = 1;
+    const bx = b.x + b.w - 5, by = b.y + 5;
+    ctx.fillStyle = n > 0 ? '#ffd45e' : '#4a5273';
+    ctx.beginPath(); ctx.arc(bx, by, 8, 0, 7); ctx.fill();
+    ctx.fillStyle = '#10132b';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.font = '800 11px -apple-system, system-ui, sans-serif';
+    ctx.fillText(n, bx, by + 0.5);
+  }
+}
+
+// full-screen modal while the paint booster waits for a color
+function drawPaintPick() {
+  ctx.fillStyle = 'rgba(10,12,30,0.72)';
+  ctx.fillRect(0, 0, W, H);
+  const chips = paintChips();
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#fff';
+  ctx.font = '800 18px -apple-system, system-ui, sans-serif';
+  ctx.fillText('PICK A COLOR', W/2, H*0.44 - 46);
+  ctx.fillStyle = '#c8d0ee';
+  ctx.font = '600 12px -apple-system, system-ui, sans-serif';
+  ctx.fillText('every cube in view gets painted', W/2, H*0.44 - 24);
+  const pl = 1 + Math.sin(lastT/220)*0.05;
+  for (const ch of chips) {
+    const s = ch.w * pl;
+    ctx.drawImage(tileSprites[ch.t], ch.x + (ch.w-s)/2, ch.y + (ch.h-s)/2, s, s);
+  }
+  ctx.font = '600 11px -apple-system, system-ui, sans-serif';
+  ctx.fillStyle = '#8f9bc4';
+  ctx.fillText('tap anywhere else to cancel', W/2, H*0.44 + chips[0].h + 26);
+}
+
+function shade(type, lum) {
+  const { dark, light } = RGB[type];
+  let r, g, b;
+  if (lum <= 1) {
+    r = dark[0] + (light[0]-dark[0])*lum;
+    g = dark[1] + (light[1]-dark[1])*lum;
+    b = dark[2] + (light[2]-dark[2])*lum;
+  } else {
+    const f = Math.min(1, lum-1);
+    r = light[0] + (255-light[0])*f;
+    g = light[1] + (255-light[1])*f;
+    b = light[2] + (255-light[2])*f;
+  }
+  return `rgb(${r|0},${g|0},${b|0})`;
+}
+
+// small 2D beveled cube — used for flying debris
+function drawCube(x, y, s, color, rot=0, alpha=1) {
+  const [c0, c1] = TILE_COLORS[color];
+  const d = s*0.16, h = s/2 - 0.5;
+  ctx.save();
+  ctx.translate(x, y);
+  if (rot) ctx.rotate(rot);
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = c1;
+  ctx.fillRect(-h, -h, h*2, h*2);
+  ctx.fillStyle = c0;
+  ctx.beginPath();
+  ctx.moveTo(-h, -h); ctx.lineTo(h, -h);
+  ctx.lineTo(h-d, -h+d); ctx.lineTo(-h+d, -h+d);
+  ctx.closePath(); ctx.fill();
+  ctx.fillStyle = 'rgba(0,0,0,0.25)';
+  ctx.beginPath();
+  ctx.moveTo(-h, h); ctx.lineTo(-h+d, h-d);
+  ctx.lineTo(h-d, h-d); ctx.lineTo(h, h);
+  ctx.closePath(); ctx.fill();
+  ctx.restore();
+}
+
+const NEIGH = [[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]];
+
+function drawFigure() {
+  if (!fig || !fig.R) return;
+  const axes = [fig.R.ex, fig.R.ey, fig.R.ez];
+  const LGT = { x:-0.30, y:-0.72, z:-0.62 };
+
+  // the 6 face orientations are shared by every voxel this frame;
+  // actual visibility is decided per voxel against the real camera position
+  const faces = [];
+  for (let a=0;a<3;a++) for (const sgn of [1,-1]) {
+    const n = { x:axes[a].x*sgn, y:axes[a].y*sgn, z:axes[a].z*sgn };
+    if (n.z >= 0.55) continue;    // definitely away at any on-screen position
+    const d = Math.max(0, n.x*LGT.x + n.y*LGT.y + n.z*LGT.z);
+    faces.push({ a, sgn, n, lum: 0.28 + 0.85*d, colors: {} });
+  }
+
+  // painter's algorithm: far voxels first
+  const order = [];
+  for (const v of fig.voxels) {
+    if (!v.alive || v.scale < 0.03) continue;
+    v.w = worldOf(v);
+    order.push(v);
+  }
+  order.sort((p,q) => q.w.z - p.w.z);
+
+  ctx.lineJoin = 'round';
+  for (const v of order) {
+    const h = 0.5 * v.scale;
+    for (const f of faces) {
+      // skip faces buried against a living neighbor
+      const dxyz = NEIGH[f.a*2 + (f.sgn===1?0:1)];
+      const nb = fig.map[(v.ix+dxyz[0])+','+(v.iy+dxyz[1])+','+(v.iz+dxyz[2])];
+      if (nb && nb.alive && nb.scale > 0.6 && v.scale > 0.95) continue;
+      // perspective-correct backface culling: is this face turned toward
+      // the camera as seen FROM THIS voxel? (fixes vanishing side faces)
+      if (f.n.x*v.w.x + f.n.y*v.w.y + f.n.z*(v.w.z + CAMZ) >= 0) continue;
+
+      const n = axes[f.a], u = axes[(f.a+1)%3], t = axes[(f.a+2)%3];
+      const cx3 = v.w.x + n.x*h*f.sgn, cy3 = v.w.y + n.y*h*f.sgn, cz3 = v.w.z + n.z*h*f.sgn;
+      ctx.beginPath();
+      for (let i=0;i<4;i++) {
+        const su = (i===0||i===3) ? 1 : -1;
+        const st = (i<2) ? 1 : -1;
+        const wx = cx3 + u.x*h*su + t.x*h*st;
+        const wy = cy3 + u.y*h*su + t.y*h*st;
+        const wz = cz3 + u.z*h*su + t.z*h*st;
+        const k = 1 / (1 + wz*0.06);
+        const px = fig.cx + wx*fig.s*k, py = fig.cy + wy*fig.s*k;
+        if (i===0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+      ctx.fillStyle = f.colors[v.color] || (f.colors[v.color] = shade(v.color, f.lum));
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(10,12,30,0.25)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+  }
+
+  // layered progress bar — one tinted segment per shell, filling as you peel inward
+  const bw = Math.min(170, W*0.44), bh = 10;
+  const bx = W/2 - bw/2, by = L.arenaBot + 2;
+  rrect(ctx, bx, by, bw, bh, bh/2);
+  ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.fill();
+  ctx.save();
+  rrect(ctx, bx+1, by+1, bw-2, bh-2, (bh-2)/2); ctx.clip();
+  let segX = bx+1;
+  for (let d=0; d<fig.layerTotal.length; d++) {
+    const segW = (bw-2) * fig.layerTotal[d] / fig.total;
+    const col = TILE_COLORS[fig.layerColor[d]];
+    ctx.globalAlpha = 0.22;
+    ctx.fillStyle = col[1];
+    ctx.fillRect(segX, by+1, segW, bh-2);
+    ctx.globalAlpha = 1;
+    const done = (fig.layerTotal[d] - fig.layerLeft[d]) / fig.layerTotal[d];
+    if (done > 0) {
+      const lg = ctx.createLinearGradient(0, by, 0, by+bh);
+      lg.addColorStop(0, col[0]); lg.addColorStop(1, col[1]);
+      ctx.fillStyle = lg;
+      ctx.fillRect(segX, by+1, segW*Math.min(1,done), bh-2);
+    }
+    segX += segW;
+  }
+  ctx.restore();
+  // pulsing swatch showing which color peels the current layer
+  const cur = fig.layerLeft.findIndex(n => n > 0);
+  if (cur >= 0) {
+    const pl = 1 + Math.sin(lastT/220)*0.12;
+    ctx.fillStyle = TILE_COLORS[fig.layerColor[cur]][0];
+    ctx.beginPath(); ctx.arc(bx - 14, by + bh/2, 5*pl, 0, 7); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(bx - 14, by + bh/2, 7.5*pl, 0, 7); ctx.stroke();
+  }
+}
+
+function drawTimer() {
+  if (!L.cell) return;
+  const cx = W/2, cy = 30;
+  const frac = Math.max(0, Math.min(1, timeLeft / GAME_TIME));
+  const low = timeLeft > 0 && timeLeft <= 10.5;
+  const mid = timeLeft <= 30.5;
+  const pulse = low ? 1 + Math.sin(lastT/110)*0.06 : 1;
+  const w = 96*pulse, h = 27*pulse, x = cx - w/2, y = cy - h/2;
+  const col = low ? '#ff8f8f' : mid ? '#ffd45e' : '#c8d0ee';
+
+  // pill with a depleting time fill
+  rrect(ctx, x, y, w, h, h/2);
+  ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.fill();
+  ctx.save();
+  rrect(ctx, x, y, w, h, h/2); ctx.clip();
+  ctx.fillStyle = low ? 'rgba(255,80,80,0.30)' : mid ? 'rgba(255,212,94,0.20)' : 'rgba(111,210,255,0.16)';
+  ctx.fillRect(x, y, w*frac, h);
+  if (timerFlash > 0) {                       // green pulse when bonus time lands
+    ctx.fillStyle = `rgba(126,232,143,${(timerFlash*0.35).toFixed(3)})`;
+    ctx.fillRect(x, y, w, h);
+  }
+  ctx.restore();
+  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = low
+    ? (Math.sin(lastT/150) > 0 ? 'rgba(255,107,107,0.95)' : 'rgba(255,176,176,0.55)')
+    : 'rgba(255,255,255,0.16)';
+  rrect(ctx, x, y, w, h, h/2); ctx.stroke();
+
+  // clock icon with a sweeping second hand
+  const ix = x + h*0.62, ir = h*0.25;
+  ctx.strokeStyle = col; ctx.lineWidth = 1.6;
+  ctx.beginPath(); ctx.arc(ix, cy, ir, 0, 7); ctx.stroke();
+  const ha = -Math.PI/2 + ((GAME_TIME - timeLeft) % 60) / 60 * Math.PI * 2;
+  ctx.beginPath(); ctx.moveTo(ix, cy);
+  ctx.lineTo(ix + Math.cos(ha)*ir*0.7, cy + Math.sin(ha)*ir*0.7);
+  ctx.stroke();
+
+  // digits
+  const t = Math.max(0, Math.ceil(timeLeft));
+  ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+  ctx.font = `800 ${Math.round(15*pulse)}px -apple-system, system-ui, sans-serif`;
+  ctx.fillStyle = low
+    ? (Math.sin(lastT/150) > 0 ? '#ff6b6b' : '#ffb0b0')
+    : (mid ? '#ffd45e' : '#e8ecff');
+  ctx.fillText(((t/60)|0) + ':' + String(t%60).padStart(2,'0'), ix + ir + 7, cy + 1);
+}
+
+function drawDebris() {
+  for (const d of debris) {
+    drawCube(d.x, d.y, d.s, d.color, d.rot, 1 - d.t/d.life);
+  }
+}
+
+function drawOrbs() {
+  for (const o of orbs) {
+    if (o.state === 'fly' && o.t < 0) continue;
+    ctx.globalAlpha = 0.25;
+    ctx.fillStyle = TILE_COLORS[o.color][0];
+    ctx.beginPath(); ctx.arc(o.x, o.y, 10, 0, 7); ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.beginPath(); ctx.arc(o.x, o.y, 5.5, 0, 7); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.beginPath(); ctx.arc(o.x, o.y, 2.2, 0, 7); ctx.fill();
+  }
+}
+
+function drawShots() {
+  for (const s of shots) {
+    if (s.t < 0) continue;
+    ctx.fillStyle = TILE_COLORS[s.color][0];
+    ctx.beginPath(); ctx.arc(s.x, s.y, 6, 0, 7); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.8)';
+    ctx.beginPath(); ctx.arc(s.x, s.y, 2.5, 0, 7); ctx.fill();
+  }
+}
+
+function drawBoard() {
+  rrect(ctx, L.boardX - 6, L.boardY - 6, L.boardW + 12, L.boardH + 12, 16);
+  ctx.fillStyle = 'rgba(255,255,255,0.05)'; ctx.fill();
+  ctx.fillStyle = 'rgba(0,0,0,0.22)';
+  for (let r=0;r<ROWS;r++) for (let c=0;c<COLS;c++) {
+    rrect(ctx, L.boardX + c*L.cell + 2, L.boardY + r*L.cell + 2, L.cell-4, L.cell-4, L.cell*0.22);
+    ctx.fill();
+  }
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(L.boardX - 6, L.boardY - 4, L.boardW + 12, L.boardH + 10);
+  ctx.clip();
+  for (let r=0;r<ROWS;r++) for (let c=0;c<COLS;c++) {
+    const g = grid[r]?.[c];
+    if (!g) continue;
+    let sc = g.scale;
+    if (g.pop) sc = Math.max(0, 1 + g.popT*2 - (g.popT*g.popT)*30);
+    if (selected && selected.r===r && selected.c===c) sc *= 1.12 + Math.sin(lastT/140)*0.03;
+    if (sc <= 0.01) continue;
+    const s = L.cell * sc;
+    if (g.power) drawPower(g, g.x, g.y, s);
+    else ctx.drawImage(tileSprites[g.type], g.x - s/2, g.y - s/2, s, s);
+  }
+  ctx.restore();
+}
+
+function drawPower(g, px, py, s) {
+  const t = lastT/1000, h = s/2;
+  ctx.save();
+  ctx.translate(px, py);
+  rrect(ctx, -h*0.88, -h*0.88, h*1.76, h*1.76, s*0.24);
+  const bg = ctx.createLinearGradient(0, -h, 0, h);
+  bg.addColorStop(0, '#454e7d'); bg.addColorStop(1, '#2a3157');
+  ctx.fillStyle = bg; ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.18)'; ctx.lineWidth = 1; ctx.stroke();
+  switch (g.power) {
+    case 'rocketH':
+    case 'rocketV': {
+      if (g.power === 'rocketV') ctx.rotate(Math.PI/2);
+      ctx.fillStyle = '#ffb347';
+      ctx.beginPath();
+      ctx.moveTo(-h*0.72, -h*0.16);
+      ctx.lineTo(-h*1.02 + Math.sin(t*30)*1.5, 0);
+      ctx.lineTo(-h*0.72, h*0.16);
+      ctx.fill();
+      ctx.fillStyle = '#e8ecff';
+      rrect(ctx, -h*0.72, -h*0.26, h*1.1, h*0.52, h*0.2); ctx.fill();
+      ctx.fillStyle = '#ff5964';
+      ctx.beginPath();
+      ctx.moveTo(h*0.34, -h*0.26); ctx.quadraticCurveTo(h*0.85, 0, h*0.34, h*0.26);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(-h*0.72, -h*0.26); ctx.lineTo(-h*0.46, -h*0.26); ctx.lineTo(-h*0.72, -h*0.52);
+      ctx.moveTo(-h*0.72, h*0.26); ctx.lineTo(-h*0.46, h*0.26); ctx.lineTo(-h*0.72, h*0.52);
+      ctx.fill();
+      ctx.fillStyle = '#55c8ff';
+      ctx.beginPath(); ctx.arc(-h*0.05, 0, h*0.12, 0, 7); ctx.fill();
+      break;
+    }
+    case 'tnt': {
+      ctx.fillStyle = '#d9453c';
+      for (const o of [-1, 0, 1]) { rrect(ctx, o*h*0.34 - h*0.16, -h*0.52, h*0.32, h*1.04, h*0.1); ctx.fill(); }
+      ctx.fillStyle = '#8c2b25';
+      ctx.fillRect(-h*0.55, -h*0.1, h*1.1, h*0.2);
+      ctx.fillStyle = '#fff';
+      ctx.font = `900 ${Math.max(7, Math.round(s*0.22))}px sans-serif`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('TNT', 0, h*0.02);
+      ctx.strokeStyle = '#ccb'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(0, -h*0.5); ctx.quadraticCurveTo(h*0.2, -h*0.78, h*0.32, -h*0.64); ctx.stroke();
+      ctx.fillStyle = Math.sin(t*20) > 0 ? '#ffd45e' : '#ff8c42';
+      ctx.beginPath(); ctx.arc(h*0.32, -h*0.64, h*0.09, 0, 7); ctx.fill();
+      break;
+    }
+    case 'prop': {
+      ctx.rotate(t*6);
+      ctx.fillStyle = '#7ee0ff';
+      for (let i=0;i<3;i++) {
+        ctx.rotate(Math.PI*2/3);
+        ctx.beginPath(); ctx.ellipse(h*0.38, 0, h*0.36, h*0.15, 0, 0, 7); ctx.fill();
+      }
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.arc(0, 0, h*0.14, 0, 7); ctx.fill();
+      break;
+    }
+    case 'paint': {
+      ctx.rotate(t*1.2);
+      const pcols = ['#ff6d7e','#ffd45e','#69dd7a','#55c8ff'];
+      for (let i=0;i<4;i++) {
+        ctx.fillStyle = pcols[i];
+        ctx.beginPath();
+        ctx.moveTo(0,0);
+        ctx.arc(0, 0, h*0.55, i*Math.PI/2, (i+1)*Math.PI/2);
+        ctx.closePath(); ctx.fill();
+      }
+      ctx.rotate(-t*1.2);
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.arc(0, 0, h*0.16, 0, 7); ctx.fill();
+      break;
+    }
+    case 'light': {
+      const pulse = 1 + Math.sin(t*5)*0.06;
+      const rg = ctx.createRadialGradient(0, -h*0.15, h*0.05, 0, 0, h*0.62*pulse);
+      rg.addColorStop(0, '#ffffff'); rg.addColorStop(0.35, '#c08bff'); rg.addColorStop(1, '#5b2a9e');
+      ctx.fillStyle = rg;
+      ctx.beginPath(); ctx.arc(0, 0, h*0.6*pulse, 0, 7); ctx.fill();
+      for (let i=0;i<5;i++) {
+        const a = t*2 + i*Math.PI*2/5;
+        ctx.fillStyle = TILE_COLORS[TYPES[i]][0];
+        ctx.beginPath(); ctx.arc(Math.cos(a)*h*0.38, Math.sin(a)*h*0.34, h*0.09, 0, 7); ctx.fill();
+      }
+      break;
+    }
+  }
+  ctx.restore();
+}
+
+function drawFlyers() {
+  for (const f of flyers) {
+    ctx.save();
+    ctx.translate(f.x, f.y);
+    ctx.rotate(f.rot);
+    ctx.fillStyle = '#7ee0ff';
+    for (let i=0;i<3;i++) {
+      ctx.rotate(Math.PI*2/3);
+      ctx.beginPath(); ctx.ellipse(9, 0, 9, 3.6, 0, 0, 7); ctx.fill();
+    }
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(0, 0, 3.5, 0, 7); ctx.fill();
+    ctx.restore();
+  }
+}
+
+function drawFx() {
+  for (const p of particles) {
+    const k = 1 - p.t/p.life;
+    ctx.globalAlpha = k;
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size*k, 0, 7);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  for (const f of floats) {
+    const k = f.t / f.life;
+    const rise = 36 * k;
+    const a = k < 0.15 ? k/0.15 : 1 - Math.max(0, (k-0.6)/0.4);
+    const pop = 1 + (k < 0.12 ? (0.12-k)*3 : 0);
+    ctx.globalAlpha = a;
+    ctx.font = `900 ${Math.round(16*f.scale*pop)}px -apple-system, system-ui, sans-serif`;
+    ctx.strokeStyle = 'rgba(0,0,0,0.55)';
+    ctx.lineWidth = 4;
+    ctx.strokeText(f.text, f.x, f.y - rise);
+    ctx.fillStyle = f.color;
+    ctx.fillText(f.text, f.x, f.y - rise);
+  }
+  ctx.globalAlpha = 1;
+}
+
+function draw() {
+  ctx.save();
+  if (shake > 0) ctx.translate((Math.random()-0.5)*shake, (Math.random()-0.5)*shake);
+  drawBackground();
+  drawHUD();
+  drawFigure();
+  drawDebris();
+  drawBoard();
+  if (state !== 'menu') { drawTimer(); drawBoosterBar(); }
+  drawShots();
+  drawOrbs();
+  drawFlyers();
+  drawFx();
+  ctx.restore();
+
+  if (paintPick && state !== 'menu' && state !== 'over') drawPaintPick();
+
+  // low-time red vignette
+  if (timeLeft > 0 && timeLeft <= 10.5 && state !== 'menu' && state !== 'over') {
+    const a = Math.max(0, 0.10 + 0.08*Math.sin(lastT/150));
+    const vg = ctx.createRadialGradient(W/2, H/2, Math.min(W,H)*0.42, W/2, H/2, Math.max(W,H)*0.72);
+    vg.addColorStop(0, 'rgba(255,50,50,0)');
+    vg.addColorStop(1, `rgba(255,50,50,${a.toFixed(3)})`);
+    ctx.fillStyle = vg;
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  if (state === 'menu' || state === 'over') {
+    const isOver = state === 'over';
+    ctx.fillStyle = 'rgba(10,12,30,0.8)';
+    ctx.fillRect(0,0,W,H);
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.font = `900 ${Math.min(44, W*0.1)}px -apple-system, system-ui, sans-serif`;
+    const tg = ctx.createLinearGradient(0, H*0.34-24, 0, H*0.34+24);
+    if (isOver) { tg.addColorStop(0, '#ff8f8f'); tg.addColorStop(1, '#f4442e'); }
+    else { tg.addColorStop(0, '#ffd45e'); tg.addColorStop(1, '#f5a623'); }
+    ctx.fillStyle = tg;
+    ctx.fillText(isOver ? "TIME'S UP" : 'MATCH FLOW', W/2, H*0.34);
+    ctx.fillStyle = '#c8d0ee';
+    ctx.font = '600 15px -apple-system, system-ui, sans-serif';
+    if (isOver) {
+      ctx.fillText('Score  ' + score.toLocaleString() + '   •   Level ' + level, W/2, H*0.34 + 42);
+      ctx.fillText('Best  ' + best.toLocaleString(), W/2, H*0.34 + 66);
+    } else {
+      ctx.fillText('Matched colors join your swarm orbiting the figure', W/2, H*0.34 + 42);
+      ctx.fillText('It only fires at cubes you can SEE — rotate to expose them!', W/2, H*0.34 + 66);
+      ctx.fillText('4+ / squares make power-ups  •  fresh 2:00 every figure', W/2, H*0.34 + 90);
+      if (best > 0) ctx.fillText('Best  ' + best.toLocaleString(), W/2, H*0.34 + 114);
+    }
+    const bounce = 1 + Math.sin(lastT/300)*0.05;
+    ctx.font = `800 ${Math.round(18*bounce)}px -apple-system, system-ui, sans-serif`;
+    ctx.fillStyle = '#fff';
+    ctx.fillText(isOver ? 'TAP TO RETRY' : 'TAP TO START', W/2, H*0.62);
+  }
+}
+
+// ---------- loop ----------
+function frame(t) {
+  const dt = Math.min(0.033, (t - lastT)/1000 || 0.016);
+  lastT = t;
+  if (state === 'menu') updateFigure(dt);   // keep the figure spinning behind the menu
+  else if (!paintPick) update(dt);          // paint modal = hard pause (timer included)
+  draw();
+  requestAnimationFrame(frame);
+}
+
+resize();
+spawnFigure(0);
+fillBoard();
+if (location.hash === '#play') startGame();   // dev: skip menu
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
