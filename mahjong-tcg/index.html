@@ -119,6 +119,68 @@ h2.title{
 .rarity-dot{display:inline-flex;align-items:center;gap:4px}
 .rarity-dot i{width:8px;height:8px;border-radius:2px;display:inline-block}
 @keyframes pulseDot{0%,100%{opacity:1}50%{opacity:.35}}
+.era-locked{pointer-events:auto}
+.era-locked>.era-name,.era-locked>.era-sub,.era-locked>.era-meta,.era-locked>.era-glyph{filter:grayscale(.9) brightness(.5)}
+.lock-veil{
+  position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+  background:rgba(8,10,8,.55);border-radius:14px;font-size:15px;z-index:2;
+}
+.lock-veil b{font-family:var(--font-display);font-size:14px;letter-spacing:.06em}
+.lock-veil small{color:#b6bfa9;font-size:12.5px}
+.lock-veil .lock-prog{color:var(--gold);font-weight:700}
+/* boosterlar */
+.booster-bar{display:flex;justify-content:center;gap:10px;margin:4px 0 2px}
+.bstr{
+  position:relative;background:rgba(0,0,0,.4);border:1px solid var(--panel-edge);
+  color:var(--ivory-2);border-radius:10px;padding:6px 12px;cursor:pointer;
+  font-family:var(--font-body);font-size:13px;display:flex;align-items:center;gap:5px;
+  transition:transform .1s;
+}
+.bstr:active{transform:scale(.94)}
+.bstr:disabled{opacity:.35;pointer-events:none}
+.bstr .bcount{
+  position:absolute;top:-7px;right:-7px;background:var(--gold);color:#1d1607;
+  font-size:10px;font-weight:700;min-width:16px;height:16px;border-radius:8px;
+  display:flex;align-items:center;justify-content:center;padding:0 4px;
+}
+.tile.hint-glow .tile-back{animation:hintPulse 1.5s ease}
+@keyframes hintPulse{
+  0%,100%{box-shadow:inset 0 1px 0 rgba(255,255,255,.06), 0 2px 4px rgba(0,0,0,.5)}
+  30%,70%{box-shadow:0 0 16px 5px rgba(201,162,75,.8)}
+}
+.tile.eagle-au .tile-back{animation:eagleAu 1.1s ease-in-out infinite}
+@keyframes eagleAu{
+  0%,100%{box-shadow:0 0 6px 2px rgba(201,162,75,.45)}
+  50%{box-shadow:0 0 18px 6px rgba(201,162,75,.95)}
+}
+.tile.eagle-ir .tile-back{animation:eagleIr 1.1s ease-in-out infinite}
+@keyframes eagleIr{
+  0%,100%{box-shadow:0 0 6px 2px rgba(75,176,201,.45)}
+  50%{box-shadow:0 0 18px 6px rgba(75,176,201,.95)}
+}
+.info-btn{
+  position:absolute;top:10px;right:10px;z-index:3;
+  width:30px;height:30px;border-radius:50%;cursor:pointer;
+  background:rgba(0,0,0,.55);border:1px solid var(--ivory-2);color:var(--ivory);
+  font-family:var(--font-display);font-size:14px;font-weight:700;
+  display:flex;align-items:center;justify-content:center;
+}
+.info-btn:active{transform:scale(.92)}
+.info-grid{
+  display:grid;grid-template-columns:repeat(5,1fr);gap:7px;margin:10px 0;
+}
+.info-grid .bslot.owned svg{width:52%;height:52%}
+.unlock-bar{
+  height:8px;border-radius:4px;background:rgba(0,0,0,.4);border:1px solid var(--panel-edge);
+  overflow:hidden;margin:8px 0 4px;
+}
+.unlock-bar i{display:block;height:100%;background:linear-gradient(90deg,#8a6a26,var(--gold));transition:width .3s}
+.preview-row{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin:8px 0}
+.preview-row .mini-tile{width:26px;height:36px;opacity:.45;filter:grayscale(.6)}
+.preview-row .mini-tile svg{width:17px;height:17px}
+.frozen-badge{
+  display:inline-block;margin-left:6px;font-size:12px;color:#7fd0e8;
+}
 /* ---------- match ---------- */
 #screen-battle{display:none;flex-direction:column;height:100%}
 #screen-battle.active{display:flex}
@@ -484,7 +546,7 @@ h2.title{
   <!-- ERA SELECT -->
   <div class="screen active" id="screen-home">
     <h2 class="title">Diyar Seç</h2>
-    <div class="subtitle">Bir maç 1 ticket. İlk 10 çifti yapan kazanır.</div>
+    <div class="subtitle">Bir maç 1 ticket · İlk 50 puana ulaşan kazanır (B1 · G2 · A3 · AU4 · GK5)</div>
     <div class="era-list" id="era-list"></div>
   </div>
 
@@ -514,6 +576,12 @@ h2.title{
     <div class="match-foot">
       <div class="strip-label"><span>Rakibin çiftleri</span><span id="ai-pair-count"></span></div>
       <div class="pairs-strip" id="strip-ai"></div>
+      <div class="booster-bar">
+        <button class="bstr" id="bstr-shuffle" onclick="useShuffle()">🔀 Shuffle<span class="bcount" id="bc-shuffle"></span></button>
+        <button class="bstr" id="bstr-hint" onclick="useHint()">💡 Hint<span class="bcount" id="bc-hint"></span></button>
+        <button class="bstr" id="bstr-freeze" onclick="useFreeze()">❄️ Freeze<span class="bcount" id="bc-freeze"></span></button>
+        <button class="bstr" id="bstr-eagle" onclick="useEagle()">🦅 Eagle<span class="bcount" id="bc-eagle"></span></button>
+      </div>
       <div class="turn-banner" id="turn-banner">SENİN SIRAN</div>
     </div>
   </div>
@@ -533,6 +601,28 @@ h2.title{
     <div class="shop-section">
       <h4>Taş Paketleri</h4>
       <div class="shop-grid" id="shop-packs"></div>
+      <h4>Boosterlar</h4>
+      <div class="shop-grid">
+        <div class="shop-item" onclick="buyBooster('shuffle',150,'gold')">
+          <div class="icon">🔀</div><b>Shuffle</b><small>Kalan taşları karıştırır, hafızaları sıfırlar</small>
+          <span class="price" id="pb-shuffle"></span>
+        </div>
+        <div class="shop-item" onclick="buyBooster('hint',200,'gold')">
+          <div class="icon">💡</div><b>Hint</b><small>Açıktaki bir çifti işaretler</small>
+          <span class="price" id="pb-hint"></span>
+        </div>
+        <div class="shop-item" onclick="buyBooster('freeze',25,'gem')">
+          <div class="icon">❄️</div><b>Freeze</b><small>Rakip bir tur atlar</small>
+          <span class="price" id="pb-freeze"></span>
+        </div>
+        <div class="shop-item" onclick="buyBooster('eagle',30,'gem')">
+          <div class="icon">🦅</div><b>Eagle Eye</b><small>Altın/Göksel taşların arkası 10 sn parlar</small>
+          <span class="price" id="pb-eagle"></span>
+        </div>
+        <div class="shop-item" style="pointer-events:none;opacity:.85">
+          <div class="icon">🎒</div><b>Envanter</b><small id="booster-inv"></small>
+        </div>
+      </div>
       <h4>Kaynaklar</h4>
       <div class="shop-grid">
         <div class="shop-item" onclick="buyTicket()">
@@ -639,7 +729,7 @@ function makeEraSet(order){ // order: array of [glyphKey, rarity]
 const ERAS = [
   {
     key:'nature', name:'Hate of the Nature', sub:'Kadim orman kin tutar',
-    back1:'#2a3626', back2:'#141c11', accent:'#5d7a4c', aiName:'Willow',
+    back1:'#2a3626', back2:'#141c11', accent:'#5d7a4c', aiName:'Willow', unlockReq:0,
     set: makeEraSet([
       ['tree','C'],['bamboo','C'],['cloud','C'],['stone','C'],['wave','C'],['sun','C'],['plum','C'],['lotus','C'],
       ['mountain','U'],['deer','U'],['crane','U'],['moon','U'],['bell','U'],['gate','U'],
@@ -650,7 +740,7 @@ const ERAS = [
   },
   {
     key:'samurai', name:'Age of Samurai', sub:'Ay ışığında çelik konuşur',
-    back1:'#33283d', back2:'#171220', accent:'#8a5fc0', aiName:'Ronin',
+    back1:'#33283d', back2:'#171220', accent:'#8a5fc0', aiName:'Ronin', unlockReq:10,
     set: makeEraSet([
       ['helmet','C'],['fan','C'],['gate','C'],['moon','C'],['stone','C'],['plum','C'],['bell','C'],['cloud','C'],
       ['katana','U'],['torii','U'],['pagoda','U'],['crane','U'],['lantern','U'],['wave','U'],
@@ -661,7 +751,7 @@ const ERAS = [
   },
   {
     key:'fire', name:'Realm of Fire', sub:'Dağ öfkeyle uyanır',
-    back1:'#3d2420', back2:'#1c0f0c', accent:'#c96b4b', aiName:'Blaze',
+    back1:'#3d2420', back2:'#1c0f0c', accent:'#c96b4b', aiName:'Blaze', unlockReq:20,
     set: makeEraSet([
       ['flame','C'],['volcano','C'],['sun','C'],['stone','C'],['mountain','C'],['cloud','C'],['bell','C'],['gate','C'],
       ['lantern','U'],['wave','U'],['katana','U'],['helmet','U'],['torii','U'],['plum','U'],
@@ -676,6 +766,7 @@ const state = {
   gold:300, gem:60, ticket:5,
   wins:0, losses:0, matches:0, packs:0,
   dailyUsed:false,
+  boosters:{shuffle:10, hint:10, freeze:10, eagle:10},
   binder:{}, // key: era.key -> {tileId: count}
   missions:{win1:false, pairs20:0, pack1:false, claimed:{}},
 };
@@ -702,6 +793,8 @@ function go(name){
   document.querySelectorAll('#nav button').forEach(b=>{
     b.classList.toggle('active', b.dataset.nav===name || (name==='battle'&&b.dataset.nav==='home'));
   });
+  if(name==='home') renderEraList();
+  if(name==='shop') renderShopBoosters();
   if(name==='binder') renderBinder();
   if(name==='missions') renderMissions();
   if(name==='profile') renderProfile();
@@ -716,11 +809,13 @@ function rarityCounts(era){
   era.set.forEach(t=>c[t.rar]++);
   return c;
 }
+function natureOwnedCount(){ return Object.keys(state.binder[ERAS[0].key]).length; }
+function eraUnlocked(era){ return natureOwnedCount()>=era.unlockReq; }
 function renderEraList(){
   const el=document.getElementById('era-list');
   el.innerHTML='';
   ERAS.forEach(era=>{ if(era.players===undefined) era.players=300+Math.floor(Math.random()*301); });
-  // Rastgele maç kartı — en üstte
+  // Rastgele maç kartı — en üstte (sadece açık diyarlar)
   const totalPlayers=ERAS.reduce((s,e)=>s+e.players,0);
   const rnd=document.createElement('div');
   rnd.className='era-card';
@@ -735,12 +830,16 @@ function renderEraList(){
       </span>
     </div>
     <div class="era-glyph" style="font-size:52px;display:flex;align-items:center;justify-content:center;opacity:.6">🎲</div>`;
-  rnd.onclick=()=>startMatch(ERAS[Math.floor(Math.random()*ERAS.length)]);
+  rnd.onclick=()=>{
+    const pool=ERAS.filter(eraUnlocked);
+    startMatch(pool[Math.floor(Math.random()*pool.length)]);
+  };
   el.appendChild(rnd);
   ERAS.forEach(era=>{
     const c=rarityCounts(era);
+    const unlocked=eraUnlocked(era);
     const d=document.createElement('div');
-    d.className='era-card';
+    d.className='era-card'+(unlocked?'':' era-locked');
     d.style.background=`linear-gradient(120deg, ${era.back1}, ${era.back2})`;
     d.innerHTML=`
       <div class="era-name">${era.name}</div>
@@ -754,8 +853,13 @@ function renderEraList(){
           <i style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#8fbf7a;margin-right:4px;animation:pulseDot 2s infinite"></i><b>${era.players}</b> oyuncu çevrimiçi
         </span>
       </div>
+      ${unlocked?'':`<button class="info-btn" onclick="event.stopPropagation();showUnlockInfo('${era.key}')">i</button>
+      <div class="lock-veil">🔒 <b>${era.name}</b><small>${ERAS[0].name} diyarından ${era.unlockReq} taş topla</small><small class="lock-prog">${Math.min(natureOwnedCount(),era.unlockReq)}/${era.unlockReq}</small></div>`}
       <div class="era-glyph">${GLYPHS[era.set[era.set.length-1].glyph].replace('#22251f','rgba(239,232,214,.8)').replaceAll('#22251f','rgba(239,232,214,.8)').replaceAll('#3f4d35','rgba(239,232,214,.35)')}</div>`;
-    d.onclick=()=>startMatch(era);
+    d.onclick=()=>{
+      if(!eraUnlocked(era)){ toast(`${era.unlockReq} ${ERAS[0].name} taşı gerekli (${natureOwnedCount()}/${era.unlockReq})`); return; }
+      startMatch(era);
+    };
     el.appendChild(d);
   });
 }
@@ -773,13 +877,16 @@ setInterval(()=>{
   if(tot) tot.textContent=ERAS.reduce((s,e)=>s+(e.players||0),0);
 },2000);
 /* ================= MATCH ================= */
-const PAIRS_TO_WIN=10;
+const TARGET_PTS=50; // kazanma şartı: puan (B1 · G2 · A3 · AU4 · GK5)
 const KINDS_IN_BOARD=20; // 20 tür × 2 = 40 taş
-// index 0 = en alt katman, son = en üst (önce üst oynanır)
-const LAYERS=[
-  {cols:5, rows:4},  // 20 taş — alt
-  {cols:4, rows:3},  // 12 taş — orta
-  {cols:4, rows:2},  // 8 taş  — üst
+// 4 harita dizilimi — temadan bağımsız, maç başında rastgele seçilir.
+// Kural: her katmanın taş adedi ÇİFT olmalı (çiftler katman içinde dağıtılır), toplam 40.
+// index 0 = en alt katman, son = en üst.
+const LAYOUTS=[
+  {name:'Zirve',   layers:[{cols:5,rows:4},{cols:4,rows:3},{cols:4,rows:2}]}, // 20/12/8
+  {name:'Sur',     layers:[{cols:6,rows:3},{cols:4,rows:3},{cols:5,rows:2}]}, // 18/12/10
+  {name:'Kule',    layers:[{cols:4,rows:5},{cols:3,rows:4},{cols:2,rows:4}]}, // 20/12/8 (dikey)
+  {name:'Aynalar', layers:[{cols:5,rows:4},{cols:5,rows:2},{cols:5,rows:2}]}, // 20/10/10
 ];
 const match={active:false};
 
@@ -801,12 +908,13 @@ function weightedDraw(era, n){
 function startMatch(era){
   if(state.ticket<1){ toast('Ticket yok — Shop\'tan al'); go('shop'); return; }
   state.ticket--; renderWallet();
+  const layout=LAYOUTS[Math.floor(Math.random()*LAYOUTS.length)];
   const uniques=weightedDraw(era, KINDS_IN_BOARD); // 20 tür
   // Türleri katmanlara paylaştır: her çift AYNI katmanda (ilk sürüm kuralı)
   const shuffled=[...uniques].sort(()=>Math.random()-.5);
   const tiles=[];
   let k=0;
-  LAYERS.forEach((L,li)=>{
+  layout.layers.forEach((L,li)=>{
     const pairCount=(L.cols*L.rows)/2;
     const kinds=shuffled.slice(k, k+pairCount); k+=pairCount;
     // katman içi pozisyonları karıştır
@@ -820,13 +928,14 @@ function startMatch(era){
     });
   });
   Object.assign(match,{
-    active:true, era, tiles,
+    active:true, era, tiles, layout,
     open:[], busy:false, turn:'me',
+    pendingShuffle:false, aiFrozenTurns:0, eagleTimer:null,
     me:{pairs:[], pts:0}, ai:{pairs:[], pts:0},
     aiMemory:{}, // tileIndex -> glyph
   });
   document.getElementById('ai-name').textContent=era.aiName;
-  document.getElementById('match-era-label').textContent=era.name;
+  document.getElementById('match-era-label').innerHTML=`${era.name} · <span style="color:var(--gold)">${layout.name} dizilimi</span>`;
   document.documentElement.style.setProperty('--era-back1',era.back1);
   document.documentElement.style.setProperty('--era-back2',era.back2);
   document.getElementById('strip-me').innerHTML='';
@@ -839,15 +948,21 @@ function layoutBoard(){
   const board=document.getElementById('board');
   const W=board.clientWidth||board.parentElement.clientWidth||340;
   const H=board.clientHeight||board.parentElement.clientHeight||420;
-  const base=LAYERS[0]; // en geniş katman ölçüyü belirler
+  const Ls=match.layout.layers;
+  // en geniş / en yüksek katman ölçüyü belirler (layout'a göre değişir)
+  const maxCols=Math.max(...Ls.map(L=>L.cols));
+  const maxRows=Math.max(...Ls.map(L=>L.rows));
   const gap=5, depth=7; // katmanlar arası derinlik ofseti
-  const tw=Math.max(30, Math.min((W-(base.cols-1)*gap-20)/base.cols, ((H-(base.rows-1)*gap-24)/base.rows)/1.38));
+  const tw=Math.max(30, Math.min((W-(maxCols-1)*gap-20)/maxCols, ((H-(maxRows-1)*gap-24)/maxRows)/1.38));
   const th=tw*1.38;
-  match.tw=tw; match.th=th;
-  match.layerOrigin=LAYERS.map((L,li)=>{
+  match.tw=tw; match.th=th; match.depth=depth;
+  // Mantıksal konumlar tam merkezli (simetrik) — derinlik ofseti SADECE görsel.
+  // Aksi halde üst katman sola-yukarı kaydığı için sağ-alt köşe taşının örtüşmesi
+  // eşiğin altına düşüyor ve "açılabilir" görünüyordu (bug hissi veren asimetri).
+  match.layerOrigin=Ls.map((L,li)=>{
     const lw=L.cols*tw+(L.cols-1)*gap;
     const lh=L.rows*th+(L.rows-1)*gap;
-    return {x:(W-lw)/2 - li*depth, y:(H-lh)/2 - li*depth, gap};
+    return {x:(W-lw)/2, y:(H-lh)/2, gap};
   });
 }
 function renderBoard(){
@@ -858,6 +973,7 @@ function renderBoard(){
     const d=document.createElement('div');
     d.className='tile'; d.dataset.i=i;
     d.style.zIndex=t.layer+1;
+    if(t.done) d.classList.add('gone'); // kalkan taşlar yeniden çizimde geri gelmesin (tıklamayı yiyordu)
     d.innerHTML=`<div class="tile-inner">
       <div class="tile-face tile-back"><div class="backmark">${match.era.name.split(' ').map(w=>w[0]).join('')}</div></div>
       <div class="tile-face tile-front" style="--rar:${RAR[t.rar].hex}">${GLYPHS[t.glyph]}<span class="rar-tag">${RAR[t.rar].tag}</span></div>
@@ -908,8 +1024,8 @@ function positionTiles(){
     const o=match.layerOrigin[t.layer];
     el.style.width=match.tw+'px';
     el.style.height=match.th+'px';
-    el.style.left=(o.x + t.c*(match.tw+o.gap))+'px';
-    el.style.top=(o.y + t.r*(match.th+o.gap))+'px';
+    el.style.left=(o.x + t.c*(match.tw+o.gap) - t.layer*match.depth)+'px';
+    el.style.top=(o.y + t.r*(match.th+o.gap) - t.layer*match.depth)+'px';
   });
 }
 window.addEventListener('resize',()=>{ if(match.active){layoutBoard();positionTiles();updateCoverage();} });
@@ -927,15 +1043,96 @@ function confirmExit(){
 }
 function tileEl(i){return document.querySelector(`.tile[data-i="${i}"]`)}
 function renderMatchHUD(){
-  document.getElementById('score-me').textContent=`${match.me.pairs.length} çift · ${match.me.pts} puan`;
-  document.getElementById('score-ai').textContent=`${match.ai.pairs.length} çift · ${match.ai.pts} puan`;
-  document.getElementById('me-pair-count').textContent=`${match.me.pairs.length}/${PAIRS_TO_WIN}`;
-  document.getElementById('ai-pair-count').textContent=`${match.ai.pairs.length}/${PAIRS_TO_WIN}`;
+  document.getElementById('score-me').textContent=`${match.me.pts}/${TARGET_PTS} puan · ${match.me.pairs.length} çift`;
+  document.getElementById('score-ai').textContent=`${match.ai.pts}/${TARGET_PTS} puan · ${match.ai.pairs.length} çift`;
+  document.getElementById('me-pair-count').textContent=`${match.me.pts} puan`;
+  document.getElementById('ai-pair-count').innerHTML=`${match.ai.pts} puan${(match.aiFrozenTurns||0)>0?` <span class="frozen-badge">❄️×${match.aiFrozenTurns}</span>`:''}`;
   document.getElementById('pcard-me').classList.toggle('turn',match.turn==='me');
   document.getElementById('pcard-ai').classList.toggle('turn',match.turn==='ai');
   const tb=document.getElementById('turn-banner');
   tb.textContent=match.turn==='me'?'SENİN SIRAN':'RAKİBİN SIRASI';
   tb.classList.toggle('opp',match.turn!=='me');
+  renderBoosterBar();
+}
+function renderBoosterBar(){
+  ['shuffle','hint','freeze','eagle'].forEach(k=>{
+    const btn=document.getElementById('bstr-'+k);
+    const cnt=document.getElementById('bc-'+k);
+    if(!btn) return;
+    cnt.textContent=state.boosters[k];
+    // tek kısıt: stok var mı ve sıra sende mi — kullanım adedi sınırsız
+    btn.disabled = !match.active || match.turn!=='me' || state.boosters[k]<1
+      || (k==='shuffle' && match.pendingShuffle)
+      || (k==='eagle' && match.eagleTimer);
+  });
+}
+function useEagle(){
+  if(match.turn!=='me'||state.boosters.eagle<1||match.eagleTimer) return;
+  state.boosters.eagle--;
+  let found=0;
+  match.tiles.forEach((t,i)=>{
+    if(t.done||match.open.includes(i)) return;
+    if(t.rar==='RR'){ tileEl(i).classList.add('eagle-au'); found++; }
+    if(t.rar==='IR'){ tileEl(i).classList.add('eagle-ir'); found++; }
+  });
+  if(!found){ state.boosters.eagle++; toast('Boardda Altın/Göksel taş kalmamış'); return; }
+  match.eagleTimer=setTimeout(()=>clearEagle(false), 10000); // 10 sn
+  renderBoosterBar();
+  toast('🦅 Altın ve Göksel taşlar 10 sn parlıyor');
+}
+function clearEagle(silent){
+  if(match.eagleTimer){ clearTimeout(match.eagleTimer); match.eagleTimer=null; }
+  document.querySelectorAll('.tile.eagle-au,.tile.eagle-ir')
+    .forEach(el=>el.classList.remove('eagle-au','eagle-ir'));
+  renderBoosterBar();
+}
+function useShuffle(){
+  if(match.turn!=='me'||state.boosters.shuffle<1||match.pendingShuffle) return;
+  state.boosters.shuffle--;
+  match.pendingShuffle=true;
+  renderBoosterBar();
+  toast('🔀 Turun bitince taşlar karışacak');
+}
+function doShuffleNow(){
+  // KİLİTLENME ÖNLEMİ: karıştırma katman içinde yapılır.
+  // Çiftler hep aynı katmanda kalır → en üstteki dolu katmanın çiftleri her zaman açılabilir.
+  match.layout.layers.forEach((L,li)=>{
+    const aliveIdx=match.tiles.map((t,i)=>(!t.done && t.layer===li)?i:null).filter(i=>i!==null);
+    const payloads=aliveIdx.map(i=>({id:match.tiles[i].id, glyph:match.tiles[i].glyph, rar:match.tiles[i].rar}));
+    payloads.sort(()=>Math.random()-.5);
+    aliveIdx.forEach((i,k)=>Object.assign(match.tiles[i], payloads[k]));
+  });
+  match.aiMemory={}; // ikimiz de her şeyi unuturuz
+  renderBoard();
+  toast('🔀 Taşlar karıştı — herkesin hafızası sıfır');
+}
+function useHint(){
+  if(match.turn!=='me'||state.boosters.hint<1) return;
+  // açıktaki taşlar arasında eş bul
+  const alive=match.tiles.map((t,i)=>(!t.done && !isCovered(i))?i:null).filter(i=>i!==null);
+  const byGlyph={};
+  let pair=null;
+  for(const i of alive){
+    const g=match.tiles[i].glyph;
+    if(byGlyph[g]!==undefined){ pair=[byGlyph[g],i]; break; }
+    byGlyph[g]=i;
+  }
+  if(!pair){ toast('Açıkta eş çift yok'); return; }
+  state.boosters.hint--;
+  pair.forEach(i=>{
+    const el=tileEl(i);
+    el.classList.remove('hint-glow'); void el.offsetWidth; el.classList.add('hint-glow');
+    setTimeout(()=>el.classList.remove('hint-glow'),1500);
+  });
+  renderBoosterBar();
+  toast('💡 Bir çift işaretlendi');
+}
+function useFreeze(){
+  if(match.turn!=='me'||state.boosters.freeze<1) return;
+  state.boosters.freeze--;
+  match.aiFrozenTurns=(match.aiFrozenTurns||0)+1;
+  renderMatchHUD();
+  toast(`❄️ Rakip donduruldu — ${match.aiFrozenTurns} tur atlayacak`);
 }
 function addPairToStrip(who,t){
   const strip=document.getElementById('strip-'+who);
@@ -980,12 +1177,25 @@ function resolveFlips(who){
     } else {
       [a,b].forEach(i=>tileEl(i).classList.add('wrong'));
       setTimeout(()=>{
-        [a,b].forEach(i=>{tileEl(i).classList.remove('flipped','wrong')});
+        [a,b].forEach(i=>{tileEl(i)&&tileEl(i).classList.remove('flipped','wrong')});
         match.open=[];
-        match.turn = who==='me'?'ai':'me';
+        let next = who==='me'?'ai':'me';
+        if(next==='ai' && (match.aiFrozenTurns||0)>0){
+          match.aiFrozenTurns--;
+          next='me';
+          toast('❄️ Rakip donuk — sıra yine sende');
+        }
+        // benim turum bitiyorsa Eagle Eye anında söner
+        if(who==='me' && next!=='me') clearEagle();
+        // benim turum bitti — sıra rakibe geçmeden kuyruktaki shuffle uygulanır
+        if(who==='me' && match.pendingShuffle){
+          match.pendingShuffle=false;
+          doShuffleNow();
+        }
+        match.turn=next;
         renderMatchHUD();
         match.busy=false;
-        if(match.turn==='ai') setTimeout(aiTurn, 600);
+        if(match.turn==='ai') setTimeout(aiTurn, 900);
       }, 800);
     }
   }, 550);
@@ -1027,16 +1237,17 @@ function aiTurn(){
   }, 650);
 }
 function checkEnd(){
-  const done = match.me.pairs.length>=PAIRS_TO_WIN || match.ai.pairs.length>=PAIRS_TO_WIN
+  const done = match.me.pts>=TARGET_PTS || match.ai.pts>=TARGET_PTS
     || match.tiles.every(t=>t.done);
   if(!done) return false;
   match.active=false;
-  const iWin = match.me.pairs.length>match.ai.pairs.length
-    || (match.me.pairs.length===match.ai.pairs.length && match.me.pts>=match.ai.pts);
+  clearEagle();
+  const iWin = match.me.pts>match.ai.pts
+    || (match.me.pts===match.ai.pts && match.me.pairs.length>=match.ai.pairs.length);
   setTimeout(()=>showResult(iWin), 900);
   return true;
 }
-function endMatchAbort(){ match.active=false; }
+function endMatchAbort(){ match.active=false; clearEagle(); match.eagleTimer=null; }
 /* ================= RESULT & SECURE ================= */
 function showResult(iWin){
   state.matches++;
@@ -1111,6 +1322,34 @@ function closeResult(){
   go('home');
 }
 /* ================= BINDER ================= */
+function showUnlockInfo(eraKey){
+  const era=ERAS.find(e=>e.key===eraKey);
+  const src=ERAS[0]; // kilit kaynağı: ilk tema
+  const b=state.binder[src.key];
+  const owned=natureOwnedCount();
+  const pct=Math.min(100, Math.round(owned/era.unlockReq*100));
+  const sorted=[...src.set].sort((x,y)=>RAR[x.rar].pts-RAR[y.rar].pts);
+  const dlg=document.getElementById('pack-dialog');
+  dlg.innerHTML=`
+    <h3 class="lose" style="font-size:18px">🔒 ${era.name}</h3>
+    <p>Açmak için <b style="color:var(--gold)">${src.name}</b> diyarından <b>${era.unlockReq} farklı taş</b> toplamalısın.</p>
+    <div class="unlock-bar"><i style="width:${pct}%"></i></div>
+    <p style="margin-bottom:4px"><b style="color:var(--gold)">${owned}/${era.unlockReq}</b> toplandı${owned>=era.unlockReq?' — açılmaya hazır!':''}</p>
+    <p style="font-size:13px;margin-bottom:2px">${src.name} seti — sahip oldukların ve eksikler:</p>
+    <div class="info-grid">
+      ${sorted.map(t=>`
+        <div class="bslot ${b[t.id]?'owned':'missing'}" style="--rar:${RAR[t.rar].hex}">
+          ${GLYPHS[t.glyph]}
+        </div>`).join('')}
+    </div>
+    <p style="font-size:13px;margin-bottom:2px">${era.name} setinden bir bakış:</p>
+    <div class="preview-row">
+      ${era.set.slice(0,10).map(t=>`<div class="mini-tile" style="border-color:${RAR[t.rar].hex}">${GLYPHS[t.glyph]}</div>`).join('')}
+      <span style="align-self:center;color:#9aa38e;font-size:12px">+${era.set.length-10} taş</span>
+    </div>
+    <button class="btn" onclick="document.getElementById('overlay-pack').classList.remove('show')">Anladım</button>`;
+  document.getElementById('overlay-pack').classList.add('show');
+}
 function addToBinder(eraKey,tileId){
   const b=state.binder[eraKey];
   b[tileId]=(b[tileId]||0)+1;
@@ -1349,6 +1588,21 @@ function addToSlots(era, t){
   tile.classList.remove('pre');
   tile.style.transform='translate(0,0) scale(1)';
 }
+function buyBooster(kind,cost,cur){
+  if(state[cur]<cost){ toast(cur==='gem'?'Yeterli gem yok':'Yeterli gold yok'); return; }
+  state[cur]-=cost;
+  state.boosters[kind]++;
+  renderWallet(); renderShopBoosters();
+  toast('+1 '+kind.charAt(0).toUpperCase()+kind.slice(1));
+}
+function renderShopBoosters(){
+  const set=(id,html)=>{const e=document.getElementById(id); if(e)e.innerHTML=html;};
+  set('pb-shuffle',ICO.gold+'150');
+  set('pb-hint',ICO.gold+'200');
+  set('pb-freeze',ICO.gem+'25');
+  set('pb-eagle',ICO.gem+'30');
+  set('booster-inv',`🔀 ${state.boosters.shuffle} · 💡 ${state.boosters.hint} · ❄️ ${state.boosters.freeze} · 🦅 ${state.boosters.eagle}`);
+}
 function buyTicket(){
   if(state.gem<20){toast('Yeterli gem yok');return;}
   state.gem-=20; state.ticket++; renderWallet(); toast('+1 Ticket');
@@ -1420,7 +1674,7 @@ function cheat(kind,amt){
 }
 /* ================= UTIL & INIT ================= */
 function cap(s){return s.charAt(0).toUpperCase()+s.slice(1)}
-renderWallet(); renderEraList(); renderShop();
+renderWallet(); renderEraList(); renderShop(); renderShopBoosters();
 </script>
 </body>
 </html>
