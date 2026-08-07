@@ -1,0 +1,1297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Car Jam — Prototype</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#79B4FF">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Fredoka:wght@600&display=swap" rel="stylesheet">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { width:100%; height:100%; overflow:hidden; background:#14161f; }
+  body {
+    font-family:'Baloo 2','Fredoka',system-ui,-apple-system,sans-serif;
+    -webkit-user-select:none; user-select:none; -webkit-touch-callout:none;
+    touch-action:none; overscroll-behavior:none;
+  }
+  #stage {
+    position:absolute; top:0; left:50%; transform:translateX(-50%);
+    height:100%; aspect-ratio:9/16; overflow:hidden;
+    background:linear-gradient(180deg,#79B4FF 0%,#9FAAFF 55%,#C9A0FF 100%);
+  }
+  @media (max-aspect-ratio: 9/16) {
+    #stage { left:0; transform:none; width:100%; height:100%; aspect-ratio:auto; }
+  }
+  .bgOrbs {
+    position:absolute; inset:0; pointer-events:none;
+    background:
+      radial-gradient(circle at 18% 16%, rgba(255,255,255,.16), transparent 42%),
+      radial-gradient(circle at 84% 9%,  rgba(255,255,255,.12), transparent 36%),
+      radial-gradient(circle at 76% 80%, rgba(255,255,255,.10), transparent 46%),
+      radial-gradient(circle at 12% 72%, rgba(255,255,255,.08), transparent 40%);
+  }
+  canvas#game { position:absolute; inset:0; width:100%; height:100%; display:block; touch-action:none; z-index:1; }
+  #hud { position:absolute; inset:0; pointer-events:none; z-index:20; }
+  #levelPill {
+    position:absolute; top:calc(12px + env(safe-area-inset-top)); left:50%; transform:translateX(-50%);
+    background:rgba(24,28,60,.38); border:2px solid rgba(255,255,255,.30);
+    padding:5px 24px 7px; border-radius:999px; color:#fff; font-weight:800;
+    font-size:19px; letter-spacing:1.5px; text-shadow:0 2px 4px rgba(0,0,0,.28);
+  }
+  #restartBtn {
+    position:absolute; top:calc(11px + env(safe-area-inset-top)); right:calc(12px + env(safe-area-inset-right));
+    width:46px; height:46px; border-radius:50%; border:none; cursor:pointer; pointer-events:auto;
+    background:linear-gradient(180deg,#6FB6FF,#3D8BE8);
+    box-shadow:inset 0 -3px 0 rgba(0,0,0,.22), 0 4px 10px rgba(0,0,0,.22);
+    display:flex; align-items:center; justify-content:center;
+    transition:transform .08s;
+  }
+  #restartBtn:active { transform:scale(.92); }
+  #restartBtn svg { width:26px; height:26px; fill:#fff; filter:drop-shadow(0 1px 1px rgba(0,0,0,.25)); }
+  #hint {
+    position:absolute; bottom:calc(20px + env(safe-area-inset-bottom)); left:50%; transform:translateX(-50%);
+    width:88%; text-align:center; color:#fff; font-weight:600; font-size:15px; line-height:1.35;
+    text-shadow:0 2px 6px rgba(0,0,0,.35); display:none;
+  }
+  canvas#confetti { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; z-index:45; }
+  #popup {
+    position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    background:rgba(0,0,0,0); transition:background .35s ease; visibility:hidden; pointer-events:none; z-index:40;
+  }
+  #popup.show { background:rgba(0,0,0,.45); visibility:visible; pointer-events:auto; }
+  #card {
+    background:#fff; border-radius:28px; padding:32px 42px 30px; text-align:center;
+    box-shadow:0 18px 50px rgba(0,0,0,.35); transform:scale(0);
+    max-width:86%;
+  }
+  #popup.show #card { animation:popIn .5s cubic-bezier(.34,1.56,.64,1) both; }
+  @keyframes popIn { from { transform:scale(.25); opacity:0; } to { transform:scale(1); opacity:1; } }
+  #popupTitle { font-size:29px; font-weight:800; color:#4B3F66; line-height:1.1; }
+  #stars { font-size:46px; margin:8px 0 18px; color:#FFC93C; letter-spacing:10px;
+    text-shadow:0 3px 0 #E8A210, 0 7px 16px rgba(232,162,16,.38); }
+  #popup.show #stars span { display:inline-block; animation:starPop .45s cubic-bezier(.34,1.56,.64,1) both; }
+  #stars span:nth-child(2) { animation-delay:.12s; font-size:1.18em; }
+  #stars span:nth-child(3) { animation-delay:.24s; }
+  @keyframes starPop { from { transform:scale(0) rotate(-32deg); } to { transform:scale(1) rotate(0); } }
+  #nextBtn {
+    font-family:inherit; font-weight:800; font-size:24px; letter-spacing:.6px; color:#fff;
+    border:none; cursor:pointer; border-radius:999px; padding:13px 62px 15px;
+    background:linear-gradient(180deg,#52E07A,#2FBF57);
+    box-shadow:inset 0 -4px 0 rgba(0,0,0,.18), 0 8px 18px rgba(47,191,87,.4);
+    text-shadow:0 2px 3px rgba(0,0,0,.18);
+    transition:transform .08s;
+  }
+  #nextBtn:active { transform:scale(.96); }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div class="bgOrbs"></div>
+  <canvas id="game"></canvas>
+  <div id="hud">
+    <div id="levelPill">LEVEL 1</div>
+    <button id="restartBtn" aria-label="Restart level">
+      <svg viewBox="0 0 24 24"><path d="M17.65 6.35A7.96 7.96 0 0 0 12 4a8 8 0 1 0 7.73 10h-2.08A6 6 0 1 1 12 6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+    </button>
+    <div id="hint">Clear the road! Cars drive off on their own through doors matching their color and facing.</div>
+  </div>
+  <canvas id="confetti"></canvas>
+  <div id="popup">
+    <div id="card">
+      <div id="popupTitle">LEVEL COMPLETE!</div>
+      <div id="stars"><span>&#9733;</span><span>&#9733;</span><span>&#9733;</span></div>
+      <button id="nextBtn">NEXT</button>
+    </div>
+  </div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+
+/* ================= DATA ================= */
+
+const PALETTE = {
+  red:    { base:'#FF4B4B', shade:'#D93636' },
+  blue:   { base:'#4C9BFF', shade:'#2F7BE0' },
+  green:  { base:'#3ED164', shade:'#2CAE4F' },
+  yellow: { base:'#FFD644', shade:'#E8B92E' },
+  orange: { base:'#FF9F40', shade:'#E5822A' },
+  purple: { base:'#B067F0', shade:'#9448D6' },
+};
+const TRAY = { floorA:'#F3EAD9', floorB:'#EAE0CC', frame:'#E3D3B9', frameShade:'#CDBA9C', slab:'#E8DCC4' };
+
+const LEVELS = [
+  {
+    id: 1, name: 'Driving School',
+    grid: { cols: 6, rows: 8 },
+    gates: [
+      { edge:'top',   start:1, span:1, color:'red'  },
+      { edge:'right', start:0, span:1, color:'blue' },
+    ],
+    pieces: [
+      { shape:'car_s', color:'red',  dir:'up',    anchor:[1,4] },
+      { shape:'car_m', color:'blue', dir:'right', anchor:[0,2] },
+    ],
+  },
+  {
+    id: 2, name: 'Valet',
+    grid: { cols: 6, rows: 8 },
+    gates: [
+      { edge:'right', start:3, span:1, color:'green' },
+      { edge:'top',   start:0, span:1, color:'blue'  },
+      { edge:'top',   start:2, span:1, color:'red'   },
+    ],
+    pieces: [
+      { shape:'car_m', color:'green', dir:'right', anchor:[0,3] },
+      { shape:'car_s', color:'blue',  dir:'up',    anchor:[3,3] },
+      { shape:'car_s', color:'red',   dir:'up',    anchor:[4,0] },
+    ],
+  },
+  {
+    id: 3, name: 'Wrong Garage',
+    grid: { cols: 6, rows: 8 },
+    gates: [
+      { edge:'left',   start:1, span:1, color:'yellow' },
+      { edge:'right',  start:4, span:1, color:'yellow' },
+      { edge:'top',    start:4, span:1, color:'red'    },
+      { edge:'right',  start:6, span:1, color:'blue'   },
+      { edge:'bottom', start:3, span:1, color:'green'  },
+    ],
+    pieces: [
+      { shape:'car_s', color:'yellow', dir:'left',  anchor:[2,4] },
+      { shape:'car_m', color:'red',    dir:'up',    anchor:[4,2] },
+      { shape:'car_s', color:'blue',   dir:'right', anchor:[3,0] },
+      { shape:'car_s', color:'green',  dir:'down',  anchor:[1,5] },
+    ],
+  },
+  {
+    id: 4, name: 'Chain Reaction',
+    grid: { cols: 6, rows: 8 },
+    gates: [
+      { edge:'top',    start:2, span:1, color:'red'    },
+      { edge:'left',   start:1, span:1, color:'blue'   },
+      { edge:'bottom', start:0, span:1, color:'green'  },
+      { edge:'right',  start:4, span:1, color:'yellow' },
+    ],
+    pieces: [
+      { shape:'car_m', color:'red',    dir:'up',    anchor:[2,3] },
+      { shape:'car_m', color:'blue',   dir:'left',  anchor:[1,1] },
+      { shape:'car_s', color:'green',  dir:'down',  anchor:[0,0] },
+      { shape:'car_s', color:'yellow', dir:'right', anchor:[0,4] },
+    ],
+  },
+  {
+    id: 5, name: 'Rush Hour',
+    grid: { cols: 6, rows: 8 },
+    gates: [
+      { edge:'right',  start:3, span:1, color:'red'    },
+      { edge:'top',    start:1, span:1, color:'blue'   },
+      { edge:'top',    start:4, span:1, color:'green'  },
+      { edge:'left',   start:5, span:1, color:'purple' },
+      { edge:'bottom', start:5, span:1, color:'yellow' },
+      { edge:'right',  start:0, span:1, color:'orange' },
+    ],
+    pieces: [
+      { shape:'car_m', color:'red',    dir:'right', anchor:[0,3] },
+      { shape:'car_m', color:'blue',   dir:'up',    anchor:[3,2] },
+      { shape:'car_s', color:'green',  dir:'up',    anchor:[4,3] },
+      { shape:'car_s', color:'purple', dir:'left',  anchor:[3,1] },
+      { shape:'car_m', color:'yellow', dir:'down',  anchor:[2,4] },
+      { shape:'car_s', color:'orange', dir:'right', anchor:[4,6] },
+    ],
+  },
+  {
+    id: 6, name: 'Convoy',
+    grid: { cols: 6, rows: 8 },
+    gates: [
+      { edge:'right',  start:1, span:1, color:'red'    },
+      { edge:'bottom', start:4, span:1, color:'blue'   },
+      { edge:'left',   start:0, span:1, color:'green'  },
+      { edge:'top',    start:0, span:1, color:'yellow' },
+    ],
+    pieces: [
+      { shape:'car_l', color:'red',    dir:'right', anchor:[0,1] },
+      { shape:'car_l', color:'blue',   dir:'down',  anchor:[4,0] },
+      { shape:'car_s', color:'yellow', dir:'up',    anchor:[4,5] },
+      { shape:'car_s', color:'green',  dir:'left',  anchor:[2,6] },
+    ],
+  },
+  {
+    id: 7, name: 'Head to Head',
+    grid: { cols: 6, rows: 8 },
+    gates: [
+      { edge:'right',  start:3, span:1, color:'red'    },
+      { edge:'left',   start:3, span:1, color:'blue'   },
+      { edge:'bottom', start:1, span:1, color:'green'  },
+      { edge:'top',    start:4, span:1, color:'yellow' },
+      { edge:'right',  start:6, span:1, color:'purple' },
+    ],
+    pieces: [
+      { shape:'car_m', color:'red',    dir:'right', anchor:[0,3] },
+      { shape:'car_m', color:'blue',   dir:'left',  anchor:[3,3] },
+      { shape:'car_m', color:'green',  dir:'down',  anchor:[1,0] },
+      { shape:'car_s', color:'yellow', dir:'up',    anchor:[4,5] },
+      { shape:'car_s', color:'purple', dir:'right', anchor:[2,6] },
+    ],
+  },
+  {
+    id: 8, name: 'Roundabout',
+    grid: { cols: 6, rows: 8 },
+    gates: [
+      { edge:'top',    start:2, span:1, color:'red'    },
+      { edge:'left',   start:1, span:1, color:'blue'   },
+      { edge:'bottom', start:0, span:1, color:'green'  },
+      { edge:'right',  start:4, span:1, color:'yellow' },
+      { edge:'right',  start:0, span:1, color:'purple' },
+    ],
+    pieces: [
+      { shape:'car_m', color:'red',    dir:'up',    anchor:[2,3] },
+      { shape:'car_m', color:'blue',   dir:'left',  anchor:[1,1] },
+      { shape:'car_s', color:'green',  dir:'down',  anchor:[0,0] },
+      { shape:'car_s', color:'yellow', dir:'right', anchor:[0,4] },
+      { shape:'car_s', color:'purple', dir:'right', anchor:[2,6] },
+    ],
+  },
+  {
+    id: 9, name: 'Parking Lot',
+    grid: { cols: 6, rows: 8 },
+    gates: [
+      { edge:'top',    start:0, span:1, color:'red'    },
+      { edge:'top',    start:3, span:1, color:'blue'   },
+      { edge:'right',  start:2, span:1, color:'green'  },
+      { edge:'bottom', start:4, span:1, color:'yellow' },
+      { edge:'bottom', start:2, span:1, color:'purple' },
+      { edge:'left',   start:3, span:1, color:'orange' },
+      { edge:'right',  start:7, span:1, color:'red'    },
+    ],
+    pieces: [
+      { shape:'car_m', color:'red',    dir:'up',    anchor:[0,2] },
+      { shape:'car_s', color:'orange', dir:'left',  anchor:[0,0] },
+      { shape:'car_m', color:'green',  dir:'right', anchor:[1,2] },
+      { shape:'car_s', color:'blue',   dir:'up',    anchor:[3,4] },
+      { shape:'car_s', color:'yellow', dir:'down',  anchor:[4,1] },
+      { shape:'car_m', color:'purple', dir:'down',  anchor:[4,4] },
+      { shape:'car_s', color:'red',    dir:'right', anchor:[0,6] },
+    ],
+  },
+  {
+    id: 10, name: 'Total Jam',
+    grid: { cols: 6, rows: 8 },
+    gates: [
+      { edge:'top',    start:1, span:1, color:'red'    },
+      { edge:'top',    start:4, span:1, color:'blue'   },
+      { edge:'bottom', start:1, span:1, color:'green'  },
+      { edge:'bottom', start:4, span:1, color:'yellow' },
+      { edge:'left',   start:2, span:1, color:'purple' },
+      { edge:'right',  start:5, span:1, color:'orange' },
+      { edge:'right',  start:7, span:1, color:'purple' },
+    ],
+    pieces: [
+      { shape:'car_m', color:'red',    dir:'up',    anchor:[1,2] },
+      { shape:'car_s', color:'purple', dir:'left',  anchor:[0,1] },
+      { shape:'car_m', color:'blue',   dir:'up',    anchor:[4,3] },
+      { shape:'car_s', color:'orange', dir:'right', anchor:[3,0] },
+      { shape:'car_m', color:'green',  dir:'down',  anchor:[2,5] },
+      { shape:'car_s', color:'yellow', dir:'down',  anchor:[5,2] },
+      { shape:'car_s', color:'red',    dir:'up',    anchor:[0,5] },
+      { shape:'car_s', color:'blue',   dir:'up',    anchor:[3,6] },
+    ],
+  },
+];
+
+/* ================= SHAPES ================= */
+
+const SHAPES = {
+  car_s: ['X','X'],
+  car_m: ['X','X','X'],
+  car_l: ['X','X','X','X'],
+};
+const DIRS = {
+  up:    { dx:0, dy:-1, edge:'top'    },
+  down:  { dx:0, dy: 1, edge:'bottom' },
+  left:  { dx:-1, dy:0, edge:'left'   },
+  right: { dx: 1, dy:0, edge:'right'  },
+};
+
+function maskCells(rows) {
+  const cells = [];
+  rows.forEach((row, r) => { [...row].forEach((ch, c) => { if (ch === 'X') cells.push({ c, r }); }); });
+  return cells;
+}
+// one CW rotation of a mask with height H: (c,r) -> (H-1-r, c)
+function shapeFor(shape, dir) {
+  const rows = SHAPES[shape];
+  let cells = maskCells(rows);
+  let w = rows[0].length, h = rows.length;
+  const n = { up:0, right:1, down:2, left:3 }[dir];
+  for (let i = 0; i < n; i++) {
+    cells = cells.map(({ c, r }) => ({ c: h - 1 - r, r: c }));
+    const t = w; w = h; h = t;
+  }
+  return { cells, w, h };
+}
+
+/* ================= SMALL UTILS ================= */
+
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const easeOutQuad  = k => 1 - (1 - k) * (1 - k);
+const easeInQuad   = k => k * k;
+const easeOutCubic = k => 1 - Math.pow(1 - k, 3);
+const easeOutBack  = k => { const c = 1.70158, c3 = c + 1; return 1 + c3 * Math.pow(k - 1, 3) + c * Math.pow(k - 1, 2); };
+
+function buzz(ms) { try { if (navigator.vibrate) navigator.vibrate(ms); } catch (e) {} }
+
+/* --- tween engine --- */
+const tweens = new Set();
+function tween(opts) {
+  const t = { t:0, dur:opts.dur || 0.3, ease:opts.ease || easeOutQuad, update:opts.update, done:opts.done };
+  tweens.add(t);
+  return t;
+}
+function killTween(t) { if (t) tweens.delete(t); }
+function updateTweens(dt) {
+  for (const t of [...tweens]) {
+    t.t += dt;
+    const raw = Math.min(1, t.t / t.dur);
+    if (t.update) t.update(t.ease(raw), raw);
+    if (raw >= 1) { tweens.delete(t); if (t.done) t.done(); }
+  }
+}
+
+/* --- exit-rule helpers --- */
+function gateSpanFits(gate, piece, tol) {
+  const horiz = (gate.edge === 'top' || gate.edge === 'bottom');
+  const pos = horiz ? piece.fx : piece.fy;
+  const ext = horiz ? piece.w : piece.h;
+  return pos >= gate.start - tol && pos + ext <= gate.start + gate.span + tol;
+}
+function gateMatches(gate, piece, tol) {
+  return gate.color === piece.color && DIRS[piece.dir].edge === gate.edge && gateSpanFits(gate, piece, tol);
+}
+// first gate on the piece's own edge matching color + span fit at current alignment
+function alignedGate(board, piece, tol) {
+  for (const g of board.gates) if (gateMatches(g, piece, tol)) return g;
+  return null;
+}
+
+/* ================= CAR MODEL ================= */
+/* Toy car built from rounded boxes. Built pointing UP (front toward -z, length
+   along z, centred on the origin); the whole group is yawed per direction. */
+
+const geoCache = new Map();
+function cachedGeo(key, make) {
+  if (!geoCache.has(key)) geoCache.set(key, make());
+  return geoCache.get(key);
+}
+const shadeMats = {};
+function shadeMaterial(color) {
+  if (!shadeMats[color]) {
+    shadeMats[color] = new THREE.MeshPhysicalMaterial({
+      color: new THREE.Color(PALETTE[color].shade),
+      roughness: 0.35, metalness: 0, clearcoat: 0.5, clearcoatRoughness: 0.35, envMapIntensity: 0.7,
+    });
+  }
+  return shadeMats[color];
+}
+let _wheelMat = null, _glassMat = null, _lightMat = null;
+function wheelMat() {
+  return _wheelMat || (_wheelMat = new THREE.MeshStandardMaterial({ color: 0x2E2E38, roughness: 0.85 }));
+}
+function glassMat() {
+  return _glassMat || (_glassMat = new THREE.MeshPhysicalMaterial({
+    color: 0x2A3852, roughness: 0.12, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.1, envMapIntensity: 1.1,
+  }));
+}
+function lightMat() {
+  return _lightMat || (_lightMat = new THREE.MeshStandardMaterial({
+    color: 0xFFF6CE, emissive: 0xFFE9A0, emissiveIntensity: 0.9, roughness: 0.4,
+  }));
+}
+
+function buildCarModel(shape, color) {
+  const L = SHAPES[shape].length; // length in cells
+  const g = new THREE.Group();
+  const bodyLen = L - 0.22;
+  const body = new THREE.Mesh(
+    cachedGeo('body' + L, () => new RoundedBoxGeometry(0.84, 0.32, L - 0.22, 3, 0.1)),
+    pieceMaterial(color)
+  );
+  body.position.y = 0.3;
+  g.add(body);
+  // glass cabin, set back from the nose so the facing reads instantly
+  const cab = new THREE.Mesh(
+    cachedGeo('cab' + L, () => new RoundedBoxGeometry(0.66, 0.3, Math.min(L * 0.42, 1.6), 3, 0.09)),
+    glassMat()
+  );
+  cab.position.set(0, 0.52, L * 0.08);
+  g.add(cab);
+  // colored roof cap
+  const roof = new THREE.Mesh(
+    cachedGeo('roof' + L, () => new RoundedBoxGeometry(0.58, 0.1, Math.min(L * 0.42, 1.6) * 0.76, 2, 0.04)),
+    shadeMaterial(color)
+  );
+  roof.position.set(0, 0.7, L * 0.08);
+  g.add(roof);
+  // headlights (front bumper, -z)
+  const lightGeo = cachedGeo('light', () => new THREE.BoxGeometry(0.15, 0.09, 0.06));
+  for (const sx of [-1, 1]) {
+    const hl = new THREE.Mesh(lightGeo, lightMat());
+    hl.position.set(sx * 0.25, 0.32, -bodyLen / 2 - 0.01);
+    g.add(hl);
+  }
+  // wheels
+  const wheelGeo = cachedGeo('wheel', () => {
+    const w = new THREE.CylinderGeometry(0.15, 0.15, 0.13, 16);
+    w.rotateZ(Math.PI / 2);
+    return w;
+  });
+  g.userData.wheels = [];
+  const axles = L > 3 ? [-(L / 2 - 0.5), 0, L / 2 - 0.5] : [-(L / 2 - 0.45), L / 2 - 0.45];
+  for (const az of axles) {
+    for (const sx of [-1, 1]) {
+      const w = new THREE.Mesh(wheelGeo, wheelMat());
+      w.position.set(sx * 0.4, 0.16, az);
+      g.add(w);
+      g.userData.wheels.push(w);
+    }
+  }
+  return g;
+}
+
+/* ================= MATERIALS & TEXTURES ================= */
+
+const pieceMats = {};
+function pieceMaterial(color) {
+  if (!pieceMats[color]) {
+    pieceMats[color] = new THREE.MeshPhysicalMaterial({
+      color: new THREE.Color(PALETTE[color].base),
+      roughness: 0.33, metalness: 0,
+      clearcoat: 0.6, clearcoatRoughness: 0.32,
+      envMapIntensity: 0.8,
+    });
+  }
+  return pieceMats[color];
+}
+
+/* mask-shaped texture (per cell rounded squares, optional blur) — used for the
+   contact shadow and the snap-preview highlight so the player can read exactly
+   which cells a piece occupies */
+const maskTexCache = new Map();
+function maskTexture(shape, dir, key, color, inset, blur) {
+  const k = shape + '|' + dir + '|' + key;
+  if (maskTexCache.has(k)) return maskTexCache.get(k);
+  const { cells, w, h } = shapeFor(shape, dir);
+  const S = 64, PAD = S / 2;
+  const cw = (w + 1) * S, ch = (h + 1) * S;
+  const tmp = document.createElement('canvas');
+  tmp.width = cw; tmp.height = ch;
+  const tg = tmp.getContext('2d');
+  tg.fillStyle = color;
+  for (const { c, r } of cells) {
+    const x = PAD + c * S + inset * S, y = PAD + r * S + inset * S, s = S - 2 * inset * S;
+    tg.beginPath();
+    tg.roundRect(x, y, s, s, S * 0.14);
+    tg.fill();
+  }
+  const cv = document.createElement('canvas');
+  cv.width = cw; cv.height = ch;
+  const g = cv.getContext('2d');
+  g.filter = 'blur(' + (blur * S) + 'px)';
+  g.drawImage(tmp, 0, 0);
+  const tex = new THREE.CanvasTexture(cv);
+  maskTexCache.set(k, tex);
+  return tex;
+}
+
+/* ================= BOARD ================= */
+
+const FRAME_T = 0.5, WALL_H = 0.5, GATE_H = 0.16;
+
+class Board {
+  constructor(scene, level) {
+    this.level = level;
+    this.cols = level.grid.cols;
+    this.rows = level.grid.rows;
+    this.group = new THREE.Group();
+    scene.add(this.group);
+    this.gates = level.gates.map(g => ({ ...g, mesh: null, pulseT: Math.random() * 5, flash: 0 }));
+    this.buildTray();
+    this.buildFrame();
+  }
+  wx(c) { return c - this.cols / 2; }
+  wz(r) { return r - this.rows / 2; }
+
+  buildTray() {
+    const { cols, rows } = this;
+    const slab = new THREE.Mesh(
+      new RoundedBoxGeometry(cols + 2 * FRAME_T + 0.14, 0.34, rows + 2 * FRAME_T + 0.14, 3, 0.13),
+      new THREE.MeshStandardMaterial({ color: TRAY.slab, roughness: 0.75 })
+    );
+    slab.position.y = -0.17;
+    slab.receiveShadow = true;
+    this.group.add(slab);
+
+    const tex = this.makeFloorTexture();
+    const floor = new THREE.Mesh(
+      new THREE.PlaneGeometry(cols, rows),
+      new THREE.MeshStandardMaterial({ map: tex, roughness: 0.9, metalness: 0 })
+    );
+    floor.rotation.x = -Math.PI / 2;
+    floor.position.y = 0.012;
+    floor.receiveShadow = true;
+    this.group.add(floor);
+  }
+
+  makeFloorTexture() {
+    const S = 96, { cols, rows } = this;
+    const c = document.createElement('canvas');
+    c.width = cols * S; c.height = rows * S;
+    const g = c.getContext('2d');
+    for (let r = 0; r < rows; r++) {
+      for (let col = 0; col < cols; col++) {
+        g.fillStyle = ((col + r) & 1) ? TRAY.floorB : TRAY.floorA;
+        g.fillRect(col * S, r * S, S, S);
+      }
+    }
+    // visible inner cell borders (readability of piece footprints)
+    g.strokeStyle = 'rgba(110,90,60,0.22)';
+    g.lineWidth = 3;
+    for (let col = 1; col < cols; col++) { g.beginPath(); g.moveTo(col * S, 0); g.lineTo(col * S, rows * S); g.stroke(); }
+    for (let r = 1; r < rows; r++) { g.beginPath(); g.moveTo(0, r * S); g.lineTo(cols * S, r * S); g.stroke(); }
+    // gate chevrons just inside each opening, pointing outward
+    for (const gate of this.gates) {
+      const col = PALETTE[gate.color].base;
+      for (let i = 0; i < gate.span; i++) {
+        let cx, cy, ang; // ang: 0 = up(-y), then rotate
+        if (gate.edge === 'top')    { cx = (gate.start + i + 0.5) * S; cy = 0.5 * S;              ang = 0; }
+        if (gate.edge === 'bottom') { cx = (gate.start + i + 0.5) * S; cy = (rows - 0.5) * S;     ang = Math.PI; }
+        if (gate.edge === 'left')   { cx = 0.5 * S;                    cy = (gate.start + i + 0.5) * S; ang = -Math.PI / 2; }
+        if (gate.edge === 'right')  { cx = (cols - 0.5) * S;           cy = (gate.start + i + 0.5) * S; ang = Math.PI / 2; }
+        this.drawChevrons(g, cx, cy, ang, col, S);
+      }
+    }
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = 4;
+    return tex;
+  }
+
+  drawChevrons(g, cx, cy, ang, color, S) {
+    g.save();
+    g.translate(cx, cy);
+    g.rotate(ang);
+    g.strokeStyle = color;
+    g.lineWidth = S * 0.09;
+    g.lineCap = 'round';
+    g.lineJoin = 'round';
+    const w = S * 0.22, h = S * 0.14;
+    for (let k = 0; k < 2; k++) {
+      const oy = -S * 0.16 + k * S * 0.22;
+      g.globalAlpha = k === 0 ? 0.55 : 0.30;
+      g.beginPath();
+      g.moveTo(-w, oy + h);
+      g.lineTo(0, oy - h);
+      g.lineTo(w, oy + h);
+      g.stroke();
+    }
+    g.restore();
+  }
+
+  buildFrame() {
+    const { cols, rows } = this;
+    const frameMat = new THREE.MeshStandardMaterial({ color: TRAY.frame, roughness: 0.7 });
+    const addWall = (len, height, x, z, alongX, mat) => {
+      const g = alongX
+        ? new RoundedBoxGeometry(Math.max(len - 0.04, 0.1), height, FRAME_T, 2, 0.07)
+        : new RoundedBoxGeometry(FRAME_T, height, Math.max(len - 0.04, 0.1), 2, 0.07);
+      const m = new THREE.Mesh(g, mat);
+      m.position.set(x, height / 2, z);
+      m.castShadow = true; m.receiveShadow = true;
+      this.group.add(m);
+      return m;
+    };
+    const edges = [
+      { edge: 'top',    len: cols, alongX: true  },
+      { edge: 'bottom', len: cols, alongX: true  },
+      { edge: 'left',   len: rows, alongX: false },
+      { edge: 'right',  len: rows, alongX: false },
+    ];
+    for (const e of edges) {
+      const gatesOn = this.gates.filter(g => g.edge === e.edge).sort((a, b) => a.start - b.start);
+      let pos = 0;
+      const segs = [];
+      for (const g of gatesOn) {
+        if (g.start > pos) segs.push({ start: pos, len: g.start - pos, gate: null });
+        segs.push({ start: g.start, len: g.span, gate: g });
+        pos = g.start + g.span;
+      }
+      if (pos < e.len) segs.push({ start: pos, len: e.len - pos, gate: null });
+      for (const s of segs) {
+        const mid = s.start + s.len / 2;
+        let x, z;
+        if (e.edge === 'top')    { x = this.wx(mid); z = -rows / 2 - FRAME_T / 2; }
+        if (e.edge === 'bottom') { x = this.wx(mid); z =  rows / 2 + FRAME_T / 2; }
+        if (e.edge === 'left')   { x = -cols / 2 - FRAME_T / 2; z = this.wz(mid); }
+        if (e.edge === 'right')  { x =  cols / 2 + FRAME_T / 2; z = this.wz(mid); }
+        if (s.gate) {
+          const base = new THREE.Color(PALETTE[s.gate.color].base);
+          const mat = new THREE.MeshStandardMaterial({
+            color: base, emissive: base, emissiveIntensity: 0.35, roughness: 0.45,
+          });
+          s.gate.mesh = addWall(s.len, GATE_H, x, z, e.alongX, mat);
+        } else {
+          addWall(s.len, WALL_H, x, z, e.alongX, frameMat);
+        }
+      }
+    }
+    // corners
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+      const m = new THREE.Mesh(new RoundedBoxGeometry(FRAME_T, WALL_H, FRAME_T, 2, 0.07), frameMat);
+      m.position.set(sx * (cols / 2 + FRAME_T / 2), WALL_H / 2, sz * (rows / 2 + FRAME_T / 2));
+      m.castShadow = true; m.receiveShadow = true;
+      this.group.add(m);
+    }
+  }
+
+  /* gate glow: pulse when a matching piece is aligned with its gate (waiting for a clear path) */
+  update(dt, pieces) {
+    for (const g of this.gates) {
+      g.pulseT += dt;
+      let target = 0.35;
+      if (g.flash > 0) {
+        g.flash -= dt;
+        target = 1.6;
+      } else {
+        let near = false;
+        for (const p of pieces) {
+          if (p.removed || p.exiting || p.spawning) continue;
+          if (gateMatches(g, p, 0.25)) { near = true; break; }
+        }
+        if (near) target = 0.55 + 0.35 * Math.sin(g.pulseT * Math.PI * 2 / 0.6);
+      }
+      const m = g.mesh.material;
+      m.emissiveIntensity += (target - m.emissiveIntensity) * Math.min(1, dt * 9);
+    }
+  }
+}
+
+function gateFlash(g) { if (g) g.flash = 0.15; }
+
+/* ================= PIECE ================= */
+
+class Piece {
+  constructor(def, board) {
+    this.color = def.color;
+    this.dir = def.dir;
+    this.board = board;
+    const s = shapeFor(def.shape, def.dir);
+    this.cells = s.cells; this.w = s.w; this.h = s.h;
+    this.ax = def.anchor[0]; this.ay = def.anchor[1]; // snapped ints
+    this.fx = this.ax; this.fy = this.ay;             // live float position
+    this.removed = false; this.exiting = false; this.dragging = false; this.spawning = false;
+    this.lift = 0;
+    this.tiltTX = 0; this.tiltTZ = 0;
+    this.snapTween = null; this.liftTween = null;
+
+    this.group = new THREE.Group();
+    this.inner = new THREE.Group();
+    this.group.add(this.inner);
+    this.mesh = buildCarModel(def.shape, def.color);
+    this.mesh.rotation.y = { up: 0, right: -Math.PI / 2, down: Math.PI, left: Math.PI / 2 }[def.dir];
+    this.mesh.traverse(o => {
+      o.userData.piece = this;
+      if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; }
+    });
+    this.inner.add(this.mesh);
+
+    this.highlight = new THREE.Mesh(
+      new THREE.PlaneGeometry(this.w + 1, this.h + 1),
+      new THREE.MeshBasicMaterial({
+        map: maskTexture(def.shape, def.dir, 'hl', '#ffffff', 0.09, 0.02),
+        transparent: true, opacity: 0, depthWrite: false,
+        color: new THREE.Color(PALETTE[def.color].base),
+      })
+    );
+    this.highlight.rotation.x = -Math.PI / 2;
+    this.highlight.position.y = 0.022;
+    this.highlight.renderOrder = 2;
+    this.syncTransform();
+  }
+
+  syncTransform() {
+    const b = this.board;
+    this.group.position.set(this.fx + this.w / 2 - b.cols / 2, this.lift, this.fy + this.h / 2 - b.rows / 2);
+  }
+
+  rects(fx = this.fx, fy = this.fy) {
+    return this.cells.map(({ c, r }) => ({ x0: fx + c, y0: fy + r, x1: fx + c + 1, y1: fy + r + 1 }));
+  }
+
+  setTiltTarget(tz, tx) { this.tiltTZ = tz; this.tiltTX = tx; }
+
+  updateTilt(dt) {
+    const kIn = Math.min(1, dt * 14), kOut = Math.min(1, dt * 6);
+    this.inner.rotation.z += (this.tiltTZ - this.inner.rotation.z) * kIn;
+    this.inner.rotation.x += (this.tiltTX - this.inner.rotation.x) * kIn;
+    this.tiltTZ += (0 - this.tiltTZ) * kOut;
+    this.tiltTX += (0 - this.tiltTX) * kOut;
+  }
+}
+
+/* ================= CONFETTI (DOM canvas) ================= */
+
+class Confetti {
+  constructor(canvas) {
+    this.cv = canvas;
+    this.ctx = canvas.getContext('2d');
+    this.parts = [];
+    this.w = 0; this.h = 0; this.dpr = 1;
+  }
+  resize(w, h, dpr) {
+    this.w = w; this.h = h; this.dpr = dpr;
+    this.cv.width = Math.round(w * dpr);
+    this.cv.height = Math.round(h * dpr);
+  }
+  burst() {
+    const colors = ['red', 'blue', 'green', 'yellow', 'orange', 'purple'].map(c => PALETTE[c].base);
+    for (let i = 0; i < 150; i++) {
+      this.parts.push({
+        x: Math.random() * this.w,
+        y: -30 - Math.random() * this.h * 0.35,
+        vy: 180 + Math.random() * 260,
+        sway: Math.random() * Math.PI * 2,
+        swayAmp: 20 + Math.random() * 40,
+        rot: Math.random() * Math.PI,
+        rotV: (Math.random() - 0.5) * 10,
+        w: 7 + Math.random() * 7,
+        h: 4 + Math.random() * 5,
+        col: colors[(Math.random() * colors.length) | 0],
+      });
+    }
+  }
+  update(dt) {
+    const g = this.ctx;
+    if (!this.parts.length) { if (this._drawn) { g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, this.cv.width, this.cv.height); this._drawn = false; } return; }
+    g.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    g.clearRect(0, 0, this.w, this.h);
+    this._drawn = true;
+    for (let i = this.parts.length - 1; i >= 0; i--) {
+      const p = this.parts[i];
+      p.y += p.vy * dt;
+      p.sway += dt * 3;
+      p.rot += p.rotV * dt;
+      if (p.y > this.h + 40) { this.parts.splice(i, 1); continue; }
+      g.save();
+      g.translate(p.x + Math.sin(p.sway) * p.swayAmp * 0.3, p.y);
+      g.rotate(p.rot);
+      g.scale(1, 0.4 + 0.6 * Math.abs(Math.sin(p.sway * 1.7)));
+      g.fillStyle = p.col;
+      g.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+      g.restore();
+    }
+  }
+}
+
+/* ================= DRAG CONTROLLER ================= */
+
+const LIFT_Y = 0.25;
+
+class DragController {
+  constructor(game, canvas) {
+    this.game = game;
+    this.canvas = canvas;
+    this.ray = new THREE.Raycaster();
+    this.ndc = new THREE.Vector2();
+    this.piece = null;
+    this.pointerId = null;
+    this.grabOff = { x: 0, y: 0 };
+    this.target = { x: 0, y: 0 };
+    canvas.addEventListener('pointerdown', e => this.onDown(e));
+    canvas.addEventListener('pointermove', e => this.onMove(e));
+    canvas.addEventListener('pointerup', e => this.onUp(e));
+    canvas.addEventListener('pointercancel', e => this.onUp(e));
+    canvas.addEventListener('contextmenu', e => e.preventDefault());
+  }
+
+  ndcFromEvent(e) {
+    const r = this.canvas.getBoundingClientRect();
+    this.ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -(((e.clientY - r.top) / r.height) * 2 - 1));
+  }
+  planePoint(y) {
+    this.ray.setFromCamera(this.ndc, this.game.camera);
+    const o = this.ray.ray.origin, d = this.ray.ray.direction;
+    const t = (y - o.y) / d.y;
+    return o.clone().addScaledVector(d, t);
+  }
+  cellFromWorld(p) {
+    const b = this.game.board;
+    return { x: p.x + b.cols / 2, y: p.z + b.rows / 2 };
+  }
+
+  onDown(e) {
+    if (this.game.state !== 'playing' || this.piece) return;
+    this.ndcFromEvent(e);
+    this.ray.setFromCamera(this.ndc, this.game.camera);
+    const meshes = this.game.pieces.filter(p => !p.removed && !p.exiting).map(p => p.mesh);
+    const hits = this.ray.intersectObjects(meshes, true);
+    if (!hits.length) return;
+    const piece = hits[0].object.userData.piece;
+    killTween(piece.snapTween); piece.snapTween = null;
+    killTween(piece.liftTween);
+    this.piece = piece;
+    this.pointerId = e.pointerId;
+    try { this.canvas.setPointerCapture(e.pointerId); } catch (err) {}
+    const c = this.cellFromWorld(this.planePoint(LIFT_Y));
+    this.grabOff.x = piece.fx - c.x;
+    this.grabOff.y = piece.fy - c.y;
+    this.target.x = piece.fx;
+    this.target.y = piece.fy;
+    piece.dragging = true;
+    const l0 = piece.lift, s0 = piece.inner.scale.x;
+    piece.liftTween = tween({ dur: 0.09, ease: easeOutQuad, update: k => {
+      piece.lift = l0 + (LIFT_Y - l0) * k;
+      piece.inner.scale.setScalar(s0 + (1.04 - s0) * k);
+      piece.syncTransform();
+    }});
+    buzz(10);
+  }
+
+  onMove(e) {
+    if (!this.piece || e.pointerId !== this.pointerId) return;
+    this.ndcFromEvent(e);
+    const c = this.cellFromWorld(this.planePoint(this.piece.lift || LIFT_Y));
+    this.target.x = c.x + this.grabOff.x;
+    this.target.y = c.y + this.grabOff.y;
+  }
+
+  onUp(e) {
+    if (!this.piece || e.pointerId !== this.pointerId) return;
+    const p = this.piece;
+    this.piece = null;
+    this.pointerId = null;
+    if (p.exiting || p.removed) return;
+    p.dragging = false;
+    const b = this.game.board;
+    // still protruding but past no point of no return -> pull back inside before snapping
+    const fx = clamp(p.fx, 0, b.cols - p.w);
+    const fy = clamp(p.fy, 0, b.rows - p.h);
+    const snap = this.findSnap(p, fx, fy);
+    this.animateSnap(p, snap.x, snap.y);
+  }
+
+  cancel() {
+    if (this.piece) { this.piece.dragging = false; this.piece = null; this.pointerId = null; }
+  }
+
+  free(p, ax, ay) {
+    const eps = 1e-6;
+    const rects = p.rects(ax, ay);
+    for (const o of this.game.pieces) {
+      if (o === p || o.removed || o.exiting) continue;
+      for (const or of o.rects()) {
+        for (const r of rects) {
+          if (r.x0 < or.x1 - eps && r.x1 > or.x0 + eps && r.y0 < or.y1 - eps && r.y1 > or.y0 + eps) return false;
+        }
+      }
+    }
+    return true;
+  }
+
+  findSnap(p, fx, fy) {
+    const b = this.game.board;
+    const cands = [];
+    for (const rx of [Math.round(fx), Math.floor(fx), Math.ceil(fx)])
+      for (const ry of [Math.round(fy), Math.floor(fy), Math.ceil(fy)])
+        cands.push({ x: clamp(rx, 0, b.cols - p.w), y: clamp(ry, 0, b.rows - p.h) });
+    const seen = new Set(), list = [];
+    for (const c of cands) { const k = c.x + ',' + c.y; if (!seen.has(k)) { seen.add(k); list.push(c); } }
+    list.sort((a, c) => ((a.x - fx) ** 2 + (a.y - fy) ** 2) - ((c.x - fx) ** 2 + (c.y - fy) ** 2));
+    for (const c of list) if (this.free(p, c.x, c.y)) return c;
+    let best = null, bd = 1e9;
+    for (let dx = -2; dx <= 2; dx++) for (let dy = -2; dy <= 2; dy++) {
+      const x = clamp(Math.round(fx) + dx, 0, b.cols - p.w);
+      const y = clamp(Math.round(fy) + dy, 0, b.rows - p.h);
+      if (this.free(p, x, y)) {
+        const d = (x - fx) ** 2 + (y - fy) ** 2;
+        if (d < bd) { bd = d; best = { x, y }; }
+      }
+    }
+    return best || { x: p.ax, y: p.ay };
+  }
+
+  animateSnap(p, ax, ay) {
+    const fx0 = p.fx, fy0 = p.fy, l0 = p.lift, s0 = p.inner.scale.x;
+    killTween(p.liftTween); p.liftTween = null;
+    p.snapTween = tween({ dur: 0.11, ease: easeOutQuad,
+      update: k => {
+        p.fx = fx0 + (ax - fx0) * k;
+        p.fy = fy0 + (ay - fy0) * k;
+        p.lift = l0 * (1 - k);
+        p.inner.scale.setScalar(s0 + (1 - s0) * k);
+        p.syncTransform();
+      },
+      done: () => {
+        p.snapTween = null;
+        p.ax = ax; p.ay = ay; p.fx = ax; p.fy = ay; p.lift = 0;
+        p.syncTransform();
+        // settle squash-and-stretch
+        tween({ dur: 0.14, ease: k => k, update: k => {
+          const s = Math.sin(k * Math.PI);
+          p.inner.scale.set(1 + 0.035 * s, 1 - 0.07 * s, 1 + 0.035 * s);
+        }, done: () => p.inner.scale.setScalar(1) });
+      },
+    });
+  }
+
+  axisMove(p, axis, d, obstacles, b) {
+    if (d === 0) return 0;
+    const eps = 1e-4;
+    // frame walls are always solid for dragging; exits happen via auto-launch
+    if (axis === 'x') {
+      if (d > 0) d = Math.min(d, Math.max(0, b.cols - (p.fx + p.w)));
+      else d = Math.max(d, Math.min(0, -p.fx));
+    } else {
+      if (d > 0) d = Math.min(d, Math.max(0, b.rows - (p.fy + p.h)));
+      else d = Math.max(d, Math.min(0, -p.fy));
+    }
+    // other pieces: slide to contact
+    const rects = p.rects();
+    for (const o of obstacles) {
+      for (const r of rects) {
+        if (axis === 'x') {
+          if (r.y0 < o.y1 - eps && r.y1 > o.y0 + eps) {
+            if (d > 0 && r.x1 <= o.x0 + eps) d = Math.min(d, o.x0 - r.x1);
+            else if (d < 0 && r.x0 >= o.x1 - eps) d = Math.max(d, o.x1 - r.x0);
+          }
+        } else {
+          if (r.x0 < o.x1 - eps && r.x1 > o.x0 + eps) {
+            if (d > 0 && r.y1 <= o.y0 + eps) d = Math.min(d, o.y0 - r.y1);
+            else if (d < 0 && r.y0 >= o.y1 - eps) d = Math.max(d, o.y1 - r.y0);
+          }
+        }
+      }
+    }
+    if (axis === 'x') p.fx += d; else p.fy += d;
+    return d;
+  }
+
+  sweep(p, dx, dy) {
+    const b = this.game.board;
+    const obstacles = [];
+    for (const o of this.game.pieces) {
+      if (o === p || o.removed || o.exiting) continue;
+      obstacles.push(...o.rects());
+    }
+    const steps = Math.max(1, Math.ceil(Math.max(Math.abs(dx), Math.abs(dy)) / 0.3));
+    let mx = 0, my = 0;
+    for (let i = 0; i < steps; i++) {
+      mx += this.axisMove(p, 'x', dx / steps, obstacles, b);
+      my += this.axisMove(p, 'y', dy / steps, obstacles, b);
+    }
+    return { dx: mx, dy: my };
+  }
+
+  update(dt) {
+    const p = this.piece;
+    if (!p || p.exiting) return;
+    const a = 1 - Math.exp(-26 * dt);
+    const dx = (this.target.x - p.fx) * a;
+    const dy = (this.target.y - p.fy) * a;
+    const res = this.sweep(p, dx, dy);
+    // blocked feedback -> slight tilt toward the push direction
+    const bx = dx - res.dx, by = dy - res.dy;
+    p.setTiltTarget(-clamp(bx * 9, -1, 1) * 0.035, clamp(by * 9, -1, 1) * 0.035);
+    // snap-preview: show exactly which cells the piece will land on
+    const b = this.game.board;
+    const hx = clamp(Math.round(p.fx), 0, b.cols - p.w);
+    const hy = clamp(Math.round(p.fy), 0, b.rows - p.h);
+    p.highlight.position.x = hx + p.w / 2 - b.cols / 2;
+    p.highlight.position.z = hy + p.h / 2 - b.rows / 2;
+    p.highlight.material.opacity += (0.45 - p.highlight.material.opacity) * Math.min(1, dt * 14);
+    p.syncTransform();
+  }
+}
+
+/* ================= GAME ================= */
+
+const ui = {
+  stage: document.getElementById('stage'),
+  levelPill: document.getElementById('levelPill'),
+  restartBtn: document.getElementById('restartBtn'),
+  hint: document.getElementById('hint'),
+  popup: document.getElementById('popup'),
+  popupTitle: document.getElementById('popupTitle'),
+  nextBtn: document.getElementById('nextBtn'),
+};
+
+class Game {
+  constructor() {
+    this.canvas = document.getElementById('game');
+    this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: true, alpha: true });
+    this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 1.0;
+    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.setClearColor(0x000000, 0);
+
+    this.scene = new THREE.Scene();
+    const pmrem = new THREE.PMREMGenerator(this.renderer);
+    this.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+
+    this.scene.add(new THREE.HemisphereLight(0xffffff, 0xCFD8E8, 0.55));
+    this.key = new THREE.DirectionalLight(0xffffff, 1.15);
+    this.key.position.set(4, 10, 6);
+    this.key.castShadow = true;
+    this.key.shadow.mapSize.set(2048, 2048);
+    this.key.shadow.bias = -0.0004;
+    this.scene.add(this.key, this.key.target);
+
+    // faint shadow catcher on the "table" below the tray
+    const catcher = new THREE.Mesh(new THREE.PlaneGeometry(90, 90), new THREE.ShadowMaterial({ opacity: 0.15 }));
+    catcher.rotation.x = -Math.PI / 2;
+    catcher.position.y = -0.36;
+    catcher.receiveShadow = true;
+    this.scene.add(catcher);
+
+    this.camera = new THREE.PerspectiveCamera(40, 9 / 16, 0.1, 200);
+    this.confetti = new Confetti(document.getElementById('confetti'));
+    this.drag = new DragController(this, this.canvas);
+
+    this.levelIndex = 0;
+    this.pieces = [];
+    this.board = null;
+    this.state = 'loading';
+    this.loadStamp = 0;
+
+    ui.restartBtn.addEventListener('click', () => this.restart());
+    ui.nextBtn.addEventListener('click', () => this.next());
+    window.addEventListener('resize', () => this.onResize());
+    window.addEventListener('orientationchange', () => setTimeout(() => this.onResize(), 60));
+
+    this.onResize();
+    this.loadLevel(0);
+    this.clock = new THREE.Clock();
+    this.renderer.setAnimationLoop(() => this.tick());
+  }
+
+  onResize() {
+    const w = ui.stage.clientWidth, h = ui.stage.clientHeight;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    this.renderer.setPixelRatio(dpr);
+    this.renderer.setSize(w, h, false);
+    this.camera.aspect = w / h;
+    this.confetti.resize(w, h, dpr);
+    this.frameCamera();
+  }
+
+  /* fit whole board + margin into the stage at the Color Block Jam pitch */
+  frameCamera() {
+    const cols = this.board ? this.board.cols : 6;
+    const rows = this.board ? this.board.rows : 8;
+    const pitch = THREE.MathUtils.degToRad(66);
+    const dir = new THREE.Vector3(0, Math.sin(pitch), Math.cos(pitch));
+    const target = new THREE.Vector3(0, 0, -0.45);
+    const xs = cols / 2 + 1.35, zs = rows / 2 + 1.35;
+    const corners = [];
+    for (const x of [-xs, xs]) for (const y of [0, 0.85]) for (const z of [-zs, zs])
+      corners.push(new THREE.Vector3(x, y, z));
+    let lo = 3, hi = 90;
+    const v = new THREE.Vector3();
+    for (let i = 0; i < 26; i++) {
+      const mid = (lo + hi) / 2;
+      this.camera.position.copy(target).addScaledVector(dir, mid);
+      this.camera.lookAt(target);
+      this.camera.updateProjectionMatrix();
+      this.camera.updateMatrixWorld();
+      let ok = true;
+      for (const c of corners) {
+        v.copy(c).project(this.camera);
+        if (Math.abs(v.x) > 0.93 || v.y > 0.72 || v.y < -0.9) { ok = false; break; }
+      }
+      if (ok) hi = mid; else lo = mid;
+    }
+    this.camera.position.copy(target).addScaledVector(dir, hi);
+    this.camera.lookAt(target);
+    this.camera.updateProjectionMatrix();
+  }
+
+  loadLevel(i) {
+    this.levelIndex = i;
+    const level = LEVELS[i];
+    const stamp = ++this.loadStamp;
+    this.drag.cancel();
+    if (this.board) this.scene.remove(this.board.group);
+    for (const p of this.pieces) { this.scene.remove(p.group, p.highlight); }
+    this.pieces = [];
+
+    this.board = new Board(this.scene, level);
+    const m = Math.max(level.grid.cols, level.grid.rows) / 2 + 3;
+    const sc = this.key.shadow.camera;
+    sc.left = -m; sc.right = m; sc.top = m; sc.bottom = -m; sc.near = 2; sc.far = 30;
+    sc.updateProjectionMatrix();
+
+    level.pieces.forEach((def, idx) => {
+      const p = new Piece(def, this.board);
+      p.spawning = true;
+      this.scene.add(p.group, p.highlight);
+      this.pieces.push(p);
+      p.group.visible = false;
+      setTimeout(() => {
+        if (stamp !== this.loadStamp || p.removed) return;
+        p.group.visible = true;
+        tween({ dur: 0.4, ease: easeOutBack, update: (k, raw) => {
+          p.lift = (1 - easeOutCubic(raw)) * 2.4;
+          p.inner.scale.setScalar(0.55 + 0.45 * k);
+          p.syncTransform();
+        }, done: () => {
+          p.lift = 0;
+          p.inner.scale.setScalar(1);
+          p.spawning = false;
+          p.syncTransform();
+        }});
+      }, 80 + idx * 70);
+    });
+
+    ui.levelPill.textContent = 'LEVEL ' + level.id;
+    ui.hint.style.display = level.id === 1 ? 'block' : 'none';
+    ui.popup.classList.remove('show');
+    this.state = 'playing';
+    this.frameCamera();
+  }
+
+  /* cars are not destroyed — they simply drove away */
+  explodePiece(p, g) {
+    p.removed = true;
+    this.scene.remove(p.group, p.highlight);
+    if (this.pieces.every(x => x.removed)) this.levelClear();
+  }
+
+  levelClear() {
+    this.state = 'clearing';
+    const stamp = this.loadStamp;
+    setTimeout(() => {
+      if (stamp !== this.loadStamp) return;
+      this.confetti.burst();
+      buzz(30);
+      const last = this.levelIndex === LEVELS.length - 1;
+      ui.popupTitle.textContent = last ? 'You cleared all levels!' : 'LEVEL COMPLETE!';
+      ui.nextBtn.textContent = last ? 'PLAY AGAIN' : 'NEXT';
+      ui.popup.classList.add('show');
+      this.state = 'complete';
+    }, 300);
+  }
+
+  next() {
+    ui.popup.classList.remove('show');
+    this.loadLevel((this.levelIndex + 1) % LEVELS.length);
+  }
+
+  restart() {
+    ui.popup.classList.remove('show');
+    this.loadLevel(this.levelIndex);
+  }
+
+  /* ---- auto-exit: an aligned arrow with a clear straight path launches itself ---- */
+
+  corridorClear(p) {
+    const b = this.board, eps = 0.03;
+    const strips = p.cells.map(({ c, r }) => {
+      switch (p.dir) {
+        case 'up':    return { x0: p.fx + c + eps, x1: p.fx + c + 1 - eps, y0: -3, y1: p.fy + r };
+        case 'down':  return { x0: p.fx + c + eps, x1: p.fx + c + 1 - eps, y0: p.fy + r + 1, y1: b.rows + 3 };
+        case 'left':  return { x0: -3, x1: p.fx + c, y0: p.fy + r + eps, y1: p.fy + r + 1 - eps };
+        case 'right': return { x0: p.fx + c + 1, x1: b.cols + 3, y0: p.fy + r + eps, y1: p.fy + r + 1 - eps };
+      }
+    });
+    for (const o of this.pieces) {
+      if (o === p || o.removed || o.exiting) continue;
+      for (const or of o.rects()) {
+        for (const s of strips) {
+          if (or.x0 < s.x1 && or.x1 > s.x0 && or.y0 < s.y1 && or.y1 > s.y0) return false;
+        }
+      }
+    }
+    return true;
+  }
+
+  checkAutoExits() {
+    if (this.state !== 'playing') return;
+    for (const p of this.pieces) {
+      if (p.removed || p.exiting || p.spawning) continue;
+      const g = alignedGate(this.board, p, p.dragging ? 0.1 : 0.03);
+      if (!g || !this.corridorClear(p)) continue;
+      this.launch(p, g);
+    }
+  }
+
+  launch(p, g) {
+    p.exiting = true;
+    p.dragging = false;
+    if (this.drag.piece === p) this.drag.cancel();
+    killTween(p.liftTween); killTween(p.snapTween);
+    p.snapTween = null;
+    // lock alignment into the gate span
+    if (p.dir === 'up' || p.dir === 'down') p.fx = clamp(p.fx, g.start, g.start + g.span - p.w);
+    else p.fy = clamp(p.fy, g.start, g.start + g.span - p.h);
+    const b = this.board, D = DIRS[p.dir];
+    let travel;
+    switch (p.dir) {
+      case 'up':    travel = p.fy + p.h; break;
+      case 'down':  travel = b.rows - p.fy; break;
+      case 'left':  travel = p.fx + p.w; break;
+      case 'right': travel = b.cols - p.fx; break;
+    }
+    travel += FRAME_T + 7.5; // keep driving well past the frame, off the screen
+    gateFlash(g);
+    buzz(15);
+    const fx0 = p.fx, fy0 = p.fy, l0 = p.lift;
+    const wheels = p.mesh.userData.wheels || [];
+    tween({ dur: 0.25 + travel * 0.05, ease: easeInQuad,
+      update: k => {
+        p.fx = fx0 + D.dx * travel * k;
+        p.fy = fy0 + D.dy * travel * k;
+        for (const w of wheels) w.rotation.x = -(travel * k) / 0.15;
+        p.lift = l0 * (1 - k);
+        p.inner.rotation.x = 0; p.inner.rotation.z = 0;
+        p.syncTransform();
+      },
+      done: () => this.explodePiece(p, g),
+    });
+  }
+
+  tick() {
+    const dt = Math.min(this.clock.getDelta(), 0.05);
+    updateTweens(dt);
+    this.drag.update(dt);
+    this.checkAutoExits();
+    if (this.board) this.board.update(dt, this.pieces);
+    for (const p of this.pieces) if (!p.removed) {
+      p.updateTilt(dt);
+      if (!p.dragging && p.highlight.material.opacity > 0.001) {
+        p.highlight.material.opacity += (0 - p.highlight.material.opacity) * Math.min(1, dt * 10);
+      }
+    }
+    this.confetti.update(dt);
+    this.renderer.render(this.scene, this.camera);
+  }
+}
+
+new Game();
+</script>
+</body>
+</html>
