@@ -1,0 +1,1116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Pile Up! — Association Solitaire</title>
+<style>
+  :root{
+    --felt1:#1f8a4c;
+    --felt2:#136b3a;
+    --ink:#2f3a37;
+    --gold:#f4c430;
+    --slots:4;
+    --tabs:5;
+    --peek:6;
+    --cw: 68px;
+    --ch: 94px;
+    --band: 19px;
+    --deepup: 17px;   /* peek of a face-up card that got stacked on */
+    --peekup: 3;
+    --r: 11px;
+    --deep: 8px;      /* vertical peek of a buried card */
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    font-family: ui-rounded, "SF Pro Rounded", "Segoe UI", Nunito, system-ui, -apple-system, sans-serif;
+    background: radial-gradient(120% 90% at 50% 0%, var(--felt1) 0%, var(--felt2) 70%, #0e5b30 100%);
+    color:#fff; overflow:hidden; user-select:none; touch-action:manipulation;
+  }
+  #app{
+    position:relative; width:100%; max-width:480px; height:100%; margin:0 auto;
+    display:flex; flex-direction:column;
+    padding: max(6px, env(safe-area-inset-top)) 10px max(4px, env(safe-area-inset-bottom));
+  }
+
+  /* ---------- top bar ---------- */
+  .topbar{display:flex; align-items:center; gap:8px; padding:0 2px 6px;}
+  .banner{
+    position:relative; min-width:72px; padding:6px 6px 11px; text-align:center;
+    background:linear-gradient(180deg,#4fd07f,#2fb463);
+    border-radius:6px 6px 0 0; box-shadow:0 3px 0 rgba(0,0,0,.18);
+    clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 82%, 0 100%);
+  }
+  .banner b{display:block; font-size:17px; line-height:1;}
+  .banner span{display:block; font-size:9px; opacity:.85; letter-spacing:.06em; text-transform:uppercase; margin-bottom:2px;}
+  /* the countdown turns red once it is nearly spent */
+  .banner.low{background:linear-gradient(180deg,#ff8a6b,#e8483f);}
+  .banner.low b{animation:pulsecnt 1s ease-in-out infinite;}
+  @keyframes pulsecnt{0%,100%{transform:scale(1)}50%{transform:scale(1.13)}}
+  .title{flex:1; text-align:center;}
+  .title b{font-size:19px; display:block; text-shadow:0 2px 0 rgba(0,0,0,.15);}
+  .title span{font-size:11px; opacity:.75;}
+  .iconbtn{
+    width:32px;height:32px;border:0;border-radius:50%;
+    background:rgba(255,255,255,.16); color:#fff; font-size:14px; cursor:pointer;
+    display:grid;place-items:center; flex:none;
+  }
+  .iconbtn:active{transform:scale(.92);}
+
+  /* ---------- stock / waste ---------- */
+  .toprow{display:flex; align-items:flex-start; gap:8px; padding:0 2px 8px;}
+  .slotcol{flex:none; text-align:center;}
+  .wastewrap{flex:1; min-width:0; display:flex; align-items:flex-start;}
+  .fan{position:relative; height:var(--ch); flex:1;}
+  .slotlabel{font-size:9px; letter-spacing:.07em; text-transform:uppercase; opacity:.7; margin-top:3px;}
+
+  /* ---------- cards ---------- */
+  .card{
+    width:var(--cw); height:var(--ch);
+    background:linear-gradient(180deg,#ffffff,#f7f3e6);
+    border-radius:var(--r);
+    box-shadow:0 2px 0 rgba(0,0,0,.16), 0 5px 10px rgba(0,0,0,.18);
+    display:grid; place-items:center; position:relative; overflow:hidden; color:var(--ink);
+    transition:transform .16s cubic-bezier(.34,1.56,.64,1), box-shadow .16s;
+  }
+  .card::after{
+    content:""; position:absolute; inset:4px; border-radius:calc(var(--r) - 4px);
+    border:1.5px solid rgba(0,0,0,.06); pointer-events:none;
+  }
+  .card.back{background:repeating-linear-gradient(45deg,#5aa9f7 0 7px,#4b98ea 7px 14px);}
+  .card.back::after{border-color:rgba(255,255,255,.35);}
+  .card.ghostslot{
+    background:rgba(255,255,255,.10); box-shadow:none;
+    border:2px dashed rgba(255,255,255,.32);
+  }
+  .card.ghostslot::after{display:none;}
+  /* the hole a lifted card (or run) leaves behind while it is being dragged */
+  .card.dropslot{
+    background:rgba(255,255,255,.07); box-shadow:none;
+    border:2px dashed rgba(255,255,255,.22);
+  }
+  .card.dropslot::after{display:none;}
+  .card.sel{box-shadow:0 0 0 3px var(--gold), 0 10px 18px rgba(0,0,0,.3); z-index:20 !important;}
+  .card.playable{cursor:pointer;}
+  .card.dim{filter:brightness(.82) saturate(.7);}
+  .face{font-size:calc(var(--cw) * .46); line-height:1;}
+  .face.digit{font-weight:800; font-size:calc(var(--cw) * .54); color:#2a5cab;}
+  .face.glyph{font-size:calc(var(--cw) * .48); color:#3b4a55;}
+  /* a colour card IS its colour — the whole face is the swatch */
+  .card.colorcard{
+    background-color:var(--c);
+    background-image:linear-gradient(180deg, rgba(255,255,255,.22), rgba(255,255,255,0) 45%, rgba(0,0,0,.16));
+  }
+  .card.colorcard::after{border-color:rgba(255,255,255,.28);}
+  .ice{
+    position:absolute; inset:0; border-radius:var(--r);
+    background:linear-gradient(150deg, rgba(160,222,255,.86), rgba(96,181,240,.78));
+    display:grid; place-items:center; box-shadow: inset 0 0 0 2px rgba(255,255,255,.6);
+  }
+  .ice b{font-size:calc(var(--cw)*.32);}
+  .ice i{position:absolute; bottom:3px; font-size:10px; font-style:normal; font-weight:800; color:#0b4a72;}
+  .stockbadge{
+    position:absolute; bottom:-4px; right:-4px; min-width:19px; height:19px; padding:0 4px;
+    background:#e8383f; border-radius:10px; font-size:11px; font-weight:800; color:#fff;
+    display:grid; place-items:center; box-shadow:0 1px 3px rgba(0,0,0,.35); z-index:5;
+  }
+
+  /* ---------- rows of piles ---------- */
+  .found{display:grid; grid-template-columns:repeat(var(--slots),1fr); gap:6px; padding-bottom:4px;}
+  .tabl {display:grid; grid-template-columns:repeat(var(--tabs),1fr); gap:6px;}
+  .col{position:relative; cursor:pointer;}
+  .pile{position:relative;}
+  .found .pile{height:calc(var(--ch) + var(--band));}
+
+  /* group header card */
+  .headercard{background:linear-gradient(180deg,#fffdf4,#f6efd9);}
+  .headercard .face{margin-top:var(--band);}
+  .hdrband{
+    position:absolute; top:0; left:0; right:0; height:var(--band);
+    background:linear-gradient(180deg,#ffd75e,#f0b423);
+    color:#5a3d05; font-size:calc(var(--band) * .48); font-weight:800;
+    display:flex; align-items:center; justify-content:space-between;
+    padding:0 5px; z-index:4; letter-spacing:-.01em;
+  }
+  .hdrband span{overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .hdrband b{flex:none; margin-left:3px;}
+  .hdricon{opacity:.85;}
+  .tabl  .pile{height:calc(var(--ch) + var(--deep) * var(--peek) + var(--deepup) * var(--peekup));}
+
+  /* a stacked card stays face-up: only its top strip shows, with a mini icon */
+  .mini{
+    position:absolute; top:0; left:0; right:0; height:var(--deepup);
+    display:grid; place-items:center; line-height:1;
+    font-size:calc(var(--deepup) * .74);
+  }
+  .mini.digit{font-weight:800; color:#2a5cab; font-size:calc(var(--deepup) * .82);}
+  .mini.glyph{color:#3b4a55;}
+  .card.peek::after{border-color:rgba(0,0,0,.05);}
+  /* tableau cards overlap downward, so each needs a hairline on its top edge to
+     separate it from the sliver it is covering */
+  .tabl .pile .card{
+    box-shadow:0 -1px 0 rgba(0,0,0,.13), 0 2px 0 rgba(0,0,0,.14), 0 5px 10px rgba(0,0,0,.16);
+  }
+  .tabl .pile .card.ghostslot,
+  .tabl .pile .card.dropslot{box-shadow:none;}
+  .tabl .pile .card.sel{box-shadow:0 0 0 3px var(--gold), 0 10px 18px rgba(0,0,0,.3);}
+  .tabl .pile .card.selrun{box-shadow:0 0 0 2px var(--gold);}
+  .pile .card{position:absolute; left:50%; transform:translateX(-50%);}
+  .prog{position:absolute; top:4px; left:5px; font-size:9px; font-weight:800; color:rgba(0,0,0,.42); z-index:6;}
+  .crown{position:absolute; top:2px; right:4px; font-size:11px; z-index:6;}
+  .cnt{
+    position:absolute; top:3px; right:4px; z-index:6;
+    background:rgba(0,0,0,.35); color:#fff; font-size:9px; font-weight:800;
+    border-radius:8px; padding:1px 5px;
+  }
+
+  /* ---------- bottom bar ---------- */
+  .spacer{flex:1; min-height:2px;}
+  .iconbtn[disabled]{opacity:.3; cursor:default;}
+
+  /* ---------- fx ---------- */
+  @keyframes shake{10%,90%{transform:translateX(-3px)}20%,80%{transform:translateX(4px)}30%,50%,70%{transform:translateX(-6px)}40%,60%{transform:translateX(6px)}}
+  .shake{animation:shake .4s;}
+  @keyframes pop{0%{transform:translateX(-50%) scale(.6); opacity:0}100%{transform:translateX(-50%) scale(1); opacity:1}}
+  .pop{animation:pop .2s cubic-bezier(.34,1.56,.64,1);}
+  /* waste cards are laid out with a plain left offset, not centred */
+  @keyframes popw{0%{transform:scale(.6) translateY(10px); opacity:0}100%{transform:none; opacity:1}}
+  .popw{animation:popw .2s cubic-bezier(.34,1.56,.64,1);}
+  @keyframes flip{0%{transform:translateX(-50%) rotateY(90deg)}100%{transform:translateX(-50%) rotateY(0)}}
+  .flip{animation:flip .22s ease-out;}
+  @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(255,235,120,.9)}50%{box-shadow:0 0 0 8px rgba(255,235,120,0)}}
+  .pulse{animation:pulse 1s ease-out 2;}
+  @keyframes burst{0%{transform:translateX(-50%) scale(1); opacity:1}100%{transform:translateX(-50%) scale(1.5) rotate(8deg); opacity:0}}
+  .burst{animation:burst .38s ease-out forwards;}
+  .conf{position:fixed; width:9px; height:14px; border-radius:2px; pointer-events:none; z-index:60;}
+  .toast{
+    position:absolute; left:50%; top:46%; transform:translateX(-50%);
+    background:rgba(0,0,0,.72); padding:9px 16px; border-radius:20px;
+    font-size:13px; font-weight:700; z-index:50; pointer-events:none;
+    opacity:0; transition:opacity .2s, transform .2s;
+  }
+  .toast.on{opacity:1; transform:translateX(-50%) translateY(-6px);}
+  .runcnt{background:var(--gold); color:#5a3d05; top:auto; bottom:4px; right:4px;}
+  /* the lifted run rides the cursor as a whole stack. --ay is the distance from the
+     stack's top edge to the middle of its front card, so the cursor keeps holding
+     the card it grabbed no matter how many cards came along. */
+  .dragstack{
+    position:fixed; z-index:70; pointer-events:none; transition:none;
+    width:var(--cw); --ay:0px;
+    transform-origin:50% var(--ay);
+    transform:translate(-50%, calc(var(--ay) * -1)) scale(1.06) rotate(-3deg);
+    filter:drop-shadow(0 12px 22px rgba(0,0,0,.4));
+  }
+  .dragstack .card{
+    position:absolute; left:0; transition:none;
+    box-shadow:0 -1px 0 rgba(0,0,0,.14), 0 2px 0 rgba(0,0,0,.14);
+  }
+
+  /* ---------- overlays ---------- */
+  .overlay{
+    position:absolute; inset:0; background:rgba(6,40,24,.82); backdrop-filter:blur(3px);
+    display:none; place-items:center; z-index:80; padding:18px;
+  }
+  .overlay.on{display:grid;}
+  .panel{
+    background:linear-gradient(180deg,#fffdf6,#f3ecd9); color:var(--ink);
+    border-radius:20px; padding:20px 18px; max-width:340px; width:100%;
+    max-height:92%; overflow:auto;
+    box-shadow:0 10px 30px rgba(0,0,0,.4); text-align:center;
+  }
+  .panel h2{margin:0 0 6px; font-size:23px;}
+  .panel p{margin:6px 0; font-size:13px; line-height:1.5; color:#4a5854;}
+  .panel .rules{text-align:left; font-size:12.5px; line-height:1.55; padding-left:18px;}
+  .panel .rules li{margin-bottom:4px;}
+  .btn{
+    margin-top:12px; border:0; border-radius:14px; padding:11px 22px;
+    background:linear-gradient(180deg,#5fcf83,#33a95c); color:#fff; font-size:16px; font-weight:800;
+    box-shadow:0 4px 0 #23854a; cursor:pointer; font-family:inherit;
+  }
+  .btn:active{transform:translateY(3px); box-shadow:0 1px 0 #23854a;}
+  .btn.alt{background:linear-gradient(180deg,#9fb0bd,#77889a); box-shadow:0 4px 0 #566672;}
+  .statline{display:flex; justify-content:center; gap:18px; margin-top:10px;}
+  .statline div{font-size:12px; opacity:.7;}
+  .statline b{display:block; font-size:20px; opacity:1; color:var(--ink);}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="topbar">
+    <div class="banner" id="movesBanner"><span>Moves left</span><b id="moves">0</b></div>
+    <div class="title"><b id="lvl">Level 1</b><span id="sub">Score 0</span></div>
+    <button class="iconbtn" id="undoBtn">↩️</button>
+    <button class="iconbtn" id="menuBtn">☰</button>
+  </div>
+
+  <!-- stock deals into the waste -->
+  <div class="toprow">
+    <div class="wastewrap"><div class="fan" id="waste"></div></div>
+    <div class="slotcol">
+      <div class="card back" id="stock"><div class="stockbadge" id="stockRe">3</div></div>
+      <div class="slotlabel" id="stockN">0</div>
+    </div>
+  </div>
+
+  <div class="found" id="found"></div>
+
+  <div class="spacer" style="flex:.5"></div>
+
+  <div class="tabl" id="tabl"></div>
+
+  <div class="spacer"></div>
+
+  <div class="toast" id="toast"></div>
+  <div class="overlay" id="ov"><div class="panel" id="ovPanel"></div></div>
+</div>
+
+<script>
+"use strict";
+
+/* ============================================================
+   DATA — every card is a picture, a colour or a digit. No vocabulary.
+   ============================================================ */
+const CATEGORIES = [
+  { id:'colors',  name:'Colors',  items:[
+    {swatch:'#e03131'},{swatch:'#1971c2'},{swatch:'#2f9e44'},{swatch:'#f08c00'},
+    {swatch:'#9c36b5'},{swatch:'#0c8599'},{swatch:'#e8590c'},{swatch:'#343a40'} ]},
+  { id:'shapes',  name:'Shapes',  items:[
+    {glyph:'●'},{glyph:'■'},{glyph:'▲'},{glyph:'★'},{glyph:'◆'},{glyph:'⬟'},{glyph:'♥'},{glyph:'✚'} ]},
+  { id:'numbers', name:'Numbers', items:[
+    {digit:'1'},{digit:'2'},{digit:'3'},{digit:'4'},{digit:'5'},{digit:'6'},{digit:'7'},{digit:'8'} ]},
+  { id:'flowers', name:'Flowers', items:[
+    {glyph:'🌸'},{glyph:'🌹'},{glyph:'🌻'},{glyph:'🌷'},{glyph:'🌺'},{glyph:'🌼'},{glyph:'🏵️'},{glyph:'💐'} ]},
+  { id:'sports',  name:'Sports',  items:[
+    {glyph:'⚽'},{glyph:'🏀'},{glyph:'🏈'},{glyph:'⚾'},{glyph:'🎾'},{glyph:'🏐'},{glyph:'🏓'},{glyph:'🥊'} ]},
+  { id:'fruits',  name:'Fruits',  items:[
+    {glyph:'🍎'},{glyph:'🍌'},{glyph:'🍇'},{glyph:'🍓'},{glyph:'🍊'},{glyph:'🍉'},{glyph:'🍒'},{glyph:'🥝'} ]},
+  { id:'animals', name:'Animals', items:[
+    {glyph:'🐶'},{glyph:'🐱'},{glyph:'🦊'},{glyph:'🐼'},{glyph:'🦁'},{glyph:'🐸'},{glyph:'🐵'},{glyph:'🐨'} ]},
+  { id:'cars',    name:'Vehicles',items:[
+    {glyph:'🚗'},{glyph:'🚌'},{glyph:'🚑'},{glyph:'🚚'},{glyph:'🚲'},{glyph:'🛵'},{glyph:'🚂'},{glyph:'✈️'} ]},
+  { id:'weather', name:'Weather', items:[
+    {glyph:'☀️'},{glyph:'🌧️'},{glyph:'⛈️'},{glyph:'🌈'},{glyph:'🌪️'},{glyph:'🌙'},{glyph:'⭐'},{glyph:'🌫️'} ]},
+  { id:'music',   name:'Music',   items:[
+    {glyph:'🎸'},{glyph:'🥁'},{glyph:'🎺'},{glyph:'🎹'},{glyph:'🎻'},{glyph:'🎷'},{glyph:'🎤'},{glyph:'🎧'} ]},
+  { id:'food',    name:'Food',    items:[
+    {glyph:'🍕'},{glyph:'🍔'},{glyph:'🌮'},{glyph:'🍩'},{glyph:'🍪'},{glyph:'🍟'},{glyph:'🥨'},{glyph:'🍣'} ]},
+  { id:'sea',     name:'Sea Life',items:[
+    {glyph:'🐠'},{glyph:'🐙'},{glyph:'🦀'},{glyph:'🐢'},{glyph:'🦈'},{glyph:'🐬'},{glyph:'🐳'},{glyph:'🦑'} ]},
+];
+const CAT = Object.fromEntries(CATEGORIES.map(c => [c.id, c]));
+// shown on the group's header card, so it never looks like one of its own items
+const CAT_ICON = {
+  colors:'🎨', shapes:'🔷', numbers:'🔢', flowers:'🌷', sports:'🏅', fruits:'🧺',
+  animals:'🐾', cars:'🛣️', weather:'⛅', music:'🎵', food:'🍽️', sea:'🌊'
+};
+
+let _uid = 0;
+const uid = () => ++_uid;
+const rnd = (a,b) => a + Math.floor(Math.random()*(b-a+1));
+function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+function sample(arr,n){ return shuffle(arr.slice()).slice(0,n); }
+
+/* ============================================================
+   AUDIO
+   ============================================================ */
+let actx = null, muted = false;
+function beep(freq, dur=0.08, type='sine', vol=0.06){
+  if (muted) return;
+  try{
+    actx = actx || new (window.AudioContext||window.webkitAudioContext)();
+    const o = actx.createOscillator(), g = actx.createGain();
+    o.type = type; o.frequency.value = freq;
+    g.gain.setValueAtTime(vol, actx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.0001, actx.currentTime + dur);
+    o.connect(g); g.connect(actx.destination);
+    o.start(); o.stop(actx.currentTime + dur);
+  }catch(e){}
+}
+const sfx = {
+  deal:  () => beep(330,.05,'square',.035),
+  place: () => beep(520,.07,'triangle'),
+  good:  () => { beep(660,.07,'triangle'); setTimeout(()=>beep(880,.09,'triangle'),70); },
+  clear: () => { [523,659,784,1047].forEach((f,i)=>setTimeout(()=>beep(f,.12,'triangle',.07), i*70)); },
+  flip:  () => beep(440,.05,'triangle',.04),
+  bad:   () => beep(150,.14,'sawtooth',.05),
+  pick:  () => beep(400,.04,'square',.03),
+  ice:   () => beep(300,.2,'sine',.05),
+};
+
+/* ============================================================
+   LEVEL BUILD — a real solitaire deal:
+   part of the deck is buried in tableau piles, the rest is the stock.
+   ============================================================ */
+const CLEAR_MS = 420;
+const TAB_PILES = 5;
+// Every action — a deal, a recycle, a foundation play, a tableau stack — spends one
+// move. Run out and the level is over, so shuffling cards about has a real cost.
+const MOVES_PER_LEVEL = 90;
+const LOW_MOVES = 12;                  // when the banner starts warning you
+const MAX_PEEK    = 6;                 // deepest pile buries 6, so every stair step stays distinct
+const MAX_PEEK_UP = 3;                 // face-up cards stacked under the top card
+// Groups competing for the foundation slots. Since a slot now only opens with a
+// header card, fewer groups fit than when any item could claim one.
+const CAT_CURVE = [5,5,6,6,6,7,7,7];
+
+function slotsForLevel(l){ return 5; }
+function catsForLevel(l){ return CAT_CURVE[Math.min(l, CAT_CURVE.length) - 1]; }
+function redealsForLevel(l){ return Math.max(1, Math.min(3, 4 - Math.floor(l / 2))); }
+
+// Klondike-style staircase: pile 1 gets one card, pile 2 gets two, and so on,
+// so the row descends left to right. Deeper levels add a step to every pile.
+function stairDepths(level, budget){
+  const bonus = Math.min(2, Math.floor((level - 1) / 3));   // 1-2-3-4-5 → 2-3-4-5-6 → 3-4-5-6-7
+  const d = Array.from({length:TAB_PILES}, (_,i) => i + 1 + bonus);
+  const total = () => d.reduce((a,b) => a + b, 0);
+  while (total() > budget){
+    const m = d.indexOf(Math.max(...d));
+    if (d[m] <= 1) break;
+    d[m]--;
+  }
+  return d;
+}
+
+let S = null;
+let selected = null;      // {zone:'waste'|'tab', i}
+let busy = false;
+
+function buildLevel(level){
+  const slots = slotsForLevel(level);
+  const cats  = sample(CATEGORIES, catsForLevel(level));
+
+  const targets = {}, items = [], headers = [];
+  cats.forEach(c => {
+    // 4 minimum: it keeps the deck big enough that the staircase deal always fits
+    const t = rnd(4, 5);
+    targets[c.id] = t;
+    sample(c.items, t).forEach(it => items.push({ id:uid(), kind:'normal', cat:c.id, item:it, frozen:0, up:false }));
+    headers.push({ id:uid(), kind:'header', cat:c.id, item:null, frozen:0, up:false });
+  });
+  shuffle(items);
+
+  // The staircase is dealt from item cards only. Header cards live in the stock,
+  // so a group can always be opened by dealing rather than by luck of the deal.
+  const depths  = stairDepths(level, Math.max(TAB_PILES, items.length - 4));
+  const tableau = depths.map(n => items.splice(0, n));
+  tableau.forEach(p => { if (p.length) p[p.length-1].up = true; });   // only the front card shows
+
+  const stock = shuffle(items.concat(headers));
+
+  // ice: never on a card that is face-up at the deal, so the opening is always playable
+  const iceCount = level >= 2 ? Math.min(5, level + 1) : 0;
+  const icePool = stock.slice(2).concat(tableau.flatMap(p => p.slice(0, -1)));
+  sample(icePool, Math.min(iceCount, icePool.length)).forEach(c => { c.frozen = rnd(2,3); });
+
+  return {
+    level, slots, targets, depths,
+    stock, waste: [], tableau,
+    found: Array.from({length:slots}, () => ({ cat:null, target:0, header:null, cards:[] })),
+    redeals: redealsForLevel(level),
+    movesLeft: MOVES_PER_LEVEL, score: S ? S.score : 0,
+    history: [],
+  };
+}
+
+/* history is excluded on purpose — restoring it would nest snapshots inside snapshots */
+function snapshot(){
+  const { stock, waste, tableau, found, redeals, movesLeft, score } = S;
+  return JSON.parse(JSON.stringify({ stock, waste, tableau, found, redeals, movesLeft, score }));
+}
+function restore(s){ Object.assign(S, JSON.parse(JSON.stringify(s))); }
+function pushHistory(){ S.history.push(snapshot()); if (S.history.length > 40) S.history.shift(); }
+
+/* ============================================================
+   RULES
+   ============================================================ */
+const wasteTop = () => S.waste.length ? S.waste[S.waste.length-1] : null;
+const tabTop   = i => { const p = S.tableau[i]; return p.length ? p[p.length-1] : null; };
+
+function cardAt(sel){
+  if (!sel) return null;
+  if (sel.zone === 'waste') return wasteTop();
+  if (sel.zone === 'tab')   return tabTop(sel.i);
+  return null;
+}
+
+// Face-up cards stacked in a tableau pile always share a group, so the movable
+// unit is the whole matching run at the front of the pile — it travels together.
+function runLen(sel){
+  if (!sel) return 0;
+  if (sel.zone === 'waste') return wasteTop() && wasteTop().frozen === 0 ? 1 : 0;
+  const p = S.tableau[sel.i];
+  if (!p.length) return 0;
+  const top = p[p.length-1];
+  if (!top.up || top.frozen > 0) return 0;
+  if (top.kind !== 'normal') return 1;
+  let n = 1;
+  for (let k = p.length - 2; k >= 0; k--){
+    const c = p[k];
+    if (c.up && c.kind === 'normal' && c.frozen === 0 && c.cat === top.cat) n++;
+    else break;
+  }
+  return n;
+}
+function runCards(sel, n){
+  n = n === undefined ? runLen(sel) : n;
+  if (!n) return [];
+  if (sel.zone === 'waste') return [wasteTop()];
+  const p = S.tableau[sel.i];
+  return p.slice(p.length - n);
+}
+function takeCards(sel, n){
+  if (sel.zone === 'waste') return [S.waste.pop()];
+  const p = S.tableau[sel.i];
+  const moved = p.splice(p.length - n, n);
+  const next = p[p.length-1];
+  if (next && !next.up){ next.up = true; S.score += 5; sfx.flip(); }   // digging pays
+  return moved;
+}
+function catOpenElsewhere(catId, exceptIdx){
+  return S.found.some((f,i) => i !== exceptIdx && f.cat === catId);
+}
+// A foundation only opens when you play that group's HEADER card onto it.
+// After that it accepts item cards of the same group, and nothing else.
+function canPlace(card, fi){
+  if (!card) return false;
+  const f = S.found[fi];
+  if (card.frozen > 0) return false;
+  if (card.kind === 'header') return f.cat === null && !catOpenElsewhere(card.cat, fi);
+  return f.cat === card.cat;
+}
+// Tableau building. A matching run stacks onto a pile of the same group; an empty
+// pile is free parking that takes anything movable — a single card or a whole run.
+function canStack(sel, ti){
+  if (!sel) return false;
+  if (sel.zone === 'tab' && sel.i === ti) return false;
+  const n = runLen(sel);
+  if (!n) return false;
+  const cards = runCards(sel, n);
+  const p = S.tableau[ti];
+  if (!p.length) return true;
+  const top = p[p.length-1];
+  if (!top.up || top.kind !== 'normal' || top.frozen > 0) return false;
+  return cards.every(c => c.kind === 'normal') && cards[0].cat === top.cat;
+}
+function movableSources(){
+  const out = [];
+  if (wasteTop()) out.push({zone:'waste', i:0});
+  S.tableau.forEach((p,i) => { if (p.length) out.push({zone:'tab', i}); });
+  return out;
+}
+function anyMoveAvailable(){
+  if (S.stock.length) return true;                                   // deal another card
+  if (S.redeals > 0 && S.waste.length) return true;                  // recycle the waste
+  for (const s of movableSources()){
+    const c = cardAt(s);
+    if (!c) continue;
+    if (c.frozen > 0) continue;
+    for (let i = 0; i < S.found.length; i++) if (canPlace(c, i)) return true;
+    for (let i = 0; i < S.tableau.length; i++) if (canStack(s, i)) return true;
+  }
+  return false;
+}
+
+/* ============================================================
+   ACTIONS
+   ============================================================ */
+/* Nothing may be spent once the counter is empty — the level is over. */
+function outOfMoves(){
+  if (S.movesLeft > 0) return false;
+  toast('No moves left'); sfx.bad();
+  return true;
+}
+
+function dealFromStock(){
+  if (busy) return;
+  if (!S.stock.length){
+    if (!S.waste.length){ toast('Stock is empty'); return; }
+    if (S.redeals <= 0){ toast('No redeals left'); sfx.bad(); return; }
+    if (outOfMoves()) return;
+    pushHistory();
+    S.redeals--; S.movesLeft--;
+    // flipping the waste over as a block puts the oldest card back on top
+    S.stock = S.waste; S.waste = [];
+    S.stock.forEach(c => c.up = false);
+    sfx.deal(); toast('♻️ Waste recycled');
+    render(); checkState(); return;
+  }
+  if (outOfMoves()) return;
+  pushHistory();
+  const c = S.stock.shift();
+  c.up = true;
+  S.waste.push(c);
+  S.movesLeft--;
+  selected = null;
+  sfx.deal();
+  render(); checkState();
+}
+
+function playTo(fi){
+  const sel = selected, card = cardAt(sel);
+  if (!card) return;
+  if (!canPlace(card, fi)){
+    const el = document.querySelector(`#found .col[data-i="${fi}"]`);
+    if (el){ el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake'); }
+    sfx.bad();
+    const f = S.found[fi];
+    if (card.frozen > 0) toast('❄️ Frozen — play other cards to thaw it');
+    else if (f.cat === null) toast('Open this slot with a group card first');
+    else if (card.kind === 'header') toast('That slot is already taken');
+    else toast('Wrong group for this pile');
+    return;
+  }
+  if (outOfMoves()) return;
+
+  pushHistory();
+  const f = S.found[fi];
+  S.movesLeft--;
+  if (card.kind === 'header'){
+    takeCards(sel, 1);
+    selected = null;
+    f.cat = card.cat; f.target = S.targets[card.cat]; f.header = card;
+    S.score += 20; sfx.good();
+    render(); checkState(); return;
+  }
+
+  // a run files as many cards as the foundation still has room for
+  const take = Math.min(runLen(sel), f.target - f.cards.length);
+  takeCards(sel, take).forEach(c => f.cards.push(c));
+  selected = null;
+  S.score += 12 * take;
+
+  for (let t = 0; t < take; t++){
+    [...S.waste, ...S.tableau.flat()].forEach(c => {
+      if (c && c.frozen > 0){ c.frozen--; if (c.frozen === 0) sfx.ice(); }
+    });
+  }
+
+  if (f.cards.length >= f.target){
+    sfx.clear();
+    S.score += 120 + 40 * (f.target - 3);
+    render();
+    const el = document.querySelector(`#found .col[data-i="${fi}"] .pile`);
+    if (el) el.querySelectorAll('.card').forEach(c => c.classList.add('burst'));
+    confettiAt(el);
+    busy = true;
+    setTimeout(() => {
+      f.cat = null; f.target = 0; f.cards = []; f.header = null;
+      busy = false; render(); checkState();
+    }, CLEAR_MS);
+    return;
+  }
+  sfx.good();
+  render(); checkState();
+}
+
+// tableau → tableau (or waste → tableau); a matching run travels as one unit
+function stackTo(ti){
+  const sel = selected;
+  if (!sel || (sel.zone === 'tab' && sel.i === ti)) return false;
+  if (!canStack(sel, ti)){
+    const el = document.querySelector(`#tabl .col[data-i="${ti}"]`);
+    if (el){ el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake'); }
+    sfx.bad();
+    return false;
+  }
+  if (outOfMoves()) return false;
+  const n = runLen(sel);
+  pushHistory();
+  takeCards(sel, n).forEach(c => S.tableau[ti].push(c));
+  selected = null; S.movesLeft--; S.score += 4 * n;
+  sfx.place();
+  render(); checkState();
+  return true;
+}
+
+/* Undo is a plain take-back, not a consumable: it costs nothing but the score the
+   undone move earned, which snapshot/restore already rolls back. */
+function doUndo(){
+  if (busy) return;
+  if (!S.history.length){ toast('Nothing to undo'); return; }
+  restore(S.history.pop());
+  selected = null; sfx.pick();
+  render();
+}
+
+/* ============================================================
+   WIN / LOSE
+   ============================================================ */
+function cardsLeft(){
+  return S.stock.length + S.waste.length + S.tableau.reduce((n,p)=>n+p.length, 0);
+}
+function checkState(){
+  if (busy) return;
+  // clearing the board on your very last move still wins, so the win check comes first
+  if (cardsLeft() === 0 && S.found.every(f => !f.header && f.cards.length === 0)){ levelComplete(); return; }
+  if (S.movesLeft <= 0){ setTimeout(() => gameOver('moves'), 500); return; }
+  if (anyMoveAvailable()) return;
+
+  // ice must never be the thing that ends a run
+  const frozen = [wasteTop(), ...S.tableau.map((p,i)=>tabTop(i))].filter(c => c && c.frozen > 0);
+  if (frozen.length){
+    frozen.forEach(c => c.frozen = 0);
+    sfx.ice(); toast('❄️ The ice cracks!');
+    render();
+    if (anyMoveAvailable()) return;
+  }
+  setTimeout(() => gameOver('stuck'), 500);
+}
+function levelComplete(){
+  // moves you never had to spend are the payoff for playing tidily
+  const bonus = 50 * S.level + S.redeals * 25 + S.movesLeft * 5;
+  S.score += bonus; save();
+  showPanel(`
+    <h2>Level ${S.level} cleared! 🎉</h2>
+    <p>Tableau dug out, every group filed away.</p>
+    <div class="statline">
+      <div>Moves left<b>${S.movesLeft}</b></div><div>Bonus<b>+${bonus}</b></div><div>Score<b>${S.score}</b></div>
+    </div>
+    <button class="btn" data-act="next">Level ${S.level+1} →</button>`);
+  confettiBurst(40);
+}
+function gameOver(reason){
+  save();
+  const head = reason === 'moves' ? 'Out of moves! ⏳' : 'Stuck! 😖';
+  const why  = reason === 'moves'
+    ? `All ${MOVES_PER_LEVEL} moves spent with cards still on the table.`
+    : 'Nothing left to deal and no card fits an open foundation.';
+  showPanel(`
+    <h2>${head}</h2>
+    <p>${why}</p>
+    <div class="statline">
+      <div>Level<b>${S.level}</b></div><div>Score<b>${S.score}</b></div><div>Best<b>${best()}</b></div>
+    </div>
+    ${S.history.length ? '<button class="btn" data-act="undo">↩️ Take back a move</button>' : ''}
+    <button class="btn ${S.history.length ? 'alt' : ''}" data-act="retry">Retry Level</button>
+    <button class="btn alt" data-act="restart">Start Over</button>`);
+}
+
+/* ============================================================
+   RENDER
+   ============================================================ */
+const $ = s => document.querySelector(s);
+const foundEl = $('#found'), tablEl = $('#tabl'), wasteEl = $('#waste');
+const seen = new Set();
+
+// Cards the pointer is carrying. They are still in S — the move only commits on
+// drop — but render() leaves them out of their pile so the board shows the gap.
+let dragHold = null;      // {zone, i, n}
+const lifted = (zone, i) =>
+  dragHold && dragHold.zone === zone && dragHold.i === i ? dragHold.n : 0;
+
+// A group's header card: gold title band plus a neutral icon, so it never reads
+// as one of the group's own items. `progress` is only passed on a foundation.
+function headerFace(card, progress){
+  const total = S.targets[card.cat];
+  const n = progress === undefined ? `×${total}` : `${progress}/${total}`;
+  return `<div class="hdrband"><span>${CAT[card.cat].name}</span><b>${n}</b></div>
+          <div class="face hdricon">${CAT_ICON[card.cat]}</div>`;
+}
+// a colour item paints the whole card instead of printing a face on it
+const isColor = c => c.kind === 'normal' && c.item && c.item.swatch;
+function faceHTML(card, progress){
+  if (card.kind === 'header') return headerFace(card, progress);
+  const it = card.item;
+  if (it.swatch) return '';
+  if (it.digit)  return `<div class="face digit">${it.digit}</div>`;
+  return `<div class="face ${card.cat === 'shapes' ? 'glyph' : ''}">${it.glyph}</div>`;
+}
+function iceHTML(card){
+  return card.frozen > 0 ? `<div class="ice"><b>❄️</b><i>${card.frozen}</i></div>` : '';
+}
+const kindClass = c => c.kind === 'header' ? 'headercard' : isColor(c) ? 'colorcard' : '';
+// colour cards carry their hue in an inline custom property
+const cardStyle = c => isColor(c) ? `--c:${c.item.swatch};` : '';
+// what a stacked-on card shows in the sliver that stays visible above the card on top of it
+function miniFace(card){
+  if (card.kind === 'header') return `<div class="hdrband"><span>${CAT[card.cat].name}</span></div>`;
+  if (card.frozen > 0)        return `<div class="mini">❄️</div>`;
+  const it = card.item;
+  if (it.swatch) return '';                     // the sliver is already the colour
+  if (it.digit)  return `<div class="mini digit">${it.digit}</div>`;
+  return `<div class="mini ${card.cat === 'shapes' ? 'glyph' : ''}">${it.glyph}</div>`;
+}
+function cardHTML(card, extra=''){
+  return `<div class="card ${kindClass(card)} ${extra}" style="${cardStyle(card)}">${faceHTML(card)}${iceHTML(card)}</div>`;
+}
+
+// The whole run travels, so the thing under the cursor is the whole run: the cards
+// behind the front one keep the same slivers they had in the pile.
+function dragStackEl(cards){
+  const cs = getComputedStyle(document.documentElement);
+  const ch = parseFloat(cs.getPropertyValue('--ch'));
+  const deepUp = parseFloat(cs.getPropertyValue('--deepup'));
+  const n = cards.length;
+  const h = (n - 1) * deepUp + ch;
+  let inner = '';
+  cards.forEach((c, k) => {
+    const pos = `${cardStyle(c)} top:${k * deepUp}px; z-index:${k + 1}`;
+    inner += k === n - 1
+      ? `<div class="card ${kindClass(c)}" style="${pos}">
+           ${faceHTML(c)}${iceHTML(c)}${n > 1 ? `<div class="cnt runcnt">×${n}</div>` : ''}
+         </div>`
+      : `<div class="card peek ${kindClass(c)}" style="${pos}">${miniFace(c)}</div>`;
+  });
+  const el = document.createElement('div');
+  el.className = 'dragstack';
+  el.style.height = h + 'px';
+  el.style.setProperty('--ay', (h - ch / 2) + 'px');   // hold it by the front card
+  el.innerHTML = inner;
+  return el;
+}
+
+function render(){
+  const root = document.documentElement.style;
+  root.setProperty('--slots', S.slots);
+  root.setProperty('--tabs', TAB_PILES);
+  root.setProperty('--peek', MAX_PEEK);
+  root.setProperty('--peekup', MAX_PEEK_UP);
+  $('#lvl').textContent = 'Level ' + S.level;
+  $('#sub').textContent = `Score ${S.score}  ·  Best ${best()}`;
+  $('#moves').textContent = S.movesLeft;
+  $('#movesBanner').classList.toggle('low', S.movesLeft <= LOW_MOVES);
+
+  // ---- stock
+  const stockEl = $('#stock');
+  stockEl.className = 'card ' + (S.stock.length ? 'back playable' : 'ghostslot playable');
+  stockEl.innerHTML = (S.stock.length ? '' : `<div class="face" style="opacity:.5;font-size:20px">${S.redeals > 0 ? '♻️' : '∅'}</div>`)
+    + `<div class="stockbadge">${S.stock.length ? S.stock.length : S.redeals}</div>`;
+  $('#stockN').textContent = S.stock.length ? 'Stock' : (S.redeals > 0 ? 'Redeal' : 'Empty');
+
+  // ---- waste: a fan of the last three, only the front one is live
+  const cw = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--cw'));
+  const rail = wasteEl.clientWidth || cw * 2.3;
+  const step = Math.max(14, Math.min(cw * 0.55, (rail - cw) / 2));
+  wasteEl.innerHTML = '';
+  const shown = S.waste.slice(-3);
+  const wasteLift = lifted('waste', 0);
+  shown.forEach((c, i) => {
+    const isTop = i === shown.length - 1;
+    // the fan keeps its layout while the front card is in the air — only that
+    // card turns into a dashed slot, so it has an obvious place to fall back to
+    const lift  = isTop && wasteLift;
+    const fresh = isTop && !lift && !seen.has(c.id); if (isTop) seen.add(c.id);
+    const wrap = document.createElement('div');
+    wrap.innerHTML = lift ? `<div class="card dropslot"></div>` : cardHTML(c, [
+      isTop ? 'playable' : 'dim',
+      isTop && selected && selected.zone === 'waste' ? 'sel' : '',
+      fresh ? 'popw' : ''
+    ].join(' '));
+    const el = wrap.firstElementChild;
+    el.style.position = 'absolute';
+    el.style.left = (i * step) + 'px';
+    el.style.transform = 'translateX(0)';
+    el.style.zIndex = i + 1;
+    if (isTop && !lift){ el.dataset.zone = 'waste'; el.dataset.i = 0; }
+    wasteEl.appendChild(el);
+  });
+
+  // ---- foundations: the header card sits at the back, its title band always visible
+  foundEl.innerHTML = '';
+  S.found.forEach((f, fi) => {
+    const d = document.createElement('div');
+    d.className = 'col';
+    d.dataset.i = fi;
+    let pile;
+    if (!f.header){
+      pile = `<div class="card ghostslot"></div>`;
+    } else {
+      pile = `<div class="card headercard" style="top:0; z-index:1">${headerFace(f.header, f.cards.length)}</div>`;
+      if (f.cards.length){
+        const top = f.cards[f.cards.length-1];
+        pile += `<div class="card ${kindClass(top)}" style="${cardStyle(top)} top:var(--band); z-index:5">
+            ${f.cards.length === f.target - 1 ? '<div class="crown">👑</div>' : ''}
+            ${faceHTML(top)}
+          </div>`;
+      }
+    }
+    d.innerHTML = `<div class="pile">${pile}</div>`;
+    foundEl.appendChild(d);
+  });
+
+  // ---- tableau. A pile is always [face-down prefix][face-up stacked][top card]:
+  // face-down cards show a blue back, stacked face-up ones keep their icon showing.
+  const cs = getComputedStyle(document.documentElement);
+  const deep   = parseFloat(cs.getPropertyValue('--deep'));
+  const deepUp = parseFloat(cs.getPropertyValue('--deepup'));
+  tablEl.innerHTML = '';
+  S.tableau.forEach((p, i) => {
+    const d = document.createElement('div');
+    d.className = 'col';
+    d.dataset.i = i;
+    // cards riding the cursor are gone from the pile; a dashed slot marks the gap
+    const lift = lifted('tab', i);
+    const vis  = lift ? p.slice(0, p.length - lift) : p;
+    let pile = '';
+    if (!vis.length){
+      pile = `<div class="card ${lift ? 'dropslot' : 'ghostslot'}" style="top:0"></div>`;
+    } else {
+      const buriedAll = vis.length - 1;
+      // with a run in the air nothing is the front card, so every visible card is "under"
+      const under     = lift ? vis : vis.slice(0, -1);
+      const downCount = under.filter(c => !c.up).length;
+      const shownDown = Math.min(downCount, MAX_PEEK);
+      const upUnder   = under.slice(downCount).slice(-MAX_PEEK_UP);
+
+      const isSel = !lift && selected && selected.zone === 'tab' && selected.i === i;
+      // the whole run lights up, since the whole run is what moves
+      const selFrom = isSel ? vis.length - runLen(selected) : vis.length;
+
+      let off = 0, z = 0;
+      for (let b = 0; b < shownDown; b++, z++){
+        pile += `<div class="card back" style="top:${off}px; z-index:${z}"></div>`;
+        off += deep;
+      }
+      upUnder.forEach((c, k) => {
+        const idx = downCount + (under.length - downCount - upUnder.length) + k;
+        pile += `<div class="card peek ${kindClass(c)} ${idx >= selFrom ? 'selrun' : ''}"
+                      style="${cardStyle(c)} top:${off}px; z-index:${z++}">${miniFace(c)}</div>`;
+        off += deepUp;
+      });
+      if (lift){
+        pile += `<div class="card dropslot" style="top:${off}px; z-index:${z}"></div>`;
+      } else {
+        const top = vis[vis.length-1];
+        const fresh = !seen.has(top.id); seen.add(top.id);
+        pile += `<div class="card playable ${kindClass(top)} ${isSel?'sel':''} ${fresh?'flip':''}"
+                      style="${cardStyle(top)} top:${off}px; z-index:${z}"
+                      data-zone="tab" data-i="${i}">
+            ${buriedAll > 0 ? `<div class="cnt">+${buriedAll}</div>` : ''}
+            ${faceHTML(top)}${iceHTML(top)}
+          </div>`;
+      }
+    }
+    d.innerHTML = `<div class="pile">${pile}</div>`;
+    tablEl.appendChild(d);
+  });
+
+  // ---- top bar controls
+  $('#undoBtn').disabled = !S.history.length;
+}
+
+/* ============================================================
+   FX
+   ============================================================ */
+let toastT = null;
+function toast(msg){
+  const t = $('#toast');
+  t.textContent = msg; t.classList.add('on');
+  clearTimeout(toastT);
+  toastT = setTimeout(() => t.classList.remove('on'), 1300);
+}
+function confettiAt(el){
+  if (!el) return;
+  const r = el.getBoundingClientRect();
+  confettiBurst(18, r.left + r.width/2, r.top + r.height/2);
+}
+function confettiBurst(n, x, y){
+  const cols = ['#ffd43b','#ff6b6b','#4dabf7','#69db7c','#da77f2','#ffa94d'];
+  x = x ?? innerWidth/2; y = y ?? innerHeight/2;
+  for (let i = 0; i < n; i++){
+    const p = document.createElement('div');
+    p.className = 'conf';
+    p.style.background = cols[i % cols.length];
+    p.style.left = x + 'px'; p.style.top = y + 'px';
+    document.body.appendChild(p);
+    const ang = Math.random()*Math.PI*2, sp = 120 + Math.random()*260;
+    p.animate([
+      { transform:'translate(0,0) rotate(0deg)', opacity:1 },
+      { transform:`translate(${Math.cos(ang)*sp*0.9}px, ${Math.sin(ang)*sp*0.9 + 420}px) rotate(${720*Math.random()-360}deg)`, opacity:0 }
+    ], { duration: 900 + Math.random()*500, easing:'cubic-bezier(.2,.6,.5,1)' }).onfinish = () => p.remove();
+  }
+}
+
+/* ============================================================
+   INPUT — tap to select then tap a foundation, or drag straight there
+   ============================================================ */
+let drag = null, suppressClick = false;
+
+function selectSource(zone, i){
+  const sel = {zone, i};
+  const card = cardAt(sel);
+  if (!card) return;
+  if (card.frozen > 0){ toast('❄️ Frozen — play other cards to thaw it'); sfx.bad(); return; }
+  if (selected && selected.zone === zone && selected.i === i) selected = null;
+  else { selected = sel; sfx.pick(); }
+  render();
+}
+
+document.addEventListener('pointerdown', e => {
+  if (busy) return;
+  const el = e.target.closest('[data-zone]');
+  if (!el) return;
+  const zone = el.dataset.zone, i = +el.dataset.i;
+  const card = cardAt({zone, i});
+  if (!card) return;
+  drag = { zone, i, card, x:e.clientX, y:e.clientY, moved:false, ghost:null };
+});
+
+document.addEventListener('pointermove', e => {
+  if (!drag) return;
+  if (!drag.moved && Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 9){
+    if (drag.card.frozen > 0){ drag = null; return; }
+    drag.moved = true;
+    selected = {zone:drag.zone, i:drag.i};
+    const n = runLen(selected);
+    if (!n){ drag = null; return; }
+    // lift the run out of its pile first, then draw the board without it
+    drag.ghost = dragStackEl(runCards(selected, n));
+    dragHold = {zone:drag.zone, i:drag.i, n};
+    render();
+    document.body.appendChild(drag.ghost);
+  }
+  if (drag.moved && drag.ghost){
+    drag.ghost.style.left = e.clientX + 'px';
+    drag.ghost.style.top  = e.clientY + 'px';
+    const under = document.elementFromPoint(e.clientX, e.clientY);
+    const col = under && under.closest('.col');
+    document.querySelectorAll('.col').forEach(c => c.style.filter = '');
+    if (col) col.style.filter = 'brightness(1.15)';
+  }
+});
+
+document.addEventListener('pointerup', e => {
+  document.querySelectorAll('.col').forEach(c => c.style.filter = '');
+  if (!drag) return;
+  const d = drag; drag = null;
+  if (d.ghost) d.ghost.remove();
+  // tableau taps are owned by the #tabl click handler, so they can mean "stack here"
+  if (!d.moved){ if (d.zone !== 'tab') selectSource(d.zone, d.i); return; }
+  suppressClick = true; setTimeout(() => { suppressClick = false; }, 0);
+  const under = document.elementFromPoint(e.clientX, e.clientY);
+  const fCol = under && under.closest('#found .col');
+  const tCol = under && under.closest('#tabl .col');
+  // put the run back on the board before the drop resolves, so a refused move
+  // (which only toasts) still leaves the pile whole instead of showing the gap
+  dragHold = null; render();
+  if (fCol) playTo(+fCol.dataset.i);
+  else if (tCol) stackTo(+tCol.dataset.i);
+});
+
+// a cancelled gesture (system swipe, lost pointer) must not leave a hole behind
+document.addEventListener('pointercancel', () => {
+  if (!drag) return;
+  if (drag.ghost) drag.ghost.remove();
+  drag = null; dragHold = null; selected = null;
+  document.querySelectorAll('.col').forEach(c => c.style.filter = '');
+  render();
+});
+
+foundEl.addEventListener('click', e => {
+  if (busy || suppressClick) return;
+  const col = e.target.closest('.col');
+  if (!col) return;
+  const fi = +col.dataset.i;
+  if (!selected){ toast('Pick a card first'); return; }
+  playTo(fi);
+});
+// Tapping another tableau pile tries to stack there; if that isn't legal we just
+// select the tapped pile instead, which is what the player usually meant.
+tablEl.addEventListener('click', e => {
+  if (busy || suppressClick) return;
+  const col = e.target.closest('.col');
+  if (!col) return;
+  const ti = +col.dataset.i;
+  if (selected && !(selected.zone === 'tab' && selected.i === ti)){
+    if (canStack(selected, ti)){ stackTo(ti); return; }
+  }
+  if (S.tableau[ti].length) selectSource('tab', ti);
+  else if (selected) selected = null, render();
+});
+$('#stock').addEventListener('click', () => { if (!suppressClick) dealFromStock(); });
+
+$('#undoBtn').onclick = () => doUndo();
+
+/* ============================================================
+   PANELS
+   ============================================================ */
+const ov = $('#ov'), ovPanel = $('#ovPanel');
+function showPanel(html){ ovPanel.innerHTML = html; ov.classList.add('on'); }
+function hidePanel(){ ov.classList.remove('on'); }
+
+ovPanel.addEventListener('click', e => {
+  const b = e.target.closest('[data-act]');
+  if (!b) return;
+  const act = b.dataset.act;
+  hidePanel();
+  if (act === 'undo')    doUndo();
+  if (act === 'next')    newLevel(S.level + 1);
+  if (act === 'retry')   newLevel(S.level);
+  if (act === 'restart' || act === 'start') { S.score = 0; newLevel(1); }
+  if (act === 'mute')    { muted = !muted; menu(); }
+});
+function newLevel(n){ S = buildLevel(n); seen.clear(); selected = null; dragHold = null; fitCards(); render(); }
+
+function rulesHTML(){
+  return `<ul class="rules">
+    <li><b>Group cards</b> carry a gold title band — <i>Animals ×4</i>. Play one onto an empty
+        foundation to open that group; only then do its items have somewhere to go.</li>
+    <li>Groups are pictures, not words: colors, shapes, numbers, flowers, sports…</li>
+    <li>Fill an open foundation to its count and it clears, freeing the slot.</li>
+    <li>Tap the <b>stock</b> to deal to the waste. Only the front waste card plays.</li>
+    <li>The <b>tableau</b> is a staircase — the right-hand piles are deepest. Clear a front card
+        and the next one flips up.</li>
+    <li>In the tableau you may <b>stack matching items</b> on each other — pile the animals together
+        to dig a column out faster. A matching run <b>moves as one unit</b>, and files onto its
+        foundation all at once.</li>
+    <li>❄️ <b>Frozen</b> cards can't move. Every card you file to a foundation thaws them by one,
+        so ice is a timer, not a wall.</li>
+    <li>An <b>empty tableau slot</b> is free parking — drop a single card or a whole matching run
+        into it to clear a column out of your way.</li>
+    <li>♻️ Redeals recycle the waste — you get a limited number.</li>
+    <li>⏳ You have <b>${MOVES_PER_LEVEL} moves</b> per level. Dealing, recycling, filing a card and
+        stacking a run each cost one. Clear the board before they run out; moves you never spend
+        are worth bonus points.</li>
+  </ul>`;
+}
+function menu(){
+  showPanel(`
+    <h2>Pile Up!</h2>
+    <p>Level ${S.level} · Score ${S.score}</p>
+    ${rulesHTML()}
+    <button class="btn" data-act="resume">Resume</button>
+    <button class="btn alt" data-act="retry">Restart Level</button>
+    <button class="btn alt" data-act="mute">${muted ? '🔇 Sound off' : '🔊 Sound on'}</button>`);
+}
+$('#menuBtn').onclick = menu;
+
+/* ============================================================
+   SIZING + BOOT
+   ============================================================ */
+function best(){ return +(localStorage.getItem('pileup_best') || 0); }
+function save(){ if (S.score > best()) localStorage.setItem('pileup_best', S.score); }
+
+function fitCards(){
+  // both rows share one card size, so size for whichever row has more columns
+  const cols = Math.max(S ? S.slots : 4, TAB_PILES);
+  const w = Math.min(480, innerWidth) - 20;
+  const byWidth = (w - (cols - 1) * 6) / cols;
+  // three card rows, the header band and the tallest possible tableau stack must fit:
+  //   3*1.38cw + 0.26cw (band) + MAX_PEEK*0.13cw (backs) + MAX_PEEK_UP*0.22cw (face-up) + chrome
+  const chrome = 52 + 20 + 24;   // top bar + row gaps + safe area (no power bar to reserve for)
+  const byHeight = (innerHeight - chrome) /
+                   (3 * 1.38 + 0.26 + MAX_PEEK * 0.13 + MAX_PEEK_UP * 0.22);
+  const cw = Math.max(44, Math.floor(Math.min(byWidth, byHeight, 78)));
+  const px = (v, min) => Math.max(min, Math.round(cw * v)) + 'px';
+  document.documentElement.style.setProperty('--cw', cw + 'px');
+  document.documentElement.style.setProperty('--ch', Math.round(cw * 1.38) + 'px');
+  document.documentElement.style.setProperty('--band',   px(0.26, 16));
+  document.documentElement.style.setProperty('--deep',   px(0.13, 7));
+  document.documentElement.style.setProperty('--deepup', px(0.22, 14));
+}
+addEventListener('resize', () => { fitCards(); if (S) render(); });
+
+S = buildLevel(1);
+fitCards();
+render();
+showPanel(`
+  <h2>Pile Up!</h2>
+  <p>Association solitaire — stock, waste, tableau and foundations, sorted by <b>what things are</b> instead of by words.</p>
+  ${rulesHTML()}
+  <button class="btn" data-act="start">Play</button>`);
+</script>
+</body>
+</html>
