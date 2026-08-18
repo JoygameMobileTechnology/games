@@ -1,0 +1,18 @@
+{
+  "id": 13,
+  "name": "Ironclad Front",
+  "shots": 16,
+  "cameraHint": { "distanceScale": 1.05, "pitchDeg": 15 },
+  "platform": { "size": [6.8, 1, 4.4], "theme": "snow" },
+  "blocks": [
+    { "type": "box", "material": "pine",  "size": [1.0, 2.4, 1.2], "pos": [-2.0, 1.2, -0.4] },
+    { "type": "box", "material": "pine",  "size": [1.0, 2.4, 1.2], "pos": [2.0, 1.2, -0.4] },
+    { "type": "box", "material": "balsa", "size": [1.0, 1.0, 1.0], "pos": [0, 0.5, -0.4] },
+    { "type": "box", "material": "balsa", "size": [1.0, 1.0, 1.0], "pos": [0, 1.5, -0.4] },
+    { "type": "box", "material": "pine",  "size": [5.4, 0.5, 1.3], "pos": [0, 2.65, -0.4] },
+    { "type": "box", "material": "stone", "size": [1.2, 1.0, 1.2], "pos": [-1.9, 3.4, -0.4] },
+    { "type": "box", "material": "stone", "size": [1.2, 1.0, 1.2], "pos": [1.9, 3.4, -0.4] },
+    { "type": "box", "material": "iron",  "size": [2.4, 2.1, 0.25], "pos": [0, 1.05, 1.4] }
+  ],
+  "tutorialText": "The middle is closed. The legs are not."
+}

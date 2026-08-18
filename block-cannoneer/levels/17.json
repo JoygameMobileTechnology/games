@@ -1,0 +1,18 @@
+{
+  "id": 17,
+  "name": "Long Fuse",
+  "shots": 16,
+  "cameraHint": { "distanceScale": 1.05, "pitchDeg": 15 },
+  "platform": { "size": [7.5, 1, 4], "theme": "sand" },
+  "blocks": [
+    { "type": "box", "material": "pine",  "size": [0.9, 1.3, 1.0], "pos": [-2.9, 0.65, 0] },
+    { "type": "box", "material": "pine",  "size": [0.9, 1.3, 1.0], "pos": [-2.9, 1.95, 0] },
+    { "type": "box", "material": "stone", "size": [0.9, 0.9, 1.0], "pos": [-2.9, 3.05, 0] },
+    { "type": "box", "material": "balsa", "size": [0.35, 2.2, 1.1], "pos": [-1.5, 1.1, -0.2] },
+    { "type": "box", "material": "glass", "size": [0.35, 2.2, 1.1], "pos": [-0.2, 1.1, -0.2] },
+    { "type": "box", "material": "balsa", "size": [0.35, 2.2, 1.1], "pos": [1.1, 1.1, -0.2] },
+    { "type": "box", "material": "glass", "size": [0.7, 1.5, 1.0], "pos": [2.9, 0.75, -0.2] },
+    { "type": "box", "material": "stone", "size": [1.5, 0.8, 1.2], "pos": [3.0, 1.9, -0.2] }
+  ],
+  "tutorialText": "Kick the first one over and stand back."
+}

@@ -1,0 +1,17 @@
+{
+  "id": 16,
+  "name": "Two Kings",
+  "shots": 16,
+  "cameraHint": { "distanceScale": 1.05, "pitchDeg": 14 },
+  "platform": { "size": [7, 1, 4], "theme": "meadow" },
+  "blocks": [
+    { "type": "box", "material": "oak",   "size": [1.0, 3.0, 1.2], "pos": [-2.2, 1.5, 0] },
+    { "type": "box", "material": "balsa", "size": [1.0, 1.0, 1.2], "pos": [2.2, 0.5, 0] },
+    { "type": "box", "material": "pine",  "size": [1.0, 1.0, 1.2], "pos": [2.2, 1.5, 0] },
+    { "type": "box", "material": "pine",  "size": [1.0, 1.0, 1.2], "pos": [2.2, 2.5, 0] },
+    { "type": "box", "material": "pine",  "size": [6.0, 0.5, 1.3], "pos": [0, 3.25, 0] },
+    { "type": "box", "material": "stone", "size": [1.3, 1.1, 1.2], "pos": [1.6, 4.05, 0] },
+    { "type": "box", "material": "balsa", "size": [0.9, 0.9, 1.0], "pos": [-2.2, 3.95, 0] }
+  ],
+  "tutorialText": "Two kings, one roof. Only one order works."
+}

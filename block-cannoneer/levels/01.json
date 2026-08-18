@@ -1,0 +1,15 @@
+{
+  "id": 1,
+  "name": "First Tap",
+  "shots": 15,
+  "cameraHint": { "distanceScale": 1.0, "pitchDeg": 14 },
+  "platform": { "size": [3.4, 1, 2.4], "theme": "meadow" },
+  "blocks": [
+    { "type": "box", "material": "pine", "size": [0.9, 0.9, 0.9], "pos": [0, 0.45, 0] },
+    { "type": "box", "material": "pine", "size": [0.9, 0.9, 0.9], "pos": [0, 1.37, 0] },
+    { "type": "box", "material": "pine", "size": [0.9, 0.9, 0.9], "pos": [0, 2.29, 0] },
+    { "type": "box", "material": "pine", "size": [0.9, 0.9, 0.9], "pos": [0, 3.21, 0] },
+    { "type": "box", "material": "pine", "size": [0.9, 0.9, 0.9], "pos": [0, 4.13, 0] }
+  ],
+  "tutorialText": "Tap the tower. Clear every block off the ledge."
+}

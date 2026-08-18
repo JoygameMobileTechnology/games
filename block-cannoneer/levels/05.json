@@ -1,0 +1,16 @@
+{
+  "id": 5,
+  "name": "Glasshouse",
+  "shots": 15,
+  "cameraHint": { "distanceScale": 1.0, "pitchDeg": 15 },
+  "platform": { "size": [4.4, 1, 2.4], "theme": "candy" },
+  "blocks": [
+    { "type": "box", "material": "pine", "size": [0.6, 1.6, 0.8], "pos": [-1.1, 0.8, 0] },
+    { "type": "box", "material": "pine", "size": [0.6, 1.6, 0.8], "pos": [1.1, 0.8, 0] },
+    { "type": "box", "material": "pine", "size": [3.0, 0.35, 1.1], "pos": [0, 1.795, 0] },
+    { "type": "box", "material": "glass", "size": [0.55, 1.5, 0.8], "pos": [-1.0, 2.74, 0] },
+    { "type": "box", "material": "glass", "size": [0.55, 1.5, 0.8], "pos": [1.0, 2.74, 0] },
+    { "type": "box", "material": "stone", "size": [2.8, 0.75, 1.2], "pos": [0, 3.885, 0] }
+  ],
+  "tutorialText": "Glass breaks under weight."
+}

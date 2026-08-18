@@ -1,0 +1,17 @@
+{
+  "id": 19,
+  "name": "Anvil Weather",
+  "shots": 16,
+  "cameraHint": { "distanceScale": 1.05, "pitchDeg": 16 },
+  "platform": { "size": [7, 1, 5], "theme": "dusk" },
+  "blocks": [
+    { "type": "box", "material": "pine",  "size": [1.1, 2.6, 1.8], "pos": [-2.2, 1.3, -0.4] },
+    { "type": "box", "material": "balsa", "size": [1.0, 2.6, 1.8], "pos": [1.4, 1.3, -0.4] },
+    { "type": "box", "material": "iron",  "size": [2.4, 2.3, 0.25], "pos": [1.4, 1.15, 0.85] },
+    { "type": "box", "material": "balsa", "size": [0.8, 1.4, 1.0], "pos": [-0.4, 0.7, -0.5] },
+    { "type": "box", "material": "pine",  "size": [5.0, 0.4, 2.2], "pos": [-0.4, 2.8, -0.1] },
+    { "type": "box", "material": "pine",  "size": [0.8, 0.8, 1.0], "pos": [-2.5, 3.4, -0.1] },
+    { "type": "box", "material": "stone", "size": [1.2, 1.2, 1.2], "pos": [1.4, 3.6, 0.3] }
+  ],
+  "tutorialText": "The shield is thick. The sky above it is not."
+}

@@ -1,0 +1,15 @@
+{
+  "id": 4,
+  "name": "Stone Crown",
+  "shots": 15,
+  "cameraHint": { "distanceScale": 1.0, "pitchDeg": 15 },
+  "platform": { "size": [4.0, 1, 2.2], "theme": "dusk" },
+  "blocks": [
+    { "type": "box", "material": "pine", "size": [0.6, 2.8, 0.7], "pos": [-1.1, 1.4, 0] },
+    { "type": "box", "material": "pine", "size": [0.6, 2.8, 0.7], "pos": [1.1, 1.4, 0] },
+    { "type": "box", "material": "stone", "size": [3.2, 0.9, 1.3], "pos": [0, 3.27, 0] },
+    { "type": "box", "material": "pine", "size": [0.8, 0.8, 0.8], "pos": [-0.9, 4.14, 0] },
+    { "type": "box", "material": "pine", "size": [0.8, 0.8, 0.8], "pos": [0.9, 4.14, 0] }
+  ],
+  "tutorialText": "Stone is the load, not the target."
+}

@@ -1,0 +1,17 @@
+{
+  "id": 6,
+  "name": "Oak Refuses",
+  "shots": 16,
+  "cameraHint": { "distanceScale": 1.0, "pitchDeg": 14 },
+  "platform": { "size": [4.0, 1, 2.2], "theme": "meadow" },
+  "blocks": [
+    { "type": "box", "material": "pine", "size": [0.45, 0.5, 1.0], "pos": [-1.35, 0.25, 0] },
+    { "type": "box", "material": "pine", "size": [0.45, 0.5, 1.0], "pos": [-0.55, 0.25, 0] },
+    { "type": "box", "material": "pine", "size": [0.45, 0.5, 1.0], "pos": [0.55, 0.25, 0] },
+    { "type": "box", "material": "pine", "size": [0.45, 0.5, 1.0], "pos": [1.35, 0.25, 0] },
+    { "type": "box", "material": "oak", "size": [1.1, 2.8, 1.1], "pos": [-0.95, 1.92, 0] },
+    { "type": "box", "material": "oak", "size": [1.1, 2.8, 1.1], "pos": [0.95, 1.92, 0] },
+    { "type": "box", "material": "pine", "size": [3.2, 0.4, 1.0], "pos": [0, 3.54, 0] }
+  ],
+  "tutorialText": "Oak won't break. Take its footing."
+}

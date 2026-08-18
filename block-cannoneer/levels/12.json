@@ -1,0 +1,15 @@
+{
+  "id": 12,
+  "name": "Tipping Point",
+  "shots": 15,
+  "cameraHint": { "distanceScale": 1.05, "pitchDeg": 13 },
+  "platform": { "size": [6, 1, 4], "theme": "sand" },
+  "blocks": [
+    { "type": "box", "material": "pine",  "size": [1.3, 2.0, 1.4], "pos": [0, 1.0, 0] },
+    { "type": "box", "material": "pine",  "size": [7.0, 0.5, 1.3], "pos": [0, 2.25, 0] },
+    { "type": "box", "material": "stone", "size": [1.0, 1.0, 1.2], "pos": [-3.0, 3.0, 0] },
+    { "type": "box", "material": "stone", "size": [1.0, 1.0, 1.2], "pos": [3.0, 3.0, 0] },
+    { "type": "box", "material": "iron",  "size": [0.8, 1.4, 0.8], "pos": [2.3, 0.7, 0.4] }
+  ],
+  "tutorialText": "A balance holds until you pick a side."
+}

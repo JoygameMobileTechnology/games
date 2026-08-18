@@ -1,0 +1,16 @@
+{
+  "id": 9,
+  "name": "Read the Beam",
+  "shots": 15,
+  "cameraHint": { "distanceScale": 1.02, "pitchDeg": 15 },
+  "platform": { "size": [5.8, 1, 2.4], "theme": "snow" },
+  "blocks": [
+    { "type": "box", "material": "balsa", "size": [0.9, 2.0, 0.9], "pos": [-1.5, 1.0, 0] },
+    { "type": "box", "material": "rubber", "size": [1.4, 2.0, 1.2], "pos": [1.6, 1.0, 0] },
+    { "type": "box", "material": "oak", "size": [4.4, 0.6, 1.0], "pos": [-0.35, 2.32, 0] },
+    { "type": "box", "material": "pine", "size": [0.85, 0.85, 0.85], "pos": [-1.7, 3.065, 0] },
+    { "type": "box", "material": "pine", "size": [0.85, 0.85, 0.85], "pos": [-1.7, 3.935, 0] },
+    { "type": "box", "material": "pine", "size": [0.85, 0.85, 0.85], "pos": [-1.7, 4.805, 0] }
+  ],
+  "tutorialText": "Rubber won't break. Something else will."
+}

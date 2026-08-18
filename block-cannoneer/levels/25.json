@@ -1,0 +1,832 @@
+{
+ "id": 25,
+ "name": "Meadow Avalanche",
+ "shots": 40,
+ "cameraHint": {
+  "distanceScale": 1.0,
+  "pitchDeg": 12
+ },
+ "platform": {
+  "size": [
+   9,
+   1,
+   6
+  ],
+  "theme": "meadow"
+ },
+ "blocks": [
+  {
+   "type": "box",
+   "material": "balsa",
+   "size": [
+    0.8,
+    1.6,
+    0.8
+   ],
+   "pos": [
+    -1.1,
+    0.8,
+    -1.1
+   ]
+  },
+  {
+   "type": "box",
+   "material": "balsa",
+   "size": [
+    0.8,
+    1.6,
+    0.8
+   ],
+   "pos": [
+    -1.1,
+    0.8,
+    1.1
+   ]
+  },
+  {
+   "type": "box",
+   "material": "balsa",
+   "size": [
+    0.8,
+    1.6,
+    0.8
+   ],
+   "pos": [
+    1.1,
+    0.8,
+    -1.1
+   ]
+  },
+  {
+   "type": "box",
+   "material": "balsa",
+   "size": [
+    0.8,
+    1.6,
+    0.8
+   ],
+   "pos": [
+    1.1,
+    0.8,
+    1.1
+   ]
+  },
+  {
+   "type": "box",
+   "material": "glass",
+   "size": [
+    3.6,
+    0.4,
+    3.6
+   ],
+   "pos": [
+    0,
+    1.8,
+    0
+   ]
+  },
+  {
+   "type": "box",
+   "material": "balsa",
+   "size": [
+    0.8,
+    1.4,
+    0.8
+   ],
+   "pos": [
+    -1.1,
+    2.7,
+    -1.1
+   ]
+  },
+  {
+   "type": "box",
+   "material": "balsa",
+   "size": [
+    0.8,
+    1.4,
+    0.8
+   ],
+   "pos": [
+    -1.1,
+    2.7,
+    1.1
+   ]
+  },
+  {
+   "type": "box",
+   "material": "balsa",
+   "size": [
+    0.8,
+    1.4,
+    0.8
+   ],
+   "pos": [
+    1.1,
+    2.7,
+    -1.1
+   ]
+  },
+  {
+   "type": "box",
+   "material": "balsa",
+   "size": [
+    0.8,
+    1.4,
+    0.8
+   ],
+   "pos": [
+    1.1,
+    2.7,
+    1.1
+   ]
+  },
+  {
+   "type": "box",
+   "material": "glass",
+   "size": [
+    3.4,
+    0.4,
+    3.4
+   ],
+   "pos": [
+    0,
+    3.6,
+    0
+   ]
+  },
+  {
+   "type": "box",
+   "material": "pine",
+   "size": [
+    0.8,
+    1.2,
+    0.8
+   ],
+   "pos": [
+    -1.0,
+    4.4,
+    -1.0
+   ]
+  },
+  {
+   "type": "box",
+   "material": "pine",
+   "size": [
+    0.8,
+    1.2,
+    0.8
+   ],
+   "pos": [
+    -1.0,
+    4.4,
+    1.0
+   ]
+  },
+  {
+   "type": "box",
+   "material": "pine",
+   "size": [
+    0.8,
+    1.2,
+    0.8
+   ],
+   "pos": [
+    1.0,
+    4.4,
+    -1.0
+   ]
+  },
+  {
+   "type": "box",
+   "material": "pine",
+   "size": [
+    0.8,
+    1.2,
+    0.8
+   ],
+   "pos": [
+    1.0,
+    4.4,
+    1.0
+   ]
+  },
+  {
+   "type": "box",
+   "material": "glass",
+   "size": [
+    3.2,
+    0.4,
+    3.2
+   ],
+   "pos": [
+    0,
+    5.2,
+    0
+   ]
+  },
+  {
+   "type": "box",
+   "material": "balsa",
+   "size": [
+    0.8,
+    1.0,
+    0.8
+   ],
+   "pos": [
+    -0.9,
+    5.9,
+    -0.9
+   ]
+  },
+  {
+   "type": "box",
+   "material": "balsa",
+   "size": [
+    0.8,
+    1.0,
+    0.8
+   ],
+   "pos": [
+    -0.9,
+    5.9,
+    0.9
+   ]
+  },
+  {
+   "type": "box",
+   "material": "balsa",
+   "size": [
+    0.8,
+    1.0,
+    0.8
+   ],
+   "pos": [
+    0.9,
+    5.9,
+    -0.9
+   ]
+  },
+  {
+   "type": "box",
+   "material": "balsa",
+   "size": [
+    0.8,
+    1.0,
+    0.8
+   ],
+   "pos": [
+    0.9,
+    5.9,
+    0.9
+   ]
+  },
+  {
+   "type": "box",
+   "material": "glass",
+   "size": [
+    3.0,
+    0.4,
+    3.0
+   ],
+   "pos": [
+    0,
+    6.6,
+    0
+   ]
+  },
+  {
+   "type": "box",
+   "material": "pine",
+   "size": [
+    0.7,
+    0.8,
+    0.7
+   ],
+   "pos": [
+    -0.8,
+    7.2,
+    -0.8
+   ]
+  },
+  {
+   "type": "box",
+   "material": "pine",
+   "size": [
+    0.7,
+    0.8,
+    0.7
+   ],
+   "pos": [
+    -0.8,
+    7.2,
+    0.8
+   ]
+  },
+  {
+   "type": "box",
+   "material": "pine",
+   "size": [
+    0.7,
+    0.8,
+    0.7
+   ],
+   "pos": [
+    0.8,
+    7.2,
+    -0.8
+   ]
+  },
+  {
+   "type": "box",
+   "material": "pine",
+   "size": [
+    0.7,
+    0.8,
+    0.7
+   ],
+   "pos": [
+    0.8,
+    7.2,
+    0.8
+   ]
+  },
+  {
+   "type": "box",
+   "material": "glass",
+   "size": [
+    2.6,
+    0.4,
+    2.6
+   ],
+   "pos": [
+    0,
+    7.8,
+    0
+   ]
+  },
+  {
+   "type": "box",
+   "material": "stone",
+   "size": [
+    1.8,
+    0.8,
+    1.8
+   ],
+   "pos": [
+    0,
+    8.4,
+    0
+   ]
+  },
+  {
+   "type": "box",
+   "material": "balsa",
+   "size": [
+    0.5,
+    0.5,
+    0.5
+   ],
+   "pos": [
+    -0.5,
+    9.05,
+    -0.5
+   ]
+  },
+  {
+   "type": "box",
+   "material": "balsa",
+   "size": [
+    0.5,
+    0.5,
+    0.5
+   ],
+   "pos": [
+    -0.5,
+    9.05,
+    0.5
+   ]
+  },
+  {
+   "type": "box",
+   "material": "balsa",
+   "size": [
+    0.5,
+    0.5,
+    0.5
+   ],
+   "pos": [
+    0.5,
+    9.05,
+    -0.5
+   ]
+  },
+  {
+   "type": "box",
+   "material": "balsa",
+   "size": [
+    0.5,
+    0.5,
+    0.5
+   ],
+   "pos": [
+    0.5,
+    9.05,
+    0.5
+   ]
+  },
+  {
+   "type": "box",
+   "material": "balsa",
+   "size": [
+    0.5,
+    0.9,
+    0.5
+   ],
+   "pos": [
+    -2.6,
+    0.45,
+    0
+   ]
+  },
+  {
+   "type": "box",
+   "material": "glass",
+   "size": [
+    0.6,
+    0.3,
+    0.6
+   ],
+   "pos": [
+    -2.6,
+    1.05,
+    0
+   ]
+  },
+  {
+   "type": "box",
+   "material": "balsa",
+   "size": [
+    0.5,
+    0.9,
+    0.5
+   ],
+   "pos": [
+    2.6,
+    0.45,
+    0
+   ]
+  },
+  {
+   "type": "box",
+   "material": "glass",
+   "size": [
+    0.6,
+    0.3,
+    0.6
+   ],
+   "pos": [
+    2.6,
+    1.05,
+    0
+   ]
+  },
+  {
+   "type": "box",
+   "material": "balsa",
+   "size": [
+    0.5,
+    0.9,
+    0.5
+   ],
+   "pos": [
+    0,
+    0.45,
+    -2.6
+   ]
+  },
+  {
+   "type": "box",
+   "material": "glass",
+   "size": [
+    0.6,
+    0.3,
+    0.6
+   ],
+   "pos": [
+    0,
+    1.05,
+    -2.6
+   ]
+  },
+  {
+   "type": "box",
+   "material": "balsa",
+   "size": [
+    0.5,
+    0.9,
+    0.5
+   ],
+   "pos": [
+    0,
+    0.45,
+    2.6
+   ]
+  },
+  {
+   "type": "box",
+   "material": "glass",
+   "size": [
+    0.6,
+    0.3,
+    0.6
+   ],
+   "pos": [
+    0,
+    1.05,
+    2.6
+   ]
+  },
+  {
+   "type": "box",
+   "material": "balsa",
+   "size": [
+    0.5,
+    0.9,
+    0.5
+   ],
+   "pos": [
+    -1.9,
+    0.45,
+    -1.9
+   ]
+  },
+  {
+   "type": "box",
+   "material": "glass",
+   "size": [
+    0.6,
+    0.3,
+    0.6
+   ],
+   "pos": [
+    -1.9,
+    1.05,
+    -1.9
+   ]
+  },
+  {
+   "type": "box",
+   "material": "balsa",
+   "size": [
+    0.5,
+    0.9,
+    0.5
+   ],
+   "pos": [
+    -1.9,
+    0.45,
+    1.9
+   ]
+  },
+  {
+   "type": "box",
+   "material": "glass",
+   "size": [
+    0.6,
+    0.3,
+    0.6
+   ],
+   "pos": [
+    -1.9,
+    1.05,
+    1.9
+   ]
+  },
+  {
+   "type": "box",
+   "material": "balsa",
+   "size": [
+    0.5,
+    0.9,
+    0.5
+   ],
+   "pos": [
+    1.9,
+    0.45,
+    -1.9
+   ]
+  },
+  {
+   "type": "box",
+   "material": "glass",
+   "size": [
+    0.6,
+    0.3,
+    0.6
+   ],
+   "pos": [
+    1.9,
+    1.05,
+    -1.9
+   ]
+  },
+  {
+   "type": "box",
+   "material": "balsa",
+   "size": [
+    0.5,
+    0.9,
+    0.5
+   ],
+   "pos": [
+    1.9,
+    0.45,
+    1.9
+   ]
+  },
+  {
+   "type": "box",
+   "material": "glass",
+   "size": [
+    0.6,
+    0.3,
+    0.6
+   ],
+   "pos": [
+    1.9,
+    1.05,
+    1.9
+   ]
+  },
+  {
+   "type": "box",
+   "material": "glass",
+   "size": [
+    0.6,
+    0.6,
+    0.6
+   ],
+   "pos": [
+    -2.6,
+    1.5,
+    0
+   ]
+  },
+  {
+   "type": "box",
+   "material": "glass",
+   "size": [
+    0.6,
+    0.6,
+    0.6
+   ],
+   "pos": [
+    2.6,
+    1.5,
+    0
+   ]
+  },
+  {
+   "type": "box",
+   "material": "glass",
+   "size": [
+    0.6,
+    0.6,
+    0.6
+   ],
+   "pos": [
+    0,
+    1.5,
+    -2.6
+   ]
+  },
+  {
+   "type": "box",
+   "material": "glass",
+   "size": [
+    0.6,
+    0.6,
+    0.6
+   ],
+   "pos": [
+    0,
+    1.5,
+    2.6
+   ]
+  },
+  {
+   "type": "box",
+   "material": "balsa",
+   "size": [
+    0.6,
+    0.6,
+    0.6
+   ],
+   "pos": [
+    -3.6,
+    0.3,
+    -1.2
+   ]
+  },
+  {
+   "type": "box",
+   "material": "balsa",
+   "size": [
+    0.6,
+    0.6,
+    0.6
+   ],
+   "pos": [
+    -3.6,
+    0.3,
+    1.2
+   ]
+  },
+  {
+   "type": "box",
+   "material": "balsa",
+   "size": [
+    0.6,
+    0.6,
+    0.6
+   ],
+   "pos": [
+    3.6,
+    0.3,
+    -1.2
+   ]
+  },
+  {
+   "type": "box",
+   "material": "balsa",
+   "size": [
+    0.6,
+    0.6,
+    0.6
+   ],
+   "pos": [
+    3.6,
+    0.3,
+    1.2
+   ]
+  },
+  {
+   "type": "box",
+   "material": "balsa",
+   "size": [
+    0.6,
+    0.6,
+    0.6
+   ],
+   "pos": [
+    -1.2,
+    0.3,
+    -2.4
+   ]
+  },
+  {
+   "type": "box",
+   "material": "balsa",
+   "size": [
+    0.6,
+    0.6,
+    0.6
+   ],
+   "pos": [
+    -1.2,
+    0.3,
+    2.4
+   ]
+  },
+  {
+   "type": "box",
+   "material": "balsa",
+   "size": [
+    0.6,
+    0.6,
+    0.6
+   ],
+   "pos": [
+    1.2,
+    0.3,
+    -2.4
+   ]
+  },
+  {
+   "type": "box",
+   "material": "balsa",
+   "size": [
+    0.6,
+    0.6,
+    0.6
+   ],
+   "pos": [
+    1.2,
+    0.3,
+    2.4
+   ]
+  }
+ ],
+ "tutorialText": "Nine metres of cake. Take the bottom layer."
+}

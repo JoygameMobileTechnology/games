@@ -1,0 +1,832 @@
+{
+ "id": 23,
+ "name": "Snowfall Rookery",
+ "shots": 35,
+ "cameraHint": {
+  "distanceScale": 1.05,
+  "pitchDeg": 13
+ },
+ "platform": {
+  "size": [
+   15,
+   1,
+   5
+  ],
+  "theme": "snow"
+ },
+ "blocks": [
+  {
+   "type": "box",
+   "material": "balsa",
+   "size": [
+    0.5,
+    1.8,
+    2.0
+   ],
+   "pos": [
+    -6.95,
+    0.9,
+    0
+   ]
+  },
+  {
+   "type": "box",
+   "material": "balsa",
+   "size": [
+    0.5,
+    1.8,
+    2.0
+   ],
+   "pos": [
+    -5.45,
+    0.9,
+    0
+   ]
+  },
+  {
+   "type": "box",
+   "material": "glass",
+   "size": [
+    2.1,
+    0.4,
+    2.0
+   ],
+   "pos": [
+    -6.2,
+    2.0,
+    0
+   ]
+  },
+  {
+   "type": "box",
+   "material": "pine",
+   "size": [
+    2.1,
+    1.0,
+    2.0
+   ],
+   "pos": [
+    -6.2,
+    2.7,
+    0
+   ]
+  },
+  {
+   "type": "box",
+   "material": "glass",
+   "size": [
+    0.6,
+    0.6,
+    0.6
+   ],
+   "pos": [
+    -6.8,
+    3.5,
+    0
+   ]
+  },
+  {
+   "type": "box",
+   "material": "glass",
+   "size": [
+    0.6,
+    0.6,
+    0.6
+   ],
+   "pos": [
+    -5.6,
+    3.5,
+    0
+   ]
+  },
+  {
+   "type": "box",
+   "material": "balsa",
+   "size": [
+    0.5,
+    1.8,
+    2.0
+   ],
+   "pos": [
+    -4.75,
+    0.9,
+    0
+   ]
+  },
+  {
+   "type": "box",
+   "material": "balsa",
+   "size": [
+    0.5,
+    1.8,
+    2.0
+   ],
+   "pos": [
+    -3.25,
+    0.9,
+    0
+   ]
+  },
+  {
+   "type": "box",
+   "material": "glass",
+   "size": [
+    2.1,
+    0.4,
+    2.0
+   ],
+   "pos": [
+    -4.0,
+    2.0,
+    0
+   ]
+  },
+  {
+   "type": "box",
+   "material": "pine",
+   "size": [
+    2.1,
+    1.0,
+    2.0
+   ],
+   "pos": [
+    -4.0,
+    2.7,
+    0
+   ]
+  },
+  {
+   "type": "box",
+   "material": "pine",
+   "size": [
+    1.4,
+    1.6,
+    1.4
+   ],
+   "pos": [
+    -4.0,
+    4.0,
+    0
+   ]
+  },
+  {
+   "type": "box",
+   "material": "glass",
+   "size": [
+    1.6,
+    0.5,
+    1.6
+   ],
+   "pos": [
+    -4.0,
+    5.05,
+    0
+   ]
+  },
+  {
+   "type": "box",
+   "material": "balsa",
+   "size": [
+    0.4,
+    0.4,
+    0.4
+   ],
+   "pos": [
+    -4.4,
+    5.5,
+    0
+   ]
+  },
+  {
+   "type": "box",
+   "material": "balsa",
+   "size": [
+    0.4,
+    0.4,
+    0.4
+   ],
+   "pos": [
+    -3.6,
+    5.5,
+    0
+   ]
+  },
+  {
+   "type": "box",
+   "material": "balsa",
+   "size": [
+    0.5,
+    1.8,
+    2.0
+   ],
+   "pos": [
+    -2.55,
+    0.9,
+    0
+   ]
+  },
+  {
+   "type": "box",
+   "material": "balsa",
+   "size": [
+    0.5,
+    1.8,
+    2.0
+   ],
+   "pos": [
+    -1.05,
+    0.9,
+    0
+   ]
+  },
+  {
+   "type": "box",
+   "material": "glass",
+   "size": [
+    2.1,
+    0.4,
+    2.0
+   ],
+   "pos": [
+    -1.8,
+    2.0,
+    0
+   ]
+  },
+  {
+   "type": "box",
+   "material": "pine",
+   "size": [
+    2.1,
+    1.0,
+    2.0
+   ],
+   "pos": [
+    -1.8,
+    2.7,
+    0
+   ]
+  },
+  {
+   "type": "box",
+   "material": "glass",
+   "size": [
+    0.6,
+    0.6,
+    0.6
+   ],
+   "pos": [
+    -2.4,
+    3.5,
+    0
+   ]
+  },
+  {
+   "type": "box",
+   "material": "glass",
+   "size": [
+    0.6,
+    0.6,
+    0.6
+   ],
+   "pos": [
+    -1.2,
+    3.5,
+    0
+   ]
+  },
+  {
+   "type": "box",
+   "material": "balsa",
+   "size": [
+    0.5,
+    1.8,
+    2.0
+   ],
+   "pos": [
+    1.05,
+    0.9,
+    0
+   ]
+  },
+  {
+   "type": "box",
+   "material": "balsa",
+   "size": [
+    0.5,
+    1.8,
+    2.0
+   ],
+   "pos": [
+    2.55,
+    0.9,
+    0
+   ]
+  },
+  {
+   "type": "box",
+   "material": "glass",
+   "size": [
+    2.1,
+    0.4,
+    2.0
+   ],
+   "pos": [
+    1.8,
+    2.0,
+    0
+   ]
+  },
+  {
+   "type": "box",
+   "material": "pine",
+   "size": [
+    2.1,
+    1.0,
+    2.0
+   ],
+   "pos": [
+    1.8,
+    2.7,
+    0
+   ]
+  },
+  {
+   "type": "box",
+   "material": "glass",
+   "size": [
+    0.6,
+    0.6,
+    0.6
+   ],
+   "pos": [
+    1.2,
+    3.5,
+    0
+   ]
+  },
+  {
+   "type": "box",
+   "material": "glass",
+   "size": [
+    0.6,
+    0.6,
+    0.6
+   ],
+   "pos": [
+    2.4,
+    3.5,
+    0
+   ]
+  },
+  {
+   "type": "box",
+   "material": "balsa",
+   "size": [
+    0.5,
+    1.8,
+    2.0
+   ],
+   "pos": [
+    3.25,
+    0.9,
+    0
+   ]
+  },
+  {
+   "type": "box",
+   "material": "balsa",
+   "size": [
+    0.5,
+    1.8,
+    2.0
+   ],
+   "pos": [
+    4.75,
+    0.9,
+    0
+   ]
+  },
+  {
+   "type": "box",
+   "material": "glass",
+   "size": [
+    2.1,
+    0.4,
+    2.0
+   ],
+   "pos": [
+    4.0,
+    2.0,
+    0
+   ]
+  },
+  {
+   "type": "box",
+   "material": "pine",
+   "size": [
+    2.1,
+    1.0,
+    2.0
+   ],
+   "pos": [
+    4.0,
+    2.7,
+    0
+   ]
+  },
+  {
+   "type": "box",
+   "material": "pine",
+   "size": [
+    1.4,
+    1.6,
+    1.4
+   ],
+   "pos": [
+    4.0,
+    4.0,
+    0
+   ]
+  },
+  {
+   "type": "box",
+   "material": "glass",
+   "size": [
+    1.6,
+    0.5,
+    1.6
+   ],
+   "pos": [
+    4.0,
+    5.05,
+    0
+   ]
+  },
+  {
+   "type": "box",
+   "material": "balsa",
+   "size": [
+    0.4,
+    0.4,
+    0.4
+   ],
+   "pos": [
+    3.6,
+    5.5,
+    0
+   ]
+  },
+  {
+   "type": "box",
+   "material": "balsa",
+   "size": [
+    0.4,
+    0.4,
+    0.4
+   ],
+   "pos": [
+    4.4,
+    5.5,
+    0
+   ]
+  },
+  {
+   "type": "box",
+   "material": "balsa",
+   "size": [
+    0.5,
+    1.8,
+    2.0
+   ],
+   "pos": [
+    5.45,
+    0.9,
+    0
+   ]
+  },
+  {
+   "type": "box",
+   "material": "balsa",
+   "size": [
+    0.5,
+    1.8,
+    2.0
+   ],
+   "pos": [
+    6.95,
+    0.9,
+    0
+   ]
+  },
+  {
+   "type": "box",
+   "material": "glass",
+   "size": [
+    2.1,
+    0.4,
+    2.0
+   ],
+   "pos": [
+    6.2,
+    2.0,
+    0
+   ]
+  },
+  {
+   "type": "box",
+   "material": "pine",
+   "size": [
+    2.1,
+    1.0,
+    2.0
+   ],
+   "pos": [
+    6.2,
+    2.7,
+    0
+   ]
+  },
+  {
+   "type": "box",
+   "material": "glass",
+   "size": [
+    0.6,
+    0.6,
+    0.6
+   ],
+   "pos": [
+    5.6,
+    3.5,
+    0
+   ]
+  },
+  {
+   "type": "box",
+   "material": "glass",
+   "size": [
+    0.6,
+    0.6,
+    0.6
+   ],
+   "pos": [
+    6.8,
+    3.5,
+    0
+   ]
+  },
+  {
+   "type": "box",
+   "material": "balsa",
+   "size": [
+    0.7,
+    1.6,
+    1.0
+   ],
+   "pos": [
+    -6.2,
+    0.8,
+    -1.8
+   ]
+  },
+  {
+   "type": "box",
+   "material": "glass",
+   "size": [
+    0.9,
+    0.4,
+    1.2
+   ],
+   "pos": [
+    -6.2,
+    1.8,
+    -1.8
+   ]
+  },
+  {
+   "type": "box",
+   "material": "pine",
+   "size": [
+    0.8,
+    0.8,
+    1.0
+   ],
+   "pos": [
+    -6.2,
+    2.4,
+    -1.8
+   ]
+  },
+  {
+   "type": "box",
+   "material": "balsa",
+   "size": [
+    0.7,
+    1.6,
+    1.0
+   ],
+   "pos": [
+    -4.0,
+    0.8,
+    -1.8
+   ]
+  },
+  {
+   "type": "box",
+   "material": "glass",
+   "size": [
+    0.9,
+    0.4,
+    1.2
+   ],
+   "pos": [
+    -4.0,
+    1.8,
+    -1.8
+   ]
+  },
+  {
+   "type": "box",
+   "material": "pine",
+   "size": [
+    0.8,
+    0.8,
+    1.0
+   ],
+   "pos": [
+    -4.0,
+    2.4,
+    -1.8
+   ]
+  },
+  {
+   "type": "box",
+   "material": "balsa",
+   "size": [
+    0.7,
+    1.6,
+    1.0
+   ],
+   "pos": [
+    -1.8,
+    0.8,
+    -1.8
+   ]
+  },
+  {
+   "type": "box",
+   "material": "glass",
+   "size": [
+    0.9,
+    0.4,
+    1.2
+   ],
+   "pos": [
+    -1.8,
+    1.8,
+    -1.8
+   ]
+  },
+  {
+   "type": "box",
+   "material": "pine",
+   "size": [
+    0.8,
+    0.8,
+    1.0
+   ],
+   "pos": [
+    -1.8,
+    2.4,
+    -1.8
+   ]
+  },
+  {
+   "type": "box",
+   "material": "balsa",
+   "size": [
+    0.7,
+    1.6,
+    1.0
+   ],
+   "pos": [
+    1.8,
+    0.8,
+    -1.8
+   ]
+  },
+  {
+   "type": "box",
+   "material": "glass",
+   "size": [
+    0.9,
+    0.4,
+    1.2
+   ],
+   "pos": [
+    1.8,
+    1.8,
+    -1.8
+   ]
+  },
+  {
+   "type": "box",
+   "material": "pine",
+   "size": [
+    0.8,
+    0.8,
+    1.0
+   ],
+   "pos": [
+    1.8,
+    2.4,
+    -1.8
+   ]
+  },
+  {
+   "type": "box",
+   "material": "balsa",
+   "size": [
+    0.7,
+    1.6,
+    1.0
+   ],
+   "pos": [
+    4.0,
+    0.8,
+    -1.8
+   ]
+  },
+  {
+   "type": "box",
+   "material": "glass",
+   "size": [
+    0.9,
+    0.4,
+    1.2
+   ],
+   "pos": [
+    4.0,
+    1.8,
+    -1.8
+   ]
+  },
+  {
+   "type": "box",
+   "material": "pine",
+   "size": [
+    0.8,
+    0.8,
+    1.0
+   ],
+   "pos": [
+    4.0,
+    2.4,
+    -1.8
+   ]
+  },
+  {
+   "type": "box",
+   "material": "balsa",
+   "size": [
+    0.7,
+    1.6,
+    1.0
+   ],
+   "pos": [
+    6.2,
+    0.8,
+    -1.8
+   ]
+  },
+  {
+   "type": "box",
+   "material": "glass",
+   "size": [
+    0.9,
+    0.4,
+    1.2
+   ],
+   "pos": [
+    6.2,
+    1.8,
+    -1.8
+   ]
+  },
+  {
+   "type": "box",
+   "material": "pine",
+   "size": [
+    0.8,
+    0.8,
+    1.0
+   ],
+   "pos": [
+    6.2,
+    2.4,
+    -1.8
+   ]
+  }
+ ],
+ "tutorialText": "Drop one pier and the whole colonnade unzips."
+}

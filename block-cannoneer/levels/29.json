@@ -1,0 +1,748 @@
+{
+ "id": 29,
+ "name": "Candy Cascade",
+ "shots": 33,
+ "cameraHint": {
+  "distanceScale": 1.08,
+  "pitchDeg": 13
+ },
+ "platform": {
+  "size": [
+   14,
+   1,
+   5
+  ],
+  "theme": "candy"
+ },
+ "blocks": [
+  {
+   "type": "box",
+   "material": "pine",
+   "size": [
+    2.2,
+    0.5,
+    2.2
+   ],
+   "pos": [
+    0,
+    0.25,
+    0
+   ]
+  },
+  {
+   "type": "box",
+   "material": "pine",
+   "size": [
+    2.0,
+    0.9,
+    2.0
+   ],
+   "pos": [
+    0,
+    0.95,
+    0
+   ]
+  },
+  {
+   "type": "box",
+   "material": "glass",
+   "size": [
+    2.2,
+    0.5,
+    2.2
+   ],
+   "pos": [
+    0,
+    1.65,
+    0
+   ]
+  },
+  {
+   "type": "box",
+   "material": "oak",
+   "size": [
+    2.4,
+    1.6,
+    2.4
+   ],
+   "pos": [
+    0,
+    2.7,
+    0
+   ]
+  },
+  {
+   "type": "box",
+   "material": "glass",
+   "size": [
+    2.2,
+    0.4,
+    2.2
+   ],
+   "pos": [
+    0,
+    3.7,
+    0
+   ]
+  },
+  {
+   "type": "box",
+   "material": "oak",
+   "size": [
+    2.2,
+    1.4,
+    2.2
+   ],
+   "pos": [
+    0,
+    4.6,
+    0
+   ]
+  },
+  {
+   "type": "box",
+   "material": "glass",
+   "size": [
+    2.0,
+    0.4,
+    2.0
+   ],
+   "pos": [
+    0,
+    5.5,
+    0
+   ]
+  },
+  {
+   "type": "box",
+   "material": "pine",
+   "size": [
+    1.8,
+    1.2,
+    1.8
+   ],
+   "pos": [
+    0,
+    6.3,
+    0
+   ]
+  },
+  {
+   "type": "box",
+   "material": "glass",
+   "size": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "pos": [
+    0,
+    7.4,
+    0
+   ]
+  },
+  {
+   "type": "box",
+   "material": "balsa",
+   "size": [
+    0.5,
+    0.5,
+    0.5
+   ],
+   "pos": [
+    0,
+    8.15,
+    0
+   ]
+  },
+  {
+   "type": "box",
+   "material": "glass",
+   "size": [
+    0.4,
+    2.0,
+    0.5
+   ],
+   "pos": [
+    -5.6,
+    1.0,
+    -1.2
+   ]
+  },
+  {
+   "type": "box",
+   "material": "glass",
+   "size": [
+    0.4,
+    2.0,
+    0.5
+   ],
+   "pos": [
+    -5.6,
+    1.0,
+    1.2
+   ]
+  },
+  {
+   "type": "box",
+   "material": "glass",
+   "size": [
+    0.4,
+    2.0,
+    0.5
+   ],
+   "pos": [
+    -4.0,
+    1.0,
+    -1.2
+   ]
+  },
+  {
+   "type": "box",
+   "material": "glass",
+   "size": [
+    0.4,
+    2.0,
+    0.5
+   ],
+   "pos": [
+    -4.0,
+    1.0,
+    1.2
+   ]
+  },
+  {
+   "type": "box",
+   "material": "glass",
+   "size": [
+    0.4,
+    2.0,
+    0.5
+   ],
+   "pos": [
+    -2.4,
+    1.0,
+    -1.2
+   ]
+  },
+  {
+   "type": "box",
+   "material": "glass",
+   "size": [
+    0.4,
+    2.0,
+    0.5
+   ],
+   "pos": [
+    -2.4,
+    1.0,
+    1.2
+   ]
+  },
+  {
+   "type": "box",
+   "material": "pine",
+   "size": [
+    3.8,
+    0.4,
+    3.2
+   ],
+   "pos": [
+    -4.0,
+    2.2,
+    0
+   ]
+  },
+  {
+   "type": "box",
+   "material": "glass",
+   "size": [
+    0.7,
+    0.7,
+    0.7
+   ],
+   "pos": [
+    -5.0,
+    2.75,
+    -0.9
+   ]
+  },
+  {
+   "type": "box",
+   "material": "glass",
+   "size": [
+    0.7,
+    0.7,
+    0.7
+   ],
+   "pos": [
+    -5.0,
+    2.75,
+    0.9
+   ]
+  },
+  {
+   "type": "box",
+   "material": "balsa",
+   "size": [
+    0.6,
+    0.6,
+    0.6
+   ],
+   "pos": [
+    -4.0,
+    2.7,
+    -0.9
+   ]
+  },
+  {
+   "type": "box",
+   "material": "balsa",
+   "size": [
+    0.6,
+    0.6,
+    0.6
+   ],
+   "pos": [
+    -4.0,
+    2.7,
+    0.9
+   ]
+  },
+  {
+   "type": "box",
+   "material": "glass",
+   "size": [
+    0.7,
+    0.7,
+    0.7
+   ],
+   "pos": [
+    -3.0,
+    2.75,
+    -0.9
+   ]
+  },
+  {
+   "type": "box",
+   "material": "glass",
+   "size": [
+    0.7,
+    0.7,
+    0.7
+   ],
+   "pos": [
+    -3.0,
+    2.75,
+    0.9
+   ]
+  },
+  {
+   "type": "box",
+   "material": "glass",
+   "size": [
+    0.4,
+    1.6,
+    0.6
+   ],
+   "pos": [
+    -5.7,
+    3.2,
+    -1.1
+   ]
+  },
+  {
+   "type": "box",
+   "material": "glass",
+   "size": [
+    0.4,
+    1.6,
+    0.6
+   ],
+   "pos": [
+    -5.7,
+    3.2,
+    1.1
+   ]
+  },
+  {
+   "type": "box",
+   "material": "glass",
+   "size": [
+    0.4,
+    1.6,
+    0.6
+   ],
+   "pos": [
+    -2.3,
+    3.2,
+    -1.1
+   ]
+  },
+  {
+   "type": "box",
+   "material": "glass",
+   "size": [
+    0.4,
+    1.6,
+    0.6
+   ],
+   "pos": [
+    -2.3,
+    3.2,
+    1.1
+   ]
+  },
+  {
+   "type": "box",
+   "material": "pine",
+   "size": [
+    3.8,
+    0.4,
+    3.0
+   ],
+   "pos": [
+    -4.0,
+    4.2,
+    0
+   ]
+  },
+  {
+   "type": "box",
+   "material": "stone",
+   "size": [
+    1.6,
+    0.8,
+    2.0
+   ],
+   "pos": [
+    -5.6,
+    4.8,
+    0
+   ]
+  },
+  {
+   "type": "box",
+   "material": "balsa",
+   "size": [
+    0.5,
+    0.5,
+    0.5
+   ],
+   "pos": [
+    -5.6,
+    5.45,
+    -0.6
+   ]
+  },
+  {
+   "type": "box",
+   "material": "balsa",
+   "size": [
+    0.5,
+    0.5,
+    0.5
+   ],
+   "pos": [
+    -5.6,
+    5.45,
+    0.6
+   ]
+  },
+  {
+   "type": "box",
+   "material": "glass",
+   "size": [
+    0.4,
+    2.0,
+    0.5
+   ],
+   "pos": [
+    5.6,
+    1.0,
+    -1.2
+   ]
+  },
+  {
+   "type": "box",
+   "material": "glass",
+   "size": [
+    0.4,
+    2.0,
+    0.5
+   ],
+   "pos": [
+    5.6,
+    1.0,
+    1.2
+   ]
+  },
+  {
+   "type": "box",
+   "material": "glass",
+   "size": [
+    0.4,
+    2.0,
+    0.5
+   ],
+   "pos": [
+    4.0,
+    1.0,
+    -1.2
+   ]
+  },
+  {
+   "type": "box",
+   "material": "glass",
+   "size": [
+    0.4,
+    2.0,
+    0.5
+   ],
+   "pos": [
+    4.0,
+    1.0,
+    1.2
+   ]
+  },
+  {
+   "type": "box",
+   "material": "glass",
+   "size": [
+    0.4,
+    2.0,
+    0.5
+   ],
+   "pos": [
+    2.4,
+    1.0,
+    -1.2
+   ]
+  },
+  {
+   "type": "box",
+   "material": "glass",
+   "size": [
+    0.4,
+    2.0,
+    0.5
+   ],
+   "pos": [
+    2.4,
+    1.0,
+    1.2
+   ]
+  },
+  {
+   "type": "box",
+   "material": "pine",
+   "size": [
+    3.8,
+    0.4,
+    3.2
+   ],
+   "pos": [
+    4.0,
+    2.2,
+    0
+   ]
+  },
+  {
+   "type": "box",
+   "material": "glass",
+   "size": [
+    0.7,
+    0.7,
+    0.7
+   ],
+   "pos": [
+    5.0,
+    2.75,
+    -0.9
+   ]
+  },
+  {
+   "type": "box",
+   "material": "glass",
+   "size": [
+    0.7,
+    0.7,
+    0.7
+   ],
+   "pos": [
+    5.0,
+    2.75,
+    0.9
+   ]
+  },
+  {
+   "type": "box",
+   "material": "balsa",
+   "size": [
+    0.6,
+    0.6,
+    0.6
+   ],
+   "pos": [
+    4.0,
+    2.7,
+    -0.9
+   ]
+  },
+  {
+   "type": "box",
+   "material": "balsa",
+   "size": [
+    0.6,
+    0.6,
+    0.6
+   ],
+   "pos": [
+    4.0,
+    2.7,
+    0.9
+   ]
+  },
+  {
+   "type": "box",
+   "material": "glass",
+   "size": [
+    0.7,
+    0.7,
+    0.7
+   ],
+   "pos": [
+    3.0,
+    2.75,
+    -0.9
+   ]
+  },
+  {
+   "type": "box",
+   "material": "glass",
+   "size": [
+    0.7,
+    0.7,
+    0.7
+   ],
+   "pos": [
+    3.0,
+    2.75,
+    0.9
+   ]
+  },
+  {
+   "type": "box",
+   "material": "glass",
+   "size": [
+    0.4,
+    1.6,
+    0.6
+   ],
+   "pos": [
+    5.7,
+    3.2,
+    -1.1
+   ]
+  },
+  {
+   "type": "box",
+   "material": "glass",
+   "size": [
+    0.4,
+    1.6,
+    0.6
+   ],
+   "pos": [
+    5.7,
+    3.2,
+    1.1
+   ]
+  },
+  {
+   "type": "box",
+   "material": "glass",
+   "size": [
+    0.4,
+    1.6,
+    0.6
+   ],
+   "pos": [
+    2.3,
+    3.2,
+    -1.1
+   ]
+  },
+  {
+   "type": "box",
+   "material": "glass",
+   "size": [
+    0.4,
+    1.6,
+    0.6
+   ],
+   "pos": [
+    2.3,
+    3.2,
+    1.1
+   ]
+  },
+  {
+   "type": "box",
+   "material": "pine",
+   "size": [
+    3.8,
+    0.4,
+    3.0
+   ],
+   "pos": [
+    4.0,
+    4.2,
+    0
+   ]
+  },
+  {
+   "type": "box",
+   "material": "stone",
+   "size": [
+    1.6,
+    0.8,
+    2.0
+   ],
+   "pos": [
+    5.6,
+    4.8,
+    0
+   ]
+  },
+  {
+   "type": "box",
+   "material": "balsa",
+   "size": [
+    0.5,
+    0.5,
+    0.5
+   ],
+   "pos": [
+    5.6,
+    5.45,
+    -0.6
+   ]
+  },
+  {
+   "type": "box",
+   "material": "balsa",
+   "size": [
+    0.5,
+    0.5,
+    0.5
+   ],
+   "pos": [
+    5.6,
+    5.45,
+    0.6
+   ]
+  }
+ ],
+ "tutorialText": "One glass ring is carrying the whole sweet shop."
+}
