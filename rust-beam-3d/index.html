@@ -1,0 +1,2016 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>RUSTBEAM 3D — prototype</title>
+<style>
+  html,body{margin:0;padding:0;height:100%;background:#070a14;overflow:hidden;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+  canvas{display:block;position:fixed;inset:0}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+/*==RB2_CORE_BEGIN==*/
+'use strict';
+// RUSTBEAM 3D core — pure simulation, no DOM. Shared by game shell and dev checker.
+// v2.1: shooters fire from the 5 slots directly (dock layer removed);
+//       objects auto-rotate slowly (manual swipe still possible);
+//       fail = all 5 slots occupied and ALL idle for stallFail seconds ("line stalled").
+const RB2 = (() => {
+  const W = 390, H = 844;
+  const TUN = {
+    burn: 0.07,        // seconds per cell-work (any stage)
+    slots: 5,          // firing bays
+    fly: 0.35,
+    stageT: 0.9,       // stage-transition celebration pause
+    objT: 1.15,        // object swap flight
+    autoSpin: 0.5,     // rad/s idle auto-rotation
+    dragGrace: 0.8,    // seconds after drag release before auto-spin resumes
+    spinDamp: 2.6,     // manual angular velocity damping (1/s)
+    stallFail: 4.0,    // all-slots-idle duration that fails the level
+    stallDebounce: 0.5,// each gun must be idle at least this long to count as stalled
+    capMin: 10, capMax: 60,
+    dt: 1 / 60, tMax: 400
+  };
+  const LAYOUT = {
+    objX: 195, objY: 268, objS: 118,          // current object center + scale (px per unit)
+    queue: [{ x: 292, y: 128, s: 46 }, { x: 340, y: 62, s: 28 }],
+    slotY: 505, slotS: 48, slotGap: 10,       // firing bays
+    laneY: 575
+  };
+  const slotX = i => (W - (TUN.slots * LAYOUT.slotS + (TUN.slots - 1) * LAYOUT.slotGap)) / 2 + i * (LAYOUT.slotS + LAYOUT.slotGap) + LAYOUT.slotS / 2;
+  const STAGES = 3; // 0 rust->worn, 1 worn->painted, 2 painted->polished
+  const STAGE_NAMES = ['CLEAN', 'PAINT', 'POLISH'];
+
+  // ---------- shapes: surfaces of revolution around the X axis ----------
+  // profile(s in 0..1) -> [x, r] in local units (x along axis -1..1, r radius)
+  const clamp01 = v => v < 0 ? 0 : v > 1 ? 1 : v;
+  const SHAPES = {
+    // pill capsule: flat-ish middle, crisp rounded caps
+    capsule: { V: 8, U: 14, len: 1.5, f: s => { const x = s * 2 - 1; const e = Math.min(1, (1 - Math.abs(x)) / 0.30); return [x * 0.92, 0.46 * Math.sin(Math.min(1, e) * Math.PI / 2)]; } },
+    // ribbed barrel: bulged body, band ridges, flat chimes — stands upright
+    barrel: {
+      V: 8, U: 14, len: 1.45, upright: true, f: s => {
+        const x = s * 2 - 1;
+        let r = 0.36 + 0.20 * Math.cos(x * 1.5);
+        r += 0.022 * Math.cos(s * Math.PI * 10);              // hoop ridges
+        if (Math.abs(x) > 0.9) r *= 0.82;                     // chime lip
+        return [x * 0.85, r];
+      }
+    },
+    // amphora (upright, base to lip): foot, waist, fat belly, neck, flared lip
+    vase: {
+      V: 10, U: 14, len: 1.6, upright: true, f: s => {
+        let r;
+        if (s < 0.10) r = 0.26;                               // foot
+        else if (s < 0.16) r = 0.17;                          // waist
+        else if (s < 0.64) r = 0.17 + 0.40 * Math.sin((s - 0.16) / 0.48 * Math.PI * 0.92); // belly
+        else if (s < 0.80) r = 0.30 - (s - 0.64) * 1.05;      // shoulder taper
+        else if (s < 0.92) r = 0.132;                         // neck
+        else r = 0.21;                                        // flared lip
+        return [(s * 2 - 1) * 0.95, Math.max(0.1, r)];
+      }
+    },
+    // dumbbell: two crisp plates + thin grip bar
+    dumbbell: {
+      V: 10, U: 14, len: 1.7, f: s => {
+        const x = s * 2 - 1, ax = Math.abs(x);
+        let r;
+        if (ax > 0.94) r = 0.20;                              // outer cap
+        else if (ax > 0.52) r = 0.46;                         // plate
+        else r = 0.13;                                        // bar
+        return [x * 0.95, r];
+      }
+    },
+    // hex bolt: chunky hex head, collar, threaded shaft with a blunt tip
+    bolt: {
+      V: 9, U: 12, len: 1.6, f: s => {
+        const x = s * 2 - 1;
+        let r;
+        if (s < 0.24) r = 0.46;                               // hex head
+        else if (s < 0.30) r = 0.30;                          // collar
+        else if (s < 0.94) r = 0.22 + 0.022 * Math.cos(s * Math.PI * 34); // threads
+        else r = 0.16;                                        // tip chamfer
+        return [x * 0.9, r];
+      }, hex: 0.3
+    },
+    // bell (upright, lip to knob): flared sound bow, curved skirt, crown, knob
+    bell: {
+      V: 10, U: 14, len: 1.5, upright: true, f: s => {
+        let r;
+        if (s < 0.06) r = 0.60;                               // lip underside
+        else if (s < 0.14) r = 0.66;                          // sound bow flare
+        else if (s < 0.84) r = 0.16 + 0.46 * Math.pow(1 - (s - 0.14) / 0.70, 1.7); // skirt
+        else if (s < 0.92) r = 0.20;                          // crown step
+        else r = 0.12;                                        // knob
+        return [(s * 2 - 1) * 0.9, r];
+      }
+    },
+    // rocket (upright, nozzle to nose): engine skirt, straight fuselage, needle nose
+    rocket: {
+      V: 10, U: 12, len: 1.75, upright: true, f: s => {
+        let r;
+        if (s < 0.10) r = 0.40;                                   // nozzle ring
+        else if (s < 0.22) r = 0.37 + (0.22 - s) * 1.5;           // skirt flare
+        else if (s < 0.70) r = 0.36;                              // fuselage
+        else r = Math.max(0.05, 0.36 * Math.pow(1 - (s - 0.70) / 0.30, 1.4)); // nose cone
+        return [(s * 2 - 1) * 0.98, Math.max(0.05, r)];
+      }
+    },
+    // gear: hub, disc, and real radial teeth (mesh modulation on the wide disc)
+    gear: { V: 7, U: 16, len: 0.9, f: s => { const x = s * 2 - 1; return [x * 0.5, Math.abs(x) > 0.6 ? 0.26 : 0.5]; }, teeth: 10 },
+    // trophy cup (upright): base, stem, bowl, wide mouth lip
+    trophy: {
+      V: 7, U: 16, len: 1.35, upright: true, f: s => {
+        let r;
+        if (s < 0.10) r = 0.34;                               // base plate
+        else if (s < 0.18) r = 0.22;                          // base neck
+        else if (s < 0.34) r = 0.09;                          // stem
+        else if (s < 0.86) r = 0.10 + 0.40 * Math.pow((s - 0.34) / 0.52, 0.72); // bowl
+        else r = 0.52;                                        // lip
+        return [(s * 2 - 1) * 0.9, r];
+      }
+    }
+  };
+
+  // ---------- color patterns over the u,v grid ----------
+  // return slot index 0..n-1 (mapped to palette via object def)
+  const PATTERNS = {
+    bands: (u, v, U, V, n) => Math.min(n - 1, Math.floor(v / V * n)),
+    stripes: (u, v, U, V, n) => Math.floor(u / U * n) % n,
+    caps: (u, v, U, V, n) => (v < Math.ceil(V * 0.22) || v >= V - Math.ceil(V * 0.22)) ? 1 % n : (n > 2 && Math.abs(v - V / 2) < 1 ? 2 : 0),
+    spiral: (u, v, U, V, n) => Math.floor(((u / U + v / V * 1.35) % 1) * n) % n,
+    checker: (u, v, U, V, n) => (Math.floor(u / (U / 4)) + Math.floor(v / (V / 2))) % n,
+    ring: (u, v, U, V, n) => (Math.abs(v - (V - 1) / 2) <= Math.max(0, V * 0.14)) ? 1 % n : 0
+  };
+
+  function buildObject(def, nPal) {
+    const shape = SHAPES[def.shape];
+    if (!shape) throw new Error('unknown shape ' + def.shape);
+    const U = shape.U, V = shape.V, total = U * V;
+    const patFn = PATTERNS[def.pattern];
+    if (!patFn) throw new Error('unknown pattern ' + def.pattern);
+    const map = def.map; // slot -> palette color index
+    const color = new Uint8Array(total);
+    const counts = new Array(nPal).fill(0);
+    for (let v = 0; v < V; v++) for (let u = 0; u < U; u++) {
+      const slot = patFn(u, v, U, V, map.length);
+      const ci = map[slot];
+      color[v * U + u] = ci;
+      counts[ci]++;
+    }
+    // profile samples (v+1 rows) for geometry & targeting
+    const px = [], pr = [];
+    for (let i = 0; i <= V; i++) { const [x, r] = shape.f(i / V); px.push(x * shape.len); pr.push(r); }
+    return { def, shape: def.shape, U, V, total, color, counts, px, pr, len: shape.len };
+  }
+
+  // ---------- level parsing / validation ----------
+  function parseLevel(L) {
+    const nPal = L.pal.length;
+    const objects = L.objects.map(d => buildObject(d, nPal));
+    const work = new Array(nPal).fill(0); // total cell-works per color (all stages, all objects)
+    for (const o of objects) for (let c = 0; c < nPal; c++) work[c] += o.counts[c] * STAGES;
+    return { nPal, objects, work };
+  }
+  function validate(L) {
+    const P = parseLevel(L);
+    const errs = [], warns = [];
+    const capSum = new Array(P.nPal).fill(0), gunCount = new Array(P.nPal).fill(0);
+    let guns = 0;
+    L.lanes.forEach(lane => lane.forEach(g => {
+      capSum[g.c] += g.cap; gunCount[g.c]++; guns++;
+      if (g.cap < TUN.capMin || g.cap > TUN.capMax) warns.push(`cap out of ${TUN.capMin}..${TUN.capMax}: c${g.c} cap ${g.cap}`);
+    }));
+    for (let c = 0; c < P.nPal; c++) {
+      if (P.work[c] === 0) { if (capSum[c] > 0) errs.push('guns for unused color ' + c); continue; }
+      const diff = capSum[c] - P.work[c];
+      if (diff < 0) errs.push(`color ${c}: caps ${capSum[c]} < work ${P.work[c]} (short ${-diff})`);
+      else if (diff > Math.ceil(P.work[c] * 0.1)) errs.push(`color ${c}: surplus ${diff} > 10%`);
+      else if (diff > 0) warns.push(`color ${c}: surplus ${diff}`);
+    }
+    return { P, errs, warns, capSum, gunCount, guns };
+  }
+
+  // ---------- simulation ----------
+  function makeSim(L, opts = {}) {
+    const P = parseLevel(L);
+    const st = {
+      L, P, t: 0, over: false, won: false, failed: false,
+      objIx: 0, obj: P.objects[0],
+      state: null, claim: null,
+      stage: 0,
+      stageRemain: null,      // remaining works in current stage for current object
+      remainByColor: null,    // remaining works per color, GLOBAL (all objects/stages)
+      theta: 0, omega: 0,
+      dragging: false, dragCool: 0,
+      stallT: 0, stalling: false,
+      freezeT: 0, freezeKind: null,  // 'stage' | 'obj'
+      guns: [], lanes: [], slots: new Array(TUN.slots).fill(-1),
+      events: [],
+      idealVis: !!opts.idealVis   // solver mode: every cell counts as visible
+    };
+    st.remainByColor = P.work.slice();
+    L.lanes.forEach((lane, li) => {
+      const ids = [];
+      lane.forEach(spec => {
+        const g = { id: st.guns.length, c: spec.c, cap: spec.cap, cap0: spec.cap, w: spec.w != null ? spec.w : -1, state: 'LANE', slot: -1, tgt: -1, burn: 0, idleT: 0, timer: 0 };
+        st.guns.push(g); ids.push(g.id);
+      });
+      st.lanes.push(ids);
+    });
+    initObject(st);
+    return st;
+  }
+  function initObject(st) {
+    const o = st.obj;
+    st.state = new Uint8Array(o.total);      // 0 rust,1 worn,2 painted,3 polished
+    st.claim = new Int16Array(o.total).fill(-1);
+    st.stage = 0;
+    st.stageRemain = o.total;
+    st.theta = 0; st.omega = 0;
+  }
+
+  const occupiedSlots = st => { let n = 0; for (const s of st.slots) if (s >= 0) n++; return n; };
+  const freeSlot = st => { for (let i = 0; i < st.slots.length; i++) if (st.slots[i] < 0) return i; return -1; };
+
+  // visibility: cell u faces camera if its radial angle is within the front window
+  function cellVisible(st, u) {
+    if (st.idealVis) return true;
+    const U = st.obj.U;
+    let a = (u + 0.5) / U * Math.PI * 2 + st.theta; // radial angle in world
+    const c = Math.cos(a);
+    return c > 0.18;
+  }
+  // screen-x of a cell (object axis lies along screen X) for targeting distance
+  function cellScreenX(st, v) {
+    const o = st.obj;
+    const midX = (o.px[v] + o.px[v + 1]) / 2;
+    return LAYOUT.objX + midX * LAYOUT.objS;
+  }
+
+  function deployLane(st, li) {
+    if (st.over) return false;
+    const lane = st.lanes[li];
+    if (!lane || !lane.length) return false;
+    const g = st.guns[lane[0]];
+    const si = freeSlot(st);
+    if (si < 0) { st.events.push({ k: 'denied', gun: g.id, why: 'slots' }); return false; }
+    lane.shift();
+    st.slots[si] = g.id;
+    g.state = 'FLY_SLOT'; g.slot = si; g.timer = TUN.fly; g.idleT = 0; g.from = 'lane';
+    st.events.push({ k: 'deploy', gun: g.id, from: 'lane', lane: li, slot: si });
+    return true;
+  }
+
+  function releaseClaim(st, g) { if (g.tgt >= 0) { st.claim[g.tgt] = -1; g.tgt = -1; } }
+  function removeEverywhere(st, g) {
+    releaseClaim(st, g);
+    for (const lane of st.lanes) { const k = lane.indexOf(g.id); if (k >= 0) lane.splice(k, 1); }
+    for (let i = 0; i < st.slots.length; i++) if (st.slots[i] === g.id) st.slots[i] = -1;
+  }
+  function despawn(st, g, why) {
+    removeEverywhere(st, g);
+    g.state = 'DEAD';
+    st.events.push({ k: why === 'content' ? 'content' : 'despawn', gun: g.id });
+  }
+
+  function acquire(st, g) {
+    const o = st.obj, U = o.U, V = o.V;
+    const gx = slotX(g.slot >= 0 ? g.slot : 2);
+    let best = -1, bs = Infinity;
+    for (let v = 0; v < V; v++) {
+      const sx = cellScreenX(st, v);
+      const dx = Math.abs(sx - gx);
+      for (let u = 0; u < U; u++) {
+        const i = v * U + u;
+        if (o.color[i] !== g.c) continue;
+        if (st.state[i] !== st.stage) continue;
+        if (st.claim[i] >= 0) continue;
+        if (!cellVisible(st, u)) continue;
+        // prefer nearest column to the bay, most-facing cells first
+        let a = (u + 0.5) / U * Math.PI * 2 + st.theta;
+        const face = Math.cos(a);
+        const s = dx + (1 - face) * 55 + v * 0.01 + u * 0.001;
+        if (s < bs) { bs = s; best = i; }
+      }
+    }
+    if (best >= 0) { g.tgt = best; st.claim[best] = g.id; }
+    return best >= 0;
+  }
+
+  function globalWorkLeft(st, c) { return st.remainByColor[c] > 0; }
+
+  function doWork(st, g) {
+    const i = g.tgt;
+    st.state[i]++;
+    st.claim[i] = -1; g.tgt = -1;
+    st.stageRemain--;
+    const c = st.obj.color[i];
+    st.remainByColor[c]--;
+    st.events.push({ k: 'work', cell: i, c, stage: st.stage, gun: g.id });
+    g.cap--;
+    st.events.push({ k: 'cap', gun: g.id, cap: g.cap });
+    if (g.cap <= 0) despawn(st, g, 'empty');
+    else if (!globalWorkLeft(st, c)) despawn(st, g, 'content');
+    // contented-despawn any other gun of a finished color
+    if (!globalWorkLeft(st, c)) for (const o of st.guns) if (o.c === c && o.state !== 'DEAD') despawn(st, o, 'content');
+    if (st.stageRemain === 0) {
+      if (st.stage < STAGES - 1) {
+        st.stage++;
+        st.stageRemain = st.obj.total;
+        st.freezeT = TUN.stageT; st.freezeKind = 'stage';
+        st.events.push({ k: 'stagedone', stage: st.stage - 1, next: st.stage });
+        for (const o of st.guns) if (o.state === 'SLOT') { releaseClaim(st, o); o.idleT = 0; }
+      } else {
+        st.events.push({ k: 'objdone', ix: st.objIx });
+        if (st.objIx < st.P.objects.length - 1) {
+          st.objIx++;
+          st.obj = st.P.objects[st.objIx];
+          initObject(st);
+          st.freezeT = TUN.objT; st.freezeKind = 'obj';
+          st.events.push({ k: 'objnext', ix: st.objIx });
+          for (const o of st.guns) if (o.state === 'SLOT') { o.tgt = -1; o.idleT = 0; }
+        } else {
+          st.won = true; st.over = true; st.events.push({ k: 'win' });
+        }
+      }
+    }
+  }
+
+  function tick(st, dt) {
+    if (st.over) return;
+    st.t += dt;
+    // rotation: manual flick (damped) + idle auto-spin (ramps back after drag)
+    if (st.dragging) st.dragCool = TUN.dragGrace;
+    else st.dragCool = Math.max(0, st.dragCool - dt);
+    const auto = st.dragging ? 0 : TUN.autoSpin * (1 - st.dragCool / TUN.dragGrace);
+    st.theta += (st.omega + auto) * dt;
+    st.omega *= Math.exp(-TUN.spinDamp * dt);
+    // flights
+    for (const g of st.guns) {
+      if (g.state === 'FLY_SLOT') { g.timer -= dt; if (g.timer <= 0) { g.state = 'SLOT'; st.events.push({ k: 'slotland', gun: g.id, slot: g.slot }); } }
+    }
+    // freeze windows (stage fanfare / object swap): no work, no stall accrual
+    if (st.freezeT > 0) { st.freezeT -= dt; if (st.stalling) { st.stalling = false; st.stallT = 0; st.events.push({ k: 'stallend' }); } return; }
+    // slotted guns: acquire + burn + idle
+    for (const g of st.guns) {
+      if (g.state !== 'SLOT') continue;
+      if (g.tgt >= 0) {
+        const i = g.tgt;
+        if (st.state[i] !== st.stage || !cellVisible(st, (i % st.obj.U))) { releaseClaim(st, g); }
+      }
+      if (g.tgt < 0) acquire(st, g);
+      if (g.tgt < 0) {
+        g.burn = 0;
+        g.idleT += dt;
+        continue;
+      }
+      g.idleT = 0;
+      g.burn += dt;
+      while (g.burn >= TUN.burn && g.tgt >= 0) {
+        g.burn -= TUN.burn;
+        doWork(st, g);
+        if (st.over || st.freezeT > 0) return;
+        if (g.state !== 'SLOT') break;
+        if (!acquire(st, g)) { g.burn = 0; break; }
+      }
+    }
+    // stall check: all 5 bays occupied, none in transit, every gun idle past debounce
+    let stalled = occupiedSlots(st) === TUN.slots;
+    if (stalled) for (const id of st.slots) {
+      const g = st.guns[id];
+      if (!g || g.state !== 'SLOT' || g.idleT < TUN.stallDebounce) { stalled = false; break; }
+    }
+    if (stalled) {
+      if (!st.stalling) { st.stalling = true; st.events.push({ k: 'stall' }); }
+      st.stallT += dt;
+      if (st.stallT >= TUN.stallFail) { st.failed = true; st.over = true; st.events.push({ k: 'fail' }); }
+    } else if (st.stalling) {
+      st.stalling = false; st.stallT = 0; st.events.push({ k: 'stallend' });
+    }
+  }
+
+  // ---------- solver / baselines (ideal rotation) ----------
+  function stageWorkOf(st, c) {
+    // unclaimed current-stage cells of color c on the current object
+    const o = st.obj;
+    let n = 0;
+    for (let i = 0; i < o.total; i++) if (o.color[i] === c && st.state[i] === st.stage && st.claim[i] < 0) n++;
+    return n;
+  }
+  function marginalWork(st, c) {
+    // stage work minus capacity already committed by slotted/incoming guns of the same color
+    let committed = 0;
+    for (const g of st.guns) if ((g.state === 'SLOT' || g.state === 'FLY_SLOT') && g.c === c) committed += g.cap;
+    return stageWorkOf(st, c) - committed;
+  }
+  function runPolicy(L, mode, onEv) {
+    const st = makeSim(L, { idealVis: true });
+    let last = -1, stalls = 0, maxStall = 0;
+    while (!st.over && st.t < TUN.tMax) {
+      if (st.t - last >= 0.25) {
+        last = st.t;
+        if (freeSlot(st) >= 0) {
+          let done = false;
+          if (mode === 'spam') {
+            for (let li = 0; li < st.lanes.length && !done; li++) {
+              const lane = st.lanes[li];
+              if (lane.length && stageWorkOf(st, st.guns[lane[0]].c) > 0) done = deployLane(st, li);
+            }
+            for (let li = 0; li < st.lanes.length && !done; li++) if (st.lanes[li].length) done = deployLane(st, li);
+          } else {
+            // greedy with wave discipline: guns are chunk-aligned to a (object, stage) wave;
+            // deploying only the active wave's guns means every gun dies exactly at its
+            // stage boundary — bays always recycle, deadlock is impossible.
+            const freeSlots = TUN.slots - occupiedSlots(st);
+            let anyActive = false;
+            for (const g of st.guns) if ((g.state === 'SLOT' && g.tgt >= 0) || g.state === 'FLY_SLOT') { anyActive = true; break; }
+            const wave = st.objIx * STAGES + st.stage;
+            const fits = g => (g.w === wave || (g.w < 0 && marginalWork(st, g.c) >= g.cap)) && marginalWork(st, g.c) > 0;
+            let bestLane = -1, bestNeed = 0;
+            for (let li = 0; li < st.lanes.length; li++) {
+              const lane = st.lanes[li];
+              if (!lane.length) continue;
+              const g = st.guns[lane[0]];
+              if (!fits(g)) continue;
+              const m = marginalWork(st, g.c);
+              if (m > bestNeed) { bestNeed = m; bestLane = li; }
+            }
+            if (bestLane >= 0) done = deployLane(st, bestLane);
+            if (!done && !anyActive && freeSlots >= 2) {
+              // dig: a fitting gun is buried — open its lane by deploying the front above it
+              // (the dug-out front squats temporarily; its own wave will consume it in full)
+              let digLane = -1, digDepth = 99;
+              for (let li = 0; li < st.lanes.length; li++) {
+                const lane = st.lanes[li];
+                for (let d = 1; d < lane.length; d++) {
+                  if (fits(st.guns[lane[d]])) { if (d < digDepth) { digDepth = d; digLane = li; } break; }
+                }
+              }
+              if (digLane >= 0) done = deployLane(st, digLane);
+            }
+          }
+        }
+      }
+      tick(st, TUN.dt);
+      if (onEv) for (const e of st.events) onEv(e, st);
+      for (const e of st.events) if (e.k === 'stall') stalls++;
+      st.events.length = 0;
+      if (st.stalling) maxStall = Math.max(maxStall, st.stallT);
+    }
+    return { won: st.won, failed: st.failed, t: st.t, stalls, maxStall };
+  }
+  function solve(L) {
+    return { greedy: runPolicy(L, 'greedy'), spam: runPolicy(L, 'spam') };
+  }
+
+  return { W, H, TUN, LAYOUT, slotX, STAGES, STAGE_NAMES, SHAPES, PATTERNS, buildObject, parseLevel, validate, makeSim, tick, deployLane, occupiedSlots, freeSlot, cellVisible, cellScreenX, stageWorkOf, marginalWork, runPolicy, solve };
+})();
+/*==RB2_CORE_END==*/
+/*==RB2_LEVELS_BEGIN==*/
+'use strict';
+// RUSTBEAM 3D levels.
+// Lanes are generated stage-chunk-aligned: every shooter's capacity fits inside one
+// (object, stage, color) chunk, so no shooter ever outlives its stage with leftover
+// capacity squatting in a firing bay. Guns are dealt round-robin in wave order
+// (obj1-rust, obj1-paint, obj1-polish, obj2-rust, ...) so early waves sit at lane fronts.
+function rb2AutoLanes(objects, nPal, laneCount) {
+  const _RB2 = (typeof RB2 !== 'undefined') ? RB2 : require('./rb2_core.js').RB2;
+  const guns = [];
+  objects.forEach((def, oi) => {
+    const o = _RB2.buildObject(def, nPal);
+    for (let s = 0; s < _RB2.STAGES; s++) {
+      const w = oi * _RB2.STAGES + s; // wave tag: which (object, stage) this gun belongs to
+      for (let c = 0; c < nPal; c++) {
+        let cnt = o.counts[c];
+        if (!cnt) continue;
+        const k = Math.ceil(cnt / _RB2.TUN.capMax);
+        const base = Math.floor(cnt / k);
+        for (let i = 0; i < k; i++) guns.push({ c, cap: base + (i < cnt - base * k ? 1 : 0), w });
+      }
+    }
+  });
+  const lanes = Array.from({ length: laneCount }, () => []);
+  guns.forEach((g, i) => lanes[i % laneCount].push(g));
+  return lanes;
+}
+const RB2_LEVELS = (() => {
+  const defs = [
+    { // 1 — tutorial: one capsule, two colors
+      name: 'Warm-Up Roller', tut: true,
+      pal: ['#FF5A47', '#FFD230'],
+      objects: [{ shape: 'capsule', pattern: 'bands', map: [0, 1] }],
+      laneCount: 2
+    },
+    { // 2 — two objects, two colors
+      name: 'Twin Tanks',
+      pal: ['#29C8FF', '#FF7A2E'],
+      objects: [
+        { shape: 'vase', pattern: 'bands', map: [0, 1] },
+        { shape: 'barrel', pattern: 'stripes', map: [1, 0] }
+      ],
+      laneCount: 3
+    },
+    { // 3 — three colors, order starts to matter across objects
+      name: 'Vase & Rocket',
+      pal: ['#FF4D6D', '#FFD230', '#35D467'],
+      objects: [
+        { shape: 'vase', pattern: 'bands', map: [0, 1, 2] },
+        { shape: 'rocket', pattern: 'caps', map: [0, 1, 2] }
+      ],
+      laneCount: 3
+    },
+    { // 4 — three objects
+      name: 'Workshop Trio',
+      pal: ['#3D7BFF', '#35D467', '#FFC530'],
+      objects: [
+        { shape: 'bolt', pattern: 'stripes', map: [0, 1, 0] },
+        { shape: 'trophy', pattern: 'ring', map: [0, 2] },
+        { shape: 'dumbbell', pattern: 'spiral', map: [1, 0, 2] }
+      ],
+      laneCount: 4
+    },
+    { // 5 — four colors
+      name: 'Foundry Line',
+      pal: ['#FF5A47', '#F6F8FB', '#FF9F2E', '#29C8FF'],
+      objects: [
+        { shape: 'bell', pattern: 'bands', map: [0, 1, 2] },
+        { shape: 'capsule', pattern: 'stripes', map: [3, 0] },
+        { shape: 'vase', pattern: 'caps', map: [1, 2, 3] }
+      ],
+      laneCount: 4
+    },
+    { // 6 — finale: four objects
+      name: 'Full Restoration',
+      pal: ['#9B5BFF', '#FF7A2E', '#FFD230', '#F6F8FB'],
+      objects: [
+        { shape: 'trophy', pattern: 'ring', map: [0, 2] },
+        { shape: 'rocket', pattern: 'caps', map: [3, 1, 2] },
+        { shape: 'dumbbell', pattern: 'bands', map: [1, 3] },
+        { shape: 'bell', pattern: 'spiral', map: [0, 1, 3] }
+      ],
+      laneCount: 5
+    }
+  ];
+  return defs.map(d => ({
+    name: d.name, tut: !!d.tut, pal: d.pal, objects: d.objects,
+    lanes: rb2AutoLanes(d.objects, d.pal.length, d.laneCount)
+  }));
+})();
+/*==RB2_LEVELS_END==*/
+/*==RB2_GAME_BEGIN==*/
+(() => {
+'use strict';
+const { W, H, TUN, LAYOUT, STAGES, STAGE_NAMES } = RB2;
+const DEBUG = /[?&]debug=1/.test(location.search);
+const VIEW = { x: 0, y: 58, w: 390, h: 452 };   // 3D viewport region in design space
+const GLRES = 2;
+
+// ---------- main 2D canvas ----------
+const cv = document.getElementById('c');
+const ctx = cv.getContext('2d');
+let scale = 1, offX = 0, offY = 0;
+function resize() {
+  const dpr = Math.min(devicePixelRatio || 1, 3);
+  const vw = innerWidth, vh = innerHeight;
+  scale = Math.min(vw / W, vh / H);
+  offX = (vw - W * scale) / 2; offY = (vh - H * scale) / 2;
+  cv.width = Math.round(vw * dpr); cv.height = Math.round(vh * dpr);
+  cv.style.width = vw + 'px'; cv.style.height = vh + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+addEventListener('resize', resize); resize();
+
+// ---------- helpers ----------
+const TAU = Math.PI * 2;
+const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+const lerp = (a, b, u) => a + (b - a) * u;
+const easeOut = u => 1 - Math.pow(1 - u, 3);
+const easeInOut = u => u < .5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2;
+let seed = 7;
+const rnd = () => (seed = seed * 16807 % 2147483647) / 2147483647;
+function hex(c) { const n = parseInt(c.slice(1), 16); return { r: n >> 16 & 255, g: n >> 8 & 255, b: n & 255 }; }
+const rgbs = c => `rgb(${c.r | 0},${c.g | 0},${c.b | 0})`;
+const rgba = (c, a) => `rgba(${c.r | 0},${c.g | 0},${c.b | 0},${a})`;
+function mix(a, b, u) { return { r: lerp(a.r, b.r, u), g: lerp(a.g, b.g, u), b: lerp(a.b, b.b, u) }; }
+function lighten(c, u) { return mix(c, { r: 255, g: 255, b: 255 }, u); }
+function darken(c, u) { return mix(c, { r: 0, g: 0, b: 0 }, u); }
+function rustify(c) {
+  let m = mix(c, { r: 96, g: 60, b: 34 }, 0.58);
+  const l = m.r * .3 + m.g * .59 + m.b * .11;
+  m = mix(m, { r: l, g: l, b: l }, 0.32);
+  return { r: m.r * .58, g: m.g * .58, b: m.b * .58 };
+}
+function wornify(c) {
+  const l = c.r * .3 + c.g * .59 + c.b * .11;
+  let m = mix(c, { r: l, g: l, b: l }, 0.34);
+  return mix(m, { r: 232, g: 226, b: 214 }, 0.22);
+}
+function rr(g, x, y, w, h, r) {
+  r = Math.min(r, w / 2, h / 2);
+  g.beginPath();
+  g.moveTo(x + r, y);
+  g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r);
+  g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r);
+  g.closePath();
+}
+function mkCanvas(w, h) { const c = document.createElement('canvas'); c.width = Math.ceil(w); c.height = Math.ceil(h); return c; }
+
+// ---------- static background ----------
+const bgC = mkCanvas(W, H);
+{
+  const g = bgC.getContext('2d');
+  // bright workshop-studio backdrop
+  const gr = g.createLinearGradient(0, 0, 30, H);
+  gr.addColorStop(0, '#f2f7fc'); gr.addColorStop(.42, '#d9e6f2'); gr.addColorStop(1, '#b6c9de');
+  g.fillStyle = gr; g.fillRect(0, 0, W, H);
+  // warm sun sheet from upper-left
+  const ls = g.createLinearGradient(0, 0, W, H * .6);
+  ls.addColorStop(0, 'rgba(255,236,190,0.35)'); ls.addColorStop(.5, 'rgba(255,236,190,0.08)'); ls.addColorStop(1, 'rgba(255,236,190,0)');
+  g.fillStyle = ls; g.fillRect(0, 0, W, H);
+  // gentle edge vignette keeps focus on the object
+  const vg = g.createRadialGradient(W / 2, H * .36, H * .2, W / 2, H * .48, H * .8);
+  vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(96,118,148,0.28)');
+  g.fillStyle = vg; g.fillRect(0, 0, W, H);
+  // bright halo behind the object
+  const fg = g.createRadialGradient(LAYOUT.objX, LAYOUT.objY, 30, LAYOUT.objX, LAYOUT.objY, 230);
+  fg.addColorStop(0, 'rgba(255,255,255,0.5)'); fg.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = fg; g.fillRect(0, 0, W, 540);
+  // (contact shadow is drawn per-frame, sized to the current object)
+}
+const motes = [];
+for (let i = 0; i < 26; i++) motes.push({ x: rnd() * W, y: rnd() * H, r: .8 + rnd() * 2.0, p: rnd() * TAU, s: .12 + rnd() * .3, a: .05 + rnd() * .09, warm: rnd() < .4 });
+
+// ---------- WebGL: object renderer ----------
+const glC = mkCanvas(VIEW.w * GLRES, VIEW.h * GLRES);
+const gl = glC.getContext('webgl', { alpha: true, antialias: true, premultipliedAlpha: true });
+const VSH = `
+attribute vec3 aPos; attribute vec3 aNrm; attribute vec2 aUV;
+uniform mat4 uProj; uniform mat4 uModel;
+varying vec3 vNrm; varying vec2 vUV; varying vec3 vPos;
+void main(){
+  vec4 wp = uModel * vec4(aPos,1.0);
+  vPos = wp.xyz;
+  vNrm = mat3(uModel[0].xyz,uModel[1].xyz,uModel[2].xyz) * aNrm;
+  vUV = aUV;
+  gl_Position = uProj * vec4(wp.x, wp.y, wp.z - 4.2, 1.0);
+}`;
+const FSH = `
+precision mediump float;
+varying vec3 vNrm; varying vec2 vUV; varying vec3 vPos;
+uniform sampler2D uState;
+uniform vec2 uGrid;
+uniform vec3 uPal[6]; uniform vec3 uPalRust[6]; uniform vec3 uPalWorn[6];
+uniform float uTime; uniform float uDim;
+uniform vec4 uImp[3];   // u, v, strength, mode(0 laser 1 paint 2 polish)
+float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7))) * 43758.5453); }
+float vnoise(vec2 p){
+  vec2 i = floor(p), f = fract(p);
+  vec2 u = f*f*(3.0-2.0*f);
+  return mix(mix(hash(i), hash(i+vec2(1,0)), u.x), mix(hash(i+vec2(0,1)), hash(i+vec2(1,1)), u.x), u.y);
+}
+float fbm(vec2 p){ return vnoise(p)*0.6 + vnoise(p*2.7)*0.28 + vnoise(p*6.1)*0.12; }
+void main(){
+  // organic state boundaries: warp the uv before snapping to the cell grid
+  vec2 warp = (vec2(vnoise(vUV*vec2(26.0,18.0)), vnoise(vUV*vec2(19.0,23.0)+7.3)) - 0.5) / uGrid * 1.15;
+  vec2 uvw = vUV + warp;
+  uvw.x = fract(uvw.x);
+  uvw.y = clamp(uvw.y, 0.001, 0.999);
+  vec4 cell = texture2D(uState, uvw);
+  float state = floor(cell.r * 255.0 / 60.0 + 0.5);   // 0..3
+  int ci = int(floor(cell.g * 255.0 / 32.0 + 0.5));
+  vec3 base = vec3(0.5); vec3 rustC = vec3(0.3); vec3 wornC = vec3(0.5);
+  for (int k = 0; k < 6; k++) { if (k == ci) { base = uPal[k]; rustC = uPalRust[k]; wornC = uPalWorn[k]; } }
+  vec3 N = normalize(vNrm);
+  vec3 V = normalize(vec3(0.0,0.0,4.2) - vPos);
+  vec3 Lk = normalize(vec3(-0.5, 0.75, 0.65));
+  float dif = max(dot(N, Lk), 0.0);
+  float rim = pow(1.0 - max(dot(N, V), 0.0), 2.6);
+  vec3 alb; float specK = 0.0; float gloss = 8.0;
+  if (state < 0.5) {           // rust: broken crust — worn paint peeks through the cracks
+    float g1 = fbm(vUV * vec2(22.0, 15.0));
+    float sp = step(0.82, vnoise(vUV*vec2(60.0,42.0)));
+    vec3 crust = rustC * (0.62 + 0.5*g1) * (1.0 - 0.35*sp) + vec3(0.10,0.045,0.02)*sp;
+    float patch = fbm(vUV * vec2(6.5, 4.5) + float(ci) * 3.7);
+    float peek = smoothstep(0.56, 0.68, patch);
+    vec3 under = wornC * (0.72 + 0.18 * vnoise(vUV * vec2(30.0, 20.0)));
+    alb = mix(crust, under, peek * 0.9);
+    specK = 0.03;
+  } else if (state < 1.5) {    // worn paint
+    float sc = 0.5 + 0.5*vnoise(vec2(vUV.x*90.0, vUV.y*8.0));
+    float bl = fbm(vUV*vec2(9.0,7.0));
+    alb = wornC * (0.78 + 0.2*bl) * (0.86 + 0.14*sc);
+    specK = 0.08; gloss = 10.0;
+  } else if (state < 2.5) {    // fresh paint (matte)
+    float bl = 0.95 + 0.05*vnoise(vUV*vec2(14.0,10.0));
+    alb = base * bl;
+    specK = 0.22; gloss = 16.0;
+  } else {                     // polished
+    alb = base * 1.06;
+    specK = 1.0; gloss = 60.0;
+  }
+  vec3 col = alb * (0.52 + 0.58 * dif);
+  // specular
+  vec3 Hh = normalize(Lk + V);
+  col += vec3(1.0, 0.98, 0.92) * specK * pow(max(dot(N, Hh), 0.0), gloss);
+  if (state > 2.5) {
+    // moving showroom gleam + fresnel for polished cells
+    float band = pow(max(dot(N, normalize(vec3(cos(uTime*0.7), 0.35, sin(uTime*0.7)))), 0.0), 24.0);
+    col += vec3(0.9,0.95,1.0) * band * 0.55;
+    col += vec3(0.55,0.62,0.75) * rim * 0.4;
+  } else {
+    col *= (1.0 - rim * 0.22);  // dark edge falloff separates the shape from the bright backdrop
+  }
+  // impact glows
+  for (int k = 0; k < 3; k++) {
+    float s = uImp[k].z;
+    if (s > 0.001) {
+      float du = abs(vUV.x - uImp[k].x); du = min(du, 1.0 - du);
+      float dv = abs(vUV.y - uImp[k].y);
+      float d = length(vec2(du * 2.2, dv));
+      float glow = s * smoothstep(0.16, 0.0, d);
+      float m = uImp[k].w;
+      vec3 gc = m < 0.5 ? vec3(1.0,0.85,0.55) : (m < 1.5 ? base * 1.35 + 0.2 : vec3(0.95,1.0,1.0));
+      col += gc * glow * (m < 0.5 ? 1.4 : 0.8);
+    }
+  }
+  col = mix(col, col * 0.55 + vec3(0.18,0.22,0.29), uDim);
+  gl_FragColor = vec4(col, 1.0);
+}`;
+let prog = null, glok = false;
+const U = {};
+function initGL() {
+  if (!gl) return;
+  function sh(type, src) {
+    const s = gl.createShader(type);
+    gl.shaderSource(s, src); gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) { console.error('[RB2] shader:', gl.getShaderInfoLog(s)); return null; }
+    return s;
+  }
+  const v = sh(gl.VERTEX_SHADER, VSH), f = sh(gl.FRAGMENT_SHADER, FSH);
+  if (!v || !f) return;
+  prog = gl.createProgram();
+  gl.attachShader(prog, v); gl.attachShader(prog, f); gl.linkProgram(prog);
+  if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) { console.error('[RB2] link:', gl.getProgramInfoLog(prog)); return; }
+  gl.useProgram(prog);
+  for (const n of ['uProj', 'uModel', 'uState', 'uGrid', 'uTime', 'uDim']) U[n] = gl.getUniformLocation(prog, n);
+  U.uPal = gl.getUniformLocation(prog, 'uPal');
+  U.uPalRust = gl.getUniformLocation(prog, 'uPalRust');
+  U.uPalWorn = gl.getUniformLocation(prog, 'uPalWorn');
+  U.uImp = gl.getUniformLocation(prog, 'uImp');
+  U.aPos = gl.getAttribLocation(prog, 'aPos');
+  U.aNrm = gl.getAttribLocation(prog, 'aNrm');
+  U.aUV = gl.getAttribLocation(prog, 'aUV');
+  gl.enable(gl.DEPTH_TEST);
+  gl.viewport(0, 0, glC.width, glC.height);
+  glok = true;
+}
+initGL();
+
+// perspective projection (column major)
+function perspMat(fovy, aspect, near, far) {
+  const t = 1 / Math.tan(fovy / 2);
+  return new Float32Array([t / aspect, 0, 0, 0, 0, t, 0, 0, 0, 0, (far + near) / (near - far), -1, 0, 0, 2 * far * near / (near - far), 0]);
+}
+// model = translate * tilt(Z) * spin(theta about local X) * scale
+// upright shapes get tiltZ ≈ +90°: they stand vertical and spin like a potter's wheel
+// (Rz preserves the z axis, so the core visibility window is unchanged)
+const objUpright = o => !!RB2.SHAPES[o.shape].upright;
+const tiltOf = up => up ? Math.PI / 2 - 0.10 : -0.13;
+function modelMat(tx, ty, tz, theta, s, up) {
+  const c = Math.cos(theta), si = Math.sin(theta);
+  // spin: y' = y c + z si ; z' = -y si + z c  (radial angle a0 + theta)
+  const tiltZ = tiltOf(up);
+  const cz = Math.cos(tiltZ), sz = Math.sin(tiltZ);
+  // column-major mat4 = T * Rz(tiltZ) * Rx(spin) * S
+  // Rx columns:
+  const rx = [1, 0, 0, 0, c, -si, 0, si, c]; // col0,col1,col2 (3x3, column major)
+  // Rz * Rx:
+  const rz = [cz, sz, 0, -sz, cz, 0, 0, 0, 1];
+  const m3 = [];
+  for (let col = 0; col < 3; col++) for (let row = 0; row < 3; row++) {
+    let acc = 0;
+    for (let k = 0; k < 3; k++) acc += rz[k * 3 + row] * rx[col * 3 + k];
+    m3[col * 3 + row] = acc * s;
+  }
+  return new Float32Array([m3[0], m3[1], m3[2], 0, m3[3], m3[4], m3[5], 0, m3[6], m3[7], m3[8], 0, tx, ty, tz, 1]);
+}
+const PROJ = perspMat(0.62, VIEW.w / VIEW.h, 0.5, 20);
+const CAMZ = 4.2;
+const objFit = o => Math.min(1, 1.42 / o.len); // long shapes shrink to fit the viewport
+// world position of a surface point (JS mirror of the shader transform)
+function surfPoint(o, u, v, theta, tx, ty, tz, s) {
+  const a0 = (u + 0.5) / o.U * TAU;
+  const vr = (o.pr[v] + o.pr[v + 1]) / 2, vx = (o.px[v] + o.px[v + 1]) / 2;
+  let x = vx, y = vr * Math.sin(a0), z = vr * Math.cos(a0);
+  const c = Math.cos(theta), si = Math.sin(theta);
+  let y2 = y * c + z * si, z2 = -y * si + z * c;
+  const tilt = tiltOf(objUpright(o));
+  const cz = Math.cos(tilt), sz = Math.sin(tilt);
+  let x3 = x * cz - y2 * sz, y3 = x * sz + y2 * cz;
+  return { x: x3 * s + tx, y: y3 * s + ty, z: z2 * s + tz };
+}
+// project world point -> design-space 2D coords
+function projPt(p) {
+  const t = 1 / Math.tan(0.62 / 2), aspect = VIEW.w / VIEW.h;
+  const zc = p.z - CAMZ;
+  const ndcX = (t / aspect) * p.x / -zc;
+  const ndcY = t * p.y / -zc;
+  return { x: VIEW.x + (ndcX * 0.5 + 0.5) * VIEW.w, y: VIEW.y + (0.5 - ndcY * 0.5) * VIEW.h };
+}
+
+// mesh + state texture per object
+function buildMeshGL(o) {
+  const shape = RB2.SHAPES[o.shape];
+  // geometry is sampled finer than the logical cell grid: smooth silhouettes,
+  // crisp profile features, real gear teeth / hex heads — uv still maps to cells
+  const SUB = 3;
+  const Useg = o.U * SUB, Vseg = o.V * SUB;
+  const prof = [];
+  for (let v = 0; v <= Vseg; v++) {
+    const s = v / Vseg;
+    const [px, pr] = shape.f(s);
+    prof.push([px * shape.len, pr, s]);
+  }
+  const verts = [], idx = [];
+  const hexK = a => { const m = ((a % (Math.PI / 3)) + Math.PI / 3) % (Math.PI / 3); return Math.cos(Math.PI / 6) / Math.cos(m - Math.PI / 6); };
+  for (let v = 0; v <= Vseg; v++) {
+    const [x, r0, s] = prof[v];
+    const vp = Math.max(0, v - 1), vn = Math.min(Vseg, v + 1);
+    const drdx = (prof[vn][1] - prof[vp][1]) / Math.max(1e-4, Math.abs(prof[vn][0] - prof[vp][0]));
+    for (let u = 0; u <= Useg; u++) {
+      const a = u / Useg * TAU;
+      let r = r0;
+      if (shape.teeth && r0 > 0.4) r *= 1 + (Math.cos(a * shape.teeth) > 0.3 ? 0.17 : -0.05);
+      if (shape.hex && s < 0.24) r *= hexK(a) * 0.96;
+      const sy = Math.sin(a), cz = Math.cos(a);
+      const nx = -Math.sign(prof[vn][0] - prof[vp][0]) * drdx, len = Math.hypot(nx, 1);
+      verts.push(x, r * sy, r * cz, nx / len, sy / len, cz / len, u / Useg, v / Vseg);
+    }
+  }
+  for (let v = 0; v < Vseg; v++) for (let u = 0; u < Useg; u++) {
+    const a = v * (Useg + 1) + u, b = a + Useg + 1;
+    idx.push(a, b, a + 1, a + 1, b, b + 1);
+  }
+  const vb = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, vb);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(verts), gl.STATIC_DRAW);
+  const ib = gl.createBuffer();
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib);
+  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(idx), gl.STATIC_DRAW);
+  // state texture
+  const tex = gl.createTexture();
+  const px = new Uint8Array(o.U * o.V * 4);
+  for (let i = 0; i < o.total; i++) {
+    px[i * 4] = 0;
+    px[i * 4 + 1] = o.color[i] * 32;
+    px[i * 4 + 2] = (Math.random() * 255) | 0;
+    px[i * 4 + 3] = 255;
+  }
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, o.U, o.V, 0, gl.RGBA, gl.UNSIGNED_BYTE, px);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); // NPOT: REPEAT would leave the texture incomplete
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  return { vb, ib, tex, n: idx.length, px };
+}
+function setCellState(mesh, o, cell, state) {
+  mesh.px[cell * 4] = state * 60;
+  const u = cell % o.U, v = (cell / o.U) | 0;
+  gl.bindTexture(gl.TEXTURE_2D, mesh.tex);
+  gl.texSubImage2D(gl.TEXTURE_2D, 0, u, v, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, mesh.px.subarray(cell * 4, cell * 4 + 4));
+}
+// object placement in GL world units
+function objPlace(slotIx, swapU) {
+  // slotIx: 0 current, 1 next, 2 next-next; swapU animates promotion
+  const spots = [
+    { x: 0, y: -0.05, z: 0, s: 0.76, dim: 0 },
+    { x: 0.84, y: 0.68, z: -0.9, s: 0.30, dim: 0.42 },
+    { x: 1.34, y: 1.22, z: -1.7, s: 0.16, dim: 0.58 }
+  ];
+  const a = spots[Math.min(slotIx, 2)];
+  if (swapU <= 0 || slotIx >= 3) return a;
+  const b = spots[Math.min(slotIx + 1, 2)]; // animating from one slot deeper
+  const u = easeInOut(swapU);
+  return { x: lerp(b.x, a.x, u), y: lerp(b.y, a.y, u), z: lerp(b.z, a.z, u), s: lerp(b.s, a.s, u), dim: lerp(b.dim, a.dim, u) };
+}
+// ---------- audio ----------
+const AU = (() => {
+  let ac = null, master = null, muted = false, noiseBuf = null;
+  let lastFx = 0;
+  function ensure() {
+    if (ac) return true;
+    try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return false; }
+    master = ac.createGain(); master.gain.value = .9; master.connect(ac.destination);
+    const len = ac.sampleRate;
+    noiseBuf = ac.createBuffer(1, len, ac.sampleRate);
+    const d = noiseBuf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    return true;
+  }
+  function unlock() { if (ensure() && ac.state === 'suspended') ac.resume(); }
+  function env(g, t0, a, peak, dur) {
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.linearRampToValueAtTime(peak, t0 + a);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  }
+  function osc(type, f0, f1, dur, peak, a = .01) {
+    if (!ac || muted) return;
+    const o = ac.createOscillator(), g = ac.createGain();
+    o.type = type; const t = ac.currentTime;
+    o.frequency.setValueAtTime(f0, t);
+    if (f1) o.frequency.exponentialRampToValueAtTime(Math.max(f1, 1), t + dur);
+    env(g, t, a, peak, dur);
+    o.connect(g); g.connect(master);
+    o.start(t); o.stop(t + dur + .05);
+  }
+  function noise(fType, f0, f1, q, dur, peak) {
+    if (!ac || muted) return;
+    const s = ac.createBufferSource(); s.buffer = noiseBuf; s.loop = true;
+    const f = ac.createBiquadFilter(); f.type = fType; f.Q.value = q || 1;
+    const t = ac.currentTime;
+    f.frequency.setValueAtTime(f0, t);
+    if (f1) f.frequency.exponentialRampToValueAtTime(f1, t + dur);
+    const g = ac.createGain(); env(g, t, .008, peak, dur);
+    s.connect(f); f.connect(g); g.connect(master);
+    s.start(t); s.stop(t + dur + .05);
+  }
+  const hums = new Map();
+  function humOn(id, colIdx, modeIx) {
+    if (!ac || muted) return;
+    const h = hums.get(id);
+    if (h && h.mode === modeIx) return;
+    if (h) humOff(id);
+    const t = ac.currentTime;
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(modeIx === 1 ? .05 : modeIx === 2 ? .04 : .055, t + .08);
+    g.connect(master);
+    const nodes = [g];
+    if (modeIx === 0) {
+      const o = ac.createOscillator(); o.type = 'sawtooth';
+      o.frequency.value = 72 + colIdx * 19;
+      const lfo = ac.createOscillator(); lfo.frequency.value = 4.6 + colIdx * .7;
+      const lg = ac.createGain(); lg.gain.value = 1.1;
+      lfo.connect(lg); lg.connect(o.frequency);
+      const f = ac.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 720; f.Q.value = 2.2;
+      o.connect(f); f.connect(g);
+      o.start(); lfo.start(); nodes.push(o, lfo);
+    } else if (modeIx === 1) {
+      const s = ac.createBufferSource(); s.buffer = noiseBuf; s.loop = true;
+      const f = ac.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 640 + colIdx * 60; f.Q.value = 1.1;
+      const lfo = ac.createOscillator(); lfo.frequency.value = 6;
+      const lg = ac.createGain(); lg.gain.value = 160;
+      lfo.connect(lg); lg.connect(f.frequency);
+      s.connect(f); f.connect(g);
+      s.start(); lfo.start(); nodes.push(s, lfo);
+    } else {
+      const o1 = ac.createOscillator(); o1.type = 'sine'; o1.frequency.value = 520 + colIdx * 30;
+      const o2 = ac.createOscillator(); o2.type = 'sine'; o2.frequency.value = 526 + colIdx * 30;
+      const f = ac.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 1600;
+      o1.connect(f); o2.connect(f); f.connect(g);
+      o1.start(); o2.start(); nodes.push(o1, o2);
+    }
+    hums.set(id, { nodes, g, mode: modeIx });
+  }
+  function humOff(id) {
+    const h = hums.get(id);
+    if (!h) return;
+    hums.delete(id);
+    const t = ac.currentTime;
+    h.g.gain.cancelScheduledValues(t); h.g.gain.setValueAtTime(h.g.gain.value, t);
+    h.g.gain.exponentialRampToValueAtTime(.0001, t + .12);
+    for (const n of h.nodes) if (n.stop) try { n.stop(t + .2); } catch (e) {}
+  }
+  function humOffAll() { for (const id of [...hums.keys()]) humOff(id); }
+  return {
+    unlock,
+    get muted() { return muted; },
+    toggleMute() { muted = !muted; if (master) master.gain.value = muted ? 0 : .9; if (muted) humOffAll(); return muted; },
+    work(stage, now) {
+      if (!ac || muted) return;
+      if (now - lastFx < .05) return;
+      lastFx = now;
+      if (stage === 0) { noise('bandpass', 2100 + Math.random() * 900, 900, 3, .09, .10); osc('square', 640, 300, .05, .02); }
+      else if (stage === 1) { noise('lowpass', 900, 260, 1, .1, .09); osc('sine', 340 + Math.random() * 60, 220, .07, .04); }
+      else { osc('sine', 1250 + Math.random() * 250, 2100, .09, .045, .004); }
+    },
+    pop() { osc('sine', 290, 520, .1, .12, .005); noise('bandpass', 800, 1600, 1.4, .16, .05); },
+    poof() { noise('lowpass', 900, 240, 1, .22, .14); osc('sine', 520, 1250, .17, .07); },
+    thunk() { osc('sine', 150, 74, .13, .18, .004); noise('lowpass', 500, 200, 1, .07, .06); },
+    buzz() { osc('square', 108, 96, .13, .085); },
+    tick() { osc('sine', 840, 660, .06, .05); },
+    fanfare(stage) {
+      if (!ac || muted) return;
+      const base = stage === 1 ? [392, 523, 659] : [440, 587, 740];
+      base.forEach((f, i) => setTimeout(() => osc('triangle', f, null, .3, .1, .01), i * 80));
+    },
+    chime() { [660, 880, 1108].forEach((f, i) => setTimeout(() => osc('sine', f, null, .4, .09, .008), i * 70)); noise('highpass', 3200, 6000, 1, .6, .03); },
+    win() {
+      if (!ac || muted) return;
+      [523, 659, 784, 880, 1046].forEach((f, i) => setTimeout(() => { osc('sine', f, null, .5, .12, .01); osc('triangle', f * 2, null, .3, .04); }, i * 95));
+      noise('highpass', 3000, 6000, 1, 1.1, .04);
+    },
+    fail() { osc('sine', 60, 42, .5, .22, .01); osc('sawtooth', 380, 55, .55, .07); },
+    humOn, humOff, humOffAll
+  };
+})();
+
+// ---------- particles ----------
+function pool(n, mk) { const arr = []; for (let i = 0; i < n; i++) arr.push(Object.assign({ on: false }, mk())); return arr; }
+const sparks = pool(260, () => ({ x: 0, y: 0, vx: 0, vy: 0, life: 0, t: 0, col: null, sz: 1, grav: 420 }));
+const drops = pool(160, () => ({ x: 0, y: 0, vx: 0, vy: 0, life: 0, t: 0, col: null, sz: 2 }));
+const stars = pool(80, () => ({ x: 0, y: 0, life: 0, t: 0, sz: 3 }));
+function emit(arr, init) { for (const p of arr) if (!p.on) { p.on = true; p.t = 0; init(p); return p; } return null; }
+function spawnSparks(x, y, col, n, boost) {
+  for (let i = 0; i < n; i++) emit(sparks, p => {
+    const a = -Math.PI / 2 + (rnd() - .5) * 2.6;
+    const v = (60 + rnd() * 160) * (boost || 1);
+    p.x = x + (rnd() - .5) * 4; p.y = y + (rnd() - .5) * 4;
+    p.vx = Math.cos(a) * v; p.vy = Math.sin(a) * v;
+    p.life = .3 + rnd() * .4; p.col = col; p.sz = .8 + rnd() * 1.8; p.grav = 420;
+  });
+}
+function spawnDrops(x, y, col, n) {
+  for (let i = 0; i < n; i++) emit(drops, p => {
+    const a = -Math.PI / 2 + (rnd() - .5) * 1.6;
+    const v = 40 + rnd() * 110;
+    p.x = x + (rnd() - .5) * 8; p.y = y + (rnd() - .5) * 8;
+    p.vx = Math.cos(a) * v; p.vy = Math.sin(a) * v;
+    p.life = .35 + rnd() * .4; p.col = col; p.sz = 1.6 + rnd() * 2.6;
+  });
+}
+function spawnStars(x, y, n) {
+  for (let i = 0; i < n; i++) emit(stars, p => {
+    p.x = x + (rnd() - .5) * 26; p.y = y + (rnd() - .5) * 22;
+    p.life = .4 + rnd() * .45; p.sz = 2 + rnd() * 3.4;
+  });
+}
+function updateParticles(dt) {
+  for (const p of sparks) if (p.on) { p.t += dt; if (p.t >= p.life) { p.on = false; continue; } p.vy += p.grav * dt; p.x += p.vx * dt; p.y += p.vy * dt; }
+  for (const p of drops) if (p.on) { p.t += dt; if (p.t >= p.life) { p.on = false; continue; } p.vy += 300 * dt; p.x += p.vx * dt; p.y += p.vy * dt; }
+  for (const p of stars) if (p.on) { p.t += dt; if (p.t >= p.life) p.on = false; }
+}
+function drawParticles(g) {
+  g.save();
+  for (const p of sparks) if (p.on) {
+    const u = 1 - p.t / p.life;
+    g.globalAlpha = u;
+    g.fillStyle = p.t < p.life * .3 ? '#ff9d3a' : rgbs(darken(p.col, .08));
+    g.fillRect(p.x - p.sz / 2, p.y - p.sz / 2, p.sz, p.sz * (1 + Math.abs(p.vy) * .004));
+  }
+  for (const p of stars) if (p.on) {
+    const u = p.t / p.life, a = Math.sin(u * Math.PI);
+    const s = p.sz * (0.5 + u);
+    g.globalAlpha = a * .85;
+    g.lineCap = 'round';
+    for (const [wd, col] of [[3.0, 'rgba(48,64,92,0.8)'], [1.3, '#ffffff']]) {
+      g.strokeStyle = col; g.lineWidth = wd;
+      g.beginPath();
+      g.moveTo(p.x - s, p.y); g.lineTo(p.x + s, p.y);
+      g.moveTo(p.x, p.y - s); g.lineTo(p.x, p.y + s);
+      g.stroke();
+    }
+  }
+  g.restore();
+  for (const p of drops) if (p.on) {
+    const u = p.t / p.life;
+    g.globalAlpha = (1 - u) * .85;
+    g.fillStyle = rgbs(p.col);
+    g.beginPath(); g.arc(p.x, p.y, p.sz * (1 - u * .4), 0, TAU); g.fill();
+  }
+  g.globalAlpha = 1;
+}
+
+// ---------- game state ----------
+const game = {
+  levelIx: 0, st: null, meshes: [],
+  mode: 'intro', modeT: 0, t: 0, speed: 1,
+  gunFx: new Map(), ghosts: [], beams: [],
+  swapT: 0, banner: null, stallTickT: 0,
+  drag: null, rotHintT: 0, everRotated: false,
+  tut: { step: 0, stallSeen: false, rotShown: false },
+  plan: null, auto: false
+};
+function gfx(id) {
+  let f = game.gunFx.get(id);
+  if (!f) { f = { popT: 9, shakeT: 9, from: null, badgePop: 1, capSeen: null }; game.gunFx.set(id, f); }
+  return f;
+}
+function loadLevel(ix, mode) {
+  game.levelIx = ix;
+  const L = RB2_LEVELS[ix];
+  game.st = RB2.makeSim(L);
+  seed = 1234 + ix * 999;
+  if (glok) game.meshes = game.st.P.objects.map(o => buildMeshGL(o));
+  // palettes
+  if (glok) {
+    const pal = [], rust = [], worn = [];
+    for (let i = 0; i < 6; i++) {
+      const c = hex(L.pal[Math.min(i, L.pal.length - 1)]);
+      const r = rustify(c), w = wornify(c);
+      pal.push(c.r / 255, c.g / 255, c.b / 255);
+      rust.push(r.r / 255, r.g / 255, r.b / 255);
+      worn.push(w.r / 255, w.g / 255, w.b / 255);
+    }
+    gl.useProgram(prog);
+    gl.uniform3fv(U.uPal, pal);
+    gl.uniform3fv(U.uPalRust, rust);
+    gl.uniform3fv(U.uPalWorn, worn);
+  }
+  game.gunFx.clear(); game.ghosts.length = 0; game.beams.length = 0;
+  for (const p of [...sparks, ...drops, ...stars]) p.on = false;
+  game.swapT = 0; game.banner = null; game.stallTickT = 0;
+  game.mode = mode || 'intro'; game.modeT = 0;
+  game.drag = null; game.rotHintT = 0; game.everRotated = false;
+  game.tut = { step: L.tut ? 1 : 0, stallSeen: false, rotShown: false };
+  AU.humOffAll();
+}
+
+// layout helpers (firing bays / lanes)
+const SLOT_X0 = (W - (TUN.slots * LAYOUT.slotS + (TUN.slots - 1) * LAYOUT.slotGap)) / 2;
+const slotXY = i => ({ x: SLOT_X0 + i * (LAYOUT.slotS + LAYOUT.slotGap) + LAYOUT.slotS / 2, y: LAYOUT.slotY + LAYOUT.slotS / 2 });
+function laneGeom(n) {
+  const gap = 10, cw = Math.min(84, (W - 24 - (n - 1) * gap) / n);
+  const x0 = (W - (n * cw + (n - 1) * gap)) / 2;
+  return { cw, gap, x0 };
+}
+function laneXY(st, li, depth) {
+  const g = laneGeom(st.lanes.length);
+  return { x: g.x0 + li * (g.cw + g.gap) + g.cw / 2, y: LAYOUT.laneY + 38 + depth * 46 };
+}
+function gunPose(g) {
+  const st = game.st, f = gfx(g.id);
+  if (g.state === 'LANE') {
+    for (let li = 0; li < st.lanes.length; li++) {
+      const d = st.lanes[li].indexOf(g.id);
+      if (d >= 0) { const p = laneXY(st, li, Math.min(d, 3.4)); return { x: p.x, y: p.y, s: d === 0 ? 1 : Math.max(.6, .84 - d * .09), depth: d }; }
+    }
+    return null;
+  }
+  if (g.state === 'FLY_SLOT') {
+    const u = easeInOut(clamp(1 - g.timer / TUN.fly, 0, 1));
+    const to = slotXY(g.slot);
+    const from = f.from || to;
+    const mx = (from.x + to.x) / 2, my = Math.min(from.y, to.y) - 42;
+    const x = lerp(lerp(from.x, mx, u), lerp(mx, to.x, u), u);
+    const y = lerp(lerp(from.y, my, u), lerp(my, to.y, u), u);
+    return { x, y, s: .96 + .14 * Math.sin(u * Math.PI) };
+  }
+  if (g.state === 'SLOT') { const p = slotXY(g.slot); return { x: p.x, y: p.y + Math.sin(game.t * 2.2 + g.slot) * 1.0, s: .92 }; }
+  return null;
+}
+
+// ---------- event consumption ----------
+function consume(st) {
+  for (const e of st.events) {
+    if (e.k === 'work') {
+      const mesh = game.meshes[st.objIx];
+      if (mesh) setCellState(mesh, st.obj, e.cell, e.stage + 1);
+      const u = e.cell % st.obj.U, v = (e.cell / st.obj.U) | 0;
+      const pl0 = objPlace(0, 0);
+      const wp = surfPoint(st.obj, u, v, st.theta, pl0.x, pl0.y, pl0.z, pl0.s * objFit(st.obj));
+      const pt = projPt(wp);
+      const col = hex(st.L.pal[e.c]);
+      if (e.stage === 0) { spawnSparks(pt.x, pt.y, col, 3); }
+      else if (e.stage === 1) { spawnDrops(pt.x, pt.y, col, 2); }
+      else { if (Math.random() < .5) spawnStars(pt.x, pt.y, 1); }
+      AU.work(e.stage, game.t);
+    } else if (e.k === 'deploy') {
+      const f = gfx(e.gun);
+      f.popT = 0;
+      f.from = laneXY(st, e.lane != null ? e.lane : 0, 0);
+      AU.pop();
+      if (st.L.tut && game.tut.step === 1 && st.guns[e.gun].c === 0) { game.tut.step = 0; }
+    } else if (e.k === 'slotland') {
+      gfx(e.gun).popT = 0;
+      AU.thunk();
+    } else if (e.k === 'stall') {
+      game.stallTickT = 0;
+      if (st.L.tut && !game.tut.stallSeen) { game.tut.stallSeen = true; game.tut.step = 3; }
+    } else if (e.k === 'despawn' || e.k === 'content') {
+      const pose = game.lastPoses.get(e.gun) || slotXY(0);
+      const g = st.guns[e.gun];
+      game.ghosts.push({ x: pose.x, y: pose.y, col: hex(st.L.pal[g.c]), t: 0 });
+      spawnSparks(pose.x, pose.y, hex(st.L.pal[g.c]), 10, 1.1);
+      AU.poof(); AU.humOff(e.gun);
+    } else if (e.k === 'denied') {
+      gfx(e.gun).shakeT = 0; AU.buzz();
+    } else if (e.k === 'stagedone') {
+      game.banner = { text: e.next === 1 ? 'PAINT!' : 'POLISH!', sub: e.next === 1 ? 'Spray the faded coat back to life' : 'Buff it to a mirror shine', t: 0 };
+      AU.fanfare(e.next);
+      AU.humOffAll();
+    } else if (e.k === 'objdone') {
+      AU.chime();
+      AU.humOffAll();
+    } else if (e.k === 'objnext') {
+      game.swapT = TUN.objT;
+    } else if (e.k === 'win') {
+      game.mode = 'winseq'; game.modeT = 0;
+      AU.humOffAll(); AU.win();
+      for (let i = 0; i < 50; i++) spawnStars(LAYOUT.objX + (rnd() - .5) * 220, LAYOUT.objY + (rnd() - .5) * 180, 1);
+    } else if (e.k === 'fail') {
+      game.mode = 'fail'; game.modeT = 0;
+      AU.humOffAll(); AU.fail();
+    }
+  }
+  st.events.length = 0;
+}
+
+// ---------- update ----------
+let last = performance.now();
+game.lastPoses = new Map();
+let acc = 0;
+function update(now) {
+  let dt = Math.min((now - last) / 1000, .1);
+  last = now;
+  game.t += dt;
+  const st = game.st;
+  if (game.mode === 'play') {
+    acc += dt * game.speed;
+    const step = TUN.dt;
+    let n = 0;
+    while (acc >= step && n < 8) {
+      acc -= step; n++;
+      RB2.tick(st, step);
+      consume(st);
+      if (game.mode !== 'play') break;
+    }
+  } else {
+    game.modeT += dt;
+    if (game.mode === 'winseq' && game.modeT > 1.6) { game.mode = 'win'; game.modeT = 0; }
+  }
+  if (game.swapT > 0) game.swapT -= dt;
+  if (game.banner) { game.banner.t += dt; if (game.banner.t > 1.6) game.banner = null; }
+  // beams + hums
+  game.beams.length = 0;
+  if (game.mode === 'play' && st.freezeT <= 0) {
+    for (const g of st.guns) {
+      if (g.state === 'SLOT' && g.tgt >= 0) {
+        const u = g.tgt % st.obj.U, v = (g.tgt / st.obj.U) | 0;
+        const pl0 = objPlace(0, 0);
+        const wp = surfPoint(st.obj, u, v, st.theta, pl0.x, pl0.y, pl0.z, pl0.s * objFit(st.obj));
+        const pt = projPt(wp);
+        const bx = slotXY(g.slot).x, by = LAYOUT.slotY - 4;
+        game.beams.push({ x0: bx, y0: by, x1: pt.x, y1: pt.y, col: hex(st.L.pal[g.c]), id: g.id, stage: st.stage, uv: [(u + .5) / st.obj.U, (v + .5) / st.obj.V] });
+        AU.humOn(g.id, g.c, st.stage);
+        if (st.stage === 1 && Math.random() < .5) {
+          const uu = Math.random();
+          emit(drops, p => {
+            p.x = lerp(bx, pt.x, .25 + uu * .6) + (rnd() - .5) * 10;
+            p.y = lerp(by, pt.y, .25 + uu * .6) + (rnd() - .5) * 10;
+            p.vx = (rnd() - .5) * 30; p.vy = -20 - rnd() * 30;
+            p.life = .25 + rnd() * .2; p.col = hex(st.L.pal[g.c]); p.sz = 1.2 + rnd() * 1.6;
+          });
+        }
+      } else AU.humOff(g.id);
+    }
+  } else for (const g of st.guns) AU.humOff(g.id);
+  // rotate hint: slotted idle guns while their color has hidden work (manual spin speeds recovery)
+  let wantHint = false;
+  if (game.mode === 'play' && st.freezeT <= 0) {
+    for (const g of st.guns) {
+      if (g.state === 'SLOT' && g.tgt < 0 && g.idleT > 1.2 && RB2.stageWorkOf(st, g.c) > 0) { wantHint = true; break; }
+    }
+  }
+  game.rotHintT = wantHint ? game.rotHintT + dt : 0;
+  if (game.rotHintT > 0.4 && st.L.tut && !game.tut.rotShown) { game.tut.rotShown = true; game.tut.step = 2; }
+  // stall alarm tick
+  if (game.mode === 'play' && st.stalling) {
+    if (game.tut.step === 3) st.stallT = 0; // freeze the meter while the tutorial explains it
+    game.stallTickT += dt;
+    if (game.stallTickT > 0.55) { game.stallTickT = 0; AU.tick(); }
+  }
+  updateParticles(dt);
+  for (const f of game.gunFx.values()) { f.popT += dt; f.shakeT += dt; }
+  for (let i = game.ghosts.length - 1; i >= 0; i--) { const g = game.ghosts[i]; g.t += dt; if (g.t > .45) game.ghosts.splice(i, 1); }
+}
+
+// ---------- GL scene ----------
+function drawGLScene() {
+  if (!glok) return;
+  const st = game.st;
+  gl.viewport(0, 0, glC.width, glC.height);
+  gl.clearColor(0, 0, 0, 0);
+  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+  gl.useProgram(prog);
+  gl.uniformMatrix4fv(U.uProj, false, PROJ);
+  gl.uniform1f(U.uTime, game.t);
+  gl.uniform2f(U.uGrid, st.obj.U, st.obj.V);
+  // impacts belong to the CURRENT object only — queue objects get zeroed uniforms,
+  // otherwise their matching uv region ghost-glows while the front object is worked
+  const imp = new Float32Array(12);
+  for (let i = 0; i < Math.min(3, game.beams.length); i++) {
+    const b = game.beams[i];
+    imp[i * 4] = b.uv[0]; imp[i * 4 + 1] = b.uv[1]; imp[i * 4 + 2] = 1; imp[i * 4 + 3] = b.stage;
+  }
+  const impZero = new Float32Array(12);
+  const swapU = game.swapT > 0 ? 1 - game.swapT / TUN.objT : 1;
+  // draw back to front: queue 2, queue 1, current (+ old flying object during swap)
+  for (let k = 2; k >= 0; k--) {
+    const oi = st.objIx + k;
+    if (oi >= st.P.objects.length) continue;
+    const o = st.P.objects[oi];
+    const mesh = game.meshes[oi];
+    if (!mesh) continue;
+    const place = objPlace(k, game.swapT > 0 ? swapU : 0);
+    const theta = k === 0 ? st.theta : 0.7 + oi;
+    gl.uniform4fv(U.uImp, k === 0 ? imp : impZero);
+    gl.uniform2f(U.uGrid, o.U, o.V);
+    gl.uniformMatrix4fv(U.uModel, false, modelMat(place.x, place.y, place.z, theta, place.s * objFit(o), objUpright(o)));
+    gl.uniform1f(U.uDim, place.dim);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, mesh.tex);
+    gl.uniform1i(U.uState, 0);
+    gl.bindBuffer(gl.ARRAY_BUFFER, mesh.vb);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, mesh.ib);
+    gl.vertexAttribPointer(U.aPos, 3, gl.FLOAT, false, 32, 0);
+    gl.vertexAttribPointer(U.aNrm, 3, gl.FLOAT, false, 32, 12);
+    gl.vertexAttribPointer(U.aUV, 2, gl.FLOAT, false, 32, 24);
+    gl.enableVertexAttribArray(U.aPos);
+    gl.enableVertexAttribArray(U.aNrm);
+    gl.enableVertexAttribArray(U.aUV);
+    gl.drawElements(gl.TRIANGLES, mesh.n, gl.UNSIGNED_SHORT, 0);
+  }
+  // previous object flying off during swap
+  if (game.swapT > 0 && st.objIx > 0) {
+    const oi = st.objIx - 1;
+    const mesh = game.meshes[oi];
+    const o = st.P.objects[oi];
+    if (mesh) {
+      const u = easeInOut(swapU);
+      gl.uniform4fv(U.uImp, impZero);
+      gl.uniform2f(U.uGrid, o.U, o.V);
+      gl.uniformMatrix4fv(U.uModel, false, modelMat(-u * 2.6, -0.06 - u * 0.5, u * 1.2, u * 2.4, 1 - u * 0.35, objUpright(o)));
+      gl.uniform1f(U.uDim, 0);
+      gl.bindTexture(gl.TEXTURE_2D, mesh.tex);
+      gl.bindBuffer(gl.ARRAY_BUFFER, mesh.vb);
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, mesh.ib);
+      gl.vertexAttribPointer(U.aPos, 3, gl.FLOAT, false, 32, 0);
+      gl.vertexAttribPointer(U.aNrm, 3, gl.FLOAT, false, 32, 12);
+      gl.vertexAttribPointer(U.aUV, 2, gl.FLOAT, false, 32, 24);
+      gl.drawElements(gl.TRIANGLES, mesh.n, gl.UNSIGNED_SHORT, 0);
+    }
+  }
+}
+
+// ---------- 2D drawing ----------
+function drawGunBody(g2, col, s, firing) {
+  g2.save(); g2.scale(s, s); g2.rotate(-Math.PI / 2);
+  const grad = g2.createLinearGradient(0, -12, 0, 12);
+  grad.addColorStop(0, '#535f76'); grad.addColorStop(.42, '#39424f'); grad.addColorStop(1, '#20262f');
+  rr(g2, -17, -11, 34, 22, 10); g2.fillStyle = grad; g2.fill();
+  g2.strokeStyle = 'rgba(0,0,0,0.4)'; g2.lineWidth = 1.2; g2.stroke();
+  rr(g2, -14, -10, 20, 7, 3.5); g2.fillStyle = 'rgba(255,255,255,0.12)'; g2.fill();
+  rr(g2, -7, -11.5, 7, 23, 3.5); g2.fillStyle = rgba(col, .95); g2.fill();
+  rr(g2, -21.5, -6.5, 6, 13, 3); g2.fillStyle = '#171c26'; g2.fill();
+  if (firing) { g2.shadowColor = rgbs(col); g2.shadowBlur = 13; }
+  rr(g2, 14, -5.5, 11, 11, 3.6); g2.fillStyle = rgbs(col); g2.fill();
+  g2.shadowBlur = 0;
+  rr(g2, 16.5, -3, 8, 6, 2.4); g2.fillStyle = firing ? '#ffffff' : rgba(lighten(col, .55), .9); g2.fill();
+  g2.restore();
+}
+function drawBadge(g2, x, y, col, n, popU) {
+  const s = 1 + Math.sin(clamp(popU, 0, 1) * Math.PI) * .3;
+  g2.save(); g2.translate(x, y); g2.scale(s, s);
+  g2.beginPath(); g2.arc(0, 0, 8.6, 0, TAU);
+  g2.fillStyle = '#f5f8fc'; g2.fill();
+  g2.lineWidth = 2.4; g2.strokeStyle = rgbs(col); g2.stroke();
+  g2.fillStyle = '#1c2230'; g2.font = '700 10px system-ui,sans-serif';
+  g2.textAlign = 'center'; g2.textBaseline = 'middle';
+  g2.fillText(n, 0, .5);
+  g2.restore();
+}
+function drawGun(g, pose, alpha) {
+  const st = game.st, f = gfx(g.id);
+  const col = hex(st.L.pal[g.c]);
+  let { x, y, s } = pose;
+  if (f.shakeT < .3) x += Math.sin(f.shakeT * 55) * 3.2 * (1 - f.shakeT / .3);
+  let sc = s;
+  if (f.popT < .18) sc = s * (1 + Math.sin((f.popT / .18) * Math.PI) * .12);
+  const firing = game.beams.some(b => b.id === g.id);
+  ctx.save();
+  if (alpha != null) ctx.globalAlpha = alpha;
+  ctx.globalAlpha *= 1;
+  ctx.fillStyle = '#050810';
+  ctx.save(); ctx.globalAlpha = .3 * sc * (alpha != null ? alpha : 1);
+  ctx.beginPath(); ctx.ellipse(x + 2, y + 14 * sc, 15 * sc, 4.4 * sc, 0, 0, TAU); ctx.fill();
+  ctx.restore();
+  ctx.translate(x, y);
+  drawGunBody(ctx, col, sc, firing);
+  ctx.restore();
+  if (f.capSeen !== g.cap) { f.capSeen = g.cap; f.badgePop = 0; }
+  if (f.badgePop < 1) f.badgePop = Math.min(1, f.badgePop + .07);
+  ctx.save();
+  if (alpha != null) ctx.globalAlpha = alpha;
+  drawBadge(ctx, x + 14 * sc, y - 13 * sc, col, g.cap, f.badgePop);
+  ctx.restore();
+  // idle marker: soft amber ring on a bay whose laser has nothing to do
+  if (g.state === 'SLOT' && g.tgt < 0 && g.idleT > 0.6 && game.st.freezeT <= 0) {
+    ctx.save();
+    ctx.lineWidth = 2.4;
+    ctx.strokeStyle = game.st.stalling ? `rgba(255,90,80,${.45 + .45 * Math.sin(game.t * 10)})` : `rgba(255,176,32,${.35 + .25 * Math.sin(game.t * 5)})`;
+    ctx.setLineDash([5, 5]);
+    ctx.beginPath(); ctx.arc(x, y, 23, 0, TAU); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+  }
+}
+function drawBeams(g2) {
+  g2.save();
+  for (const b of game.beams) {
+    const dx = b.x1 - b.x0, dy = b.y1 - b.y0;
+    const len = Math.hypot(dx, dy) || 1;
+    const nx = -dy / len, ny = dx / len;
+    if (b.stage === 0) {
+      const sway = Math.sin(game.t * 13 + b.id * 2.4) * 2.2;
+      const mx = (b.x0 + b.x1) / 2 + nx * sway, my = (b.y0 + b.y1) / 2 + ny * sway;
+      // dark halo keeps the beam punchy on the bright backdrop
+      for (const [wd, styl] of [[13, 'rgba(30,42,64,0.18)'], [7.5, rgba(darken(b.col, .12), .5)], [4.2, rgba(b.col, .95)], [1.8, 'rgba(255,255,255,0.95)']]) {
+        g2.beginPath(); g2.moveTo(b.x0, b.y0); g2.quadraticCurveTo(mx, my, b.x1, b.y1);
+        g2.lineCap = 'round'; g2.lineWidth = wd * (1 + Math.sin(game.t * 31 + b.id) * .12);
+        g2.strokeStyle = styl; g2.stroke();
+      }
+      const fr = 8 + Math.sin(game.t * 37 + b.id * 3) * 2.5;
+      const rad = g2.createRadialGradient(b.x1, b.y1, 0, b.x1, b.y1, fr * 2);
+      rad.addColorStop(0, 'rgba(255,255,255,0.95)');
+      rad.addColorStop(.35, rgba(b.col, .75));
+      rad.addColorStop(1, rgba(b.col, 0));
+      g2.fillStyle = rad; g2.beginPath(); g2.arc(b.x1, b.y1, fr * 2, 0, TAU); g2.fill();
+    } else if (b.stage === 1) {
+      // paint spray: soft cone of color
+      const steps = 9;
+      for (let i = 0; i < steps; i++) {
+        const u = i / (steps - 1);
+        const px = lerp(b.x0, b.x1, u) + nx * Math.sin(game.t * 21 + i * 1.7) * (2 + u * 7);
+        const py = lerp(b.y0, b.y1, u) + ny * Math.cos(game.t * 19 + i * 2.1) * (2 + u * 7);
+        const r = 2.5 + u * 8;
+        g2.globalAlpha = .28 * (1 - u * .35);
+        g2.fillStyle = rgbs(lighten(b.col, .15));
+        g2.beginPath(); g2.arc(px, py, r, 0, TAU); g2.fill();
+      }
+      g2.globalAlpha = .5;
+      const rad = g2.createRadialGradient(b.x1, b.y1, 0, b.x1, b.y1, 16);
+      rad.addColorStop(0, rgba(lighten(b.col, .25), .8)); rad.addColorStop(1, 'rgba(0,0,0,0)');
+      g2.fillStyle = rad; g2.beginPath(); g2.arc(b.x1, b.y1, 16, 0, TAU); g2.fill();
+      g2.globalAlpha = 1;
+    } else {
+      // polish: blobby mercury bead chain
+      const steps = 8;
+      for (let i = 0; i < steps; i++) {
+        const u = i / (steps - 1);
+        const wob = Math.sin(game.t * 9 + i * 2.4) * (1.5 + u * 5);
+        const px = lerp(b.x0, b.x1, u) + nx * wob;
+        const py = lerp(b.y0, b.y1, u) + ny * wob;
+        const r = 3 + Math.sin(game.t * 12 + i) * 1.2 + u * 2.5;
+        g2.globalAlpha = .30;
+        g2.fillStyle = 'rgba(214,224,236,0.9)';
+        g2.beginPath(); g2.arc(px, py, r, 0, TAU); g2.fill();
+        g2.globalAlpha = .5;
+        g2.fillStyle = 'rgba(255,255,255,0.8)';
+        g2.beginPath(); g2.arc(px - r * .3, py - r * .3, r * .35, 0, TAU); g2.fill();
+      }
+      g2.globalAlpha = .65;
+      const rad = g2.createRadialGradient(b.x1, b.y1, 0, b.x1, b.y1, 14);
+      rad.addColorStop(0, 'rgba(240,248,255,0.9)'); rad.addColorStop(1, 'rgba(0,0,0,0)');
+      g2.fillStyle = rad; g2.beginPath(); g2.arc(b.x1, b.y1, 14, 0, TAU); g2.fill();
+      g2.globalAlpha = 1;
+    }
+  }
+  g2.restore();
+}
+function drawGhosts(g2) {
+  for (const gh of game.ghosts) {
+    const u = gh.t / .45;
+    g2.save();
+    g2.translate(gh.x, gh.y - u * 26);
+    g2.globalAlpha = 1 - u;
+    drawGunBody(g2, gh.col, 1 - u * .7, false);
+    g2.restore();
+    g2.save();
+    g2.globalAlpha = (1 - u) * .6;
+    g2.strokeStyle = rgba(darken(gh.col, .1), .9); g2.lineWidth = 2.4;
+    g2.beginPath(); g2.arc(gh.x, gh.y - u * 26, 6 + u * 26, 0, TAU); g2.stroke();
+    g2.restore();
+  }
+}
+function drawSlots(g2) {
+  const st = game.st;
+  const rowW = TUN.slots * LAYOUT.slotS + (TUN.slots - 1) * LAYOUT.slotGap;
+  for (let i = 0; i < TUN.slots; i++) {
+    const x = SLOT_X0 + i * (LAYOUT.slotS + LAYOUT.slotGap), y = LAYOUT.slotY;
+    rr(g2, x, y, LAYOUT.slotS, LAYOUT.slotS, 11);
+    g2.fillStyle = 'rgba(13,18,34,0.72)'; g2.fill();
+    g2.lineWidth = 1.5;
+    g2.strokeStyle = st.stalling ? `rgba(255,90,80,${.4 + .45 * Math.sin(game.t * 9)})` : 'rgba(255,255,255,0.09)';
+    if (game.mode === 'fail') g2.strokeStyle = `rgba(255,60,70,${.5 + .5 * Math.sin(game.t * 14)})`;
+    rr(g2, x + .8, y + .8, LAYOUT.slotS - 1.6, LAYOUT.slotS - 1.6, 10); g2.stroke();
+    if (st.slots[i] < 0) {
+      // empty firing bay: dashed pad + up arrow
+      g2.strokeStyle = 'rgba(255,255,255,0.11)'; g2.lineWidth = 1.3;
+      g2.setLineDash([4, 4]);
+      g2.beginPath(); g2.arc(x + LAYOUT.slotS / 2, y + LAYOUT.slotS / 2, 10, 0, TAU); g2.stroke();
+      g2.setLineDash([]);
+      g2.strokeStyle = 'rgba(255,255,255,0.16)'; g2.lineWidth = 2;
+      const cx = x + LAYOUT.slotS / 2, cy = y + LAYOUT.slotS / 2;
+      g2.beginPath(); g2.moveTo(cx - 5, cy + 3); g2.lineTo(cx, cy - 4); g2.lineTo(cx + 5, cy + 3); g2.stroke();
+    }
+  }
+  // stall meter: fills while the whole line sits idle
+  if (st.stalling && game.mode === 'play') {
+    const u = clamp(st.stallT / TUN.stallFail, 0, 1);
+    const y = LAYOUT.slotY - 13;
+    rr(g2, SLOT_X0, y, rowW, 6, 3);
+    g2.fillStyle = 'rgba(8,12,24,0.8)'; g2.fill();
+    if (u > 0.01) {
+      rr(g2, SLOT_X0 + 1, y + 1, Math.max(4, (rowW - 2) * u), 4, 2);
+      g2.fillStyle = `rgba(255,${Math.round(150 - u * 90)},60,0.95)`; g2.fill();
+    }
+    g2.fillStyle = `rgba(255,120,90,${.7 + .3 * Math.sin(game.t * 9)})`;
+    g2.font = '800 10px system-ui,sans-serif'; g2.textAlign = 'center';
+    g2.fillText('LINE STALLING!', W / 2, y - 5);
+  }
+}
+function drawLanes(g2) {
+  const st = game.st;
+  const geo = laneGeom(st.lanes.length);
+  const laneH = H - LAYOUT.laneY - 8;
+  for (let li = 0; li < st.lanes.length; li++) {
+    const x = geo.x0 + li * (geo.cw + geo.gap);
+    rr(g2, x, LAYOUT.laneY, geo.cw, laneH, 13);
+    g2.fillStyle = 'rgba(13,18,34,0.66)'; g2.fill();
+    g2.strokeStyle = 'rgba(255,255,255,0.06)'; g2.lineWidth = 1.2;
+    rr(g2, x + .6, LAYOUT.laneY + .6, geo.cw - 1.2, laneH - 1.2, 12); g2.stroke();
+    const lane = st.lanes[li];
+    if (lane.length && game.mode === 'play') {
+      const front = st.guns[lane[0]];
+      if (RB2.stageWorkOf(st, front.c) > 0 && RB2.freeSlot(st) >= 0) {
+        const p = laneXY(st, li, 0);
+        const a = .25 + .18 * Math.sin(game.t * 4.2);
+        g2.save();
+        g2.beginPath(); g2.arc(p.x, p.y, 26, 0, TAU);
+        g2.fillStyle = rgba(hex(st.L.pal[front.c]), a * .35); g2.fill();
+        g2.restore();
+      }
+    }
+    if (lane.length > 4) {
+      g2.fillStyle = 'rgba(255,255,255,0.5)'; g2.font = '700 11px system-ui,sans-serif';
+      g2.textAlign = 'center';
+      g2.fillText('+' + (lane.length - 4), x + geo.cw / 2, H - 14);
+    }
+  }
+  for (let li = 0; li < st.lanes.length; li++) {
+    const lane = st.lanes[li];
+    for (let d = Math.min(lane.length - 1, 3); d >= 0; d--) {
+      const g = st.guns[lane[d]];
+      const pose = gunPose(g);
+      if (pose) drawGun(g, pose, d === 0 ? 1 : Math.max(.28, .62 - d * .13));
+    }
+  }
+}
+const HITS = [];
+function hit(id, x, y, w, h) { HITS.push({ id, x, y, w, h }); }
+function btnPill(g2, x, y, w, h, label, col, id) {
+  rr(g2, x, y, w, h, h / 2);
+  const gr = g2.createLinearGradient(0, y, 0, y + h);
+  gr.addColorStop(0, rgbs(lighten(col, .18))); gr.addColorStop(1, rgbs(darken(col, .12)));
+  g2.fillStyle = gr; g2.fill();
+  g2.strokeStyle = 'rgba(0,0,0,0.3)'; g2.lineWidth = 1.4; g2.stroke();
+  rr(g2, x + 3, y + 2.5, w - 6, h * .42, h * .3);
+  g2.fillStyle = 'rgba(255,255,255,0.28)'; g2.fill();
+  g2.fillStyle = '#132018'; g2.font = `800 ${h * .42}px system-ui,sans-serif`;
+  g2.textAlign = 'center'; g2.textBaseline = 'middle';
+  g2.fillText(label, x + w / 2, y + h / 2 + 1);
+  hit(id, x, y, w, h);
+}
+function drawHUD(g2) {
+  const st = game.st;
+  rr(g2, 10, 8, W - 20, 44, 14);
+  g2.fillStyle = 'rgba(10,14,27,0.72)'; g2.fill();
+  g2.strokeStyle = 'rgba(255,255,255,0.07)'; g2.lineWidth = 1.2;
+  rr(g2, 10.6, 8.6, W - 21.2, 42.8, 13.4); g2.stroke();
+  rr(g2, 18, 16, 52, 28, 10);
+  g2.fillStyle = '#2a3550'; g2.fill();
+  g2.fillStyle = '#cfe0ff'; g2.font = '800 13px system-ui,sans-serif';
+  g2.textAlign = 'center'; g2.textBaseline = 'middle';
+  g2.fillText('LV ' + (game.levelIx + 1), 44, 31);
+  // object pips
+  const nObj = st.P.objects.length;
+  for (let i = 0; i < nObj; i++) {
+    const px = 82 + i * 15;
+    g2.beginPath(); g2.arc(px, 24, 4.4, 0, TAU);
+    g2.fillStyle = i < st.objIx ? '#3DDC84' : i === st.objIx ? '#ffd76e' : 'rgba(255,255,255,0.18)';
+    g2.fill();
+  }
+  // tri-stage bar of current object
+  const bx = 78, bw = W - 78 - 104, by = 30, bh = 12, gap = 3;
+  const segW = (bw - gap * 2) / 3;
+  const cols = ['#ffb63b', '#3DDC84', '#7fd4ff'];
+  for (let s = 0; s < 3; s++) {
+    const x = bx + s * (segW + gap);
+    rr(g2, x, by, segW, bh, 6);
+    g2.fillStyle = 'rgba(4,7,14,0.8)'; g2.fill();
+    let f = 0;
+    if (s < st.stage) f = 1;
+    else if (s === st.stage) f = 1 - st.stageRemain / st.obj.total;
+    if (f > .02) {
+      rr(g2, x + 1, y1(by), Math.max(4, (segW - 2) * f), bh - 2, 5);
+      g2.fillStyle = cols[s]; g2.fill();
+    }
+  }
+  function y1(v) { return v + 1; }
+  // restart + mute
+  const btns = [{ id: 'restart', x: W - 100 }, { id: 'mute', x: W - 58 }];
+  for (const b of btns) {
+    g2.beginPath(); g2.arc(b.x + 16, 30, 15, 0, TAU);
+    g2.fillStyle = '#222c44'; g2.fill();
+    g2.strokeStyle = 'rgba(255,255,255,0.12)'; g2.lineWidth = 1.3; g2.stroke();
+    g2.strokeStyle = '#cfe0ff'; g2.lineWidth = 2.1; g2.lineCap = 'round';
+    if (b.id === 'restart') {
+      g2.beginPath(); g2.arc(b.x + 16, 30, 6.5, -.6, TAU - 1.7); g2.stroke();
+      g2.beginPath(); g2.moveTo(b.x + 21.5, 23.5); g2.lineTo(b.x + 23.5, 28); g2.lineTo(b.x + 18.5, 28);
+      g2.fillStyle = '#cfe0ff'; g2.fill();
+    } else {
+      g2.beginPath();
+      g2.moveTo(b.x + 10, 27); g2.lineTo(b.x + 14, 27); g2.lineTo(b.x + 19, 22.5); g2.lineTo(b.x + 19, 37.5); g2.lineTo(b.x + 14, 33); g2.lineTo(b.x + 10, 33); g2.closePath();
+      g2.fillStyle = '#cfe0ff'; g2.fill();
+      if (AU.muted) { g2.strokeStyle = '#ff5a5a'; g2.beginPath(); g2.moveTo(b.x + 7, 22); g2.lineTo(b.x + 26, 39); g2.stroke(); }
+      else { g2.beginPath(); g2.arc(b.x + 20.5, 30, 4.5, -.9, .9); g2.stroke(); }
+    }
+    hit(b.id, b.x - 2, 12, 36, 36);
+  }
+}
+function drawBanner(g2) {
+  if (!game.banner) return;
+  const b = game.banner;
+  const inU = clamp(b.t / .25, 0, 1), outU = clamp((b.t - 1.15) / .45, 0, 1);
+  const a = inU * (1 - outU);
+  g2.save();
+  g2.globalAlpha = a;
+  g2.translate(W / 2, 300 + (1 - easeOut(inU)) * 30);
+  g2.font = '800 34px system-ui,sans-serif';
+  g2.textAlign = 'center'; g2.textBaseline = 'middle';
+  g2.lineWidth = 6; g2.strokeStyle = 'rgba(8,12,24,0.75)';
+  g2.strokeText(b.text, 0, 0);
+  g2.fillStyle = '#ffd76e';
+  g2.fillText(b.text, 0, 0);
+  g2.font = '600 13px system-ui,sans-serif';
+  g2.fillStyle = 'rgba(255,255,255,0.85)';
+  g2.fillText(b.sub, 0, 30);
+  g2.restore();
+}
+function drawRotateHint(g2) {
+  if (game.rotHintT < 0.6 || game.mode !== 'play') return;
+  const a = clamp((game.rotHintT - .6) / .4, 0, 1) * (0.7 + 0.3 * Math.sin(game.t * 4));
+  // horizontal swipe arc under the object, arrowheads on both ends
+  const cx = LAYOUT.objX, cy = LAYOUT.objY - 26, r = 146;
+  const a0 = Math.PI * 0.36, a1 = Math.PI * 0.64;
+  g2.save();
+  g2.globalAlpha = a;
+  g2.strokeStyle = '#fff'; g2.lineWidth = 3; g2.lineCap = 'round';
+  g2.shadowColor = 'rgba(40,55,80,0.6)'; g2.shadowBlur = 4;
+  g2.beginPath(); g2.arc(cx, cy, r, a0, a1); g2.stroke();
+  for (const [ae, dir] of [[a1, 1], [a0, -1]]) {
+    const px = cx + Math.cos(ae) * r, py = cy + Math.sin(ae) * r;
+    const tx = -Math.sin(ae) * dir, ty = Math.cos(ae) * dir;
+    g2.beginPath();
+    g2.moveTo(px + tx * 12 - ty * 7, py + ty * 12 + tx * 7);
+    g2.lineTo(px + tx * 14, py + ty * 14);
+    g2.lineTo(px + tx * 12 + ty * 7, py + ty * 12 - tx * 7);
+    g2.stroke();
+  }
+  g2.font = '700 12px system-ui,sans-serif';
+  g2.fillStyle = '#fff'; g2.textAlign = 'center';
+  g2.fillText('swipe', cx, cy + r + 30);
+  g2.restore();
+}
+function dim(g2, a) { g2.fillStyle = `rgba(6,9,18,${a})`; g2.fillRect(0, 0, W, H); }
+function card(g2, w, h) {
+  const x = (W - w) / 2, y = (H - h) / 2 - 60;
+  g2.save();
+  g2.shadowColor = 'rgba(0,0,0,0.5)'; g2.shadowBlur = 30; g2.shadowOffsetY = 10;
+  rr(g2, x, y, w, h, 20);
+  const gr = g2.createLinearGradient(0, y, 0, y + h);
+  gr.addColorStop(0, '#2b3554'); gr.addColorStop(1, '#171e33');
+  g2.fillStyle = gr; g2.fill();
+  g2.restore();
+  rr(g2, x + 1, y + 1, w - 2, h - 2, 19);
+  g2.strokeStyle = 'rgba(255,255,255,0.12)'; g2.lineWidth = 1.4; g2.stroke();
+  return { x, y };
+}
+function bubble(g2, cx, cy, w, text) {
+  const lines = text.split('\n');
+  const h = 26 + lines.length * 17;
+  rr(g2, cx - w / 2, cy, w, h, 12);
+  g2.fillStyle = 'rgba(255,255,255,0.96)'; g2.fill();
+  g2.fillStyle = '#1a2233'; g2.font = '700 13px system-ui,sans-serif';
+  g2.textAlign = 'center'; g2.textBaseline = 'middle';
+  lines.forEach((ln, i) => g2.fillText(ln, cx, cy + 20 + i * 17));
+}
+function drawHand(g2, x, y) {
+  const bob = Math.sin(game.t * 5) * 7;
+  g2.save();
+  g2.translate(x + 14, y + 34 + bob);
+  g2.rotate(-.5);
+  g2.fillStyle = '#fff';
+  g2.strokeStyle = 'rgba(0,0,0,0.35)'; g2.lineWidth = 2;
+  g2.beginPath();
+  g2.moveTo(0, -16); g2.lineTo(4.5, -2); g2.lineTo(9, 10); g2.lineTo(-2, 12); g2.lineTo(-8, 2); g2.lineTo(-4.5, -3);
+  g2.closePath(); g2.fill(); g2.stroke();
+  g2.beginPath(); g2.arc(0, -16, 4.5, 0, TAU); g2.fill(); g2.stroke();
+  g2.restore();
+}
+function drawTutorial(g2) {
+  const st = game.st, tut = game.tut;
+  if (!tut.step || game.mode !== 'play') return;
+  if (tut.step === 1) {
+    const p = laneXY(st, 0, 0);
+    g2.save();
+    g2.fillStyle = 'rgba(6,9,18,0.62)';
+    g2.beginPath(); g2.rect(0, 0, W, H);
+    g2.arc(p.x, p.y, 42, 0, TAU, true);
+    g2.fill('evenodd');
+    g2.restore();
+    drawHand(g2, p.x, p.y);
+    bubble(g2, W / 2, p.y - 120, 260, 'Tap a laser to send it\nto a firing bay!');
+  } else if (tut.step === 2) {
+    bubble(g2, W / 2, VIEW.y + 26, 292, 'Rusty spots hiding on the back?\nSwipe the object to spin it!');
+    hit('tut2', 0, 0, 0, 0);
+  } else if (tut.step === 3) {
+    g2.save();
+    g2.fillStyle = 'rgba(6,9,18,0.62)';
+    g2.beginPath(); g2.rect(0, 0, W, H);
+    const m = 8;
+    rr(g2, SLOT_X0 - m, LAYOUT.slotY - m, TUN.slots * LAYOUT.slotS + (TUN.slots - 1) * LAYOUT.slotGap + m * 2, LAYOUT.slotS + m * 2, 14);
+    g2.fill('evenodd');
+    g2.restore();
+    bubble(g2, W / 2, LAYOUT.slotY - 110, 330, 'All 5 bays idle = the line stalls\nand the meter starts!\nKeep at least one laser working.');
+    g2.fillStyle = 'rgba(255,255,255,0.6)'; g2.font = '600 11px system-ui,sans-serif';
+    g2.textAlign = 'center';
+    g2.fillText('tap to continue', W / 2, LAYOUT.slotY - 26);
+    hit('tut3', 0, 0, W, H);
+  }
+}
+function drawIntro(g2) {
+  const u = clamp(game.modeT / .4, 0, 1);
+  dim(g2, .55 * u);
+  g2.save();
+  g2.translate(0, (1 - easeOut(u)) * 40);
+  const { y } = card(g2, 292, 180);
+  g2.textAlign = 'center';
+  g2.fillStyle = 'rgba(255,255,255,0.55)'; g2.font = '800 13px system-ui,sans-serif';
+  g2.fillText('LEVEL ' + (game.levelIx + 1), W / 2, y + 38);
+  g2.fillStyle = '#fff'; g2.font = '800 25px system-ui,sans-serif';
+  g2.fillText(game.st.L.name.toUpperCase(), W / 2, y + 76);
+  g2.fillStyle = 'rgba(255,255,255,0.6)'; g2.font = '600 12px system-ui,sans-serif';
+  g2.fillText(game.st.P.objects.length + (game.st.P.objects.length > 1 ? ' objects' : ' object') + ' to restore', W / 2, y + 104);
+  const tp = .55 + .45 * Math.sin(game.t * 4);
+  g2.fillStyle = `rgba(255,210,80,${tp})`; g2.font = '800 14px system-ui,sans-serif';
+  g2.fillText('TAP TO START', W / 2, y + 142);
+  g2.restore();
+  hit('start', 0, 0, W, H);
+}
+function drawWin(g2) {
+  const u = clamp(game.modeT / .4, 0, 1);
+  dim(g2, .5 * u);
+  const { x, y } = card(g2, 292, 196);
+  g2.textAlign = 'center';
+  g2.fillStyle = '#ffd76e'; g2.font = '800 24px system-ui,sans-serif';
+  g2.fillText('LEVEL COMPLETE!', W / 2, y + 46);
+  g2.fillStyle = 'rgba(255,255,255,0.75)'; g2.font = '600 14px system-ui,sans-serif';
+  g2.fillText('Every piece restored to a shine', W / 2, y + 78);
+  btnPill(g2, x + 66, y + 116, 160, 46, game.levelIx < RB2_LEVELS.length - 1 ? 'CONTINUE' : 'FINISH', { r: 61, g: 220, b: 132 }, 'continue');
+}
+function drawEnd(g2) {
+  dim(g2, .6);
+  const { x, y } = card(g2, 300, 200);
+  g2.textAlign = 'center';
+  g2.fillStyle = '#ffd76e'; g2.font = '800 24px system-ui,sans-serif';
+  g2.fillText('ALL RESTORED!', W / 2, y + 50);
+  g2.fillStyle = 'rgba(255,255,255,0.75)'; g2.font = '600 13px system-ui,sans-serif';
+  g2.fillText('The whole workshop gleams again.', W / 2, y + 82);
+  btnPill(g2, x + 70, y + 118, 160, 46, 'PLAY AGAIN', { r: 53, g: 209, b: 255 }, 'again');
+}
+function drawFail(g2) {
+  const u = clamp(game.modeT / .4, 0, 1);
+  const fl = Math.max(0, 1 - game.modeT * 1.8);
+  if (fl > 0) { g2.fillStyle = `rgba(255,40,50,${fl * .3})`; g2.fillRect(0, 0, W, H); }
+  if (game.modeT < .8) return;
+  dim(g2, .5 * u);
+  const { x, y } = card(g2, 292, 186);
+  g2.textAlign = 'center';
+  g2.fillStyle = '#ff6b6b'; g2.font = '800 26px system-ui,sans-serif';
+  g2.fillText('LINE STALLED!', W / 2, y + 50);
+  g2.fillStyle = 'rgba(255,255,255,0.7)'; g2.font = '600 13px system-ui,sans-serif';
+  g2.fillText('All 5 lasers sat idle too long.', W / 2, y + 80);
+  btnPill(g2, x + 66, y + 112, 160, 46, 'RETRY', { r: 255, g: 122, b: 61 }, 'retry');
+}
+function drawDebug(g2) {
+  if (!DEBUG) return;
+  g2.font = '700 10px monospace'; g2.textAlign = 'left';
+  const y = H - 6;
+  let x = 6;
+  for (let i = 0; i < RB2_LEVELS.length; i++) {
+    const w = 20;
+    rr(g2, x, y - 16, w, 16, 4);
+    g2.fillStyle = i === game.levelIx ? '#3e5d8f' : '#20293f'; g2.fill();
+    g2.fillStyle = '#cfe0ff'; g2.fillText(i + 1, x + 5, y - 4);
+    hit('dbg' + i, x, y - 16, w, 16);
+    x += w + 3;
+  }
+  for (const [id, label] of [['dbgS', 'x' + game.speed], ['dbgK', 'SKIP']]) {
+    const w = 38;
+    rr(g2, x, y - 16, w, 16, 4);
+    g2.fillStyle = '#20293f'; g2.fill();
+    g2.fillStyle = '#ffd76e'; g2.fillText(label, x + 4, y - 4);
+    hit(id, x, y - 16, w, 16);
+    x += w + 3;
+  }
+  const st = game.st;
+  g2.fillStyle = '#7f92b8';
+  g2.fillText(`t=${st.t.toFixed(1)} fps=${fps | 0} stage=${st.stage} obj=${st.objIx + 1}/${st.P.objects.length} slots=${RB2.occupiedSlots(st)}`, x + 4, y - 4);
+}
+
+// ---------- frame ----------
+let fps = 60;
+function frame(now) {
+  requestAnimationFrame(frame);
+  try { doFrame(now); }
+  catch (e) { if (!frame._err) { frame._err = 1; console.error('[RB2] frame error:', e && e.stack || e); } }
+}
+setInterval(() => { if (document.hidden) { try { doFrame(performance.now()); } catch (e) { if (!frame._err) { frame._err = 1; console.error('[RB2] frame error:', e && e.stack || e); } } } }, 250);
+function doFrame(now) {
+  const dtMs = now - (frame._t || now);
+  frame._t = now;
+  fps = fps * .95 + (1000 / Math.max(dtMs, 1)) * .05;
+  update(now);
+  HITS.length = 0;
+  ctx.save();
+  ctx.fillStyle = '#131a28';
+  ctx.fillRect(0, 0, cv.width, cv.height);
+  ctx.translate(offX, offY); ctx.scale(scale, scale);
+  ctx.drawImage(bgC, 0, 0);
+  for (const m of motes) {
+    const y = (m.y + game.t * 6 * m.s) % H;
+    const x = m.x + Math.sin(game.t * m.s + m.p) * 14;
+    ctx.globalAlpha = m.a * (0.6 + 0.4 * Math.sin(game.t * m.s * 3 + m.p));
+    ctx.fillStyle = m.warm ? '#e8b46a' : '#8fa6c2';
+    ctx.beginPath(); ctx.arc(x, y, m.r, 0, TAU); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  // contact shadow sized to the current object
+  {
+    const o = game.st.obj;
+    const up = objUpright(o);
+    let maxR = 0; for (const r of o.pr) maxR = Math.max(maxR, r);
+    const halfW = up ? 175 * maxR : 105 * o.len / 1.5;
+    const sy = LAYOUT.objY + (up ? 60 + 92 * o.len / 1.6 : 118);
+    const sg = ctx.createRadialGradient(LAYOUT.objX, sy, 2, LAYOUT.objX, sy, halfW);
+    sg.addColorStop(0, 'rgba(58,76,102,0.34)'); sg.addColorStop(.7, 'rgba(58,76,102,0.14)'); sg.addColorStop(1, 'rgba(58,76,102,0)');
+    ctx.save();
+    ctx.translate(LAYOUT.objX, sy); ctx.scale(1, 0.14); ctx.translate(-LAYOUT.objX, -sy);
+    ctx.fillStyle = sg;
+    ctx.beginPath(); ctx.arc(LAYOUT.objX, sy, halfW, 0, TAU); ctx.fill();
+    ctx.restore();
+  }
+  // 3D scene
+  drawGLScene();
+  ctx.drawImage(glC, VIEW.x, VIEW.y, VIEW.w, VIEW.h);
+  // queue labels
+  ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.font = '700 9px system-ui,sans-serif'; ctx.textAlign = 'center';
+  if (game.st.objIx + 1 < game.st.P.objects.length) ctx.fillText('NEXT', 292, 82);
+  drawSlots(ctx);
+  drawLanes(ctx);
+  // slotted + flying guns
+  const st = game.st;
+  game.lastPoses.clear();
+  const fly = [];
+  for (const g of st.guns) {
+    if (g.state === 'DEAD' || g.state === 'LANE') continue;
+    const pose = gunPose(g);
+    if (!pose) continue;
+    game.lastPoses.set(g.id, pose);
+    if (g.state === 'FLY_SLOT') fly.push([g, pose]);
+    else drawGun(g, pose);
+  }
+  drawGhosts(ctx);
+  drawBeams(ctx);
+  for (const [g, pose] of fly) drawGun(g, pose);
+  drawParticles(ctx);
+  drawHUD(ctx);
+  drawBanner(ctx);
+  drawRotateHint(ctx);
+  drawTutorial(ctx);
+  if (game.mode === 'intro') drawIntro(ctx);
+  else if (game.mode === 'win') { if (game.levelIx < RB2_LEVELS.length - 1) drawWin(ctx); else drawEnd(ctx); }
+  else if (game.mode === 'fail') drawFail(ctx);
+  drawDebug(ctx);
+  ctx.restore();
+}
+
+// ---------- input ----------
+function toDesign(ev) { return { x: (ev.clientX - offX) / scale, y: (ev.clientY - offY) / scale }; }
+cv.addEventListener('pointerdown', ev => {
+  AU.unlock();
+  const p = toDesign(ev);
+  game.drag = { x0: p.x, y0: p.y, x: p.x, y: p.y, t0: performance.now(), moved: 0, vel: 0, lastX: p.x, lastT: performance.now(), inView: p.y > VIEW.y && p.y < VIEW.y + VIEW.h && game.mode === 'play' };
+  if (game.drag.inView) { game.st.omega = 0; game.st.dragging = true; }
+});
+cv.addEventListener('pointermove', ev => {
+  if (!game.drag) return;
+  const p = toDesign(ev);
+  const d = game.drag;
+  const dx = p.x - (d.lastX != null ? d.lastX : p.x);
+  d.moved += Math.abs(p.x - d.x) + Math.abs(p.y - d.y);
+  d.x = p.x; d.y = p.y;
+  if (d.inView && d.moved > 6) {
+    game.st.theta -= dx * 0.012;
+    const nowT = performance.now();
+    const dtm = Math.max(1, nowT - d.lastT);
+    d.vel = -dx / dtm * 1000 * 0.012;
+    d.lastT = nowT;
+    game.everRotated = true;
+    if (game.tut.step === 2) game.tut.step = 0;
+  }
+  d.lastX = p.x;
+});
+addEventListener('pointerup', ev => {
+  const d = game.drag;
+  game.drag = null;
+  game.st.dragging = false;
+  if (!d) return;
+  const p = toDesign(ev);
+  const quick = performance.now() - d.t0 < 320 && d.moved < 9;
+  if (d.inView && !quick) {
+    game.st.omega = clamp(d.vel, -14, 14);
+    return;
+  }
+  if (!quick) return;
+  // tap
+  for (let i = HITS.length - 1; i >= 0; i--) {
+    const h = HITS[i];
+    if (p.x >= h.x && p.x <= h.x + h.w && p.y >= h.y && p.y <= h.y + h.h) {
+      if (handleUI(h.id)) return;
+    }
+  }
+  if (game.mode !== 'play') return;
+  const st = game.st;
+  const geo = laneGeom(st.lanes.length);
+  for (let li = 0; li < st.lanes.length; li++) {
+    const lx = geo.x0 + li * (geo.cw + geo.gap);
+    if (p.x >= lx && p.x <= lx + geo.cw && p.y >= LAYOUT.laneY && p.y <= H - 6) {
+      if (st.L.tut && game.tut.step === 1 && li !== 0) return;
+      if (st.lanes[li].length) { RB2.deployLane(st, li); consume(st); }
+      return;
+    }
+  }
+});
+function handleUI(id) {
+  if (id === 'mute') { AU.toggleMute(); return true; }
+  if (id === 'restart') { loadLevel(game.levelIx, 'play'); return true; }
+  if (id === 'start' && game.mode === 'intro') { game.mode = 'play'; game.modeT = 0; return true; }
+  if (id === 'continue' && game.mode === 'win') { loadLevel(game.levelIx + 1, 'intro'); return true; }
+  if (id === 'again' && game.mode === 'win') { loadLevel(0, 'intro'); return true; }
+  if (id === 'retry' && game.mode === 'fail') { loadLevel(game.levelIx, 'play'); return true; }
+  if (id === 'tut3') { game.tut.step = 0; return true; }
+  if (id.startsWith('dbg')) {
+    if (id === 'dbgS') { game.speed = game.speed === 1 ? 2 : game.speed === 2 ? 4 : 1; return true; }
+    if (id === 'dbgK') { // finish current stage instantly (debug)
+      const st = game.st, o = st.obj;
+      for (let i = 0; i < o.total; i++) if (st.state[i] === st.stage) {
+        st.state[i]++; st.stageRemain--; st.remainByColor[o.color[i]]--;
+        const mesh = game.meshes[st.objIx];
+        if (mesh) setCellState(mesh, o, i, st.state[i]);
+      }
+      // trigger transition logic via a tiny synthetic work pass
+      if (st.stageRemain <= 0) {
+        if (st.stage < 2) { st.stage++; st.stageRemain = o.total; st.freezeT = TUN.stageT; game.banner = { text: st.stage === 1 ? 'PAINT!' : 'POLISH!', sub: '', t: 0 }; }
+        else if (st.objIx < st.P.objects.length - 1) { st.objIx++; st.obj = st.P.objects[st.objIx]; st.state = new Uint8Array(st.obj.total); st.claim = new Int16Array(st.obj.total).fill(-1); st.stage = 0; st.stageRemain = st.obj.total; st.theta = 0; st.omega = 0; st.freezeT = TUN.objT; game.swapT = TUN.objT; }
+        else { st.won = true; st.over = true; game.mode = 'winseq'; game.modeT = 0; }
+      }
+      for (const g of st.guns) if (g.state === 'SLOT') { g.tgt = -1; g.idleT = 0; }
+      return true;
+    }
+    const ix = +id.slice(3);
+    if (!isNaN(ix)) { loadLevel(ix, 'play'); return true; }
+  }
+  return false;
+}
+
+// boot
+window.__RB2_GAME = game;
+if (DEBUG) { window.__RB2_DO = doFrame; window.__RB2_LOAD = loadLevel; }
+try {
+  loadLevel(0, 'intro');
+  requestAnimationFrame(frame);
+} catch (e) {
+  console.error('[RB2] boot failed:', e && e.stack || e);
+}
+})();
+/*==RB2_GAME_END==*/
+</script>
+</body>
+</html>
