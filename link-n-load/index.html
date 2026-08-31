@@ -137,6 +137,24 @@ html,body{width:100%;height:100%;overflow:hidden;background:#140d08;
 .gem.twinkle .glint{animation:twk 1.2s ease-in-out}
 @keyframes twk{0%,100%{opacity:0;transform:scale(.3) rotate(0)}45%{opacity:.95;transform:scale(1.2) rotate(40deg)}}
 
+/* ============ boosters ============ */
+#boosterBar{position:absolute;left:0;bottom:6px;width:390px;height:50px;z-index:20;
+  display:flex;align-items:center;justify-content:center;gap:10px}
+.boostBtn{position:relative;width:112px;height:46px;border-radius:14px;border:0;font:inherit;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;gap:6px;
+  color:#5B3F22;background:linear-gradient(#FFF6E6,#EBD9BA);box-shadow:0 3px 0 rgba(0,0,0,.4)}
+.boostBtn:active{transform:translateY(2px);box-shadow:0 1px 0 rgba(0,0,0,.4)}
+.boostBtn svg{width:22px;height:22px;flex:0 0 auto}
+.boostBtn span{font-size:10.5px;font-weight:800;line-height:1.05;text-align:left;max-width:56px}
+.adTag{position:absolute;right:-5px;top:-7px;font-style:normal;font-size:8.5px;font-weight:800;
+  color:#3B2A18;background:#FFCC5C;border-radius:6px;padding:1px 5px;letter-spacing:.04em;
+  box-shadow:0 1px 0 rgba(0,0,0,.35)}
+.adTag::before{content:"▶";font-size:6.5px;margin-right:2px}
+.boostBtn.armed{background:linear-gradient(#FFE9A8,#F0C464);box-shadow:0 3px 0 #A8762A}
+#stationLayer.picking .qMini{cursor:pointer;animation:pickPulse .9s ease-in-out infinite}
+@keyframes pickPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.12)}}
+#stationLayer.picking .qMini.far{opacity:1}
+
 /* ============ hud ============ */
 #hud{display:flex;align-items:center;gap:7px}
 .hudBtn{height:38px;padding:0 13px;border-radius:13px;border:0;font:inherit;font-weight:800;font-size:13px;
@@ -252,6 +270,11 @@ html,body{width:100%;height:100%;overflow:hidden;background:#140d08;
     <div id="boardFrame"></div>
     <div id="boardInner"></div>
     <svg id="linkSvg" viewBox="0 0 390 434"></svg>
+    <div id="boosterBar">
+      <button class="boostBtn" id="bShuffle"><svg viewBox="0 0 24 24"><path d="M3 7h4l3.5 5L7 17H3" fill="none" stroke="#5B3F22" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M13 7h3.5L21 12l-4.5 5H13" fill="none" stroke="#5B3F22" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M18 4l3 3-3 3M18 14l3 3-3 3" fill="none" stroke="#5B3F22" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Shuffle</span><i class="adTag">AD</i></button>
+      <button class="boostBtn" id="bWagon"><svg viewBox="0 0 24 24"><path d="M4 8h13l-2 8H6z" fill="#8A6238" stroke="#4A2F19" stroke-width="1.6"/><circle cx="8" cy="19" r="2" fill="#3C424B"/><circle cx="15" cy="19" r="2" fill="#3C424B"/><path d="M19 4v6M16 7h6" stroke="#2E7D46" stroke-width="2.6" stroke-linecap="round"/></svg><span>Add wagon</span><i class="adTag">AD</i></button>
+      <button class="boostBtn" id="bTarget"><svg viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="11" rx="2.5" fill="#EFE0C8" stroke="#5B3F22" stroke-width="1.8"/><path d="M12 16V3M8 7l4-4 4 4" fill="none" stroke="#5B3F22" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Change target</span><i class="adTag">AD</i></button>
+    </div>
   </div>
 
   <div id="hud">
@@ -298,7 +321,7 @@ const CFG = {
   stationRefillDelay: 600,
   boardRefillSlide: 180,
   failFreezeHold: 1000,
-  lapTime: 12000,          // one full lap at 1.0x
+  lapTime: 8000,           // one full lap ≈ 8s at 1.0× (wagons 1.5× faster)
   toastTime: 900,
   sound: true
 };
@@ -561,9 +584,9 @@ function startLevel(idx){
   const L = LEVELS[idx];
   const cols = L.board.cols, rows = L.board.rows;
   const pad = 12;
-  const cell = Math.min((390 - pad*2)/cols, (434 - pad*2 - 6)/rows);
+  const cell = Math.min((390 - pad*2)/cols, (434 - pad*2 - 58)/rows);   // 58px reserved for booster bar
   const bw = cell*cols, bh = cell*rows;
-  const ox = (390 - bw)/2, oy = (434 - bh)/2;
+  const ox = (390 - bw)/2, oy = (434 - 58 - bh)/2;
 
   S = {
     lvlIdx: idx, L: L,
@@ -594,6 +617,7 @@ function startLevel(idx){
   refreshTypeGating();
   renderDbg();
   clearLinkPath();
+  setPicking(false);
   scrEnd.classList.add('hide');
   scrMenu.classList.add('hide');
   dbgLog('level ' + L.id + ' started · demand ' + levelOrders(L).reduce((a,t)=>a+t.count,0));
@@ -661,26 +685,45 @@ function cartSVG(){
     '<circle cx="41" cy="40.5" r="1.6" fill="#B6BEC9"/>' +
     '</svg>';
 }
+function makeCart(i, offset){
+  const el = document.createElement('div');
+  el.className = 'cart';
+  el.innerHTML = '<div class="cHud"><div class="cGhost"></div>' +
+                 '<div class="cCount neutral">0/'+S.cap+'</div></div>' + cartSVG();
+  cartLayer.appendChild(el);
+  return {
+    i, type:null, count:0, pending:0, el,
+    hudEl: el.querySelector('.cHud'),
+    countEl: el.querySelector('.cCount'),
+    ghostEl: el.querySelector('.cGhost'),
+    pileG: el.querySelector('.pileG'),
+    offset
+  };
+}
 function buildCarts(){
   cartLayer.innerHTML = '';
   S.carts = [];
   const n = S.L.cartCount;
-  for(let i=0;i<n;i++){
-    const el = document.createElement('div');
-    el.className = 'cart';
-    el.innerHTML = '<div class="cHud"><div class="cGhost"></div>' +
-                   '<div class="cCount neutral">0/'+S.cap+'</div></div>' + cartSVG();
-    cartLayer.appendChild(el);
-    S.carts.push({
-      i, type:null, count:0, pending:0, el,
-      hudEl: el.querySelector('.cHud'),
-      countEl: el.querySelector('.cCount'),
-      ghostEl: el.querySelector('.cGhost'),
-      pileG: el.querySelector('.pileG'),
-      offset: TRACK.P * i / n
-    });
-  }
+  for(let i=0;i<n;i++) S.carts.push(makeCart(i, TRACK.P * i / n));
   updateCartPositions();
+}
+/* booster: drop a new wagon into the middle of the widest gap in the chain */
+function addWagon(){
+  if(S.carts.length >= 8){ showToast('MAX WAGONS'); return; }
+  const offs = S.carts.map(c=>c.offset).sort((a,b)=>a-b);
+  let bestGap = -1, bestMid = 0;
+  for(let i=0;i<offs.length;i++){
+    const a = offs[i], b = (i+1 < offs.length) ? offs[i+1] : offs[0] + TRACK.P;
+    if(b - a > bestGap){ bestGap = b - a; bestMid = (a + (b-a)/2) % TRACK.P; }
+  }
+  const c = makeCart(S.carts.length, bestMid);
+  S.carts.push(c);
+  updateCartPositions();
+  c.el.classList.add('squash');
+  setTimeout(()=>c.el.classList.remove('squash'), 300);
+  refreshCartVisuals();
+  refreshTypeGating();
+  settle('wagon added');
 }
 function cartS(c){ return (S.beltPos + c.offset) % TRACK.P; }
 function cartPoint(c){ return trackPoint(cartS(c)); }
@@ -770,7 +813,7 @@ function renderStationQueue(st){
   const q = st.queue;
   let h = '';
   for(let i=0;i<Math.min(2, q.length);i++){
-    h += '<div class="qMini' + (i===1 ? ' far' : '') + '">' +
+    h += '<div class="qMini' + (i===1 ? ' far' : '') + '" data-st="' + st.i + '" data-qi="' + i + '">' +
          gemSVG(q[i].type,{glint:false,shadow:false}) + '<b>' + q[i].count + '</b></div>';
   }
   if(q.length > 2) h += '<div class="qMoreChip">+' + (q.length-2) + '</div>';
@@ -1316,79 +1359,81 @@ function frame(ts){
     advanceBelt(TRACK.P * dt / lap);
   }
   updateCartPositions();
+  if(!S.over) processUnloads();
   updateFlying(dt);
   if(S.link.active) updatePreview();
 }
 requestAnimationFrame(frame);
 
-/* advance belt, stopping exactly at the first dock event inside this step */
-function advanceBelt(ds){
-  if(S.docking) return;
-  let bestD = ds + 1, bestCart = null, bestSt = null;
-  for(const c of S.carts){
-    if(c.count <= 0 || !c.type) continue;
-    for(const st of S.stations){
-      if(!st.target || st.target.type !== c.type) continue;
-      if(st.target.progress >= st.target.need) continue;
-      const d = fwdDist(cartS(c), st.sTrack);
-      if(d <= ds && d < bestD){ bestD = d; bestCart = c; bestSt = st; }
+function advanceBelt(ds){ S.beltPos = (S.beltPos + ds) % TRACK.P; }
+
+/* ---- drive-by unloading: the belt never stops. A matching cart starts
+   unloading as it nears a station and is paced so the last gem leaves just
+   before the cart exits the window. ---- */
+const UNLOAD_W = 60;   // px of track on each side of a station
+function processUnloads(){
+  for(const st of S.stations){
+    for(const c of S.carts){
+      const off = (((st.sTrack - cartS(c)) % TRACK.P) + TRACK.P + TRACK.P/2) % TRACK.P - TRACK.P/2;
+      const inWin = off <= UNLOAD_W && off >= -UNLOAD_W;
+      /* a plan lives for one pass through the window only */
+      if(c.unload && c.unload.st === st &&
+         (!inWin || !st.target || c.unload.tgt !== st.target || c.count <= 0)) c.unload = null;
+      if(!st.target || st.refilling || st.target.progress >= st.target.need) continue;
+      if(!inWin || c.count <= 0 || c.type !== st.target.type) continue;
+      const f = (UNLOAD_W - off) / (2*UNLOAD_W);          // 0 entering → 1 leaving
+      if(!c.unload || c.unload.st !== st || c.unload.tgt !== st.target){
+        c.unload = { st, tgt: st.target, planned: Math.min(c.count, st.target.need - st.target.progress), sent: 0 };
+        dbgLog('unload cart#' + c.i + ' (' + c.type + ' ' + c.count + ') → st#' + st.i +
+               ' ' + st.target.progress + '/' + st.target.need + ' ⇒ plan ' + c.unload.planned);
+      }
+      const u = c.unload;
+      const want = Math.min(u.planned, Math.floor(f * (u.planned + 1)));
+      let moved = 0;
+      while(u.sent < want && c.count > 0 && st.target.progress < st.target.need){
+        u.sent++; c.count--; st.target.progress++;
+        flyToStation(c.type, cartStagePos(c), { x: st.dock.x, y: 150 });
+        sfxTick(u.sent, u.planned);
+        moved++;
+      }
+      if(moved){
+        updateStationCounter(st, true);
+        c.countEl.classList.remove('tick'); void c.countEl.offsetWidth; c.countEl.classList.add('tick');
+        refreshCartVisuals();
+        if(st.target.progress >= st.target.need) completeOrder(st);
+        else if(c.count === 0) refreshTypeGating();
+      }
     }
-  }
-  if(bestCart){
-    S.beltPos = (S.beltPos + bestD) % TRACK.P;
-    updateCartPositions();
-    dock(bestCart, bestSt);
-  } else {
-    S.beltPos = (S.beltPos + ds) % TRACK.P;
   }
 }
-
-async function dock(cart, st){
-  S.docking = true; S.beltPaused = true;
-  const t = st.target;
-  const amount = Math.min(cart.count, t.need - t.progress);
-  dbgLog('dock cart#' + cart.i + ' (' + cart.type + ' ' + cart.count + ') → st#' + st.i +
-         ' ' + t.progress + '/' + t.need + ' ⇒ xfer ' + amount);
-  for(let i=0;i<amount;i++){
-    if(!S || S.over) break;
-    cart.count--;
-    t.progress++;
-    const from = cartStagePos(cart);
-    const to = { x: st.dock.x, y: 150 };   // chute tip under the active order card
-    flyToStation(cart.type, from, to);
-    refreshCartVisuals();
-    cart.countEl.classList.remove('tick'); void cart.countEl.offsetWidth; cart.countEl.classList.add('tick');
-    updateStationCounter(st, true);
-    sfxTick(i+1, amount);
-    await sleep(CFG.transferTick);
-  }
-  refreshTypeGating();
-
-  if(t.progress >= t.need){
-    /* completion celebration */
-    S.stats.done++;
-    st.card.classList.add('done');
-    burstParticles(st.dock.x, 116, GEMS[t.type].color, 16);
-    sfxBurst();
-    world.classList.remove('shake'); void world.offsetWidth; world.classList.add('shake');
-    setTimeout(()=>world.classList.remove('shake'), 360);
-    st.target = null;
-    await sleep(560);
-    st.card.classList.remove('done');
+async function completeOrder(st){
+  if(st.refilling) return;
+  const my = S;
+  st.refilling = true;
+  S.stats.done++;
+  st.card.classList.add('done');
+  burstParticles(st.dock.x, 116, GEMS[st.target.type].color, 16);
+  sfxBurst();
+  world.classList.remove('shake'); void world.offsetWidth; world.classList.add('shake');
+  setTimeout(()=>world.classList.remove('shake'), 360);
+  st.target = null;
+  await sleep(560);
+  if(S !== my) return;
+  st.card.classList.remove('done');
+  renderStation(st);
+  await sleep((my.L.stationRefillDelay*1000) || CFG.stationRefillDelay);
+  if(S !== my) return;
+  if(st.queue.length){
+    const q = st.queue.shift();
+    st.target = { type:q.type, need:q.count, progress:q.progress||0 };
+    renderStation(st, true);
+  } else {
+    st.closed = true;
     renderStation(st);
-    await sleep((S.L.stationRefillDelay*1000) || CFG.stationRefillDelay);
-    if(st.queue.length){
-      const q = st.queue.shift();
-      st.target = { type:q.type, need:q.count, progress:0 };
-      renderStation(st, true);
-    } else {
-      st.closed = true;
-      renderStation(st);
-    }
-    renderStationQueue(st);
-    refreshTypeGating();
   }
-  S.beltPaused = false; S.docking = false;
+  renderStationQueue(st);
+  st.refilling = false;
+  refreshTypeGating();
   settle('delivery finished');
 }
 function flyToStation(type, from, to){
@@ -1427,7 +1472,7 @@ function possibleDeliveryExists(){
 }
 function settle(reason){
   if(!S || S.over) return;
-  if(S.pendingLands > 0 || S.docking) return;
+  if(S.pendingLands > 0) return;
   /* WIN: queue empty and all stations completed/closed */
   if(S.stations.every(st => st.target === null && st.queue.length === 0)){
     endGame(true); return;
@@ -1535,6 +1580,60 @@ function renderDbg(){
     refreshCartVisuals(); refreshTypeGating(); };
   $('dbgLog').textContent = DBG.lines.slice(-24).join('\n');
 }
+
+/* ============================================================ BOOSTERS
+   Ad-gated in the real game; the AD tag is cosmetic for now (no economy). */
+let picking = false;
+function boosterShuffle(){
+  if(!S || S.over || S.link.active) return;
+  const gems = [];
+  for(let r=0;r<S.rows;r++) for(let c=0;c<S.cols;c++) if(S.grid[r][c]) gems.push(S.grid[r][c]);
+  let tries = 0;
+  do {
+    for(let i=gems.length-1;i>0;i--){             // permute types across positions
+      const j = (Math.random()*(i+1))|0;
+      const t = gems[i].type; gems[i].type = gems[j].type; gems[j].type = t;
+    }
+    tries++;
+  } while(!boardHasGroup() && tries < 50);
+  for(const g of gems){
+    g.el.querySelector('.gbody').innerHTML = gemSVG(g.type);
+    g.el.classList.remove('born'); void g.el.offsetWidth; g.el.classList.add('born');
+  }
+  refreshTypeGating();
+  sfxBurst();
+  dbgLog('booster: shuffle (' + tries + ' roll' + (tries>1?'s':'') + ')');
+  settle('shuffle');
+}
+function setPicking(on){
+  picking = on;
+  if(S) S.inputLocked = on;
+  stationLayer.classList.toggle('picking', on);
+  $('bTarget').classList.toggle('armed', on);
+  if(on) showToast('PICK AN ORDER');
+}
+function pickTarget(st, qi){
+  const picked = st.queue.splice(qi, 1)[0];
+  if(!picked){ setPicking(false); return; }
+  if(st.target) st.queue.unshift({ type: st.target.type, count: st.target.need, progress: st.target.progress });
+  st.target = { type: picked.type, need: picked.count, progress: picked.progress || 0 };
+  st.closed = false;
+  renderStation(st, true);
+  renderStationQueue(st);
+  refreshTypeGating();
+  dbgLog('booster: target ' + st.target.type + ' → front of st#' + st.i);
+  setPicking(false);
+  settle('target swapped');
+}
+stationLayer.addEventListener('click', e=>{
+  if(!picking) return;
+  const mini = e.target.closest('.qMini');
+  if(!mini){ setPicking(false); return; }
+  pickTarget(S.stations[+mini.dataset.st], +mini.dataset.qi);
+});
+$('bShuffle').onclick = ()=>{ ac(); boosterShuffle(); };
+$('bWagon').onclick   = ()=>{ ac(); if(S && !S.over){ dbgLog('booster: add wagon'); addWagon(); } };
+$('bTarget').onclick  = ()=>{ ac(); if(!S || S.over) return; setPicking(!picking); };
 
 /* ================================================================ BOOT */
 $('btnRestart').onclick = ()=>{ if(S) startLevel(S.lvlIdx); };
