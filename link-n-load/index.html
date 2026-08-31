@@ -33,30 +33,27 @@ html,body{width:100%;height:100%;overflow:hidden;background:#140d08;
   box-shadow:inset 0 0 120px 40px rgba(0,0,0,.5), inset 0 0 40px 4px rgba(0,0,0,.3)}
 
 /* ============ layout bands ============ */
-#queueStrip{position:absolute;left:0;top:0;width:390px;height:84px;padding:7px 10px 6px}
-#beltArea{position:absolute;left:0;top:84px;width:390px;height:254px}
+#beltArea{position:absolute;left:0;top:0;width:390px;height:338px}
 #boardArea{position:absolute;left:0;top:338px;width:390px;height:434px}
 #hud{position:absolute;left:0;top:772px;width:390px;height:72px;padding:8px 12px}
 #fxLayer{position:absolute;inset:0;pointer-events:none;z-index:60}
 
-/* ============ queue strip ============ */
-.stripHead{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#C9A882;
-  font-weight:800;margin:0 0 4px 2px;opacity:.85}
-#queueRow{display:flex;gap:6px;align-items:center;height:46px}
-.qCard{width:38px;height:44px;border-radius:11px;flex:0 0 auto;position:relative;
-  background:linear-gradient(#FFF8EC,#EFE0C8);box-shadow:0 2px 0 rgba(0,0,0,.28),inset 0 -3px 0 rgba(0,0,0,.06);
-  display:flex;flex-direction:column;align-items:center;justify-content:center;
-  transition:transform .24s cubic-bezier(.34,1.56,.64,1), opacity .24s}
-.qCard.enter{transform:translateX(30px) scale(.6);opacity:0}
-.qCard svg{width:21px;height:21px;display:block;margin-top:-1px}
-.qCard b{font-size:12.5px;font-weight:800;color:#6B4A2C;line-height:1;margin-top:-1px}
-.qMore{width:34px;height:44px;border-radius:12px;flex:0 0 auto;display:flex;align-items:center;justify-content:center;
-  background:rgba(255,248,236,.13);border:2px dashed rgba(255,248,236,.32);color:#F3E3C8;font-weight:800;font-size:12px}
-.qEmpty{color:#C9A882;font-size:11.5px;font-weight:700;opacity:.8;padding-left:4px}
+/* ============ per-station target queues (stacked above each station) ============ */
+.qStack{position:absolute;left:50%;transform:translateX(-50%);bottom:100%;margin-bottom:5px;
+  display:flex;flex-direction:column-reverse;align-items:center;gap:4px}
+.qMini{width:46px;height:32px;border-radius:9px;flex:0 0 auto;
+  background:linear-gradient(#F6ECD8,#E2D0B2);box-shadow:0 2px 0 rgba(0,0,0,.28);
+  display:flex;align-items:center;justify-content:center;gap:2px;
+  transition:transform .25s cubic-bezier(.34,1.56,.64,1),opacity .25s}
+.qMini svg{width:17px;height:17px;flex:0 0 auto}
+.qMini b{font-size:11px;font-weight:800;color:#6B4A2C;line-height:1}
+.qMini.far{transform:scale(.9);opacity:.72}
+.qMoreChip{font-size:9.5px;font-weight:800;color:#D8BF9C;background:rgba(255,248,236,.12);
+  border:1.5px dashed rgba(255,248,236,.3);border-radius:8px;padding:0 7px;line-height:1.6}
 
 /* ============ belt / track ============ */
-#trackSvg{position:absolute;left:0;top:0;width:390px;height:254px;overflow:visible}
-#cartLayer,#stationLayer{position:absolute;left:0;top:0;width:390px;height:254px}
+#trackSvg{position:absolute;left:0;top:0;width:390px;height:338px;overflow:visible}
+#cartLayer,#stationLayer{position:absolute;left:0;top:0;width:390px;height:338px}
 #beltGlow{position:absolute;pointer-events:none;opacity:0;transition:opacity .3s;border-radius:999px}
 #beltGlow.on{opacity:1;animation:pulseGlow 1.5s ease-in-out infinite}
 @keyframes pulseGlow{0%,100%{opacity:.4}50%{opacity:1}}
@@ -244,13 +241,8 @@ html,body{width:100%;height:100%;overflow:hidden;background:#140d08;
 <div id="fit"><div id="stage"><div id="world">
   <div id="bg"></div>
 
-  <div id="queueStrip">
-    <div class="stripHead">Upcoming orders</div>
-    <div id="queueRow"></div>
-  </div>
-
   <div id="beltArea">
-    <svg id="trackSvg" viewBox="0 0 390 254"></svg>
+    <svg id="trackSvg" viewBox="0 0 390 338"></svg>
     <div id="beltGlow"></div>
     <div id="stationLayer"></div>
     <div id="cartLayer"></div>
@@ -446,36 +438,45 @@ function gemSVG(type, opts){
     '</svg>';
 }
 
-/* ---------------------------------------------------------------- LEVELS */
+/* ---------------------------------------------------------------- LEVELS
+   Each station owns its own target queue (stationQueues[i]), shown stacked
+   above that station. Target counts are 25+ so big links stay rewarding —
+   one order takes several cart deliveries. */
 const LEVELS = [
   { id:1, name:'First shift', blurb:'4 types · 4 carts · 2 stations',
     board:{cols:7,rows:6}, gemTypes:['ruby','emerald','sapphire','topaz'],
-    cartCount:4, cartCapacity:10, stationCount:2, beltSpeed:1.0, spawnWeightK:2.5,
+    cartCount:4, cartCapacity:10, beltSpeed:1.0, spawnWeightK:2.5,
     stationRefillDelay:0.6,
-    targetQueue:[{type:'ruby',count:6},{type:'emerald',count:5},{type:'sapphire',count:4},
-                 {type:'topaz',count:5},{type:'ruby',count:4}],
+    stationQueues:[
+      [{type:'ruby',count:25},{type:'sapphire',count:25}],
+      [{type:'emerald',count:25},{type:'topaz',count:25}]
+    ],
     hint:'Link 3+ matching gems. Carts hold one type, 10 gems max.' },
   { id:2, name:'Double orders', blurb:'5 types · 4 carts · 3 stations',
     board:{cols:7,rows:7}, gemTypes:['ruby','emerald','sapphire','topaz','amethyst'],
-    cartCount:4, cartCapacity:10, stationCount:3, beltSpeed:1.0, spawnWeightK:2.0,
+    cartCount:4, cartCapacity:10, beltSpeed:1.0, spawnWeightK:2.0,
     stationRefillDelay:0.6,
-    targetQueue:[{type:'emerald',count:6},{type:'ruby',count:7},{type:'amethyst',count:5},
-                 {type:'sapphire',count:6},{type:'emerald',count:4},{type:'topaz',count:8},
-                 {type:'ruby',count:5},{type:'amethyst',count:6}] },
+    stationQueues:[
+      [{type:'emerald',count:30},{type:'ruby',count:25}],
+      [{type:'ruby',count:25},{type:'amethyst',count:30}],
+      [{type:'sapphire',count:25},{type:'topaz',count:30}]
+    ] },
   { id:3, name:'Tight rails', blurb:'6 types · 3 carts · 3 stations',
     board:{cols:7,rows:7}, gemTypes:['ruby','emerald','sapphire','topaz','amethyst','diamond'],
-    cartCount:3, cartCapacity:10, stationCount:3, beltSpeed:1.1, spawnWeightK:1.5,
+    cartCount:3, cartCapacity:10, beltSpeed:1.1, spawnWeightK:1.5,
     stationRefillDelay:0.6,
-    targetQueue:[{type:'sapphire',count:8},{type:'topaz',count:6},{type:'ruby',count:9},
-                 {type:'diamond',count:5},{type:'emerald',count:7},{type:'amethyst',count:6},
-                 {type:'sapphire',count:5},{type:'ruby',count:6},{type:'topaz',count:7},
-                 {type:'diamond',count:8}] }
+    stationQueues:[
+      [{type:'sapphire',count:30},{type:'ruby',count:25}],
+      [{type:'topaz',count:25},{type:'emerald',count:30},{type:'diamond',count:25}],
+      [{type:'diamond',count:30},{type:'amethyst',count:25}]
+    ] }
 ];
+function levelOrders(L){ return L.stationQueues.flat(); }
 
 /* --------------------------------------------------------- TRACK GEOMETRY
    Stadium loop: top straight -> right arc -> bottom straight -> left arc.
    Clockwise. Arclength parametrisation so carts stay evenly spaced.     */
-const TRACK = { cx:195, cy:174, r:52, L:226 };   // top straight lowered to clear room for cart badges
+const TRACK = { cx:195, cy:258, r:52, L:226 };   // belt band now spans 0-338; screen position of rails unchanged
 TRACK.P = 2*TRACK.L + 2*Math.PI*TRACK.r;
 TRACK.segTop    = TRACK.L;
 TRACK.segRight  = TRACK.L + Math.PI*TRACK.r;
@@ -504,13 +505,13 @@ function stationTrackS(i, n){ return TRACK.L * (i + 0.5) / n; }
 function fwdDist(from, to){ return ((to - from) % TRACK.P + TRACK.P) % TRACK.P; }
 
 /* stage-space offsets of the bands */
-const BELT_Y = 84, BOARD_Y = 338;
+const BELT_Y = 0, BOARD_Y = 338;
 
 /* ------------------------------------------------------------------- DOM */
 const $ = id => document.getElementById(id);
 const stage=$('stage'), world=$('world'), boardInner=$('boardInner'), boardFrame=$('boardFrame'),
       linkSvg=$('linkSvg'), cartLayer=$('cartLayer'), stationLayer=$('stationLayer'),
-      trackSvg=$('trackSvg'), queueRow=$('queueRow'), fxLayer=$('fxLayer'),
+      trackSvg=$('trackSvg'), fxLayer=$('fxLayer'),
       toastEl=$('toast'), dragCount=$('dragCount'), beltGlow=$('beltGlow'),
       scrMenu=$('scrMenu'), scrEnd=$('scrEnd'), dbgEl=$('dbg'), capOverlay=$('capOverlay'),
       hintLine=$('hintLine'), lvlTag=$('lvlTag');
@@ -570,7 +571,6 @@ function startLevel(idx){
     cap: L.cartCapacity || CFG.CART_CAPACITY,
     grid: Array.from({length:rows}, ()=>new Array(cols).fill(null)),
     carts: [], stations: [],
-    queue: L.targetQueue.map(t=>({type:t.type, count:t.count})),
     beltPos: 0, beltPaused: false, docking: false,
     link: { active:false, type:null, cells:[], plan:[] },
     flying: [], pendingLands: 0,
@@ -590,14 +590,13 @@ function startLevel(idx){
   buildStations();
   generateBoard();
   loadStationsFromQueue(true);
-  renderQueue();
   refreshCartVisuals();
   refreshTypeGating();
   renderDbg();
   clearLinkPath();
   scrEnd.classList.add('hide');
   scrMenu.classList.add('hide');
-  dbgLog('level ' + L.id + ' started · demand ' + L.targetQueue.reduce((a,t)=>a+t.count,0));
+  dbgLog('level ' + L.id + ' started · demand ' + levelOrders(L).reduce((a,t)=>a+t.count,0));
 }
 
 /* ------------------------------------------------------------ track art */
@@ -740,8 +739,9 @@ function refreshCartVisuals(){
 function buildStations(){
   stationLayer.innerHTML = '';
   S.stations = [];
-  const n = S.L.stationCount;
+  const n = S.L.stationQueues.length;
   const cw = n >= 4 ? 46 : (n === 3 ? 54 : 60);
+  const cardTop = 96;                 // active card sits here; queue stacks upward above it
   for(let i=0;i<n;i++){
     const s = stationTrackS(i, n);
     const p = trackPoint(s);
@@ -749,18 +749,32 @@ function buildStations(){
     el.className = 'station';
     el.style.width = cw + 'px';
     el.style.left = p.x + 'px';
-    el.style.top = '2px';
+    el.style.top = cardTop + 'px';
     el.innerHTML =
+      '<div class="qStack"></div>' +
       '<div class="ordCard" style="width:'+cw+'px;height:40px"></div>' +
       '<div class="chute" style="top:42px"></div>' +
-      '<div class="drop" style="top:56px;height:'+(p.y-26-56)+'px"></div>';
+      '<div class="drop" style="top:56px;height:'+(p.y - 23 - cardTop - 56)+'px"></div>';
     stationLayer.appendChild(el);
     S.stations.push({
       i, sTrack:s, target:null, closed:false, el,
+      queue: S.L.stationQueues[i].map(t=>({type:t.type, count:t.count})),
       card: el.querySelector('.ordCard'),
+      stackEl: el.querySelector('.qStack'),
       dock: {x:p.x, y:p.y + BELT_Y}
     });
   }
+}
+/* per-station upcoming stack: next target sits closest to the active card */
+function renderStationQueue(st){
+  const q = st.queue;
+  let h = '';
+  for(let i=0;i<Math.min(2, q.length);i++){
+    h += '<div class="qMini' + (i===1 ? ' far' : '') + '">' +
+         gemSVG(q[i].type,{glint:false,shadow:false}) + '<b>' + q[i].count + '</b></div>';
+  }
+  if(q.length > 2) h += '<div class="qMoreChip">+' + (q.length-2) + '</div>';
+  st.stackEl.innerHTML = h;
 }
 function renderStation(st, entering){
   const card = st.card;
@@ -794,30 +808,19 @@ function updateStationCounter(st, hit){
 }
 function loadStationsFromQueue(initial){
   for(const st of S.stations){
-    if(st.target) continue;
-    if(S.queue.length){
-      const q = S.queue.shift();
-      st.target = { type:q.type, need:q.count, progress:0 };
-      st.closed = false;
-      renderStation(st, !initial);
-    } else {
-      st.closed = true; st.target = null;
-      renderStation(st);
+    if(!st.target){
+      if(st.queue.length){
+        const q = st.queue.shift();
+        st.target = { type:q.type, need:q.count, progress:0 };
+        st.closed = false;
+        renderStation(st, !initial);
+      } else {
+        st.closed = true; st.target = null;
+        renderStation(st);
+      }
     }
+    renderStationQueue(st);
   }
-  renderQueue();
-}
-
-/* ------------------------------------------------------------ queue UI */
-function renderQueue(){
-  const show = S.queue.slice(0,5);
-  let h = '';
-  for(const q of show){
-    h += '<div class="qCard">' + gemSVG(q.type,{glint:false,shadow:false}) + '<b>' + q.count + '</b></div>';
-  }
-  if(S.queue.length > 5) h += '<div class="qMore">+' + (S.queue.length-5) + '</div>';
-  if(!S.queue.length) h += '<div class="qEmpty">No orders left in the queue</div>';
-  queueRow.innerHTML = h;
 }
 
 /* ============================================================ BOARD GEN */
@@ -847,8 +850,10 @@ function newGem(type, r, c){
 /* -------------------------------------------------- weighted spawner 6.5 */
 function demandOf(type){
   let d = 0;
-  for(const st of S.stations) if(st.target && st.target.type === type) d += (st.target.need - st.target.progress);
-  for(let i=0;i<Math.min(2, S.queue.length);i++) if(S.queue[i].type === type) d += 0.5 * S.queue[i].count;
+  for(const st of S.stations){
+    if(st.target && st.target.type === type) d += (st.target.need - st.target.progress);
+    if(st.queue[0] && st.queue[0].type === type) d += 0.5 * st.queue[0].count;  // next order per station
+  }
   return d;
 }
 function cartStock(type){ let n=0; for(const c of S.carts) if(c.type===type) n += c.count; return n; }
@@ -1349,7 +1354,7 @@ async function dock(cart, st){
     cart.count--;
     t.progress++;
     const from = cartStagePos(cart);
-    const to = { x: st.dock.x, y: BELT_Y + 58 };   // chute tip under the order card
+    const to = { x: st.dock.x, y: 150 };   // chute tip under the active order card
     flyToStation(cart.type, from, to);
     refreshCartVisuals();
     cart.countEl.classList.remove('tick'); void cart.countEl.offsetWidth; cart.countEl.classList.add('tick');
@@ -1363,7 +1368,7 @@ async function dock(cart, st){
     /* completion celebration */
     S.stats.done++;
     st.card.classList.add('done');
-    burstParticles(st.dock.x, st.dock.y - 34, GEMS[t.type].color, 16);
+    burstParticles(st.dock.x, 116, GEMS[t.type].color, 16);
     sfxBurst();
     world.classList.remove('shake'); void world.offsetWidth; world.classList.add('shake');
     setTimeout(()=>world.classList.remove('shake'), 360);
@@ -1372,16 +1377,15 @@ async function dock(cart, st){
     st.card.classList.remove('done');
     renderStation(st);
     await sleep((S.L.stationRefillDelay*1000) || CFG.stationRefillDelay);
-    if(S.queue.length){
-      const q = S.queue.shift();
+    if(st.queue.length){
+      const q = st.queue.shift();
       st.target = { type:q.type, need:q.count, progress:0 };
       renderStation(st, true);
-      renderQueue();
     } else {
       st.closed = true;
       renderStation(st);
-      renderQueue();
     }
+    renderStationQueue(st);
     refreshTypeGating();
   }
   S.beltPaused = false; S.docking = false;
@@ -1401,19 +1405,18 @@ function flyToStation(type, from, to){
 }
 
 /* ============================================== WIN / FAIL
-   FAIL = the player has no legal move (NO EMPTY SPACE state: every type is
-   either belt-capped below MIN_LINK or has no 3-group on the board).
-   Design change over GDD 6.6: a delivery still en route no longer postpones
-   the fail — once the player is out of moves, the level is lost.
-   Checks run only between settled events, so a transfer already docking
-   completes (and may free space) before the verdict. */
+   FAIL = no legal move (NO EMPTY SPACE) AND nothing on the belt can deliver.
+   With 25+ orders, filling every cart with wanted types is the intended
+   strategy (each order takes several cart trips), so carts that still match
+   an active station keep the run alive — they will drain and free space.
+   A belt full of unwanted cargo still fails on the spot. */
 function legalMoveExists(){
   for(const t of S.L.gemTypes){
     if(capacityFor(t) >= CFG.MIN_LINK && largestGroup(t) >= CFG.MIN_LINK) return true;
   }
   return false;
 }
-function possibleDeliveryExists(){  // kept for the debug log only — no longer part of the fail rule
+function possibleDeliveryExists(){
   for(const c of S.carts){
     if(eff(c) <= 0 || !c.type) continue;
     for(const st of S.stations){
@@ -1426,12 +1429,12 @@ function settle(reason){
   if(!S || S.over) return;
   if(S.pendingLands > 0 || S.docking) return;
   /* WIN: queue empty and all stations completed/closed */
-  if(S.queue.length === 0 && S.stations.every(st => st.target === null)){
+  if(S.stations.every(st => st.target === null && st.queue.length === 0)){
     endGame(true); return;
   }
-  const lm = legalMoveExists();
-  if(DBG.logFail) dbgLog('failcheck[' + reason + '] legalMove=' + lm + ' (delivery=' + possibleDeliveryExists() + ') → ' + (!lm ? 'FAIL' : 'ok'));
-  if(!lm) endGame(false);
+  const lm = legalMoveExists(), pd = possibleDeliveryExists();
+  if(DBG.logFail) dbgLog('failcheck[' + reason + '] legalMove=' + lm + ' delivery=' + pd + ' → ' + (!lm&&!pd ? 'FAIL' : 'ok'));
+  if(!lm && !pd) endGame(false);
 }
 
 async function endGame(win){
@@ -1449,7 +1452,7 @@ async function endGame(win){
     '<div class="gemRow">' + gems + '</div>' +
     '<h1>' + (win ? 'All orders shipped!' : 'No empty space') + '</h1>' +
     '<p>' + (win ? 'Level ' + S.L.id + ' — ' + S.L.name + ' cleared.'
-                 : 'No empty space left on the belt — no moves can save the run.') + '</p>' +
+                 : 'No empty space left and nothing on the belt can deliver — the run is stuck.') + '</p>' +
     '<div class="statRow">' +
       '<div class="statBox"><b>' + S.stats.done + '</b><span>Orders done</span></div>' +
       '<div class="statBox"><b>' + S.stats.biggest + '</b><span>Biggest link</span></div>' +
@@ -1477,8 +1480,8 @@ function showMenu(){
     '<p>Link 3+ matching gems. They load into mine carts — one type, 10 gems each. Carts auto-deliver to matching orders on the loop.</p>' +
     '<div class="lvlList">' +
       LEVELS.map((L,i)=>'<button class="lvlBtn" data-i="' + i + '"><b>' + L.id + '. ' + L.name + '</b>' +
-        '<span>' + L.blurb + ' · ' + L.targetQueue.length + ' orders · demand ' +
-        L.targetQueue.reduce((a,t)=>a+t.count,0) + '</span></button>').join('') +
+        '<span>' + L.blurb + ' · ' + levelOrders(L).length + ' orders · demand ' +
+        levelOrders(L).reduce((a,t)=>a+t.count,0) + '</span></button>').join('') +
     '</div>';
   scrMenu.classList.remove('hide');
   scrEnd.classList.add('hide');
@@ -1525,7 +1528,7 @@ function renderDbg(){
   $('btnFail').onclick = e=>{ DBG.logFail = !DBG.logFail; e.target.classList.toggle('act', DBG.logFail); };
   $('btnSnd').onclick = e=>{ CFG.sound = !CFG.sound; e.target.classList.toggle('act', CFG.sound); };
   $('btnStep').onclick = ()=>{ const l=legalMoveExists(), p=possibleDeliveryExists();
-    dbgLog('manual: legalMove=' + l + ' delivery=' + p + ' win=' + (S.queue.length===0 && S.stations.every(s=>!s.target))); settle('manual'); };
+    dbgLog('manual: legalMove=' + l + ' delivery=' + p + ' win=' + S.stations.every(s=>!s.target && !s.queue.length)); settle('manual'); };
   $('btnFillCarts').onclick = ()=>{ for(const c of S.carts){ if(!c.type) c.type = S.L.gemTypes[c.i % S.L.gemTypes.length];
     c.count = S.cap; c.pending = 0; } refreshCartVisuals(); refreshTypeGating(); settle('debug fill'); };
   $('btnEmptyCarts').onclick = ()=>{ for(const c of S.carts){ c.type=null; c.count=0; c.pending=0; }
