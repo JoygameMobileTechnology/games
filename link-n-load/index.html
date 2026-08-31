@@ -54,6 +54,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:#140d08;
 /* ============ belt / track ============ */
 #trackSvg{position:absolute;left:0;top:0;width:390px;height:338px;overflow:visible}
 #cartLayer,#stationLayer{position:absolute;left:0;top:0;width:390px;height:338px}
+#cartLayer,#beltGlow,#trackSvg{pointer-events:none}   /* taps must reach the station queue minis below */
 #beltGlow{position:absolute;pointer-events:none;opacity:0;transition:opacity .3s;border-radius:999px}
 #beltGlow.on{opacity:1;animation:pulseGlow 1.5s ease-in-out infinite}
 @keyframes pulseGlow{0%,100%{opacity:.4}50%{opacity:1}}
