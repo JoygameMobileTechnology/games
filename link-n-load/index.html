@@ -1,0 +1,1543 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Link N Load — prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+/* ============ base ============ */
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{width:100%;height:100%;overflow:hidden;background:#140d08;
+  font-family:"Baloo 2",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  -webkit-user-select:none;user-select:none;touch-action:none}
+#fit{position:fixed;inset:0;display:flex;align-items:center;justify-content:center}
+#stage{width:390px;height:844px;position:relative;transform-origin:center center;
+  overflow:hidden;background:#2A1C14;box-shadow:0 24px 60px rgba(0,0,0,.6)}
+#world{position:absolute;inset:0;will-change:transform}
+
+/* ============ cave backdrop ============ */
+#bg{position:absolute;inset:0;
+  background:
+   radial-gradient(130px 100px at 12% 40%, rgba(255,196,110,.20), transparent 72%),
+   radial-gradient(150px 120px at 92% 41%, rgba(255,178,90,.15), transparent 72%),
+   radial-gradient(180px 110px at 50% 90%, rgba(255,186,96,.10), transparent 74%),
+   radial-gradient(150% 100% at 50% 0%, #3A2718 0%, #2A1C14 45%, #1C120B 100%)}
+#bg::after{content:"";position:absolute;inset:0;opacity:.5;
+  background-image:radial-gradient(rgba(255,255,255,.035) 1px, transparent 1px),
+    radial-gradient(rgba(0,0,0,.20) 1px, transparent 1px);
+  background-size:7px 7px, 11px 11px;background-position:0 0, 4px 6px}
+#vign{position:absolute;inset:0;pointer-events:none;z-index:50;
+  box-shadow:inset 0 0 120px 40px rgba(0,0,0,.5), inset 0 0 40px 4px rgba(0,0,0,.3)}
+
+/* ============ layout bands ============ */
+#queueStrip{position:absolute;left:0;top:0;width:390px;height:84px;padding:7px 10px 6px}
+#beltArea{position:absolute;left:0;top:84px;width:390px;height:254px}
+#boardArea{position:absolute;left:0;top:338px;width:390px;height:434px}
+#hud{position:absolute;left:0;top:772px;width:390px;height:72px;padding:8px 12px}
+#fxLayer{position:absolute;inset:0;pointer-events:none;z-index:60}
+
+/* ============ queue strip ============ */
+.stripHead{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#C9A882;
+  font-weight:800;margin:0 0 4px 2px;opacity:.85}
+#queueRow{display:flex;gap:6px;align-items:center;height:52px}
+.qCard{width:43px;height:50px;border-radius:12px;flex:0 0 auto;position:relative;
+  background:linear-gradient(#FFF8EC,#EFE0C8);box-shadow:0 2px 0 rgba(0,0,0,.28),inset 0 -3px 0 rgba(0,0,0,.06);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  transition:transform .24s cubic-bezier(.34,1.56,.64,1), opacity .24s}
+.qCard.enter{transform:translateX(30px) scale(.6);opacity:0}
+.qCard svg{width:25px;height:25px;display:block;margin-top:-1px}
+.qCard b{font-size:14px;font-weight:800;color:#6B4A2C;line-height:1;margin-top:-1px}
+.qMore{width:38px;height:50px;border-radius:12px;flex:0 0 auto;display:flex;align-items:center;justify-content:center;
+  background:rgba(255,248,236,.13);border:2px dashed rgba(255,248,236,.32);color:#F3E3C8;font-weight:800;font-size:12px}
+.qEmpty{color:#C9A882;font-size:11.5px;font-weight:700;opacity:.8;padding-left:4px}
+
+/* ============ belt / track ============ */
+#trackSvg{position:absolute;left:0;top:0;width:390px;height:254px;overflow:visible}
+#cartLayer,#stationLayer{position:absolute;left:0;top:0;width:390px;height:254px}
+#beltGlow{position:absolute;pointer-events:none;opacity:0;transition:opacity .3s;border-radius:999px}
+#beltGlow.on{opacity:1;animation:pulseGlow 1.5s ease-in-out infinite}
+@keyframes pulseGlow{0%,100%{opacity:.4}50%{opacity:1}}
+
+.cart{position:absolute;left:0;top:0;width:66px;height:66px;margin-left:-33px;margin-top:-34px;will-change:transform}
+.cart .cartBody{position:absolute;left:0;top:.5px;width:66px;height:50.6px;transform-origin:50% 90%;
+  filter:drop-shadow(0 2px 4px rgba(0,0,0,.7))}
+.cart.squash .cartBody{animation:cartSquash .26s ease-out}
+@keyframes cartSquash{0%{transform:scale(1,1)}35%{transform:scale(1.13,.85)}100%{transform:scale(1,1)}}
+.cHud{position:absolute;left:50%;top:50%;z-index:3;
+  display:flex;flex-direction:column;align-items:center;gap:2px;
+  transform:translate(-50%,-50%) translateY(-38px)}
+.cCount{font-size:13px;font-weight:800;color:#3B2A18;background:#FFF6E6;
+  padding:0 7px;border-radius:9px;white-space:nowrap;line-height:1.5;
+  box-shadow:0 2px 0 rgba(0,0,0,.3)}
+.cCount.warn{background:#FFCC5C;color:#5A3A00}
+.cCount.full{background:#FF4D5E;color:#fff}
+.cCount.neutral{background:rgba(255,246,230,.5);color:#5c4830}
+.cCount.tick{animation:cTick .2s ease-out}
+@keyframes cTick{0%{transform:translateX(-50%) scale(1)}45%{transform:translateX(-50%) scale(1.32)}100%{transform:translateX(-50%) scale(1)}}
+.cGhost{font-size:11px;font-weight:800;color:#12351f;background:#8CE99A;padding:0 6px;border-radius:8px;
+  line-height:1.6;white-space:nowrap;box-shadow:0 2px 0 rgba(0,0,0,.3);opacity:0;transition:opacity .1s}
+.cGhost.on{opacity:1;animation:ghostPop .22s cubic-bezier(.34,1.56,.64,1)}
+@keyframes ghostPop{0%{transform:scale(.6)}100%{transform:scale(1)}}
+.cart.destHi .cartBody{filter:drop-shadow(0 0 7px rgba(140,233,154,.95))}
+.cartPile{position:absolute;left:0;top:0;width:60px;height:46px;pointer-events:none}
+
+/* ============ stations ============ */
+.station{position:absolute;left:0;top:0;transform:translate(-50%,0);text-align:center}
+.ordCard{border-radius:14px;position:relative;
+  background:linear-gradient(#FFF8EC,#E9D7BB);
+  box-shadow:0 3px 0 rgba(0,0,0,.32),inset 0 -3px 0 rgba(0,0,0,.07);
+  display:flex;align-items:center;justify-content:center;
+  transition:transform .3s cubic-bezier(.34,1.56,.64,1),opacity .3s}
+.ordCard svg{width:31px;height:31px;flex:0 0 auto;margin-left:-3px}
+.ordCount{font-size:15px;font-weight:800;color:#6B4A2C;line-height:1;letter-spacing:-.4px}
+.ordCount i{font-style:normal;color:#AD9070;font-size:12.5px}
+.ordCard.done{animation:ordDone .55s ease-out forwards}
+@keyframes ordDone{0%{transform:scale(1)}22%{transform:scale(1.24)}100%{transform:translateY(-70px) scale(.35);opacity:0}}
+.ordCard.enter{transform:translateY(-46px) scale(.55);opacity:0}
+.ordCard.closed{background:linear-gradient(#6A5A48,#4E4234);box-shadow:0 3px 0 rgba(0,0,0,.3)}
+.ordCard.hit{animation:ordHit .18s ease-out}
+@keyframes ordHit{0%{transform:scale(1)}50%{transform:scale(1.08)}100%{transform:scale(1)}}
+.closedTxt{font-size:9.5px;font-weight:800;color:#BCA98F;letter-spacing:.05em}
+.chute{position:absolute;left:50%;transform:translateX(-50%);width:28px;height:15px;
+  background:linear-gradient(#7A5B3A,#553D26);clip-path:polygon(0 0,100% 0,74% 100%,26% 100%);}
+.ordProg{position:absolute;left:6px;right:6px;bottom:4px;height:4px;border-radius:3px;background:rgba(107,74,44,.16);overflow:hidden}
+.ordProg i{display:block;height:100%;width:0;border-radius:3px;background:#4CD07A;transition:width .18s ease-out}
+
+/* ============ board ============ */
+#boardInner{position:absolute;left:0;top:0;width:390px;height:434px}
+#boardFrame{position:absolute;border-radius:22px;pointer-events:none;
+  background:rgba(0,0,0,.15);box-shadow:inset 0 0 0 2px rgba(255,226,180,.08), inset 0 8px 22px rgba(0,0,0,.3)}
+#linkSvg{position:absolute;left:0;top:0;width:390px;height:434px;pointer-events:none;z-index:5;overflow:visible}
+.gem{position:absolute;left:0;top:0;will-change:transform;z-index:2}
+.gem svg{width:100%;height:100%;display:block;overflow:visible}
+.gem.slide{transition:transform .18s cubic-bezier(.22,1.35,.55,1)}
+.gem.sel{z-index:4}
+.gem .gbody{transform-origin:50% 55%;display:block;width:100%;height:100%}
+.gem.sel .gbody{animation:gemSel .16s ease-out forwards}
+@keyframes gemSel{to{transform:scale(1.15)}}
+.gem.dim .gbody{filter:saturate(.4) brightness(.8)}
+.gem.pop .gbody{animation:gemPop .15s ease-in forwards}
+@keyframes gemPop{to{transform:scale(1.4);opacity:0}}
+.gem.wob .gbody{animation:gemWob .34s ease-out}
+@keyframes gemWob{0%,100%{transform:rotate(0)}25%{transform:rotate(-9deg)}55%{transform:rotate(7deg)}80%{transform:rotate(-3deg)}}
+.gem.shake .gbody{animation:gemShake .3s ease-out}
+@keyframes gemShake{0%,100%{transform:translateX(0)}20%{transform:translateX(-5px)}40%{transform:translateX(5px)}60%{transform:translateX(-3px)}80%{transform:translateX(3px)}}
+.gem.land .gbody{animation:gemLand .22s ease-out}
+@keyframes gemLand{0%{transform:scale(1.18,.82)}60%{transform:scale(.95,1.05)}100%{transform:scale(1,1)}}
+.gem.born .gbody{animation:gemBorn .28s cubic-bezier(.34,1.56,.64,1)}
+@keyframes gemBorn{0%{transform:scale(.55)}100%{transform:scale(1)}}
+.badgeFull{position:absolute;right:0;top:0;width:15px;height:15px;border-radius:50%;
+  background:#3B2A18;border:2px solid #FFCC5C;display:flex;align-items:center;justify-content:center;z-index:6}
+.badgeFull::after{content:"";width:6px;height:4px;border:1.6px solid #FFCC5C;border-top:none;border-radius:0 0 2px 2px}
+.capTag{position:absolute;left:50%;transform:translateX(-50%);bottom:-5px;font-size:9px;font-weight:800;
+  color:#fff;background:rgba(0,0,0,.66);padding:0 4px;border-radius:5px;z-index:7;line-height:1.5}
+.glint{opacity:0;transform-origin:center}
+.gem.twinkle .glint{animation:twk 1.2s ease-in-out}
+@keyframes twk{0%,100%{opacity:0;transform:scale(.3) rotate(0)}45%{opacity:.95;transform:scale(1.2) rotate(40deg)}}
+
+/* ============ hud ============ */
+#hud{display:flex;align-items:center;gap:7px}
+.hudBtn{height:38px;padding:0 13px;border-radius:13px;border:0;font:inherit;font-weight:800;font-size:13px;
+  color:#5B3F22;background:linear-gradient(#FFF6E6,#EBD9BA);box-shadow:0 3px 0 rgba(0,0,0,.34);cursor:pointer}
+.hudBtn:active{transform:translateY(2px);box-shadow:0 1px 0 rgba(0,0,0,.34)}
+.hudBtn.ghost{background:rgba(255,246,230,.13);color:#F0DFC2;box-shadow:0 3px 0 rgba(0,0,0,.26)}
+#lvlTag{font-size:12.5px;font-weight:800;color:#F3E3C8;line-height:1.15}
+#lvlTag small{display:block;font-size:10px;color:#C9A882;font-weight:700}
+#hintLine{position:absolute;left:12px;right:12px;top:-1px;font-size:10.5px;color:#D8BF9C;font-weight:700;text-align:center}
+
+/* ============ fx ============ */
+.fly{position:absolute;left:0;top:0;z-index:70;will-change:transform}
+.fly svg{width:100%;height:100%;display:block}
+#toast{position:absolute;left:50%;top:300px;transform:translate(-50%,0) scale(.8);
+  background:#FF4D5E;color:#fff;font-weight:800;font-size:13px;letter-spacing:.06em;
+  padding:7px 16px;border-radius:14px;box-shadow:0 4px 0 rgba(0,0,0,.35);opacity:0;
+  transition:opacity .16s,transform .16s;z-index:80;white-space:nowrap}
+#toast.on{opacity:1;transform:translate(-50%,-8px) scale(1)}
+#dragCount{position:absolute;left:0;top:0;z-index:78;pointer-events:none;opacity:0;transition:opacity .1s}
+#dragCount.on{opacity:1}
+#dragCount .bub{font-size:18px;font-weight:800;color:#fff;padding:2px 11px;border-radius:14px;
+  background:rgba(20,12,6,.84);box-shadow:0 0 0 2px rgba(255,255,255,.26);white-space:nowrap;
+  transform:translate(-50%,-50%)}
+.callout{position:absolute;left:50%;top:320px;z-index:82;
+  font-size:25px;font-weight:800;color:#FFE7A8;text-shadow:0 3px 0 #8A4B12,0 0 18px rgba(255,190,80,.6);
+  animation:callo 1.05s ease-out forwards;white-space:nowrap}
+@keyframes callo{0%{opacity:0;transform:translate(-50%,10px) scale(.5)}
+  20%{opacity:1;transform:translate(-50%,-6px) scale(1.16)}
+  38%{transform:translate(-50%,-8px) scale(1)}
+  100%{opacity:0;transform:translate(-50%,-44px) scale(1)}}
+.spark{position:absolute;border-radius:50%;z-index:75;will-change:transform,opacity}
+#world.shake{animation:wshake .34s ease-out}
+@keyframes wshake{0%,100%{transform:translate(0,0)}
+ 15%{transform:translate(-4px,3px)}35%{transform:translate(5px,-3px)}
+ 55%{transform:translate(-3px,-2px)}78%{transform:translate(2px,2px)}}
+
+/* ============ overlays ============ */
+.screen{position:absolute;inset:0;z-index:120;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:13px;padding:26px;
+  background:rgba(14,9,5,.88);text-align:center}
+.screen.hide{display:none}
+.screen h1{font-size:29px;color:#FFE7A8;text-shadow:0 3px 0 #8A4B12;line-height:1.1}
+.screen h2{font-size:19px;color:#FFF6E6;font-weight:800}
+.screen p{font-size:13px;color:#D8BF9C;font-weight:700;max-width:300px;line-height:1.5}
+.bigBtn{height:52px;padding:0 30px;border-radius:18px;border:0;font:inherit;font-weight:800;font-size:17px;
+  color:#5B3F22;background:linear-gradient(#FFE9A8,#F0C464);box-shadow:0 5px 0 #A8762A;cursor:pointer;margin-top:4px}
+.bigBtn:active{transform:translateY(3px);box-shadow:0 2px 0 #A8762A}
+.bigBtn.alt{background:linear-gradient(#FFF6E6,#E4D2B4);box-shadow:0 5px 0 #7A6144;color:#4A331C;
+  height:44px;font-size:14.5px;padding:0 22px}
+.lvlList{display:flex;flex-direction:column;gap:9px;width:276px}
+.lvlBtn{padding:12px 15px;border-radius:16px;border:0;font:inherit;text-align:left;cursor:pointer;
+  background:linear-gradient(#FFF8EC,#E9D7BB);box-shadow:0 4px 0 rgba(0,0,0,.4)}
+.lvlBtn:active{transform:translateY(2px);box-shadow:0 2px 0 rgba(0,0,0,.4)}
+.lvlBtn b{display:block;font-size:15.5px;color:#5B3F22;font-weight:800}
+.lvlBtn span{display:block;font-size:11px;color:#8A6A48;font-weight:700;margin-top:2px}
+.statRow{display:flex;gap:14px;margin-top:2px}
+.statBox{background:rgba(255,246,230,.09);border-radius:14px;padding:8px 15px;min-width:86px}
+.statBox b{display:block;font-size:22px;color:#FFE7A8;font-weight:800;line-height:1.2}
+.statBox span{font-size:9.5px;color:#C9A882;font-weight:800;letter-spacing:.07em;text-transform:uppercase}
+.logoWrap{display:flex;flex-direction:column;align-items:center;margin-bottom:2px}
+.logoWrap .sub{font-size:10.5px;letter-spacing:.3em;color:#C9A882;font-weight:800;text-transform:uppercase}
+.gemRow{display:flex;gap:1px;margin-bottom:2px}
+.gemRow svg{width:33px;height:33px}
+
+/* ============ debug ============ */
+#dbg{position:absolute;right:8px;top:90px;width:190px;z-index:130;
+  background:rgba(16,11,7,.95);border:1px solid rgba(255,226,180,.22);border-radius:14px;padding:10px;
+  color:#EDD9B8;font-size:11px;font-weight:700;display:none;max-height:660px;overflow:auto}
+#dbg.on{display:block}
+#dbg h3{font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;color:#FFCC5C;margin-bottom:4px}
+#dbg label{display:block;margin:7px 0 1px;color:#C9A882}
+#dbg input[type=range]{width:100%;accent-color:#FFCC5C}
+#dbg .row{display:flex;gap:4px;margin-top:5px;flex-wrap:wrap}
+#dbg button{flex:1;min-width:50px;padding:5px 0;border-radius:8px;border:0;font:inherit;font-size:10.5px;font-weight:800;
+  background:#3A2A1A;color:#FFE7A8;cursor:pointer}
+#dbg button.act{background:#FFCC5C;color:#3B2A18}
+#dbgLog{margin-top:7px;font-family:ui-monospace,Consolas,monospace;font-size:9.5px;font-weight:400;
+  color:#9FE6B0;white-space:pre-wrap;line-height:1.4;max-height:160px;overflow:auto;
+  background:rgba(0,0,0,.45);border-radius:8px;padding:6px}
+#capOverlay{position:absolute;left:8px;top:90px;z-index:125;display:none;
+  background:rgba(16,11,7,.92);border-radius:12px;padding:8px 10px;color:#EDD9B8;font-size:10.5px;font-weight:700;line-height:1.65}
+#capOverlay.on{display:block}
+#capOverlay b{color:#FFCC5C}
+#capOverlay .no{color:#FF8A96}
+
+/* ============ rotate hint ============ */
+#rot{position:fixed;inset:0;z-index:999;display:none;flex-direction:column;align-items:center;justify-content:center;
+  gap:14px;background:#140d08;color:#FFE7A8;text-align:center;padding:30px;font-weight:800}
+@media (orientation:landscape) and (max-height:520px){
+  #rot{display:flex} #fit{display:none}
+}
+</style>
+</head>
+<body>
+<div id="rot">
+  <svg width="70" height="70" viewBox="0 0 72 72"><g fill="none" stroke="#FFCC5C" stroke-width="4" stroke-linecap="round">
+  <rect x="23" y="7" width="26" height="44" rx="5"/><path d="M13 58c6 6 14 9 23 9s17-3 23-9"/></g></svg>
+  <div style="font-size:17px">Please rotate your device</div>
+  <div style="font-size:12px;color:#C9A882;font-weight:700">Link N Load is portrait only</div>
+</div>
+
+<div id="fit"><div id="stage"><div id="world">
+  <div id="bg"></div>
+
+  <div id="queueStrip">
+    <div class="stripHead">Upcoming orders</div>
+    <div id="queueRow"></div>
+  </div>
+
+  <div id="beltArea">
+    <svg id="trackSvg" viewBox="0 0 390 254"></svg>
+    <div id="beltGlow"></div>
+    <div id="stationLayer"></div>
+    <div id="cartLayer"></div>
+  </div>
+
+  <div id="boardArea">
+    <div id="boardFrame"></div>
+    <div id="boardInner"></div>
+    <svg id="linkSvg" viewBox="0 0 390 434"></svg>
+  </div>
+
+  <div id="hud">
+    <div id="hintLine"></div>
+    <div id="lvlTag">Level 1<small>First shift</small></div>
+    <div style="flex:1"></div>
+    <button class="hudBtn ghost" id="btnMenu">Levels</button>
+    <button class="hudBtn" id="btnRestart">Restart</button>
+    <button class="hudBtn ghost" id="btnDbg">dbg</button>
+  </div>
+
+  <div id="vign"></div>
+  <div id="fxLayer">
+    <div id="toast">NO EMPTY SPACE</div>
+    <div id="dragCount"><div class="bub">&times;3</div></div>
+  </div>
+
+  <div id="capOverlay"></div>
+  <div id="dbg"></div>
+
+  <div class="screen" id="scrMenu"></div>
+  <div class="screen hide" id="scrEnd"></div>
+</div></div></div>
+
+<svg id="gemDefs" width="0" height="0" style="position:absolute;pointer-events:none" aria-hidden="true"><defs id="gemDefsInner"></defs></svg>
+
+<script>
+"use strict";
+/* =========================================================================
+   LINK N LOAD — single-file prototype
+   Implements GDD v1.0 section 6 (authoritative rules), 7 (feedback),
+   9 (level schema + 3 levels), 10 (tuning constants), 11 (scope).
+   ========================================================================= */
+
+/* ---------------------------------------------------------------- CONFIG */
+const CFG = {
+  MIN_LINK: 3,
+  CART_CAPACITY: 10,
+  WARN_THRESHOLD: 8,
+  gemFlyTime: 260,
+  gemFlyStagger: 40,
+  transferTick: 80,
+  transferFlyTime: 210,
+  stationRefillDelay: 600,
+  boardRefillSlide: 180,
+  failFreezeHold: 1000,
+  lapTime: 12000,          // one full lap at 1.0x
+  toastTime: 900,
+  sound: true
+};
+
+/* ------------------------------------------------------------- GEM TYPES */
+const GEMS = {
+  ruby:     { name:'Ruby',     color:'#E8384F' },
+  emerald:  { name:'Emerald',  color:'#2ECC71' },
+  sapphire: { name:'Sapphire', color:'#3B82F6' },
+  topaz:    { name:'Topaz',    color:'#F5A623' },
+  amethyst: { name:'Amethyst', color:'#9B59B6' },
+  diamond:  { name:'Diamond',  color:'#7FDBFF' }
+};
+const ALL_TYPES = Object.keys(GEMS);
+
+/* -------------------------------------------------- gem shape geometry
+   Each type: unique silhouette so types read by shape alone (colorblind safe).
+   Gloss recipe per GDD 3: radial body gradient, facet planes, specular
+   highlight, rim light, drop shadow, occasional glint.                  */
+const SHAPES = {
+  ruby: { // round brilliant
+    tag: a => '<circle cx="50" cy="50" r="42" ' + a + '/>',
+    facets:
+      '<polygon points="50,25 68,32 75,50 68,68 50,75 32,68 25,50 32,32" fill="#fff" opacity=".17"/>' +
+      '<polygon points="50,4 78,16 68,32 50,25 32,32 22,16" fill="#fff" opacity=".13"/>' +
+      '<polygon points="75,50 98,50 84,80 68,68" fill="#000" opacity=".14"/>' +
+      '<polygon points="50,75 68,68 78,86 50,98 22,86 32,68" fill="#000" opacity=".17"/>' +
+      '<polygon points="25,50 2,50 16,20 32,32" fill="#fff" opacity=".07"/>',
+    spec: 'cx="35" cy="31" rx="12" ry="7.5" transform="rotate(-30 35 31)"',
+    glint: '72,26', shadow: 'rx="28" ry="6"'
+  },
+  emerald: { // emerald cut — rounded rect, step facets
+    tag: a => '<rect x="13" y="21" width="74" height="58" rx="11" ' + a + '/>',
+    facets:
+      '<rect x="22" y="30" width="56" height="40" rx="7" fill="#fff" opacity=".15"/>' +
+      '<rect x="31" y="38" width="38" height="24" rx="5" fill="#fff" opacity=".13"/>' +
+      '<polygon points="13,21 22,30 22,70 13,79" fill="#000" opacity=".10"/>' +
+      '<polygon points="87,21 78,30 78,70 87,79" fill="#000" opacity=".16"/>' +
+      '<polygon points="13,79 22,70 78,70 87,79" fill="#000" opacity=".18"/>' +
+      '<polygon points="13,21 22,30 78,30 87,21" fill="#fff" opacity=".10"/>',
+    spec: 'cx="32" cy="33" rx="12" ry="5" transform="rotate(-12 32 33)"',
+    glint: '74,30', shadow: 'rx="30" ry="6"'
+  },
+  sapphire: { // pear / teardrop
+    tag: a => '<path d="M50 4 C66 24 85 45 85 60 A35 35 0 0 1 15 60 C15 45 34 24 50 4 Z" ' + a + '/>',
+    facets:
+      '<polygon points="50,10 67,58 50,90 33,58" fill="#fff" opacity=".16"/>' +
+      '<polygon points="50,10 33,58 16,60 22,38" fill="#fff" opacity=".09"/>' +
+      '<polygon points="50,10 67,58 84,60 78,38" fill="#000" opacity=".10"/>' +
+      '<polygon points="33,58 50,90 16,62" fill="#000" opacity=".13"/>' +
+      '<polygon points="67,58 50,90 84,62" fill="#000" opacity=".19"/>',
+    spec: 'cx="41" cy="30" rx="8" ry="12" transform="rotate(20 41 30)"',
+    glint: '70,42', shadow: 'rx="27" ry="6"'
+  },
+  topaz: { // trillion — rounded triangle
+    tag: a => '<path d="M50 8 Q57 8 61 15 L90 68 Q95 78 84 78 L16 78 Q5 78 10 68 L39 15 Q43 8 50 8 Z" ' + a + '/>',
+    facets:
+      '<polygon points="50,22 74,66 26,66" fill="#fff" opacity=".16"/>' +
+      '<polygon points="50,8 50,22 26,66 10,70" fill="#fff" opacity=".10"/>' +
+      '<polygon points="50,8 50,22 74,66 90,70" fill="#000" opacity=".12"/>' +
+      '<polygon points="10,72 26,66 74,66 90,72 90,80 10,80" fill="#000" opacity=".20"/>',
+    spec: 'cx="42" cy="34" rx="7" ry="11" transform="rotate(24 42 34)"',
+    glint: '72,60', shadow: 'rx="30" ry="6"'
+  },
+  amethyst: { // hexagon
+    tag: a => '<polygon points="50,6 89,28 89,72 50,94 11,72 11,28" ' + a + '/>',
+    facets:
+      '<polygon points="50,26 72,38 72,62 50,74 28,62 28,38" fill="#fff" opacity=".16"/>' +
+      '<polygon points="50,6 89,28 72,38 50,26" fill="#fff" opacity=".11"/>' +
+      '<polygon points="11,28 50,6 50,26 28,38" fill="#fff" opacity=".05"/>' +
+      '<polygon points="89,28 89,72 72,62 72,38" fill="#000" opacity=".13"/>' +
+      '<polygon points="11,72 28,62 50,74 50,94" fill="#000" opacity=".15"/>' +
+      '<polygon points="89,72 50,94 50,74 72,62" fill="#000" opacity=".21"/>',
+    spec: 'cx="36" cy="32" rx="11" ry="6" transform="rotate(-28 36 32)"',
+    glint: '74,32', shadow: 'rx="29" ry="6"'
+  },
+  diamond: { // classic diamond profile (kite, table + pavilion)
+    tag: a => '<path d="M29 12 H71 L92 38 L50 94 L8 38 Z" ' + a + '/>',
+    facets:
+      '<polygon points="29,12 71,12 84,38 16,38" fill="#fff" opacity=".22"/>' +
+      '<polygon points="38,20 62,20 68,38 32,38" fill="#fff" opacity=".16"/>' +
+      '<polygon points="71,12 92,38 84,38" fill="#000" opacity=".12"/>' +
+      '<polygon points="16,38 50,38 50,94" fill="#fff" opacity=".08"/>' +
+      '<polygon points="50,38 84,38 50,94" fill="#000" opacity=".15"/>' +
+      '<polygon points="84,38 92,38 50,94" fill="#000" opacity=".22"/>',
+    spec: 'cx="41" cy="24" rx="10" ry="4.5"',
+    glint: '76,34', shadow: 'rx="26" ry="6"'
+  }
+};
+
+/* --------------------------------------------------------- color helpers */
+function hexToRgb(h){ h=h.replace('#',''); return [parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)]; }
+function rgbToHex(r){ return '#'+r.map(v=>Math.max(0,Math.min(255,Math.round(v))).toString(16).padStart(2,'0')).join(''); }
+function shade(hex,amt){ // amt>0 -> toward white, amt<0 -> toward black
+  const c=hexToRgb(hex);
+  return rgbToHex(c.map(v => amt>=0 ? v+(255-v)*amt : v*(1+amt)));
+}
+
+/* ------------------------------------------------- build gem SVG <defs> */
+(function buildDefs(){
+  let d = '';
+  d += '<linearGradient id="rimLight" x1="0" y1="0" x2="1" y2="1">' +
+       '<stop offset="42%" stop-color="#ffffff" stop-opacity="0"/>' +
+       '<stop offset="100%" stop-color="#ffffff" stop-opacity=".8"/></linearGradient>';
+  d += '<linearGradient id="woodG" x1="0" y1="0" x2="0" y2="1">' +
+       '<stop offset="0" stop-color="#D19A5E"/><stop offset="50%" stop-color="#A9713C"/>' +
+       '<stop offset="100%" stop-color="#7A4C26"/></linearGradient>';
+  d += '<linearGradient id="metalG" x1="0" y1="0" x2="0" y2="1">' +
+       '<stop offset="0" stop-color="#C9CFD8"/><stop offset="50%" stop-color="#8E97A3"/>' +
+       '<stop offset="100%" stop-color="#5C646F"/></linearGradient>';
+  for(const t of ALL_TYPES){
+    const c = GEMS[t].color;
+    d += '<radialGradient id="grad_'+t+'" cx="34%" cy="26%" r="78%">' +
+         '<stop offset="0%" stop-color="'+shade(c,.72)+'"/>' +
+         '<stop offset="30%" stop-color="'+shade(c,.28)+'"/>' +
+         '<stop offset="68%" stop-color="'+c+'"/>' +
+         '<stop offset="100%" stop-color="'+shade(c,-.45)+'"/></radialGradient>';
+    d += '<clipPath id="clip_'+t+'">'+SHAPES[t].tag('')+'</clipPath>';
+  }
+  document.getElementById('gemDefsInner').innerHTML = d;
+})();
+
+const STAR = 'M0,-9 L2.2,-2.4 L9,0 L2.2,2.4 L0,9 L-2.2,2.4 L-9,0 L-2.2,-2.4 Z';
+
+/* gemSVG(type, opts) -> markup for one glossy gem */
+function gemSVG(type, opts){
+  opts = opts || {};
+  const s = SHAPES[type];
+  const g = opts.glint !== false ? s.glint.split(',') : null;
+  return '<svg viewBox="-4 -4 108 112" class="gsvg">' +
+    (opts.shadow === false ? '' : '<ellipse cx="50" cy="95" ' + s.shadow + ' fill="#000" opacity=".32"/>') +
+    s.tag('fill="url(#grad_'+type+')"') +
+    '<g clip-path="url(#clip_'+type+')">' + s.facets + '</g>' +
+    '<ellipse ' + s.spec + ' fill="#fff" opacity=".85"/>' +
+    s.tag('fill="none" stroke="url(#rimLight)" stroke-width="3.4" stroke-linejoin="round"') +
+    (g ? '<g class="glint" transform="translate('+g[0]+','+g[1]+')"><path d="'+STAR+'" fill="#fff"/></g>' : '') +
+    '</svg>';
+}
+
+/* ---------------------------------------------------------------- LEVELS */
+const LEVELS = [
+  { id:1, name:'First shift', blurb:'4 types · 4 carts · 2 stations',
+    board:{cols:7,rows:6}, gemTypes:['ruby','emerald','sapphire','topaz'],
+    cartCount:4, cartCapacity:10, stationCount:2, beltSpeed:1.0, spawnWeightK:2.5,
+    stationRefillDelay:0.6,
+    targetQueue:[{type:'ruby',count:6},{type:'emerald',count:5},{type:'sapphire',count:4},
+                 {type:'topaz',count:5},{type:'ruby',count:4}],
+    hint:'Link 3+ matching gems. Carts hold one type, 10 gems max.' },
+  { id:2, name:'Double orders', blurb:'5 types · 4 carts · 3 stations',
+    board:{cols:7,rows:7}, gemTypes:['ruby','emerald','sapphire','topaz','amethyst'],
+    cartCount:4, cartCapacity:10, stationCount:3, beltSpeed:1.0, spawnWeightK:2.0,
+    stationRefillDelay:0.6,
+    targetQueue:[{type:'emerald',count:6},{type:'ruby',count:7},{type:'amethyst',count:5},
+                 {type:'sapphire',count:6},{type:'emerald',count:4},{type:'topaz',count:8},
+                 {type:'ruby',count:5},{type:'amethyst',count:6}] },
+  { id:3, name:'Tight rails', blurb:'6 types · 3 carts · 3 stations',
+    board:{cols:7,rows:7}, gemTypes:['ruby','emerald','sapphire','topaz','amethyst','diamond'],
+    cartCount:3, cartCapacity:10, stationCount:3, beltSpeed:1.1, spawnWeightK:1.5,
+    stationRefillDelay:0.6,
+    targetQueue:[{type:'sapphire',count:8},{type:'topaz',count:6},{type:'ruby',count:9},
+                 {type:'diamond',count:5},{type:'emerald',count:7},{type:'amethyst',count:6},
+                 {type:'sapphire',count:5},{type:'ruby',count:6},{type:'topaz',count:7},
+                 {type:'diamond',count:8}] }
+];
+
+/* --------------------------------------------------------- TRACK GEOMETRY
+   Stadium loop: top straight -> right arc -> bottom straight -> left arc.
+   Clockwise. Arclength parametrisation so carts stay evenly spaced.     */
+const TRACK = { cx:195, cy:156, r:70, L:226 };
+TRACK.P = 2*TRACK.L + 2*Math.PI*TRACK.r;
+TRACK.segTop    = TRACK.L;
+TRACK.segRight  = TRACK.L + Math.PI*TRACK.r;
+TRACK.segBottom = 2*TRACK.L + Math.PI*TRACK.r;
+
+function trackPoint(s, radiusOffset){
+  const T=TRACK, ro = radiusOffset||0, r = T.r + ro;
+  s = ((s % T.P) + T.P) % T.P;
+  if(s < T.segTop){                       // top straight, moving right
+    return {x: T.cx - T.L/2 + s, y: T.cy - r, nx:0, ny:-1};
+  } else if(s < T.segRight){              // right arc
+    const th = -Math.PI/2 + (s - T.segTop)/T.r;
+    return {x: T.cx + T.L/2 + r*Math.cos(th), y: T.cy + r*Math.sin(th),
+            nx: Math.cos(th), ny: Math.sin(th)};
+  } else if(s < T.segBottom){             // bottom straight, moving left
+    return {x: T.cx + T.L/2 - (s - T.segRight), y: T.cy + r, nx:0, ny:1};
+  } else {                                // left arc
+    const th = Math.PI/2 + (s - T.segBottom)/T.r;
+    return {x: T.cx - T.L/2 + r*Math.cos(th), y: T.cy + r*Math.sin(th),
+            nx: Math.cos(th), ny: Math.sin(th)};
+  }
+}
+/* loading anchor = track point closest to the board = bottom straight centre */
+const LOAD_ANCHOR_S = TRACK.segRight + TRACK.L/2;
+function stationTrackS(i, n){ return TRACK.L * (i + 0.5) / n; }
+function fwdDist(from, to){ return ((to - from) % TRACK.P + TRACK.P) % TRACK.P; }
+
+/* stage-space offsets of the bands */
+const BELT_Y = 84, BOARD_Y = 338;
+
+/* ------------------------------------------------------------------- DOM */
+const $ = id => document.getElementById(id);
+const stage=$('stage'), world=$('world'), boardInner=$('boardInner'), boardFrame=$('boardFrame'),
+      linkSvg=$('linkSvg'), cartLayer=$('cartLayer'), stationLayer=$('stationLayer'),
+      trackSvg=$('trackSvg'), queueRow=$('queueRow'), fxLayer=$('fxLayer'),
+      toastEl=$('toast'), dragCount=$('dragCount'), beltGlow=$('beltGlow'),
+      scrMenu=$('scrMenu'), scrEnd=$('scrEnd'), dbgEl=$('dbg'), capOverlay=$('capOverlay'),
+      hintLine=$('hintLine'), lvlTag=$('lvlTag');
+
+/* -------------------------------------------------------------- SCALING */
+let SCALE = 1;
+function fitStage(){
+  const w = window.innerWidth, h = window.innerHeight;
+  SCALE = Math.min(w/390, h/844);
+  stage.style.transform = 'scale(' + SCALE + ')';
+}
+window.addEventListener('resize', fitStage);
+window.addEventListener('orientationchange', ()=>setTimeout(fitStage,120));
+fitStage();
+
+/* ---------------------------------------------------------------- AUDIO */
+let AC = null;
+function ac(){ if(!AC){ try{ AC = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ AC=false; } } return AC; }
+function blip(freq, dur, type, vol){
+  if(!CFG.sound) return; const a = ac(); if(!a) return;
+  try{
+    const o=a.createOscillator(), g=a.createGain();
+    o.type=type||'sine'; o.frequency.value=freq;
+    g.gain.setValueAtTime(0,a.currentTime);
+    g.gain.linearRampToValueAtTime(vol||0.09, a.currentTime+0.008);
+    g.gain.exponentialRampToValueAtTime(0.0001, a.currentTime+(dur||0.1));
+    o.connect(g); g.connect(a.destination); o.start(); o.stop(a.currentTime+(dur||0.1)+0.02);
+  }catch(e){}
+}
+function sfxSelect(n){ blip(420 + Math.min(n,12)*38, 0.07, 'triangle', 0.06); }
+function sfxPop(){ blip(660, 0.09, 'sine', 0.07); }
+function sfxTick(n, of){ blip(500 + (n/Math.max(1,of))*450, 0.08, 'square', 0.045); }
+function sfxErr(){ blip(150, 0.16, 'sawtooth', 0.06); }
+function sfxBurst(){ blip(880,0.16,'triangle',0.1); setTimeout(()=>blip(1320,0.2,'triangle',0.08),70); }
+function sfxWin(){ [523,659,784,1047].forEach((f,i)=>setTimeout(()=>blip(f,0.22,'triangle',0.09), i*110)); }
+function sfxFail(){ [330,262,196].forEach((f,i)=>setTimeout(()=>blip(f,0.3,'sawtooth',0.07), i*140)); }
+
+/* ---------------------------------------------------------------- STATE */
+let S = null;
+let gemUID = 0;
+const DBG = { showCap:false, logFail:false, speedMul:1, kOverride:null, lines:[] };
+
+function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+
+/* ================================================================= SETUP */
+function startLevel(idx){
+  const L = LEVELS[idx];
+  const cols = L.board.cols, rows = L.board.rows;
+  const pad = 12;
+  const cell = Math.min((390 - pad*2)/cols, (434 - pad*2 - 6)/rows);
+  const bw = cell*cols, bh = cell*rows;
+  const ox = (390 - bw)/2, oy = (434 - bh)/2;
+
+  S = {
+    lvlIdx: idx, L: L,
+    cols, rows, cell, ox, oy,
+    cap: L.cartCapacity || CFG.CART_CAPACITY,
+    grid: Array.from({length:rows}, ()=>new Array(cols).fill(null)),
+    carts: [], stations: [],
+    queue: L.targetQueue.map(t=>({type:t.type, count:t.count})),
+    beltPos: 0, beltPaused: false, docking: false,
+    link: { active:false, type:null, cells:[], plan:[] },
+    flying: [], pendingLands: 0,
+    inputLocked: false, over: false,
+    stats: { done:0, biggest:0 },
+    beltSpeed: L.beltSpeed, k: L.spawnWeightK
+  };
+
+  boardFrame.style.left = (ox-8)+'px'; boardFrame.style.top = (oy-8)+'px';
+  boardFrame.style.width = (bw+16)+'px'; boardFrame.style.height = (bh+16)+'px';
+
+  lvlTag.innerHTML = 'Level '+L.id+'<small>'+L.name+'</small>';
+  hintLine.textContent = L.hint || '';
+
+  buildTrackArt();
+  buildCarts();
+  buildStations();
+  generateBoard();
+  loadStationsFromQueue(true);
+  renderQueue();
+  refreshCartVisuals();
+  refreshTypeGating();
+  renderDbg();
+  clearLinkPath();
+  scrEnd.classList.add('hide');
+  scrMenu.classList.add('hide');
+  dbgLog('level ' + L.id + ' started · demand ' + L.targetQueue.reduce((a,t)=>a+t.count,0));
+}
+
+/* ------------------------------------------------------------ track art */
+function buildTrackArt(){
+  const T = TRACK;
+  function stadiumPath(ro){
+    const r = T.r + ro, x0 = T.cx - T.L/2, x1 = T.cx + T.L/2;
+    return 'M'+x0+' '+(T.cy-r)+' L'+x1+' '+(T.cy-r)+
+           ' A'+r+' '+r+' 0 0 1 '+x1+' '+(T.cy+r)+
+           ' L'+x0+' '+(T.cy+r)+
+           ' A'+r+' '+r+' 0 0 1 '+x0+' '+(T.cy-r)+' Z';
+  }
+  let h = '';
+  /* bed: kept dark + desaturated so the warm wooden carts pop against it */
+  h += '<path d="'+stadiumPath(0)+'" fill="none" stroke="rgba(0,0,0,.5)" stroke-width="48"/>';
+  h += '<path d="'+stadiumPath(0)+'" fill="none" stroke="#241A12" stroke-width="40"/>';
+  /* sleepers */
+  const step = 15;
+  for(let s=0; s<T.P-1; s+=step){
+    const a = trackPoint(s, -14), b = trackPoint(s, 14);
+    h += '<line x1="'+a.x.toFixed(1)+'" y1="'+a.y.toFixed(1)+'" x2="'+b.x.toFixed(1)+'" y2="'+b.y.toFixed(1)+
+         '" stroke="#402D1E" stroke-width="6" stroke-linecap="round"/>';
+    h += '<line x1="'+a.x.toFixed(1)+'" y1="'+(a.y-1.4).toFixed(1)+'" x2="'+b.x.toFixed(1)+'" y2="'+(b.y-1.4).toFixed(1)+
+         '" stroke="#563D28" stroke-width="1.8" stroke-linecap="round" opacity=".7"/>';
+  }
+  /* rails */
+  h += '<path d="'+stadiumPath(-11)+'" fill="none" stroke="#1B2027" stroke-width="5"/>';
+  h += '<path d="'+stadiumPath(11)+'" fill="none" stroke="#1B2027" stroke-width="5"/>';
+  h += '<path d="'+stadiumPath(-11)+'" fill="none" stroke="#7E8894" stroke-width="2.4"/>';
+  h += '<path d="'+stadiumPath(11)+'" fill="none" stroke="#7E8894" stroke-width="2.4"/>';
+  h += '<path d="'+stadiumPath(-11.7)+'" fill="none" stroke="#C6CEDA" stroke-width=".9" opacity=".8"/>';
+  h += '<path d="'+stadiumPath(10.3)+'" fill="none" stroke="#C6CEDA" stroke-width=".9" opacity=".8"/>';
+  trackSvg.innerHTML = h;
+
+  const gl = beltGlow.style;
+  gl.left = (T.cx - T.L/2 - T.r - 26)+'px'; gl.top = (T.cy - T.r - 26)+'px';
+  gl.width = (T.L + T.r*2 + 52)+'px'; gl.height = (T.r*2 + 52)+'px';
+}
+
+/* ---------------------------------------------------------------- carts */
+function cartSVG(){
+  return '<svg class="cartBody" viewBox="0 0 60 46">' +
+    '<ellipse cx="30" cy="43.5" rx="25" ry="4.5" fill="#000" opacity=".45"/>' +
+    /* dark interior seen through the open top */
+    '<path d="M7 12 L53 12 L47 37 L13 37 Z" fill="#2A1B0F"/>' +
+    /* wooden front face */
+    '<path d="M7 13.5 L53 13.5 L47 37 L13 37 Z" fill="url(#woodG)"/>' +
+    '<path d="M7 13.5 L53 13.5 L52 18 L8 18 Z" fill="#000" opacity=".28"/>' +
+    '<line x1="21" y1="15" x2="19.4" y2="36" stroke="#4A2F19" stroke-width="1.1" opacity=".5"/>' +
+    '<line x1="30" y1="15" x2="30" y2="36" stroke="#4A2F19" stroke-width="1.1" opacity=".5"/>' +
+    '<line x1="39" y1="15" x2="40.6" y2="36" stroke="#4A2F19" stroke-width="1.1" opacity=".5"/>' +
+    /* gem pile: drawn over the body so cargo is visible */
+    '<g class="pileG"></g>' +
+    /* metal rim on top: the pile tucks behind its lip */
+    '<rect x="4.5" y="9.5" width="51" height="5" rx="2.4" fill="url(#metalG)"/>' +
+    '<rect x="4.5" y="9.5" width="51" height="1.6" rx=".8" fill="#E4EAF2" opacity=".65"/>' +
+    '<path d="M7 13.5 L53 13.5 L47 37 L13 37 Z" fill="none" stroke="#33200F" stroke-width="2" stroke-linejoin="round"/>' +
+    '<rect x="11" y="34" width="38" height="4.2" rx="2.1" fill="url(#metalG)"/>' +
+    '<circle cx="19" cy="40.5" r="5.4" fill="#2B3039"/><circle cx="19" cy="40.5" r="3.4" fill="#5A626D"/>' +
+    '<circle cx="19" cy="40.5" r="1.6" fill="#B6BEC9"/>' +
+    '<circle cx="41" cy="40.5" r="5.4" fill="#2B3039"/><circle cx="41" cy="40.5" r="3.4" fill="#5A626D"/>' +
+    '<circle cx="41" cy="40.5" r="1.6" fill="#B6BEC9"/>' +
+    '</svg>';
+}
+function buildCarts(){
+  cartLayer.innerHTML = '';
+  S.carts = [];
+  const n = S.L.cartCount;
+  for(let i=0;i<n;i++){
+    const el = document.createElement('div');
+    el.className = 'cart';
+    el.innerHTML = '<div class="cHud"><div class="cGhost"></div>' +
+                   '<div class="cCount neutral">0/'+S.cap+'</div></div>' + cartSVG();
+    cartLayer.appendChild(el);
+    S.carts.push({
+      i, type:null, count:0, pending:0, el,
+      hudEl: el.querySelector('.cHud'),
+      countEl: el.querySelector('.cCount'),
+      ghostEl: el.querySelector('.cGhost'),
+      pileG: el.querySelector('.pileG'),
+      offset: TRACK.P * i / n
+    });
+  }
+  updateCartPositions();
+}
+function cartS(c){ return (S.beltPos + c.offset) % TRACK.P; }
+function cartPoint(c){ return trackPoint(cartS(c)); }
+/* stage-space centre of a cart's gem pile */
+function cartStagePos(c){ const p = cartPoint(c); return {x:p.x, y:p.y + BELT_Y - 8}; }
+
+function updateCartPositions(){
+  for(const c of S.carts){
+    const p = cartPoint(c);
+    c.el.style.transform = 'translate('+p.x.toFixed(2)+'px,'+p.y.toFixed(2)+'px)';
+    /* keep the n/10 counter inside the loop, clear of the station cards */
+    const dy = p.ny < -0.5 ? 46 : (p.ny > 0.5 ? -46 : -38);
+    c.hudEl.style.transform = 'translate(-50%,-50%) translateY(' + dy + 'px)';
+  }
+}
+function isNeutral(c){ return c.count === 0 && c.pending === 0; }
+function eff(c){ return c.count + c.pending; }
+
+/* pile drawing: the cart's visible cargo grows with n (pyramid, max 10) */
+const PILE_SLOTS = [
+  [17,31.5],[25,31.5],[33,31.5],[41,31.5],   // bottom row
+  [21,25.5],[29,25.5],[37,25.5],             // second row
+  [25,20],[33,20],                           // third row
+  [29,15]                                    // peak
+];
+function drawPile(c){
+  if(!c.type || c.count === 0){ c.pileG.innerHTML=''; return; }
+  const col = GEMS[c.type].color;
+  const lo = shade(col,-.3), hi = shade(col,.6);
+  const total = Math.min(c.count, PILE_SLOTS.length);
+  let h = '';
+  for(let i=0;i<total;i++){
+    const s = PILE_SLOTS[i];
+    h += '<circle cx="'+s[0]+'" cy="'+s[1]+'" r="4.6" fill="'+lo+'"/>' +
+         '<circle cx="'+s[0]+'" cy="'+s[1]+'" r="3.9" fill="'+col+'"/>' +
+         '<circle cx="'+(s[0]-1.2)+'" cy="'+(s[1]-1.4)+'" r="1.4" fill="'+hi+'" opacity=".9"/>';
+  }
+  c.pileG.innerHTML = h;
+}
+function refreshCartVisuals(){
+  let neutrals = 0;
+  for(const c of S.carts){
+    /* rule 6.3: a cart that reaches 0 becomes neutral the same tick */
+    if(isNeutral(c)){ c.type = null; neutrals++; }
+    const cnt = c.countEl;
+    cnt.textContent = c.count + '/' + S.cap;
+    cnt.className = 'cCount' + (isNeutral(c) ? ' neutral' : (c.count>=S.cap ? ' full' : (c.count>=CFG.WARN_THRESHOLD ? ' warn' : '')));
+    if(c.count >= S.cap) cnt.textContent = 'FULL ' + c.count + '/' + S.cap;
+    drawPile(c);
+  }
+  beltGlow.classList.toggle('on', neutrals === 0);
+  if(DBG.showCap) renderCapOverlay();
+}
+
+/* ------------------------------------------------------------- stations */
+function buildStations(){
+  stationLayer.innerHTML = '';
+  S.stations = [];
+  const n = S.L.stationCount;
+  const cw = n >= 4 ? 56 : (n === 3 ? 70 : 76);
+  for(let i=0;i<n;i++){
+    const s = stationTrackS(i, n);
+    const p = trackPoint(s);
+    const el = document.createElement('div');
+    el.className = 'station';
+    el.style.width = cw + 'px';
+    el.style.left = p.x + 'px';
+    el.style.top = '2px';
+    el.innerHTML =
+      '<div class="ordCard" style="width:'+cw+'px;height:'+(p.y-32)+'px"></div>' +
+      '<div class="chute" style="top:'+(p.y-33)+'px"></div>';
+    stationLayer.appendChild(el);
+    S.stations.push({
+      i, sTrack:s, target:null, closed:false, el,
+      card: el.querySelector('.ordCard'),
+      dock: {x:p.x, y:p.y + BELT_Y}
+    });
+  }
+}
+function renderStation(st, entering){
+  const card = st.card;
+  if(!st.target){
+    if(st.closed){
+      card.className = 'ordCard closed';
+      card.innerHTML = '<div class="closedTxt">CLOSED</div>';
+    } else {
+      card.className = 'ordCard';
+      card.style.opacity = '0';
+      card.innerHTML = '';
+    }
+    return;
+  }
+  const t = st.target;
+  card.style.opacity = '';
+  card.className = 'ordCard' + (entering ? ' enter' : '');
+  card.innerHTML =
+    gemSVG(t.type, {glint:false, shadow:false}) +
+    '<div class="ordCount">' + t.progress + '<i>/' + t.need + '</i></div>' +
+    '<div class="ordProg"><i style="width:' + (100*t.progress/t.need) + '%"></i></div>';
+  if(entering) requestAnimationFrame(()=>requestAnimationFrame(()=>card.classList.remove('enter')));
+}
+function updateStationCounter(st, hit){
+  const t = st.target; if(!t) return;
+  const c = st.card.querySelector('.ordCount');
+  if(c) c.innerHTML = t.progress + '<i>/' + t.need + '</i>';
+  const p = st.card.querySelector('.ordProg i');
+  if(p) p.style.width = (100*t.progress/t.need) + '%';
+  if(hit){ st.card.classList.remove('hit'); void st.card.offsetWidth; st.card.classList.add('hit'); }
+}
+function loadStationsFromQueue(initial){
+  for(const st of S.stations){
+    if(st.target) continue;
+    if(S.queue.length){
+      const q = S.queue.shift();
+      st.target = { type:q.type, need:q.count, progress:0 };
+      st.closed = false;
+      renderStation(st, !initial);
+    } else {
+      st.closed = true; st.target = null;
+      renderStation(st);
+    }
+  }
+  renderQueue();
+}
+
+/* ------------------------------------------------------------ queue UI */
+function renderQueue(){
+  const show = S.queue.slice(0,5);
+  let h = '';
+  for(const q of show){
+    h += '<div class="qCard">' + gemSVG(q.type,{glint:false,shadow:false}) + '<b>' + q.count + '</b></div>';
+  }
+  if(S.queue.length > 5) h += '<div class="qMore">+' + (S.queue.length-5) + '</div>';
+  if(!S.queue.length) h += '<div class="qEmpty">No orders left in the queue</div>';
+  queueRow.innerHTML = h;
+}
+
+/* ============================================================ BOARD GEN */
+function makeGemEl(type, r, c){
+  const el = document.createElement('div');
+  el.className = 'gem';
+  const size = S.cell * 0.94;
+  el.style.width = size+'px'; el.style.height = size+'px';
+  el.innerHTML = '<div class="gbody">' + gemSVG(type) + '</div>';
+  boardInner.appendChild(el);
+  return el;
+}
+function cellCenter(r,c){ return { x: S.ox + c*S.cell + S.cell/2, y: S.oy + r*S.cell + S.cell/2 }; }
+function placeGem(g, animate){
+  const p = cellCenter(g.r, g.c);
+  const size = S.cell*0.94;
+  g.el.classList.toggle('slide', !!animate);
+  g.el.style.transform = 'translate(' + (p.x - size/2).toFixed(2) + 'px,' + (p.y - size/2).toFixed(2) + 'px)';
+}
+function newGem(type, r, c){
+  const g = { id:++gemUID, type, r, c, el:makeGemEl(type,r,c) };
+  g.el.dataset.gid = g.id;
+  S.grid[r][c] = g;
+  return g;
+}
+
+/* -------------------------------------------------- weighted spawner 6.5 */
+function demandOf(type){
+  let d = 0;
+  for(const st of S.stations) if(st.target && st.target.type === type) d += (st.target.need - st.target.progress);
+  for(let i=0;i<Math.min(2, S.queue.length);i++) if(S.queue[i].type === type) d += 0.5 * S.queue[i].count;
+  return d;
+}
+function cartStock(type){ let n=0; for(const c of S.carts) if(c.type===type) n += c.count; return n; }
+function spawnType(){
+  const types = S.L.gemTypes;
+  const dem = {}; let sum = 0;
+  for(const t of types){ dem[t] = demandOf(t); sum += dem[t]; }
+  const denom = Math.max(1, sum);
+  const k = DBG.kOverride !== null ? DBG.kOverride : S.k;
+  const w = []; let wsum = 0;
+  for(const t of types){
+    let x = 1 + k * dem[t] / denom;
+    if(cartStock(t) > 0 && dem[t] === 0) x *= 0.5;   // anti-clog damper
+    w.push(x); wsum += x;
+  }
+  let roll = Math.random() * wsum;
+  for(let i=0;i<types.length;i++){ roll -= w[i]; if(roll <= 0) return types[i]; }
+  return types[types.length-1];
+}
+
+function generateBoard(){
+  boardInner.innerHTML = '';
+  let tries = 0;
+  do {
+    boardInner.innerHTML = '';
+    S.grid = Array.from({length:S.rows}, ()=>new Array(S.cols).fill(null));
+    for(let r=0;r<S.rows;r++) for(let c=0;c<S.cols;c++){
+      const g = newGem(spawnType(), r, c);
+      placeGem(g,false);
+      g.el.classList.add('born');
+    }
+    tries++;
+  } while(!boardHasGroup() && tries < 50);
+  if(tries >= 50) console.warn('[LinkNLoad] board reroll cap (50) hit — shipping board without guaranteed move');
+  scheduleTwinkles();
+}
+function boardHasGroup(){
+  for(const t of S.L.gemTypes) if(largestGroup(t) >= CFG.MIN_LINK) return true;
+  return false;
+}
+function largestGroup(type){
+  const seen = new Set(); let best = 0;
+  for(let r=0;r<S.rows;r++) for(let c=0;c<S.cols;c++){
+    const g = S.grid[r][c];
+    if(!g || g.type !== type || seen.has(g.id)) continue;
+    let n = 0; const st = [[r,c]];
+    seen.add(g.id);
+    while(st.length){
+      const [rr,cc] = st.pop(); n++;
+      for(let dr=-1;dr<=1;dr++) for(let dc=-1;dc<=1;dc++){
+        if(!dr && !dc) continue;
+        const nr=rr+dr, nc=cc+dc;
+        if(nr<0||nc<0||nr>=S.rows||nc>=S.cols) continue;
+        const h = S.grid[nr][nc];
+        if(h && h.type===type && !seen.has(h.id)){ seen.add(h.id); st.push([nr,nc]); }
+      }
+    }
+    if(n > best) best = n;
+  }
+  return best;
+}
+
+/* --------------------------------------------- anti-gravity collapse 6.1 */
+function collapseAndRefill(){
+  const bottomY = S.oy + S.rows*S.cell;
+  for(let c=0;c<S.cols;c++){
+    const stack = [];
+    for(let r=0;r<S.rows;r++) if(S.grid[r][c]) stack.push(S.grid[r][c]);
+    for(let r=0;r<S.rows;r++) S.grid[r][c] = null;
+    /* pack existing gems toward the TOP (gems below slide up) */
+    for(let i=0;i<stack.length;i++){
+      const g = stack[i];
+      g.r = i; S.grid[i][c] = g;
+      placeGem(g, true);
+    }
+    /* new gems enter from BELOW the bottom edge, in rigid formation */
+    const nNew = S.rows - stack.length;
+    for(let k=0;k<nNew;k++){
+      const r = stack.length + k;
+      const g = newGem(spawnType(), r, c);
+      const size = S.cell*0.94;
+      const p = cellCenter(r,c);
+      const startY = bottomY + S.cell/2 + k*S.cell;
+      g.el.style.transform = 'translate(' + (p.x-size/2).toFixed(2) + 'px,' + (startY-size/2).toFixed(2) + 'px)';
+      void g.el.offsetWidth;
+      requestAnimationFrame(()=>{ placeGem(g,true);
+        setTimeout(()=>{ g.el.classList.add('land'); setTimeout(()=>g.el.classList.remove('land'),240); }, CFG.boardRefillSlide);
+      });
+    }
+  }
+  setTimeout(()=>{ refreshTypeGating(); }, CFG.boardRefillSlide+20);
+}
+
+/* twinkle: subtle random glints on a few gems */
+let twinkleTimer = null;
+function scheduleTwinkles(){
+  if(twinkleTimer) clearInterval(twinkleTimer);
+  twinkleTimer = setInterval(()=>{
+    if(!S || document.hidden) return;
+    const all = [];
+    for(let r=0;r<S.rows;r++) for(let c=0;c<S.cols;c++) if(S.grid[r][c]) all.push(S.grid[r][c]);
+    if(!all.length) return;
+    const g = all[(Math.random()*all.length)|0];
+    g.el.classList.remove('twinkle'); void g.el.offsetWidth; g.el.classList.add('twinkle');
+    setTimeout(()=>g.el.classList.remove('twinkle'), 1300);
+  }, 620);
+}
+
+/* ================================================== CAPACITY (rule 6.2) */
+function capacityFor(type){
+  let cap = 0;
+  for(const c of S.carts){
+    if(isNeutral(c)) cap += S.cap;
+    else if(c.type === type) cap += Math.max(0, S.cap - eff(c));
+  }
+  return cap;
+}
+function refreshTypeGating(){
+  const unlinkable = {};
+  for(const t of S.L.gemTypes) unlinkable[t] = capacityFor(t) < CFG.MIN_LINK;
+  for(let r=0;r<S.rows;r++) for(let c=0;c<S.cols;c++){
+    const g = S.grid[r][c]; if(!g) continue;
+    const bad = !!unlinkable[g.type];
+    if(bad !== !!g.dim){
+      g.dim = bad;
+      g.el.classList.toggle('dim', bad);
+      if(bad){
+        const b = document.createElement('div'); b.className='badgeFull'; g.el.appendChild(b);
+      } else {
+        const b = g.el.querySelector('.badgeFull'); if(b) b.remove();
+      }
+    }
+  }
+  refreshCapTags();
+  if(DBG.showCap) renderCapOverlay();
+}
+function refreshCapTags(){
+  for(let r=0;r<S.rows;r++) for(let c=0;c<S.cols;c++){
+    const g = S.grid[r][c]; if(!g) continue;
+    let tag = g.el.querySelector('.capTag');
+    if(DBG.showCap){
+      if(!tag){ tag = document.createElement('div'); tag.className='capTag'; g.el.appendChild(tag); }
+      tag.textContent = capacityFor(g.type);
+    } else if(tag) tag.remove();
+  }
+}
+function renderCapOverlay(){
+  let h = '<div style="color:#FFCC5C;letter-spacing:.1em;font-size:9.5px;margin-bottom:3px">CAPACITY FOR(t)</div>';
+  for(const t of S.L.gemTypes){
+    const v = capacityFor(t);
+    h += '<div><b>' + GEMS[t].name.padEnd(9,' ') + '</b> ' +
+         (v < CFG.MIN_LINK ? '<span class="no">' + v + ' · locked</span>' : v) +
+         ' <span style="opacity:.6">dmd ' + demandOf(t).toFixed(1) + ' · stk ' + cartStock(t) + '</span></div>';
+  }
+  capOverlay.innerHTML = h;
+}
+
+/* ------------------------------------------- distribution plan (rule 6.3) */
+function planDistribution(type, L){
+  const plan = [];
+  const used = new Set();
+  const partials = S.carts.filter(c => !isNeutral(c) && c.type === type && eff(c) < S.cap)
+                          .sort((a,b) => (eff(b)-eff(a)) || (a.i-b.i));
+  let rem = L;
+  for(const c of partials){
+    if(rem <= 0) break;
+    const space = S.cap - eff(c);
+    const amt = Math.min(space, rem);
+    if(amt > 0){ plan.push({cart:c, amount:amt, before:eff(c), claimed:false}); used.add(c.i); rem -= amt; }
+  }
+  while(rem > 0){
+    const empties = S.carts.filter(c => isNeutral(c) && !used.has(c.i));
+    if(!empties.length) break;
+    empties.sort((a,b) => fwdDist(LOAD_ANCHOR_S, cartS(a)) - fwdDist(LOAD_ANCHOR_S, cartS(b)));
+    const c = empties[0];
+    const amt = Math.min(S.cap, rem);
+    plan.push({cart:c, amount:amt, before:0, claimed:true});
+    used.add(c.i); rem -= amt;
+  }
+  return plan;
+}
+
+/* ================================================================ INPUT */
+let ptrActive = false;
+function localFromEvent(e, el){
+  const r = el.getBoundingClientRect();
+  return { x:(e.clientX - r.left)/SCALE, y:(e.clientY - r.top)/SCALE };
+}
+function cellFromPoint(p){
+  const c = Math.floor((p.x - S.ox)/S.cell), r = Math.floor((p.y - S.oy)/S.cell);
+  if(r<0||c<0||r>=S.rows||c>=S.cols) return null;
+  const ctr = cellCenter(r,c);
+  const dx = p.x-ctr.x, dy = p.y-ctr.y;
+  if(dx*dx+dy*dy > (S.cell*0.52)*(S.cell*0.52)) return null;  // forgiving hit disc
+  return {r,c};
+}
+function adjacent8(a,b){ const dr=Math.abs(a.r-b.r), dc=Math.abs(a.c-b.c); return (dr<=1&&dc<=1)&&(dr+dc>0); }
+
+const boardHit = document.createElement('div');
+boardHit.style.cssText = 'position:absolute;inset:0;z-index:8';
+$('boardArea').appendChild(boardHit);
+
+boardHit.addEventListener('pointerdown', e=>{
+  if(!S || S.inputLocked || S.over) return;
+  boardHit.setPointerCapture(e.pointerId);
+  const p = localFromEvent(e, boardHit);
+  const cc = cellFromPoint(p); if(!cc) return;
+  const g = S.grid[cc.r][cc.c]; if(!g) return;
+  if(capacityFor(g.type) < CFG.MIN_LINK){ blockFeedback(g); return; }
+  ptrActive = true;
+  S.link.active = true; S.link.type = g.type; S.link.cells = [cc];
+  markSelected();
+  sfxSelect(1);
+  updateDrag(p);
+});
+boardHit.addEventListener('pointermove', e=>{
+  if(!ptrActive || !S.link.active) return;
+  const p = localFromEvent(e, boardHit);
+  updateDrag(p);
+  const cc = cellFromPoint(p); if(!cc) return;
+  const cells = S.link.cells;
+  const last = cells[cells.length-1];
+  if(cc.r===last.r && cc.c===last.c) return;
+  /* backtrack-deselect */
+  if(cells.length >= 2){
+    const prev = cells[cells.length-2];
+    if(cc.r===prev.r && cc.c===prev.c){
+      cells.pop(); markSelected(); updateDrag(p); sfxSelect(cells.length); return;
+    }
+  }
+  const g = S.grid[cc.r][cc.c]; if(!g || g.type !== S.link.type) return;
+  if(cells.some(x=>x.r===cc.r&&x.c===cc.c)) return;     // simple path, no revisit
+  if(!adjacent8(last, cc)) return;
+  /* capacity gating */
+  if(cells.length + 1 > capacityFor(S.link.type)){ blockFeedback(g); return; }
+  cells.push(cc);
+  markSelected();
+  updateDrag(p);              // keep the ×N bubble in sync with the new length
+  sfxSelect(cells.length);
+});
+function endDrag(){
+  if(!ptrActive) return;
+  ptrActive = false;
+  dragCount.classList.remove('on');
+  resolveLink();
+}
+boardHit.addEventListener('pointerup', endDrag);
+boardHit.addEventListener('pointercancel', endDrag);
+window.addEventListener('pointerup', endDrag);
+
+let lastBlock = 0;
+function blockFeedback(g){
+  g.el.classList.remove('shake'); void g.el.offsetWidth; g.el.classList.add('shake');
+  setTimeout(()=>g.el.classList.remove('shake'), 320);
+  if(Date.now() - lastBlock > 260){ lastBlock = Date.now(); showToast('NO EMPTY SPACE'); sfxErr(); }
+  if(navigator.vibrate) try{ navigator.vibrate(28); }catch(e){}
+}
+let toastT = null;
+function showToast(msg){
+  toastEl.textContent = msg;
+  toastEl.classList.add('on');
+  clearTimeout(toastT);
+  toastT = setTimeout(()=>toastEl.classList.remove('on'), CFG.toastTime);
+}
+
+/* ------------------------------------------------- link visual + preview */
+function markSelected(){
+  const set = new Set(S.link.cells.map(c=>c.r+':'+c.c));
+  for(let r=0;r<S.rows;r++) for(let c=0;c<S.cols;c++){
+    const g = S.grid[r][c]; if(!g) continue;
+    g.el.classList.toggle('sel', set.has(r+':'+c));
+  }
+  drawLinkPath();
+  updatePreview();
+}
+function drawLinkPath(tipX, tipY){
+  const cells = S.link.cells;
+  if(!S.link.active || cells.length === 0){ clearLinkPath(); return; }
+  const col = GEMS[S.link.type].color;
+  let pts = cells.map(c=>cellCenter(c.r,c.c));
+  let d = 'M' + pts.map(p=>p.x.toFixed(1)+' '+p.y.toFixed(1)).join(' L');
+  if(tipX !== undefined) d += ' L' + tipX.toFixed(1) + ' ' + tipY.toFixed(1);
+  let h = '<path d="'+d+'" fill="none" stroke="rgba(0,0,0,.30)" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/>';
+  h += '<path d="'+d+'" fill="none" stroke="'+col+'" stroke-width="9" stroke-linecap="round" stroke-linejoin="round" opacity=".92"/>';
+  h += '<path d="'+d+'" fill="none" stroke="'+shade(col,.55)+'" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" opacity=".85"/>';
+  for(const p of pts) h += '<circle cx="'+p.x.toFixed(1)+'" cy="'+p.y.toFixed(1)+'" r="5" fill="#fff" opacity=".55"/>';
+  linkSvg.innerHTML = h;
+}
+function clearLinkPath(){ linkSvg.innerHTML = ''; }
+function updateDrag(p){
+  drawLinkPath(p.x, p.y);
+  const n = S.link.cells.length;
+  if(n >= 1){
+    dragCount.classList.add('on');
+    dragCount.style.transform = 'translate(' + p.x.toFixed(1) + 'px,' + (p.y + BOARD_Y - 42).toFixed(1) + 'px)';
+    const bub = dragCount.firstElementChild;
+    bub.textContent = '×' + n;
+    bub.style.background = n >= CFG.MIN_LINK ? 'rgba(20,12,6,.86)' : 'rgba(120,26,26,.86)';
+  } else dragCount.classList.remove('on');
+}
+function updatePreview(){
+  for(const c of S.carts){ c.el.classList.remove('destHi'); c.ghostEl.classList.remove('on'); }
+  const n = S.link.cells.length;
+  if(!S.link.active || n === 0) return;
+  const plan = planDistribution(S.link.type, n);
+  S.link.plan = plan;
+  for(const p of plan){
+    p.cart.el.classList.add('destHi');
+    const g = p.cart.ghostEl;
+    g.textContent = p.claimed
+      ? '+' + p.amount + ' → ' + p.amount + '/' + S.cap
+      : p.before + ' → ' + (p.before + p.amount) + '/' + S.cap;
+    g.classList.remove('on'); void g.offsetWidth; g.classList.add('on');
+  }
+}
+
+/* ==================================================== RESOLVE LINK (6.3) */
+function resolveLink(){
+  const cells = S.link.cells.slice();
+  const type = S.link.type;
+  S.link.active = false; S.link.cells = []; S.link.plan = [];
+  clearLinkPath();
+  for(const c of S.carts){ c.el.classList.remove('destHi'); c.ghostEl.classList.remove('on'); }
+  for(let r=0;r<S.rows;r++) for(let c=0;c<S.cols;c++){ const g=S.grid[r][c]; if(g) g.el.classList.remove('sel'); }
+
+  if(cells.length < CFG.MIN_LINK){
+    for(const cc of cells){
+      const g = S.grid[cc.r][cc.c]; if(!g) continue;
+      g.el.classList.remove('wob'); void g.el.offsetWidth; g.el.classList.add('wob');
+      setTimeout(()=>g.el.classList.remove('wob'), 360);
+    }
+    return;
+  }
+
+  const L = cells.length;
+  if(L > S.stats.biggest) S.stats.biggest = L;
+
+  /* reserve capacity immediately: claim cart types & pending counts */
+  const plan = planDistribution(type, L);
+  const targets = [];
+  for(const p of plan){
+    if(p.claimed){ p.cart.type = type; }
+    p.cart.pending += p.amount;
+    for(let i=0;i<p.amount;i++) targets.push(p.cart);
+  }
+  refreshCartVisuals();
+
+  /* fly gems board -> carts, staggered */
+  let idx = 0;
+  for(const cc of cells){
+    const g = S.grid[cc.r][cc.c]; if(!g) continue;
+    const cart = targets[idx] || targets[targets.length-1];
+    const size = S.cell*0.94;
+    const ctr = cellCenter(cc.r, cc.c);
+    const from = { x: ctr.x, y: ctr.y + BOARD_Y };
+    S.grid[cc.r][cc.c] = null;
+    const el = g.el;
+    setTimeout(()=>{
+      el.classList.add('pop');
+      setTimeout(()=>el.remove(), 170);
+      spawnFly(g.type, from, cart, size*0.8);
+      sfxPop();
+    }, idx * CFG.gemFlyStagger);
+    idx++;
+  }
+
+  /* callouts */
+  if(L >= S.cap) showCallout('PERFECT LOAD!');
+  else if(L >= 7) showCallout('Great!');
+
+  collapseAndRefill();
+  refreshTypeGating();
+}
+function showCallout(txt){
+  const d = document.createElement('div');
+  d.className = 'callout'; d.textContent = txt;
+  fxLayer.appendChild(d);
+  setTimeout(()=>d.remove(), 1100);
+  sfxBurst();
+}
+
+/* -------------------------------------------------------- flying gems fx */
+function spawnFly(type, from, cart, size){
+  const el = document.createElement('div');
+  el.className = 'fly';
+  el.style.width = size+'px'; el.style.height = size+'px';
+  el.innerHTML = gemSVG(type, {glint:false});
+  fxLayer.appendChild(el);
+  const f = { el, type, from, cart, size, t:0, dur:CFG.gemFlyTime,
+              spin:(Math.random()*2-1)*180, arc:(Math.random()*0.5+0.5) };
+  S.flying.push(f);
+  S.pendingLands++;
+  return f;
+}
+function updateFlying(dtms){
+  for(let i=S.flying.length-1;i>=0;i--){
+    const f = S.flying[i];
+    f.t += dtms;
+    let k = Math.min(1, f.t / f.dur);
+    const e = 1 - Math.pow(1-k, 2.2);
+    const to = f.toStatic || cartStagePos(f.cart);
+    const mx = (f.from.x + to.x)/2, my = (f.from.y + to.y)/2;
+    const dx = to.x - f.from.x, dy = to.y - f.from.y;
+    const len = Math.hypot(dx,dy) || 1;
+    const cxp = mx + (-dy/len) * len * 0.22 * f.arc;
+    const cyp = my + ( dx/len) * len * 0.22 * f.arc;
+    const u = 1-e;
+    const x = u*u*f.from.x + 2*u*e*cxp + e*e*to.x;
+    const y = u*u*f.from.y + 2*u*e*cyp + e*e*to.y;
+    const sc = 1 - 0.35*e;
+    f.el.style.transform = 'translate(' + (x - f.size/2).toFixed(2) + 'px,' + (y - f.size/2).toFixed(2) +
+                           'px) rotate(' + (f.spin*e).toFixed(1) + 'deg) scale(' + sc.toFixed(3) + ')';
+    if(k >= 1){
+      f.el.remove();
+      S.flying.splice(i,1);
+      S.pendingLands--;
+      if(f.onLand) f.onLand();
+      else landIntoCart(f.cart);
+      if(S.pendingLands === 0){ refreshTypeGating(); settle('flight settled'); }
+    }
+  }
+}
+function landIntoCart(cart){
+  cart.pending = Math.max(0, cart.pending - 1);
+  cart.count = Math.min(S.cap, cart.count + 1);
+  refreshCartVisuals();
+  cart.countEl.classList.remove('tick'); void cart.countEl.offsetWidth; cart.countEl.classList.add('tick');
+  cart.el.classList.remove('squash'); void cart.el.offsetWidth; cart.el.classList.add('squash');
+  setTimeout(()=>cart.el.classList.remove('squash'), 280);
+  blip(300 + cart.count*32, 0.06, 'sine', 0.05);
+}
+function burstParticles(x, y, color, n){
+  for(let i=0;i<(n||10);i++){
+    const p = document.createElement('div');
+    p.className = 'spark';
+    const sz = 5 + Math.random()*7;
+    p.style.width = sz+'px'; p.style.height = sz+'px';
+    p.style.background = i%3===0 ? '#FFF3C4' : color;
+    p.style.transform = 'translate(' + x + 'px,' + y + 'px)';
+    fxLayer.appendChild(p);
+    const a = Math.random()*Math.PI*2, d = 24 + Math.random()*44;
+    requestAnimationFrame(()=>{
+      p.style.transition = 'transform .55s cubic-bezier(.2,.8,.3,1), opacity .55s';
+      p.style.transform = 'translate(' + (x + Math.cos(a)*d) + 'px,' + (y + Math.sin(a)*d + 14) + 'px) scale(.2)';
+      p.style.opacity = '0';
+    });
+    setTimeout(()=>p.remove(), 620);
+  }
+}
+
+/* ================================================ BELT + DOCKING (6.3/6.4) */
+let lastTs = 0;
+function frame(ts){
+  requestAnimationFrame(frame);
+  if(!S) return;
+  const dt = lastTs ? Math.min(60, ts - lastTs) : 16;
+  lastTs = ts;
+  if(!S.beltPaused && !S.over){
+    const lap = CFG.lapTime / (S.beltSpeed * DBG.speedMul);
+    advanceBelt(TRACK.P * dt / lap);
+  }
+  updateCartPositions();
+  updateFlying(dt);
+  if(S.link.active) updatePreview();
+}
+requestAnimationFrame(frame);
+
+/* advance belt, stopping exactly at the first dock event inside this step */
+function advanceBelt(ds){
+  if(S.docking) return;
+  let bestD = ds + 1, bestCart = null, bestSt = null;
+  for(const c of S.carts){
+    if(c.count <= 0 || !c.type) continue;
+    for(const st of S.stations){
+      if(!st.target || st.target.type !== c.type) continue;
+      if(st.target.progress >= st.target.need) continue;
+      const d = fwdDist(cartS(c), st.sTrack);
+      if(d <= ds && d < bestD){ bestD = d; bestCart = c; bestSt = st; }
+    }
+  }
+  if(bestCart){
+    S.beltPos = (S.beltPos + bestD) % TRACK.P;
+    updateCartPositions();
+    dock(bestCart, bestSt);
+  } else {
+    S.beltPos = (S.beltPos + ds) % TRACK.P;
+  }
+}
+
+async function dock(cart, st){
+  S.docking = true; S.beltPaused = true;
+  const t = st.target;
+  const amount = Math.min(cart.count, t.need - t.progress);
+  dbgLog('dock cart#' + cart.i + ' (' + cart.type + ' ' + cart.count + ') → st#' + st.i +
+         ' ' + t.progress + '/' + t.need + ' ⇒ xfer ' + amount);
+  for(let i=0;i<amount;i++){
+    if(!S || S.over) break;
+    cart.count--;
+    t.progress++;
+    const from = cartStagePos(cart);
+    const to = { x: st.dock.x, y: st.dock.y - 30 };
+    flyToStation(cart.type, from, to);
+    refreshCartVisuals();
+    cart.countEl.classList.remove('tick'); void cart.countEl.offsetWidth; cart.countEl.classList.add('tick');
+    updateStationCounter(st, true);
+    sfxTick(i+1, amount);
+    await sleep(CFG.transferTick);
+  }
+  refreshTypeGating();
+
+  if(t.progress >= t.need){
+    /* completion celebration */
+    S.stats.done++;
+    st.card.classList.add('done');
+    burstParticles(st.dock.x, st.dock.y - 34, GEMS[t.type].color, 16);
+    sfxBurst();
+    world.classList.remove('shake'); void world.offsetWidth; world.classList.add('shake');
+    setTimeout(()=>world.classList.remove('shake'), 360);
+    st.target = null;
+    await sleep(560);
+    st.card.classList.remove('done');
+    renderStation(st);
+    await sleep((S.L.stationRefillDelay*1000) || CFG.stationRefillDelay);
+    if(S.queue.length){
+      const q = S.queue.shift();
+      st.target = { type:q.type, need:q.count, progress:0 };
+      renderStation(st, true);
+      renderQueue();
+    } else {
+      st.closed = true;
+      renderStation(st);
+      renderQueue();
+    }
+    refreshTypeGating();
+  }
+  S.beltPaused = false; S.docking = false;
+  settle('delivery finished');
+}
+function flyToStation(type, from, to){
+  const el = document.createElement('div');
+  const size = 22;
+  el.className = 'fly';
+  el.style.width = size+'px'; el.style.height = size+'px';
+  el.innerHTML = gemSVG(type, {glint:false});
+  fxLayer.appendChild(el);
+  const f = { el, from, size, t:0, dur:CFG.transferFlyTime, toStatic:to,
+              spin:(Math.random()*2-1)*140, arc:1, cart:null,
+              onLand(){ burstParticles(to.x, to.y, GEMS[type].color, 4); } };
+  S.flying.push(f); S.pendingLands++;
+}
+
+/* ============================================== WIN / FAIL
+   FAIL = the player has no legal move (NO EMPTY SPACE state: every type is
+   either belt-capped below MIN_LINK or has no 3-group on the board).
+   Design change over GDD 6.6: a delivery still en route no longer postpones
+   the fail — once the player is out of moves, the level is lost.
+   Checks run only between settled events, so a transfer already docking
+   completes (and may free space) before the verdict. */
+function legalMoveExists(){
+  for(const t of S.L.gemTypes){
+    if(capacityFor(t) >= CFG.MIN_LINK && largestGroup(t) >= CFG.MIN_LINK) return true;
+  }
+  return false;
+}
+function possibleDeliveryExists(){  // kept for the debug log only — no longer part of the fail rule
+  for(const c of S.carts){
+    if(eff(c) <= 0 || !c.type) continue;
+    for(const st of S.stations){
+      if(st.target && st.target.type === c.type && st.target.progress < st.target.need) return true;
+    }
+  }
+  return false;
+}
+function settle(reason){
+  if(!S || S.over) return;
+  if(S.pendingLands > 0 || S.docking) return;
+  /* WIN: queue empty and all stations completed/closed */
+  if(S.queue.length === 0 && S.stations.every(st => st.target === null)){
+    endGame(true); return;
+  }
+  const lm = legalMoveExists();
+  if(DBG.logFail) dbgLog('failcheck[' + reason + '] legalMove=' + lm + ' (delivery=' + possibleDeliveryExists() + ') → ' + (!lm ? 'FAIL' : 'ok'));
+  if(!lm) endGame(false);
+}
+
+async function endGame(win){
+  S.over = true; S.inputLocked = true;
+  S.link.active = false; clearLinkPath(); dragCount.classList.remove('on');
+  if(!win){
+    await sleep(CFG.failFreezeHold);
+    sfxFail();
+  } else {
+    sfxWin();
+  }
+  const gems = S.L.gemTypes.slice(0,4).map(t=>gemSVG(t,{glint:false,shadow:false})).join('');
+  const nextIdx = S.lvlIdx + 1;
+  scrEnd.innerHTML =
+    '<div class="gemRow">' + gems + '</div>' +
+    '<h1>' + (win ? 'All orders shipped!' : 'No empty space') + '</h1>' +
+    '<p>' + (win ? 'Level ' + S.L.id + ' — ' + S.L.name + ' cleared.'
+                 : 'No empty space left on the belt — no moves can save the run.') + '</p>' +
+    '<div class="statRow">' +
+      '<div class="statBox"><b>' + S.stats.done + '</b><span>Orders done</span></div>' +
+      '<div class="statBox"><b>' + S.stats.biggest + '</b><span>Biggest link</span></div>' +
+    '</div>' +
+    (win && nextIdx < LEVELS.length
+      ? '<button class="bigBtn" id="btnNext">Next level</button>'
+      : '<button class="bigBtn" id="btnAgain">' + (win ? 'Play again' : 'Restart') + '</button>') +
+    '<button class="bigBtn alt" id="btnBack">Level select</button>';
+  scrEnd.classList.remove('hide');
+  const bn = $('btnNext'), ba = $('btnAgain');
+  if(bn) bn.onclick = ()=>startLevel(nextIdx);
+  if(ba) ba.onclick = ()=>startLevel(S.lvlIdx);
+  $('btnBack').onclick = showMenu;
+}
+
+/* ==================================================== MENU / END SCREENS */
+function showMenu(){
+  const gems = ALL_TYPES.map(t=>gemSVG(t,{glint:false,shadow:false})).join('');
+  scrMenu.innerHTML =
+    '<div class="logoWrap">' +
+      '<div class="gemRow">' + gems + '</div>' +
+      '<h1>LINK N LOAD</h1>' +
+      '<div class="sub">Mine · Load · Ship</div>' +
+    '</div>' +
+    '<p>Link 3+ matching gems. They load into mine carts — one type, 10 gems each. Carts auto-deliver to matching orders on the loop.</p>' +
+    '<div class="lvlList">' +
+      LEVELS.map((L,i)=>'<button class="lvlBtn" data-i="' + i + '"><b>' + L.id + '. ' + L.name + '</b>' +
+        '<span>' + L.blurb + ' · ' + L.targetQueue.length + ' orders · demand ' +
+        L.targetQueue.reduce((a,t)=>a+t.count,0) + '</span></button>').join('') +
+    '</div>';
+  scrMenu.classList.remove('hide');
+  scrEnd.classList.add('hide');
+  scrMenu.querySelectorAll('.lvlBtn').forEach(b=>{
+    b.onclick = ()=>{ ac(); startLevel(+b.dataset.i); };
+  });
+}
+
+/* ============================================================ DEBUG PANEL */
+function dbgLog(s){
+  DBG.lines.push(s);
+  if(DBG.lines.length > 60) DBG.lines.shift();
+  const el = $('dbgLog');
+  if(el){ el.textContent = DBG.lines.slice(-24).join('\n'); el.scrollTop = el.scrollHeight; }
+}
+function renderDbg(){
+  dbgEl.innerHTML =
+    '<h3>Debug</h3>' +
+    '<div class="row">' + LEVELS.map((L,i)=>'<button data-lvl="' + i + '"' +
+      (S && S.lvlIdx===i ? ' class="act"' : '') + '>L' + L.id + '</button>').join('') + '</div>' +
+    '<label>Belt speed <span id="dbgSpd">' + DBG.speedMul.toFixed(2) + '×</span></label>' +
+    '<input type="range" id="rngSpd" min="0.4" max="2.5" step="0.05" value="' + DBG.speedMul + '">' +
+    '<label>Spawner k <span id="dbgK">' + (DBG.kOverride===null ? 'level (' + (S?S.k:'-') + ')' : DBG.kOverride.toFixed(2)) + '</span></label>' +
+    '<input type="range" id="rngK" min="0" max="4" step="0.1" value="' + (DBG.kOverride===null ? (S?S.k:2) : DBG.kOverride) + '">' +
+    '<div class="row">' +
+      '<button id="btnCap"' + (DBG.showCap?' class="act"':'') + '>capacity overlay</button>' +
+    '</div>' +
+    '<div class="row">' +
+      '<button id="btnFail"' + (DBG.logFail?' class="act"':'') + '>log fail-checks</button>' +
+    '</div>' +
+    '<div class="row">' +
+      '<button id="btnFillCarts">fill carts</button>' +
+      '<button id="btnEmptyCarts">empty carts</button>' +
+    '</div>' +
+    '<div class="row"><button id="btnSnd"' + (CFG.sound?' class="act"':'') + '>sound</button>' +
+    '<button id="btnStep">force check</button></div>' +
+    '<div id="dbgLog"></div>';
+
+  dbgEl.querySelectorAll('[data-lvl]').forEach(b=>b.onclick=()=>startLevel(+b.dataset.lvl));
+  $('rngSpd').oninput = e=>{ DBG.speedMul = +e.target.value; $('dbgSpd').textContent = DBG.speedMul.toFixed(2)+'×'; };
+  $('rngK').oninput = e=>{ DBG.kOverride = +e.target.value; $('dbgK').textContent = DBG.kOverride.toFixed(2); };
+  $('btnCap').onclick = e=>{ DBG.showCap = !DBG.showCap; e.target.classList.toggle('act', DBG.showCap);
+    capOverlay.classList.toggle('on', DBG.showCap); refreshCapTags(); if(DBG.showCap) renderCapOverlay(); };
+  $('btnFail').onclick = e=>{ DBG.logFail = !DBG.logFail; e.target.classList.toggle('act', DBG.logFail); };
+  $('btnSnd').onclick = e=>{ CFG.sound = !CFG.sound; e.target.classList.toggle('act', CFG.sound); };
+  $('btnStep').onclick = ()=>{ const l=legalMoveExists(), p=possibleDeliveryExists();
+    dbgLog('manual: legalMove=' + l + ' delivery=' + p + ' win=' + (S.queue.length===0 && S.stations.every(s=>!s.target))); settle('manual'); };
+  $('btnFillCarts').onclick = ()=>{ for(const c of S.carts){ if(!c.type) c.type = S.L.gemTypes[c.i % S.L.gemTypes.length];
+    c.count = S.cap; c.pending = 0; } refreshCartVisuals(); refreshTypeGating(); settle('debug fill'); };
+  $('btnEmptyCarts').onclick = ()=>{ for(const c of S.carts){ c.type=null; c.count=0; c.pending=0; }
+    refreshCartVisuals(); refreshTypeGating(); };
+  $('dbgLog').textContent = DBG.lines.slice(-24).join('\n');
+}
+
+/* ================================================================ BOOT */
+$('btnRestart').onclick = ()=>{ if(S) startLevel(S.lvlIdx); };
+$('btnMenu').onclick = showMenu;
+$('btnDbg').onclick = ()=>{ dbgEl.classList.toggle('on'); if(dbgEl.classList.contains('on')) renderDbg(); };
+document.addEventListener('visibilitychange', ()=>{ lastTs = 0; });
+
+startLevel(0);
+showMenu();
+</script>
+</body>
+</html>
