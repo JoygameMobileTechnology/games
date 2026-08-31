@@ -42,15 +42,15 @@ html,body{width:100%;height:100%;overflow:hidden;background:#140d08;
 /* ============ queue strip ============ */
 .stripHead{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#C9A882;
   font-weight:800;margin:0 0 4px 2px;opacity:.85}
-#queueRow{display:flex;gap:6px;align-items:center;height:52px}
-.qCard{width:43px;height:50px;border-radius:12px;flex:0 0 auto;position:relative;
+#queueRow{display:flex;gap:6px;align-items:center;height:46px}
+.qCard{width:38px;height:44px;border-radius:11px;flex:0 0 auto;position:relative;
   background:linear-gradient(#FFF8EC,#EFE0C8);box-shadow:0 2px 0 rgba(0,0,0,.28),inset 0 -3px 0 rgba(0,0,0,.06);
   display:flex;flex-direction:column;align-items:center;justify-content:center;
   transition:transform .24s cubic-bezier(.34,1.56,.64,1), opacity .24s}
 .qCard.enter{transform:translateX(30px) scale(.6);opacity:0}
-.qCard svg{width:25px;height:25px;display:block;margin-top:-1px}
-.qCard b{font-size:14px;font-weight:800;color:#6B4A2C;line-height:1;margin-top:-1px}
-.qMore{width:38px;height:50px;border-radius:12px;flex:0 0 auto;display:flex;align-items:center;justify-content:center;
+.qCard svg{width:21px;height:21px;display:block;margin-top:-1px}
+.qCard b{font-size:12.5px;font-weight:800;color:#6B4A2C;line-height:1;margin-top:-1px}
+.qMore{width:34px;height:44px;border-radius:12px;flex:0 0 auto;display:flex;align-items:center;justify-content:center;
   background:rgba(255,248,236,.13);border:2px dashed rgba(255,248,236,.32);color:#F3E3C8;font-weight:800;font-size:12px}
 .qEmpty{color:#C9A882;font-size:11.5px;font-weight:700;opacity:.8;padding-left:4px}
 
@@ -91,9 +91,9 @@ html,body{width:100%;height:100%;overflow:hidden;background:#140d08;
   box-shadow:0 3px 0 rgba(0,0,0,.32),inset 0 -3px 0 rgba(0,0,0,.07);
   display:flex;align-items:center;justify-content:center;
   transition:transform .3s cubic-bezier(.34,1.56,.64,1),opacity .3s}
-.ordCard svg{width:31px;height:31px;flex:0 0 auto;margin-left:-3px}
-.ordCount{font-size:15px;font-weight:800;color:#6B4A2C;line-height:1;letter-spacing:-.4px}
-.ordCount i{font-style:normal;color:#AD9070;font-size:12.5px}
+.ordCard svg{width:23px;height:23px;flex:0 0 auto;margin-left:-2px}
+.ordCount{font-size:13px;font-weight:800;color:#6B4A2C;line-height:1;letter-spacing:-.4px}
+.ordCount i{font-style:normal;color:#AD9070;font-size:10.5px}
 .ordCard.done{animation:ordDone .55s ease-out forwards}
 @keyframes ordDone{0%{transform:scale(1)}22%{transform:scale(1.24)}100%{transform:translateY(-70px) scale(.35);opacity:0}}
 .ordCard.enter{transform:translateY(-46px) scale(.55);opacity:0}
@@ -101,8 +101,10 @@ html,body{width:100%;height:100%;overflow:hidden;background:#140d08;
 .ordCard.hit{animation:ordHit .18s ease-out}
 @keyframes ordHit{0%{transform:scale(1)}50%{transform:scale(1.08)}100%{transform:scale(1)}}
 .closedTxt{font-size:9.5px;font-weight:800;color:#BCA98F;letter-spacing:.05em}
-.chute{position:absolute;left:50%;transform:translateX(-50%);width:28px;height:15px;
-  background:linear-gradient(#7A5B3A,#553D26);clip-path:polygon(0 0,100% 0,74% 100%,26% 100%);}
+.chute{position:absolute;left:50%;transform:translateX(-50%);width:22px;height:14px;
+  background:linear-gradient(#7A5B3A,#553D26);clip-path:polygon(0 0,100% 0,74% 100%,26% 100%)}
+.drop{position:absolute;left:50%;transform:translateX(-50%);width:3px;border-radius:2px;
+  background:linear-gradient(rgba(122,91,58,.85),rgba(122,91,58,.15))}
 .ordProg{position:absolute;left:6px;right:6px;bottom:4px;height:4px;border-radius:3px;background:rgba(107,74,44,.16);overflow:hidden}
 .ordProg i{display:block;height:100%;width:0;border-radius:3px;background:#4CD07A;transition:width .18s ease-out}
 
@@ -473,7 +475,7 @@ const LEVELS = [
 /* --------------------------------------------------------- TRACK GEOMETRY
    Stadium loop: top straight -> right arc -> bottom straight -> left arc.
    Clockwise. Arclength parametrisation so carts stay evenly spaced.     */
-const TRACK = { cx:195, cy:156, r:70, L:226 };
+const TRACK = { cx:195, cy:174, r:52, L:226 };   // top straight lowered to clear room for cart badges
 TRACK.P = 2*TRACK.L + 2*Math.PI*TRACK.r;
 TRACK.segTop    = TRACK.L;
 TRACK.segRight  = TRACK.L + Math.PI*TRACK.r;
@@ -691,7 +693,7 @@ function updateCartPositions(){
     const p = cartPoint(c);
     c.el.style.transform = 'translate('+p.x.toFixed(2)+'px,'+p.y.toFixed(2)+'px)';
     /* keep the n/10 counter inside the loop, clear of the station cards */
-    const dy = p.ny < -0.5 ? 46 : (p.ny > 0.5 ? -46 : -38);
+    const dy = -44;   // capacity badge always rides above the wagon
     c.hudEl.style.transform = 'translate(-50%,-50%) translateY(' + dy + 'px)';
   }
 }
@@ -739,7 +741,7 @@ function buildStations(){
   stationLayer.innerHTML = '';
   S.stations = [];
   const n = S.L.stationCount;
-  const cw = n >= 4 ? 56 : (n === 3 ? 70 : 76);
+  const cw = n >= 4 ? 46 : (n === 3 ? 54 : 60);
   for(let i=0;i<n;i++){
     const s = stationTrackS(i, n);
     const p = trackPoint(s);
@@ -749,8 +751,9 @@ function buildStations(){
     el.style.left = p.x + 'px';
     el.style.top = '2px';
     el.innerHTML =
-      '<div class="ordCard" style="width:'+cw+'px;height:'+(p.y-32)+'px"></div>' +
-      '<div class="chute" style="top:'+(p.y-33)+'px"></div>';
+      '<div class="ordCard" style="width:'+cw+'px;height:40px"></div>' +
+      '<div class="chute" style="top:42px"></div>' +
+      '<div class="drop" style="top:56px;height:'+(p.y-26-56)+'px"></div>';
     stationLayer.appendChild(el);
     S.stations.push({
       i, sTrack:s, target:null, closed:false, el,
@@ -1346,7 +1349,7 @@ async function dock(cart, st){
     cart.count--;
     t.progress++;
     const from = cartStagePos(cart);
-    const to = { x: st.dock.x, y: st.dock.y - 30 };
+    const to = { x: st.dock.x, y: BELT_Y + 58 };   // chute tip under the order card
     flyToStation(cart.type, from, to);
     refreshCartVisuals();
     cart.countEl.classList.remove('tick'); void cart.countEl.offsetWidth; cart.countEl.classList.add('tick');
