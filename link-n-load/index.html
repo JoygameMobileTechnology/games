@@ -70,6 +70,8 @@ html,body{width:100%;height:100%;overflow:hidden;background:#140d08;
   filter:drop-shadow(0 2px 4px rgba(0,0,0,.7))}
 .cart.squash .cartBody{animation:cartSquash .26s ease-out}
 @keyframes cartSquash{0%{transform:scale(1,1)}35%{transform:scale(1.13,.85)}100%{transform:scale(1,1)}}
+.cart.shakeC .cartBody{animation:cartJolt .55s ease-out}
+@keyframes cartJolt{0%,100%{transform:translateX(0) rotate(0)}15%{transform:translateX(-6px) rotate(-4deg)}35%{transform:translateX(6px) rotate(4deg)}55%{transform:translateX(-4px) rotate(-2.5deg)}75%{transform:translateX(3px) rotate(1.5deg)}}
 .cHud{position:absolute;left:50%;top:50%;z-index:3;
   display:flex;flex-direction:column;align-items:center;gap:2px;
   transform:translate(-50%,-50%) translateY(-38px)}
@@ -610,6 +612,7 @@ function startLevel(idx){
     inputLocked: false, over: false,
     stats: { done:0, biggest:0 },
     movesLeft: L.moves || 50,
+    retired: new Set(),
     beltSpeed: L.beltSpeed, k: L.spawnWeightK
   };
 
@@ -918,7 +921,8 @@ function demandOf(type){
 }
 function cartStock(type){ let n=0; for(const c of S.carts) if(c.type===type) n += c.count; return n; }
 function spawnType(){
-  const types = S.L.gemTypes;
+  const types = S.L.gemTypes.filter(t => !S.retired.has(t));
+  if(!types.length) return null;   // every type retired — nothing left to spawn
   const dem = {}; let sum = 0;
   for(const t of types){ dem[t] = demandOf(t); sum += dem[t]; }
   const denom = Math.max(1, sum);
@@ -993,7 +997,9 @@ function collapseAndRefill(){
     const nNew = S.rows - stack.length;
     for(let k=0;k<nNew;k++){
       const r = stack.length + k;
-      const g = newGem(spawnType(), r, c);
+      const nt = spawnType();
+      if(!nt) continue;                       // all types retired — leave the hole
+      const g = newGem(nt, r, c);
       const size = S.cell*0.94;
       const p = cellCenter(r,c);
       const startY = bottomY + S.cell/2 + k*S.cell;
@@ -1334,6 +1340,7 @@ function updateFlying(dtms){
       S.flying.splice(i,1);
       S.pendingLands--;
       if(f.onLand) f.onLand();
+      else if(S.retired.has(f.type)){ f.cart.pending = Math.max(0, f.cart.pending - 1); refreshCartVisuals(); }
       else landIntoCart(f.cart);
       if(S.pendingLands === 0){ refreshTypeGating(); settle('flight settled'); }
     }
@@ -1453,9 +1460,67 @@ async function completeOrder(st){
   }
   renderStationQueue(st);
   st.refilling = false;
+  checkRetirement();
   refreshTypeGating();
   settle('delivery finished');
 }
+
+/* =============================================== TYPE RETIREMENT
+   When a type has no remaining demand anywhere (no active target, nothing
+   queued at any station), it leaves the level: wagons shake their leftover
+   gems out, every board copy shatters, and the spawner stops producing it. */
+function typeStillWanted(t){
+  for(const st of S.stations){
+    if(st.target && st.target.type === t) return true;
+    for(const q of st.queue) if(q.type === t) return true;
+  }
+  return false;
+}
+function checkRetirement(){
+  for(const t of S.L.gemTypes){
+    if(!S.retired.has(t) && !typeStillWanted(t)) retireType(t);
+  }
+}
+function retireType(t){
+  S.retired.add(t);
+  dbgLog('type retired: ' + t);
+  /* cancel a link of that type mid-drag */
+  if(S.link.active && S.link.type === t){
+    ptrActive = false;
+    S.link.active = false; S.link.cells = [];
+    clearLinkPath(); dragCount.classList.remove('on');
+    for(let r=0;r<S.rows;r++) for(let c=0;c<S.cols;c++){ const g=S.grid[r][c]; if(g) g.el.classList.remove('sel'); }
+    for(const c of S.carts){ c.el.classList.remove('destHi'); c.ghostEl.classList.remove('on'); }
+  }
+  /* wagons shake out their leftover gems */
+  for(const c of S.carts){
+    if(c.type !== t || c.count <= 0) continue;
+    const pos = cartStagePos(c);
+    burstParticles(pos.x, pos.y, GEMS[t].color, 10);
+    c.count = 0;
+    c.unload = null;
+    c.el.classList.remove('shakeC'); void c.el.offsetWidth; c.el.classList.add('shakeC');
+    setTimeout(()=>c.el.classList.remove('shakeC'), 580);
+  }
+  /* board copies shatter simultaneously */
+  let exploded = 0;
+  for(let r=0;r<S.rows;r++) for(let c=0;c<S.cols;c++){
+    const g = S.grid[r][c];
+    if(!g || g.type !== t) continue;
+    S.grid[r][c] = null;
+    exploded++;
+    const ctr = cellCenter(r, c);
+    burstParticles(ctr.x, ctr.y + BOARD_Y, GEMS[t].color, 6);
+    g.el.classList.add('pop');
+    setTimeout(((el)=>()=>el.remove())(g.el), 180);
+  }
+  sfxBurst();
+  showCallout(GEMS[t].name + ' cleared!');
+  if(exploded) collapseAndRefill();
+  refreshCartVisuals();
+  refreshTypeGating();
+}
+
 function flyToStation(type, from, to){
   const el = document.createElement('div');
   const size = 22;
