@@ -1,0 +1,1747 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Roll N Serve — prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+/* ============ base ============ */
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{width:100%;height:100%;overflow:hidden;background:#F3E3E0;
+  font-family:"Baloo 2",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  -webkit-user-select:none;user-select:none;touch-action:none}
+#fit{position:fixed;inset:0;display:flex;align-items:center;justify-content:center}
+#stage{width:390px;height:844px;position:relative;transform-origin:center center;
+  overflow:hidden;background:#FBF3EF;box-shadow:0 24px 60px rgba(120,70,80,.35)}
+#world{position:absolute;inset:0;will-change:transform}
+
+/* ============ cave backdrop ============ */
+#bg{position:absolute;inset:0;
+  background:
+   radial-gradient(150px 110px at 14% 36%, rgba(255,255,255,.55), transparent 72%),
+   radial-gradient(170px 130px at 90% 44%, rgba(255,220,228,.5), transparent 72%),
+   linear-gradient(180deg, #FCF9F4 0%, #FAEFEA 46%, #F6DFE0 100%)}
+#bg::after{content:"";position:absolute;inset:0;opacity:.4;
+  background-image:radial-gradient(rgba(255,255,255,.5) 1px, transparent 1px),
+    radial-gradient(rgba(210,160,165,.12) 1px, transparent 1px);
+  background-size:7px 7px, 11px 11px;background-position:0 0, 4px 6px}
+#vign{position:absolute;inset:0;pointer-events:none;z-index:50;
+  box-shadow:inset 0 0 110px 40px rgba(214,160,170,.28), inset 0 0 36px 4px rgba(214,160,170,.14)}
+
+/* ============ layout bands ============ */
+#beltArea{position:absolute;left:0;top:0;width:390px;height:338px}
+#boardArea{position:absolute;left:0;top:338px;width:390px;height:434px}
+#hud{position:absolute;left:0;top:772px;width:390px;height:72px;padding:8px 12px}
+#fxLayer{position:absolute;inset:0;pointer-events:none;z-index:60}
+
+/* ============ per-station target queues (stacked above each station) ============ */
+.qStack{position:absolute;left:50%;transform:translateX(-50%);bottom:100%;margin-bottom:5px;
+  display:flex;flex-direction:column-reverse;align-items:center;gap:4px}
+.qMini{width:46px;height:32px;border-radius:9px;flex:0 0 auto;
+  background:linear-gradient(#FFFFFF,#F4E6E0);box-shadow:0 2px 0 rgba(150,90,100,.28);
+  display:flex;align-items:center;justify-content:center;gap:2px;
+  transition:transform .25s cubic-bezier(.34,1.56,.64,1),opacity .25s}
+.qMini svg{width:17px;height:17px;flex:0 0 auto}
+.qMini b{font-size:11px;font-weight:800;color:#7A4650;line-height:1}
+.qMini.far{transform:scale(.9);opacity:.72}
+.qMoreChip{font-size:9.5px;font-weight:800;color:#B07A85;background:rgba(255,255,255,.5);
+  border:1.5px dashed rgba(176,122,133,.45);border-radius:8px;padding:0 7px;line-height:1.6}
+
+/* ============ belt / track ============ */
+#trackSvg{position:absolute;left:0;top:0;width:390px;height:338px;overflow:visible}
+#cartLayer,#stationLayer{position:absolute;left:0;top:0;width:390px;height:338px}
+#cartLayer,#beltGlow,#trackSvg,#movesPill{pointer-events:none}   /* taps must reach the station queue minis below */
+#movesPill{position:absolute;left:50%;transform:translateX(-50%);top:4px;z-index:5;width:82px;padding:4px 0 6px;text-align:center;
+  background:linear-gradient(#FFFFFF,#F6E7E2);border-radius:12px;box-shadow:0 3px 0 rgba(150,90,100,.35)}
+#movesPill small{display:block;font-size:9px;font-weight:800;letter-spacing:.14em;color:#C08691}
+#movesPill b{display:block;font-size:27px;font-weight:800;color:#6E3D46;line-height:1.05}
+#movesPill.low b{color:#D63A50}
+#movesPill.low{animation:pulseGlow 1.2s ease-in-out infinite}
+#beltGlow{position:absolute;pointer-events:none;opacity:0;transition:opacity .3s;border-radius:999px}
+#beltGlow.on{opacity:1;animation:pulseGlow 1.5s ease-in-out infinite}
+@keyframes pulseGlow{0%,100%{opacity:.4}50%{opacity:1}}
+
+.cart{position:absolute;left:0;top:0;width:66px;height:66px;margin-left:-33px;margin-top:-34px;will-change:transform}
+.cart .cartBody{position:absolute;left:0;top:.5px;width:66px;height:50.6px;transform-origin:50% 90%;
+  filter:drop-shadow(0 2px 4px rgba(0,0,0,.7))}
+.cart.squash .cartBody{animation:cartSquash .26s ease-out}
+@keyframes cartSquash{0%{transform:scale(1,1)}35%{transform:scale(1.13,.85)}100%{transform:scale(1,1)}}
+.cart.shakeC .cartBody{animation:cartJolt .55s ease-out}
+@keyframes cartJolt{0%,100%{transform:translateX(0) rotate(0)}15%{transform:translateX(-6px) rotate(-4deg)}35%{transform:translateX(6px) rotate(4deg)}55%{transform:translateX(-4px) rotate(-2.5deg)}75%{transform:translateX(3px) rotate(1.5deg)}}
+.cHud{position:absolute;left:50%;top:50%;z-index:3;
+  display:flex;flex-direction:column;align-items:center;gap:2px;
+  transform:translate(-50%,-50%) translateY(-38px)}
+.cCount{font-size:13px;font-weight:800;color:#5C3A41;background:#FFFFFF;
+  padding:0 7px;border-radius:9px;white-space:nowrap;line-height:1.5;
+  box-shadow:0 2px 0 rgba(0,0,0,.3)}
+.cCount.warn{background:#FFCC5C;color:#5A3A00}
+.cCount.full{background:#FF4D5E;color:#fff}
+.cCount.neutral{background:rgba(255,255,255,.62);color:#8A6B70}
+.cCount.tick{animation:cTick .2s ease-out}
+@keyframes cTick{0%{transform:translateX(-50%) scale(1)}45%{transform:translateX(-50%) scale(1.32)}100%{transform:translateX(-50%) scale(1)}}
+.cGhost{font-size:11px;font-weight:800;color:#12351f;background:#8CE99A;padding:0 6px;border-radius:8px;
+  line-height:1.6;white-space:nowrap;box-shadow:0 2px 0 rgba(0,0,0,.3);opacity:0;transition:opacity .1s}
+.cGhost.on{opacity:1;animation:ghostPop .22s cubic-bezier(.34,1.56,.64,1)}
+@keyframes ghostPop{0%{transform:scale(.6)}100%{transform:scale(1)}}
+.cart.destHi .cartBody{filter:drop-shadow(0 0 7px rgba(140,233,154,.95))}
+.cartPile{position:absolute;left:0;top:0;width:60px;height:46px;pointer-events:none}
+
+/* ============ stations ============ */
+.station{position:absolute;left:0;top:0;transform:translate(-50%,0);text-align:center}
+.ordCard{border-radius:14px;position:relative;
+  background:linear-gradient(#FFFFFF,#F4E6E0);
+  box-shadow:0 3px 0 rgba(150,90,100,.3),inset 0 -3px 0 rgba(150,90,100,.06);
+  display:flex;align-items:center;justify-content:center;
+  transition:transform .3s cubic-bezier(.34,1.56,.64,1),opacity .3s}
+.ordCard svg{width:23px;height:23px;flex:0 0 auto;margin-left:-2px}
+.ordCount{font-size:13px;font-weight:800;color:#7A4650;line-height:1;letter-spacing:-.4px}
+.ordCount i{font-style:normal;color:#C39AA3;font-size:10.5px}
+.ordCard.done{animation:ordDone .55s ease-out forwards}
+@keyframes ordDone{0%{transform:scale(1)}22%{transform:scale(1.24)}100%{transform:translateY(-70px) scale(.35);opacity:0}}
+.ordCard.enter{transform:translateY(-46px) scale(.55);opacity:0}
+.ordCard.closed{background:linear-gradient(#D9C8C4,#C4B0AC);box-shadow:0 3px 0 rgba(150,90,100,.25)}
+.ordCard.hit{animation:ordHit .18s ease-out}
+@keyframes ordHit{0%{transform:scale(1)}50%{transform:scale(1.08)}100%{transform:scale(1)}}
+.closedTxt{font-size:9.5px;font-weight:800;color:#7E6165;letter-spacing:.05em}
+.chute{position:absolute;left:50%;transform:translateX(-50%);width:22px;height:14px;
+  background:linear-gradient(#E2758A,#C95A70);clip-path:polygon(0 0,100% 0,74% 100%,26% 100%)}
+.drop{position:absolute;left:50%;transform:translateX(-50%);width:3px;border-radius:2px;
+  background:linear-gradient(rgba(201,90,112,.7),rgba(201,90,112,.1))}
+.ordProg{position:absolute;left:6px;right:6px;bottom:4px;height:4px;border-radius:3px;background:rgba(107,74,44,.16);overflow:hidden}
+.ordProg i{display:block;height:100%;width:0;border-radius:3px;background:#4CD07A;transition:width .18s ease-out}
+
+/* ============ board ============ */
+#boardInner{position:absolute;left:0;top:0;width:390px;height:434px}
+#boardFrame{position:absolute;border-radius:22px;pointer-events:none;
+  background:rgba(255,255,255,.55);box-shadow:inset 0 0 0 2px rgba(226,117,138,.16), inset 0 8px 22px rgba(190,130,140,.16)}
+#linkSvg{position:absolute;left:0;top:0;width:390px;height:434px;pointer-events:none;z-index:5;overflow:visible}
+.gem{position:absolute;left:0;top:0;will-change:transform;z-index:2}
+.gem svg{width:100%;height:100%;display:block;overflow:visible}
+.gem.slide{transition:transform .18s cubic-bezier(.22,1.35,.55,1)}
+.gem.sel{z-index:4}
+.gem .gbody{transform-origin:50% 55%;display:block;width:100%;height:100%}
+.gem.sel .gbody{animation:gemSel .16s ease-out forwards}
+@keyframes gemSel{to{transform:scale(1.15)}}
+.gem.dim .gbody{filter:saturate(.4) brightness(.8)}
+.gem.pop .gbody{animation:gemPop .15s ease-in forwards}
+@keyframes gemPop{to{transform:scale(1.4);opacity:0}}
+.gem.wob .gbody{animation:gemWob .34s ease-out}
+@keyframes gemWob{0%,100%{transform:rotate(0)}25%{transform:rotate(-9deg)}55%{transform:rotate(7deg)}80%{transform:rotate(-3deg)}}
+.gem.shake .gbody{animation:gemShake .3s ease-out}
+@keyframes gemShake{0%,100%{transform:translateX(0)}20%{transform:translateX(-5px)}40%{transform:translateX(5px)}60%{transform:translateX(-3px)}80%{transform:translateX(3px)}}
+.gem.land .gbody{animation:gemLand .22s ease-out}
+@keyframes gemLand{0%{transform:scale(1.18,.82)}60%{transform:scale(.95,1.05)}100%{transform:scale(1,1)}}
+.gem.born .gbody{animation:gemBorn .28s cubic-bezier(.34,1.56,.64,1)}
+@keyframes gemBorn{0%{transform:scale(.55)}100%{transform:scale(1)}}
+.badgeFull{position:absolute;right:0;top:0;width:15px;height:15px;border-radius:50%;
+  background:#3B2A18;border:2px solid #FFCC5C;display:flex;align-items:center;justify-content:center;z-index:6}
+.badgeFull::after{content:"";width:6px;height:4px;border:1.6px solid #FFCC5C;border-top:none;border-radius:0 0 2px 2px}
+.capTag{position:absolute;left:50%;transform:translateX(-50%);bottom:-5px;font-size:9px;font-weight:800;
+  color:#fff;background:rgba(0,0,0,.66);padding:0 4px;border-radius:5px;z-index:7;line-height:1.5}
+.glint{opacity:0;transform-origin:center}
+.gem.twinkle .glint{animation:twk 1.2s ease-in-out}
+@keyframes twk{0%,100%{opacity:0;transform:scale(.3) rotate(0)}45%{opacity:.95;transform:scale(1.2) rotate(40deg)}}
+
+/* ============ boosters ============ */
+#boosterBar{position:absolute;left:0;bottom:6px;width:390px;height:50px;z-index:20;
+  display:flex;align-items:center;justify-content:center;gap:10px}
+.boostBtn{position:relative;width:112px;height:46px;border-radius:14px;border:0;font:inherit;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;gap:6px;
+  color:#6E3D46;background:linear-gradient(#FFFFFF,#F4E6E0);box-shadow:0 3px 0 rgba(150,90,100,.32)}
+.boostBtn:active{transform:translateY(2px);box-shadow:0 1px 0 rgba(150,90,100,.32)}
+.boostBtn svg{width:22px;height:22px;flex:0 0 auto}
+.boostBtn span{font-size:10.5px;font-weight:800;line-height:1.05;text-align:left;max-width:56px}
+.adTag{position:absolute;right:-5px;top:-7px;font-style:normal;font-size:8.5px;font-weight:800;
+  color:#7A3D14;background:#FFC94D;border-radius:6px;padding:1px 5px;letter-spacing:.04em;
+  box-shadow:0 1px 0 rgba(0,0,0,.35)}
+.adTag::before{content:"▶";font-size:6.5px;margin-right:2px}
+.boostBtn.armed{background:linear-gradient(#FFD9E0,#F5B9C6);box-shadow:0 3px 0 #C98495}
+#stationLayer.picking .qMini{cursor:pointer;animation:pickPulse .9s ease-in-out infinite}
+@keyframes pickPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.12)}}
+#stationLayer.picking .qMini.far{opacity:1}
+
+/* ============ hud ============ */
+#hud{display:flex;align-items:center;gap:7px}
+.hudBtn{height:38px;padding:0 13px;border-radius:13px;border:0;font:inherit;font-weight:800;font-size:13px;
+  color:#6E3D46;background:linear-gradient(#FFFFFF,#F4E6E0);box-shadow:0 3px 0 rgba(150,90,100,.32);cursor:pointer}
+.hudBtn:active{transform:translateY(2px);box-shadow:0 1px 0 rgba(150,90,100,.32)}
+.hudBtn.ghost{background:rgba(255,255,255,.5);color:#9A6570;box-shadow:0 3px 0 rgba(150,90,100,.2)}
+#lvlTag{font-size:12.5px;font-weight:800;color:#6E3D46;line-height:1.15}
+#lvlTag small{display:block;font-size:10px;color:#B07A85;font-weight:700}
+#hintLine{position:absolute;left:12px;right:12px;top:-1px;font-size:10.5px;color:#A87680;font-weight:700;text-align:center}
+
+/* ============ fx ============ */
+.fly{position:absolute;left:0;top:0;z-index:70;will-change:transform}
+.fly svg{width:100%;height:100%;display:block}
+#toast{position:absolute;left:50%;top:300px;transform:translate(-50%,0) scale(.8);
+  background:#FF4D5E;color:#fff;font-weight:800;font-size:13px;letter-spacing:.06em;
+  padding:7px 16px;border-radius:14px;box-shadow:0 4px 0 rgba(0,0,0,.35);opacity:0;
+  transition:opacity .16s,transform .16s;z-index:80;white-space:nowrap}
+#toast.on{opacity:1;transform:translate(-50%,-8px) scale(1)}
+#dragCount{position:absolute;left:0;top:0;z-index:78;pointer-events:none;opacity:0;transition:opacity .1s}
+#dragCount.on{opacity:1}
+#dragCount .bub{font-size:18px;font-weight:800;color:#fff;padding:2px 11px;border-radius:14px;
+  background:rgba(20,12,6,.84);box-shadow:0 0 0 2px rgba(255,255,255,.26);white-space:nowrap;
+  transform:translate(-50%,-50%)}
+.callout{position:absolute;left:50%;top:320px;z-index:82;
+  font-size:25px;font-weight:800;color:#E2758A;text-shadow:0 2px 0 #FFFFFF,0 0 18px rgba(226,117,138,.5);
+  animation:callo 1.05s ease-out forwards;white-space:nowrap}
+@keyframes callo{0%{opacity:0;transform:translate(-50%,10px) scale(.5)}
+  20%{opacity:1;transform:translate(-50%,-6px) scale(1.16)}
+  38%{transform:translate(-50%,-8px) scale(1)}
+  100%{opacity:0;transform:translate(-50%,-44px) scale(1)}}
+.spark{position:absolute;border-radius:50%;z-index:75;will-change:transform,opacity}
+#world.shake{animation:wshake .34s ease-out}
+@keyframes wshake{0%,100%{transform:translate(0,0)}
+ 15%{transform:translate(-4px,3px)}35%{transform:translate(5px,-3px)}
+ 55%{transform:translate(-3px,-2px)}78%{transform:translate(2px,2px)}}
+
+/* ============ overlays ============ */
+.screen{position:absolute;inset:0;z-index:120;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:13px;padding:26px;
+  background:rgba(252,244,240,.93);text-align:center}
+.screen.hide{display:none}
+.screen h1{font-size:29px;color:#E2758A;text-shadow:0 3px 0 rgba(150,70,90,.35);line-height:1.1}
+.screen h2{font-size:19px;color:#FFF6E6;font-weight:800}
+.screen p{font-size:13px;color:#96636D;font-weight:700;max-width:300px;line-height:1.5}
+.bigBtn{height:52px;padding:0 30px;border-radius:18px;border:0;font:inherit;font-weight:800;font-size:17px;
+  color:#FFFFFF;background:linear-gradient(#F08CA0,#E2758A);box-shadow:0 5px 0 #B75468;cursor:pointer;margin-top:4px}
+.bigBtn:active{transform:translateY(3px);box-shadow:0 2px 0 #B75468}
+.bigBtn.alt{background:linear-gradient(#FFFFFF,#F4E6E0);box-shadow:0 5px 0 #C09AA2;color:#6E3D46;
+  height:44px;font-size:14.5px;padding:0 22px}
+.lvlList{display:flex;flex-direction:column;gap:9px;width:276px}
+.lvlBtn{padding:12px 15px;border-radius:16px;border:0;font:inherit;text-align:left;cursor:pointer;
+  background:linear-gradient(#FFFFFF,#F6E7E2);box-shadow:0 4px 0 rgba(150,90,100,.32)}
+.lvlBtn:active{transform:translateY(2px);box-shadow:0 2px 0 rgba(150,90,100,.32)}
+.lvlBtn b{display:block;font-size:15.5px;color:#6E3D46;font-weight:800}
+.lvlBtn span{display:block;font-size:11px;color:#B07A85;font-weight:700;margin-top:2px}
+.statRow{display:flex;gap:14px;margin-top:2px}
+.statBox{background:rgba(226,117,138,.1);border-radius:14px;padding:8px 15px;min-width:86px}
+.statBox b{display:block;font-size:22px;color:#D96A80;font-weight:800;line-height:1.2}
+.statBox span{font-size:9.5px;color:#B07A85;font-weight:800;letter-spacing:.07em;text-transform:uppercase}
+.logoWrap{display:flex;flex-direction:column;align-items:center;margin-bottom:2px}
+.logoWrap .sub{font-size:10.5px;letter-spacing:.3em;color:#C08691;font-weight:800;text-transform:uppercase}
+.gemRow{display:flex;gap:1px;margin-bottom:2px}
+.gemRow svg{width:33px;height:33px}
+
+/* ============ debug ============ */
+#dbg{position:absolute;right:8px;top:90px;width:190px;z-index:130;
+  background:rgba(16,11,7,.95);border:1px solid rgba(255,226,180,.22);border-radius:14px;padding:10px;
+  color:#EDD9B8;font-size:11px;font-weight:700;display:none;max-height:660px;overflow:auto}
+#dbg.on{display:block}
+#dbg h3{font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;color:#FFCC5C;margin-bottom:4px}
+#dbg label{display:block;margin:7px 0 1px;color:#C9A882}
+#dbg input[type=range]{width:100%;accent-color:#FFCC5C}
+#dbg .row{display:flex;gap:4px;margin-top:5px;flex-wrap:wrap}
+#dbg button{flex:1;min-width:50px;padding:5px 0;border-radius:8px;border:0;font:inherit;font-size:10.5px;font-weight:800;
+  background:#3A2A1A;color:#FFE7A8;cursor:pointer}
+#dbg button.act{background:#FFCC5C;color:#3B2A18}
+#dbgLog{margin-top:7px;font-family:ui-monospace,Consolas,monospace;font-size:9.5px;font-weight:400;
+  color:#9FE6B0;white-space:pre-wrap;line-height:1.4;max-height:160px;overflow:auto;
+  background:rgba(0,0,0,.45);border-radius:8px;padding:6px}
+#capOverlay{position:absolute;left:8px;top:90px;z-index:125;display:none;
+  background:rgba(16,11,7,.92);border-radius:12px;padding:8px 10px;color:#EDD9B8;font-size:10.5px;font-weight:700;line-height:1.65}
+#capOverlay.on{display:block}
+#capOverlay b{color:#FFCC5C}
+#capOverlay .no{color:#FF8A96}
+
+/* ============ rotate hint ============ */
+#rot{position:fixed;inset:0;z-index:999;display:none;flex-direction:column;align-items:center;justify-content:center;
+  gap:14px;background:#FBF3EF;color:#B75468;text-align:center;padding:30px;font-weight:800}
+@media (orientation:landscape) and (max-height:520px){
+  #rot{display:flex} #fit{display:none}
+}
+</style>
+</head>
+<body>
+<div id="rot">
+  <svg width="70" height="70" viewBox="0 0 72 72"><g fill="none" stroke="#FFCC5C" stroke-width="4" stroke-linecap="round">
+  <rect x="23" y="7" width="26" height="44" rx="5"/><path d="M13 58c6 6 14 9 23 9s17-3 23-9"/></g></svg>
+  <div style="font-size:17px">Please rotate your device</div>
+  <div style="font-size:12px;color:#C9A882;font-weight:700">Roll N Serve is portrait only</div>
+</div>
+
+<div id="fit"><div id="stage"><div id="world">
+  <div id="bg"></div>
+
+  <div id="beltArea">
+    <svg id="trackSvg" viewBox="0 0 390 338"></svg>
+    <div id="beltGlow"></div>
+    <div id="movesPill"><small>MOVES</small><b id="movesNum">50</b></div>
+    <div id="stationLayer"></div>
+    <div id="cartLayer"></div>
+  </div>
+
+  <div id="boardArea">
+    <div id="boardFrame"></div>
+    <div id="boardInner"></div>
+    <svg id="linkSvg" viewBox="0 0 390 434"></svg>
+    <div id="boosterBar">
+      <button class="boostBtn" id="bShuffle"><svg viewBox="0 0 24 24"><path d="M3 7h4l3.5 5L7 17H3" fill="none" stroke="#6E3D46" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M13 7h3.5L21 12l-4.5 5H13" fill="none" stroke="#6E3D46" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M18 4l3 3-3 3M18 14l3 3-3 3" fill="none" stroke="#6E3D46" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Shuffle</span><i class="adTag">AD</i></button>
+      <button class="boostBtn" id="bWagon"><svg viewBox="0 0 24 24"><ellipse cx="11" cy="14" rx="9" ry="5.5" fill="#FFFDF8" stroke="#E2758A" stroke-width="1.8"/><ellipse cx="11" cy="13.2" rx="5.5" ry="3" fill="#F4E6E0"/><path d="M19 3v6M16 6h6" stroke="#C95A70" stroke-width="2.6" stroke-linecap="round"/></svg><span>Add plate</span><i class="adTag">AD</i></button>
+      <button class="boostBtn" id="bTarget"><svg viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="11" rx="2.5" fill="#F4E6E0" stroke="#6E3D46" stroke-width="1.8"/><path d="M12 16V3M8 7l4-4 4 4" fill="none" stroke="#6E3D46" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Change target</span><i class="adTag">AD</i></button>
+    </div>
+  </div>
+
+  <div id="hud">
+    <div id="hintLine"></div>
+    <div id="lvlTag">Level 1<small>First shift</small></div>
+    <div style="flex:1"></div>
+    <button class="hudBtn ghost" id="btnMenu">Levels</button>
+    <button class="hudBtn" id="btnRestart">Restart</button>
+    <button class="hudBtn ghost" id="btnDbg">dbg</button>
+  </div>
+
+  <div id="vign"></div>
+  <div id="fxLayer">
+    <div id="toast">NO EMPTY SPACE</div>
+    <div id="dragCount"><div class="bub">&times;3</div></div>
+  </div>
+
+  <div id="capOverlay"></div>
+  <div id="dbg"></div>
+
+  <div class="screen" id="scrMenu"></div>
+  <div class="screen hide" id="scrEnd"></div>
+</div></div></div>
+
+<svg id="gemDefs" width="0" height="0" style="position:absolute;pointer-events:none" aria-hidden="true"><defs id="gemDefsInner"></defs></svg>
+
+<script>
+"use strict";
+/* =========================================================================
+   ROLL N SERVE — sushi reskin of the Link N Load prototype (identical rules)
+   Implements GDD v1.0 section 6 (authoritative rules), 7 (feedback),
+   9 (level schema + 3 levels), 10 (tuning constants), 11 (scope).
+   ========================================================================= */
+
+/* ---------------------------------------------------------------- CONFIG */
+const CFG = {
+  MIN_LINK: 2,
+  CART_CAPACITY: 10,
+  WARN_THRESHOLD: 8,
+  gemFlyTime: 260,
+  gemFlyStagger: 40,
+  transferTick: 80,
+  transferFlyTime: 210,
+  stationRefillDelay: 600,
+  boardRefillSlide: 180,
+  failFreezeHold: 1000,
+  lapTime: 5333,           // one full lap ≈ 5.3s at 1.0× (2.25× the original pace)
+  toastTime: 900,
+  sound: true
+};
+
+/* ------------------------------------------------------------- GEM TYPES */
+const GEMS = {
+  ruby:     { name:'Tuna',     color:'#E8433F' },
+  emerald:  { name:'Cucumber', color:'#3AB54A' },
+  sapphire: { name:'Mackerel', color:'#5B8BD0' },
+  topaz:    { name:'Tamago',   color:'#F2BE3A' },
+  amethyst: { name:'Tako',     color:'#A66BC7' },
+  diamond:  { name:'Ebi',      color:'#F58FA0' }
+};
+const ALL_TYPES = Object.keys(GEMS);
+
+/* -------------------------------------------------- gem shape geometry
+   Each type: unique silhouette so types read by shape alone (colorblind safe).
+   Gloss recipe per GDD 3: radial body gradient, facet planes, specular
+   highlight, rim light, drop shadow, occasional glint.                  */
+const SHAPES = {
+  ruby: { // maguro (tuna) nigiri — oval mound
+    tag: a => '<rect x="8" y="26" width="84" height="50" rx="24" ' + a + '/>',
+    facets:
+      '<path d="M8 56 Q50 48 92 56 L92 76 Q50 84 8 76 Z" fill="#FBF7EE" opacity=".97"/>' +
+      '<path d="M8 58 Q50 50 92 58 L92 62 Q50 54 8 62 Z" fill="#D9CFBA" opacity=".55"/>' +
+      '<path d="M24 30 Q30 44 26 54 L34 54 Q38 42 32 28 Z" fill="#fff" opacity=".30"/>' +
+      '<path d="M46 27 Q52 41 48 53 L56 53 Q60 40 54 26 Z" fill="#fff" opacity=".30"/>' +
+      '<path d="M68 28 Q74 42 70 53 L78 53 Q82 42 76 30 Z" fill="#fff" opacity=".30"/>' +
+      '<path d="M8 50 Q50 40 92 50 L92 56 Q50 46 8 56 Z" fill="#000" opacity=".10"/>',
+    spec: 'cx="32" cy="34" rx="13" ry="6" transform="rotate(-8 32 34)"',
+    glint: '76,32', shadow: 'rx="32" ry="6"'
+  },
+  emerald: { // kappa maki (cucumber roll) — top view circle
+    tag: a => '<circle cx="50" cy="50" r="41" ' + a + '/>',
+    facets:
+      '<circle cx="50" cy="50" r="41" fill="#2E3327" opacity=".95"/>' +
+      '<circle cx="50" cy="50" r="32" fill="#FBF7EE"/>' +
+      '<circle cx="50" cy="50" r="31" fill="#fff" opacity=".5"/>' +
+      '<circle cx="50" cy="50" r="14" fill="#3AB54A"/>' +
+      '<circle cx="46" cy="46" r="5" fill="#8FE29B" opacity=".85"/>' +
+      '<circle cx="41" cy="43" r="2" fill="#E8E2D2"/><circle cx="59" cy="41" r="2" fill="#E8E2D2"/>' +
+      '<circle cx="62" cy="58" r="2" fill="#E8E2D2"/><circle cx="40" cy="59" r="2" fill="#E8E2D2"/>' +
+      '<path d="M50 9 A41 41 0 0 1 91 50 L84 50 A34 34 0 0 0 50 16 Z" fill="#fff" opacity=".14"/>',
+    spec: 'cx="36" cy="28" rx="11" ry="5.5" transform="rotate(-24 36 28)"',
+    glint: '72,26', shadow: 'rx="30" ry="6"'
+  },
+  sapphire: { // saba (mackerel) nigiri — tapered slice
+    tag: a => '<path d="M8 52 Q12 30 50 26 Q88 30 92 52 Q88 72 50 76 Q12 72 8 52 Z" ' + a + '/>',
+    facets:
+      '<path d="M10 56 Q50 48 90 56 L88 68 Q50 80 12 68 Z" fill="#FBF7EE" opacity=".97"/>' +
+      '<path d="M12 30 Q50 22 88 30 L86 38 Q50 30 14 38 Z" fill="#fff" opacity=".45"/>' +
+      '<path d="M26 30 Q32 42 28 52 L36 52 Q40 40 34 28 Z" fill="#31517E" opacity=".55"/>' +
+      '<path d="M48 27 Q54 40 50 52 L58 52 Q62 39 56 26 Z" fill="#31517E" opacity=".55"/>' +
+      '<path d="M70 29 Q76 41 72 52 L80 52 Q84 42 78 31 Z" fill="#31517E" opacity=".55"/>' +
+      '<path d="M8 52 Q50 44 92 52 L92 56 Q50 48 8 56 Z" fill="#000" opacity=".12"/>',
+    spec: 'cx="34" cy="33" rx="12" ry="5" transform="rotate(-8 34 33)"',
+    glint: '74,32', shadow: 'rx="31" ry="6"'
+  },
+  topaz: { // tamago nigiri — rectangle with nori band
+    tag: a => '<rect x="12" y="24" width="76" height="52" rx="10" ' + a + '/>',
+    facets:
+      '<path d="M12 58 L88 58 L88 66 Q88 76 78 76 L22 76 Q12 76 12 66 Z" fill="#FBF7EE" opacity=".97"/>' +
+      '<rect x="14" y="34" width="72" height="4" fill="#fff" opacity=".4"/>' +
+      '<rect x="14" y="46" width="72" height="3" fill="#C98F1F" opacity=".35"/>' +
+      '<rect x="40" y="24" width="20" height="52" fill="#2E3327" opacity=".92"/>' +
+      '<rect x="40" y="24" width="20" height="8" fill="#fff" opacity=".12"/>' +
+      '<rect x="12" y="24" width="76" height="7" rx="4" fill="#fff" opacity=".28"/>',
+    spec: 'cx="28" cy="31" rx="9" ry="4.5" transform="rotate(-6 28 31)"',
+    glint: '78,30', shadow: 'rx="31" ry="6"'
+  },
+  amethyst: { // tako (octopus) nigiri — scalloped top
+    tag: a => '<path d="M10 58 Q10 36 28 32 Q38 20 50 30 Q62 20 72 32 Q90 36 90 58 Q90 74 50 78 Q10 74 10 58 Z" ' + a + '/>',
+    facets:
+      '<path d="M10 58 Q50 50 90 58 L90 64 Q50 76 10 64 Z" fill="#FBF7EE" opacity=".97"/>' +
+      '<circle cx="30" cy="40" r="5" fill="#fff" opacity=".5"/>' +
+      '<circle cx="50" cy="38" r="5" fill="#fff" opacity=".5"/>' +
+      '<circle cx="70" cy="40" r="5" fill="#fff" opacity=".5"/>' +
+      '<path d="M14 46 Q50 36 86 46 L86 52 Q50 42 14 52 Z" fill="#fff" opacity=".22"/>' +
+      '<path d="M10 54 Q50 46 90 54 L90 58 Q50 50 10 58 Z" fill="#000" opacity=".12"/>',
+    spec: 'cx="33" cy="32" rx="10" ry="5" transform="rotate(-14 33 32)"',
+    glint: '72,28', shadow: 'rx="30" ry="6"'
+  },
+  diamond: { // ebi (shrimp) nigiri — fan with chevrons
+    tag: a => '<path d="M50 16 Q86 24 90 58 Q92 74 76 74 L24 74 Q8 74 10 58 Q14 24 50 16 Z" ' + a + '/>',
+    facets:
+      '<path d="M12 56 Q50 48 88 56 L86 66 Q50 78 14 66 Z" fill="#FBF7EE" opacity=".97"/>' +
+      '<path d="M34 22 L46 40 L38 52 L28 52 Q28 34 34 22 Z" fill="#fff" opacity=".55"/>' +
+      '<path d="M58 20 L68 38 L62 52 L52 52 L60 38 Z" fill="#fff" opacity=".55"/>' +
+      '<path d="M76 28 L84 44 L78 52 L70 52 L76 40 Z" fill="#fff" opacity=".45"/>' +
+      '<path d="M50 16 Q86 24 90 58 L84 58 Q80 30 50 22 Z" fill="#D5556A" opacity=".4"/>',
+    spec: 'cx="36" cy="30" rx="10" ry="5" transform="rotate(-18 36 30)"',
+    glint: '70,26', shadow: 'rx="30" ry="6"'
+  }
+};
+
+/* --------------------------------------------------------- color helpers */
+function hexToRgb(h){ h=h.replace('#',''); return [parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)]; }
+function rgbToHex(r){ return '#'+r.map(v=>Math.max(0,Math.min(255,Math.round(v))).toString(16).padStart(2,'0')).join(''); }
+function shade(hex,amt){ // amt>0 -> toward white, amt<0 -> toward black
+  const c=hexToRgb(hex);
+  return rgbToHex(c.map(v => amt>=0 ? v+(255-v)*amt : v*(1+amt)));
+}
+
+/* ------------------------------------------------- build gem SVG <defs> */
+(function buildDefs(){
+  let d = '';
+  d += '<linearGradient id="rimLight" x1="0" y1="0" x2="1" y2="1">' +
+       '<stop offset="42%" stop-color="#ffffff" stop-opacity="0"/>' +
+       '<stop offset="100%" stop-color="#ffffff" stop-opacity=".8"/></linearGradient>';
+  d += '<linearGradient id="woodG" x1="0" y1="0" x2="0" y2="1">' +
+       '<stop offset="0" stop-color="#D19A5E"/><stop offset="50%" stop-color="#A9713C"/>' +
+       '<stop offset="100%" stop-color="#7A4C26"/></linearGradient>';
+  d += '<linearGradient id="metalG" x1="0" y1="0" x2="0" y2="1">' +
+       '<stop offset="0" stop-color="#C9CFD8"/><stop offset="50%" stop-color="#8E97A3"/>' +
+       '<stop offset="100%" stop-color="#5C646F"/></linearGradient>';
+  for(const t of ALL_TYPES){
+    const c = GEMS[t].color;
+    d += '<radialGradient id="grad_'+t+'" cx="34%" cy="26%" r="78%">' +
+         '<stop offset="0%" stop-color="'+shade(c,.72)+'"/>' +
+         '<stop offset="30%" stop-color="'+shade(c,.28)+'"/>' +
+         '<stop offset="68%" stop-color="'+c+'"/>' +
+         '<stop offset="100%" stop-color="'+shade(c,-.45)+'"/></radialGradient>';
+    d += '<clipPath id="clip_'+t+'">'+SHAPES[t].tag('')+'</clipPath>';
+  }
+  document.getElementById('gemDefsInner').innerHTML = d;
+})();
+
+const STAR = 'M0,-9 L2.2,-2.4 L9,0 L2.2,2.4 L0,9 L-2.2,2.4 L-9,0 L-2.2,-2.4 Z';
+
+/* gemSVG(type, opts) -> markup for one glossy gem */
+function gemSVG(type, opts){
+  opts = opts || {};
+  const s = SHAPES[type];
+  const g = opts.glint !== false ? s.glint.split(',') : null;
+  return '<svg viewBox="-4 -4 108 112" class="gsvg">' +
+    (opts.shadow === false ? '' : '<ellipse cx="50" cy="95" ' + s.shadow + ' fill="#000" opacity=".32"/>') +
+    s.tag('fill="url(#grad_'+type+')"') +
+    '<g clip-path="url(#clip_'+type+')">' + s.facets + '</g>' +
+    '<ellipse ' + s.spec + ' fill="#fff" opacity=".85"/>' +
+    s.tag('fill="none" stroke="url(#rimLight)" stroke-width="3.4" stroke-linejoin="round"') +
+    (g ? '<g class="glint" transform="translate('+g[0]+','+g[1]+')"><path d="'+STAR+'" fill="#fff"/></g>' : '') +
+    '</svg>';
+}
+
+/* ---------------------------------------------------------------- LEVELS
+   Each station owns its own target queue (stationQueues[i]), shown stacked
+   above that station. Target counts are 25+ so big links stay rewarding —
+   one order takes several cart deliveries. */
+const LEVELS = [
+  { id:1, name:'First service', blurb:'4 kinds · 4 plates · 2 seats',
+    board:{cols:7,rows:6}, gemTypes:['ruby','emerald','sapphire','topaz'],
+    cartCount:4, cartCapacity:10, beltSpeed:1.0, spawnWeightK:2.5,
+    stationRefillDelay:0.6,
+    stationQueues:[
+      [{type:'ruby',count:25},{type:'sapphire',count:25}],
+      [{type:'emerald',count:25},{type:'topaz',count:25}]
+    ],
+    hint:'Link 2+ matching sushi. Plates hold one kind, 10 pieces max.' },
+  { id:2, name:'Double orders', blurb:'5 kinds · 4 plates · 3 seats',
+    board:{cols:7,rows:7}, gemTypes:['ruby','emerald','sapphire','topaz','amethyst'],
+    cartCount:4, cartCapacity:10, beltSpeed:1.0, spawnWeightK:2.0,
+    stationRefillDelay:0.6, moves:30,
+    stationQueues:[
+      [{type:'emerald',count:25},{type:'ruby',count:25}],
+      [{type:'amethyst',count:25}],
+      [{type:'sapphire',count:25}]
+    ] },
+  { id:3, name:'Tight belt', blurb:'4 kinds · 3 plates · 3 seats',
+    board:{cols:7,rows:7}, gemTypes:['ruby','emerald','sapphire','topaz'],
+    cartCount:3, cartCapacity:10, beltSpeed:1.1, spawnWeightK:1.8,
+    stationRefillDelay:0.6, moves:30,
+    stationQueues:[
+      [{type:'sapphire',count:25},{type:'ruby',count:25}],
+      [{type:'topaz',count:25}],
+      [{type:'ruby',count:25},{type:'emerald',count:25}]
+    ] },
+  { id:4, name:'Deep menu', blurb:'5 kinds · 4 plates · 3 seats',
+    board:{cols:7,rows:7}, gemTypes:['ruby','emerald','sapphire','topaz','amethyst'],
+    cartCount:4, cartCapacity:10, beltSpeed:1.05, spawnWeightK:1.8,
+    stationRefillDelay:0.6, moves:40,
+    stationQueues:[
+      [{type:'sapphire',count:25},{type:'ruby',count:25}],
+      [{type:'topaz',count:25},{type:'amethyst',count:25}],
+      [{type:'emerald',count:25},{type:'ruby',count:25}]
+    ] },
+  { id:5, name:'Night service', blurb:'5 kinds · 4 plates · 2 seats',
+    board:{cols:7,rows:7}, gemTypes:['ruby','sapphire','topaz','amethyst','diamond'],
+    cartCount:4, cartCapacity:10, beltSpeed:1.1, spawnWeightK:1.8,
+    stationRefillDelay:0.6, moves:50,
+    stationQueues:[
+      [{type:'diamond',count:25},{type:'sapphire',count:25},{type:'ruby',count:25},{type:'topaz',count:25}],
+      [{type:'amethyst',count:25},{type:'diamond',count:25},{type:'ruby',count:25}]
+    ] }
+];
+LEVELS[0].moves = 30;
+function levelOrders(L){ return L.stationQueues.flat(); }
+
+/* --------------------------------------------------------- TRACK GEOMETRY
+   Stadium loop: top straight -> right arc -> bottom straight -> left arc.
+   Clockwise. Arclength parametrisation so carts stay evenly spaced.     */
+const TRACK = { cx:195, cy:258, r:52, L:226 };   // belt band now spans 0-338; screen position of rails unchanged
+TRACK.P = 2*TRACK.L + 2*Math.PI*TRACK.r;
+TRACK.segTop    = TRACK.L;
+TRACK.segRight  = TRACK.L + Math.PI*TRACK.r;
+TRACK.segBottom = 2*TRACK.L + Math.PI*TRACK.r;
+
+function trackPoint(s, radiusOffset){
+  const T=TRACK, ro = radiusOffset||0, r = T.r + ro;
+  s = ((s % T.P) + T.P) % T.P;
+  if(s < T.segTop){                       // top straight, moving right
+    return {x: T.cx - T.L/2 + s, y: T.cy - r, nx:0, ny:-1};
+  } else if(s < T.segRight){              // right arc
+    const th = -Math.PI/2 + (s - T.segTop)/T.r;
+    return {x: T.cx + T.L/2 + r*Math.cos(th), y: T.cy + r*Math.sin(th),
+            nx: Math.cos(th), ny: Math.sin(th)};
+  } else if(s < T.segBottom){             // bottom straight, moving left
+    return {x: T.cx + T.L/2 - (s - T.segRight), y: T.cy + r, nx:0, ny:1};
+  } else {                                // left arc
+    const th = Math.PI/2 + (s - T.segBottom)/T.r;
+    return {x: T.cx - T.L/2 + r*Math.cos(th), y: T.cy + r*Math.sin(th),
+            nx: Math.cos(th), ny: Math.sin(th)};
+  }
+}
+/* loading anchor = track point closest to the board = bottom straight centre */
+const LOAD_ANCHOR_S = TRACK.segRight + TRACK.L/2;
+function stationTrackS(i, n){ return TRACK.L * (i + 0.5) / n; }
+function fwdDist(from, to){ return ((to - from) % TRACK.P + TRACK.P) % TRACK.P; }
+
+/* stage-space offsets of the bands */
+const BELT_Y = 0, BOARD_Y = 338;
+
+/* ------------------------------------------------------------------- DOM */
+const $ = id => document.getElementById(id);
+const stage=$('stage'), world=$('world'), boardInner=$('boardInner'), boardFrame=$('boardFrame'),
+      linkSvg=$('linkSvg'), cartLayer=$('cartLayer'), stationLayer=$('stationLayer'),
+      trackSvg=$('trackSvg'), fxLayer=$('fxLayer'),
+      toastEl=$('toast'), dragCount=$('dragCount'), beltGlow=$('beltGlow'),
+      scrMenu=$('scrMenu'), scrEnd=$('scrEnd'), dbgEl=$('dbg'), capOverlay=$('capOverlay'),
+      hintLine=$('hintLine'), lvlTag=$('lvlTag');
+
+/* -------------------------------------------------------------- SCALING */
+let SCALE = 1;
+function fitStage(){
+  const w = window.innerWidth, h = window.innerHeight;
+  SCALE = Math.min(w/390, h/844);
+  stage.style.transform = 'scale(' + SCALE + ')';
+}
+window.addEventListener('resize', fitStage);
+window.addEventListener('orientationchange', ()=>setTimeout(fitStage,120));
+fitStage();
+
+/* ---------------------------------------------------------------- AUDIO */
+let AC = null;
+function ac(){ if(!AC){ try{ AC = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ AC=false; } } return AC; }
+function blip(freq, dur, type, vol){
+  if(!CFG.sound) return; const a = ac(); if(!a) return;
+  try{
+    const o=a.createOscillator(), g=a.createGain();
+    o.type=type||'sine'; o.frequency.value=freq;
+    g.gain.setValueAtTime(0,a.currentTime);
+    g.gain.linearRampToValueAtTime(vol||0.09, a.currentTime+0.008);
+    g.gain.exponentialRampToValueAtTime(0.0001, a.currentTime+(dur||0.1));
+    o.connect(g); g.connect(a.destination); o.start(); o.stop(a.currentTime+(dur||0.1)+0.02);
+  }catch(e){}
+}
+function sfxSelect(n){ blip(420 + Math.min(n,12)*38, 0.07, 'triangle', 0.06); }
+function sfxPop(){ blip(660, 0.09, 'sine', 0.07); }
+function sfxTick(n, of){ blip(500 + (n/Math.max(1,of))*450, 0.08, 'square', 0.045); }
+function sfxErr(){ blip(150, 0.16, 'sawtooth', 0.06); }
+function sfxBurst(){ blip(880,0.16,'triangle',0.1); setTimeout(()=>blip(1320,0.2,'triangle',0.08),70); }
+function sfxWin(){ [523,659,784,1047].forEach((f,i)=>setTimeout(()=>blip(f,0.22,'triangle',0.09), i*110)); }
+function sfxFail(){ [330,262,196].forEach((f,i)=>setTimeout(()=>blip(f,0.3,'sawtooth',0.07), i*140)); }
+
+/* ---------------------------------------------------------------- STATE */
+let S = null;
+let gemUID = 0;
+const DBG = { showCap:false, logFail:false, speedMul:1, kOverride:null, lines:[] };
+
+function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+
+/* ================================================================= SETUP */
+function startLevel(idx){
+  const L = LEVELS[idx];
+  const cols = L.board.cols, rows = L.board.rows;
+  const pad = 12;
+  const cell = Math.min((390 - pad*2)/cols, (434 - pad*2 - 58)/rows);   // 58px reserved for booster bar
+  const bw = cell*cols, bh = cell*rows;
+  const ox = (390 - bw)/2, oy = (434 - 58 - bh)/2;
+
+  S = {
+    lvlIdx: idx, L: L,
+    cols, rows, cell, ox, oy,
+    cap: L.cartCapacity || CFG.CART_CAPACITY,
+    grid: Array.from({length:rows}, ()=>new Array(cols).fill(null)),
+    carts: [], stations: [],
+    beltPos: 0, beltPaused: false, docking: false,
+    link: { active:false, type:null, cells:[], plan:[] },
+    flying: [], pendingLands: 0,
+    inputLocked: false, over: false,
+    stats: { done:0, biggest:0 },
+    movesLeft: L.moves || 50,
+    retired: new Set(),
+    beltSpeed: L.beltSpeed, k: L.spawnWeightK
+  };
+
+  boardFrame.style.left = (ox-8)+'px'; boardFrame.style.top = (oy-8)+'px';
+  boardFrame.style.width = (bw+16)+'px'; boardFrame.style.height = (bh+16)+'px';
+
+  lvlTag.innerHTML = 'Level '+L.id+'<small>'+L.name+'</small>';
+  hintLine.textContent = L.hint || '';
+
+  buildTrackArt();
+  buildCarts();
+  buildStations();
+  generateBoard();
+  loadStationsFromQueue(true);
+  refreshCartVisuals();
+  refreshTypeGating();
+  renderDbg();
+  clearLinkPath();
+  setPicking(false);
+  renderMoves();
+  scrEnd.classList.add('hide');
+  scrMenu.classList.add('hide');
+  dbgLog('level ' + L.id + ' started · demand ' + levelOrders(L).reduce((a,t)=>a+t.count,0));
+}
+
+/* ------------------------------------------------------------ track art */
+function buildTrackArt(){
+  const T = TRACK;
+  function stadiumPath(ro){
+    const r = T.r + ro, x0 = T.cx - T.L/2, x1 = T.cx + T.L/2;
+    return 'M'+x0+' '+(T.cy-r)+' L'+x1+' '+(T.cy-r)+
+           ' A'+r+' '+r+' 0 0 1 '+x1+' '+(T.cy+r)+
+           ' L'+x0+' '+(T.cy+r)+
+           ' A'+r+' '+r+' 0 0 1 '+x0+' '+(T.cy-r)+' Z';
+  }
+  let h = '';
+  /* counter base + soft shadow */
+  h += '<path d="'+stadiumPath(0)+'" fill="none" stroke="rgba(180,130,130,.30)" stroke-width="50"/>';
+  h += '<path d="'+stadiumPath(0)+'" fill="none" stroke="#E9DED6" stroke-width="44"/>';
+  /* the moving belt strip */
+  h += '<path d="'+stadiumPath(0)+'" fill="none" stroke="#CFC4BC" stroke-width="34"/>';
+  h += '<path d="'+stadiumPath(0)+'" fill="none" stroke="#DAD0C8" stroke-width="30"/>';
+  /* plank separators along the belt */
+  const step = 17;
+  for(let sPos=0; sPos<T.P-1; sPos+=step){
+    const a = trackPoint(sPos, -14), b = trackPoint(sPos, 14);
+    h += '<line x1="'+a.x.toFixed(1)+'" y1="'+a.y.toFixed(1)+'" x2="'+b.x.toFixed(1)+'" y2="'+b.y.toFixed(1)+
+         '" stroke="#C2B6AD" stroke-width="2.4" stroke-linecap="round" opacity=".8"/>';
+  }
+  /* edge trims */
+  h += '<path d="'+stadiumPath(-16)+'" fill="none" stroke="#B9A9A0" stroke-width="3"/>';
+  h += '<path d="'+stadiumPath(16)+'" fill="none" stroke="#B9A9A0" stroke-width="3"/>';
+  h += '<path d="'+stadiumPath(-16.5)+'" fill="none" stroke="#FFF6F0" stroke-width="1.4" opacity=".9"/>';
+  h += '<path d="'+stadiumPath(16.5)+'" fill="none" stroke="#FFF6F0" stroke-width="1.4" opacity=".9"/>';
+  trackSvg.innerHTML = h;
+
+  const gl = beltGlow.style;
+  gl.left = (T.cx - T.L/2 - T.r - 26)+'px'; gl.top = (T.cy - T.r - 26)+'px';
+  gl.width = (T.L + T.r*2 + 52)+'px'; gl.height = (T.r*2 + 52)+'px';
+}
+
+/* ---------------------------------------------------------------- carts */
+function cartSVG(){
+  return '<svg class="cartBody" viewBox="0 0 60 46">' +
+    '<ellipse cx="30" cy="40" rx="26" ry="5" fill="#B98A8A" opacity=".35"/>' +
+    '<ellipse cx="30" cy="30" rx="27" ry="12" fill="#E8E2D8"/>' +
+    '<ellipse cx="30" cy="28" rx="27" ry="12" fill="#FFFDF8"/>' +
+    '<ellipse cx="30" cy="28" rx="27" ry="12" fill="none" stroke="#E2758A" stroke-width="2.4"/>' +
+    '<ellipse cx="30" cy="29" rx="20" ry="8" fill="#F4EEE2"/>' +
+    '<ellipse cx="30" cy="28.4" rx="20" ry="8" fill="#FBF7EE"/>' +
+    '<g class="pileG"></g>' +
+    '<path d="M6 26 A27 13 0 0 0 18 37" fill="none" stroke="#fff" stroke-width="2" opacity=".8"/>' +
+    '</svg>';
+}
+function makeCart(i, offset){
+  const el = document.createElement('div');
+  el.className = 'cart';
+  el.innerHTML = '<div class="cHud"><div class="cGhost"></div>' +
+                 '<div class="cCount neutral">0/'+S.cap+'</div></div>' + cartSVG();
+  cartLayer.appendChild(el);
+  return {
+    i, type:null, count:0, pending:0, el,
+    hudEl: el.querySelector('.cHud'),
+    countEl: el.querySelector('.cCount'),
+    ghostEl: el.querySelector('.cGhost'),
+    pileG: el.querySelector('.pileG'),
+    offset
+  };
+}
+function buildCarts(){
+  cartLayer.innerHTML = '';
+  S.carts = [];
+  const n = S.L.cartCount;
+  for(let i=0;i<n;i++) S.carts.push(makeCart(i, TRACK.P * i / n));
+  updateCartPositions();
+}
+/* booster: drop a new wagon into the middle of the widest gap in the chain */
+function addWagon(){
+  if(S.carts.length >= 8){ showToast('MAX PLATES'); return; }
+  const offs = S.carts.map(c=>c.offset).sort((a,b)=>a-b);
+  let bestGap = -1, bestMid = 0;
+  for(let i=0;i<offs.length;i++){
+    const a = offs[i], b = (i+1 < offs.length) ? offs[i+1] : offs[0] + TRACK.P;
+    if(b - a > bestGap){ bestGap = b - a; bestMid = (a + (b-a)/2) % TRACK.P; }
+  }
+  const c = makeCart(S.carts.length, bestMid);
+  S.carts.push(c);
+  updateCartPositions();
+  c.el.classList.add('squash');
+  setTimeout(()=>c.el.classList.remove('squash'), 300);
+  refreshCartVisuals();
+  refreshTypeGating();
+  settle('wagon added');
+}
+function cartS(c){ return (S.beltPos + c.offset) % TRACK.P; }
+function cartPoint(c){ return trackPoint(cartS(c)); }
+/* stage-space centre of a cart's gem pile */
+function cartStagePos(c){ const p = cartPoint(c); return {x:p.x, y:p.y + BELT_Y - 8}; }
+
+function updateCartPositions(){
+  for(const c of S.carts){
+    const p = cartPoint(c);
+    c.el.style.transform = 'translate('+p.x.toFixed(2)+'px,'+p.y.toFixed(2)+'px)';
+    /* keep the n/10 counter inside the loop, clear of the station cards */
+    const dy = -44;   // capacity badge always rides above the wagon
+    c.hudEl.style.transform = 'translate(-50%,-50%) translateY(' + dy + 'px)';
+  }
+}
+function isNeutral(c){ return c.count === 0 && c.pending === 0; }
+function eff(c){ return c.count + c.pending; }
+
+/* pile drawing: the cart's visible cargo grows with n (pyramid, max 10) */
+const PILE_SLOTS = [
+  [17,31.5],[25,31.5],[33,31.5],[41,31.5],   // bottom row
+  [21,25.5],[29,25.5],[37,25.5],             // second row
+  [25,20],[33,20],                           // third row
+  [29,15]                                    // peak
+];
+function drawPile(c){
+  if(!c.type || c.count === 0){ c.pileG.innerHTML=''; return; }
+  const col = GEMS[c.type].color;
+  const lo = shade(col,-.3), hi = shade(col,.6);
+  const total = Math.min(c.count, PILE_SLOTS.length);
+  let h = '';
+  for(let i=0;i<total;i++){
+    const s = PILE_SLOTS[i];
+    h += '<circle cx="'+s[0]+'" cy="'+s[1]+'" r="4.6" fill="'+lo+'"/>' +
+         '<circle cx="'+s[0]+'" cy="'+s[1]+'" r="3.9" fill="'+col+'"/>' +
+         '<circle cx="'+(s[0]-1.2)+'" cy="'+(s[1]-1.4)+'" r="1.4" fill="'+hi+'" opacity=".9"/>';
+  }
+  c.pileG.innerHTML = h;
+}
+function refreshCartVisuals(){
+  let neutrals = 0;
+  for(const c of S.carts){
+    /* rule 6.3: a cart that reaches 0 becomes neutral the same tick */
+    if(isNeutral(c)){ c.type = null; neutrals++; }
+    const cnt = c.countEl;
+    cnt.textContent = c.count + '/' + S.cap;
+    cnt.className = 'cCount' + (isNeutral(c) ? ' neutral' : (c.count>=S.cap ? ' full' : (c.count>=CFG.WARN_THRESHOLD ? ' warn' : '')));
+    if(c.count >= S.cap) cnt.textContent = 'FULL ' + c.count + '/' + S.cap;
+    drawPile(c);
+  }
+  beltGlow.classList.toggle('on', neutrals === 0);
+  if(DBG.showCap) renderCapOverlay();
+}
+
+/* ------------------------------------------------------------- stations */
+function buildStations(){
+  stationLayer.innerHTML = '';
+  S.stations = [];
+  const n = S.L.stationQueues.length;
+  const cw = n >= 4 ? 46 : (n === 3 ? 54 : 60);
+  const cardTop = 96;                 // active card sits here; queue stacks upward above it
+  for(let i=0;i<n;i++){
+    const s = stationTrackS(i, n);
+    const p = trackPoint(s);
+    const el = document.createElement('div');
+    el.className = 'station';
+    el.style.width = cw + 'px';
+    el.style.left = p.x + 'px';
+    el.style.top = cardTop + 'px';
+    el.innerHTML =
+      '<div class="qStack"></div>' +
+      '<div class="ordCard" style="width:'+cw+'px;height:40px"></div>' +
+      '<div class="chute" style="top:42px"></div>' +
+      '<div class="drop" style="top:56px;height:'+(p.y - 23 - cardTop - 56)+'px"></div>';
+    stationLayer.appendChild(el);
+    S.stations.push({
+      i, sTrack:s, target:null, closed:false, el,
+      queue: S.L.stationQueues[i].map(t=>({type:t.type, count:t.count})),
+      card: el.querySelector('.ordCard'),
+      stackEl: el.querySelector('.qStack'),
+      dock: {x:p.x, y:p.y + BELT_Y}
+    });
+  }
+}
+function renderMoves(){
+  const el = $("movesNum");
+  el.textContent = S.movesLeft;
+  $("movesPill").classList.toggle("low", S.movesLeft <= 10);
+}
+/* per-station upcoming stack: next target sits closest to the active card */
+function renderStationQueue(st){
+  const q = st.queue;
+  let h = '';
+  for(let i=0;i<Math.min(2, q.length);i++){
+    h += '<div class="qMini' + (i===1 ? ' far' : '') + '" data-st="' + st.i + '" data-qi="' + i + '">' +
+         gemSVG(q[i].type,{glint:false,shadow:false}) + '<b>' + q[i].count + '</b></div>';
+  }
+  if(q.length > 2) h += '<div class="qMoreChip">+' + (q.length-2) + '</div>';
+  st.stackEl.innerHTML = h;
+}
+function renderStation(st, entering){
+  const card = st.card;
+  if(!st.target){
+    if(st.closed){
+      card.className = 'ordCard closed';
+      card.innerHTML = '<div class="closedTxt">CLOSED</div>';
+    } else {
+      card.className = 'ordCard';
+      card.style.opacity = '0';
+      card.innerHTML = '';
+    }
+    return;
+  }
+  const t = st.target;
+  card.style.opacity = '';
+  card.className = 'ordCard' + (entering ? ' enter' : '');
+  card.innerHTML =
+    gemSVG(t.type, {glint:false, shadow:false}) +
+    '<div class="ordCount">' + t.progress + '<i>/' + t.need + '</i></div>' +
+    '<div class="ordProg"><i style="width:' + (100*t.progress/t.need) + '%"></i></div>';
+  if(entering) requestAnimationFrame(()=>requestAnimationFrame(()=>card.classList.remove('enter')));
+}
+function updateStationCounter(st, hit){
+  const t = st.target; if(!t) return;
+  const c = st.card.querySelector('.ordCount');
+  if(c) c.innerHTML = t.progress + '<i>/' + t.need + '</i>';
+  const p = st.card.querySelector('.ordProg i');
+  if(p) p.style.width = (100*t.progress/t.need) + '%';
+  if(hit){ st.card.classList.remove('hit'); void st.card.offsetWidth; st.card.classList.add('hit'); }
+}
+function loadStationsFromQueue(initial){
+  for(const st of S.stations){
+    if(!st.target){
+      if(st.queue.length){
+        const q = st.queue.shift();
+        st.target = { type:q.type, need:q.count, progress:0 };
+        st.closed = false;
+        renderStation(st, !initial);
+      } else {
+        st.closed = true; st.target = null;
+        renderStation(st);
+      }
+    }
+    renderStationQueue(st);
+  }
+}
+
+/* ============================================================ BOARD GEN */
+function makeGemEl(type, r, c){
+  const el = document.createElement('div');
+  el.className = 'gem';
+  const size = S.cell * 0.94;
+  el.style.width = size+'px'; el.style.height = size+'px';
+  el.innerHTML = '<div class="gbody">' + gemSVG(type) + '</div>';
+  boardInner.appendChild(el);
+  return el;
+}
+function cellCenter(r,c){ return { x: S.ox + c*S.cell + S.cell/2, y: S.oy + r*S.cell + S.cell/2 }; }
+function placeGem(g, animate){
+  const p = cellCenter(g.r, g.c);
+  const size = S.cell*0.94;
+  g.el.classList.toggle('slide', !!animate);
+  g.el.style.transform = 'translate(' + (p.x - size/2).toFixed(2) + 'px,' + (p.y - size/2).toFixed(2) + 'px)';
+}
+function newGem(type, r, c){
+  const g = { id:++gemUID, type, r, c, el:makeGemEl(type,r,c) };
+  g.el.dataset.gid = g.id;
+  S.grid[r][c] = g;
+  return g;
+}
+
+/* -------------------------------------------------- weighted spawner 6.5 */
+function demandOf(type){
+  let d = 0;
+  for(const st of S.stations){
+    if(st.target && st.target.type === type) d += (st.target.need - st.target.progress);
+    if(st.queue[0] && st.queue[0].type === type) d += 0.5 * st.queue[0].count;  // next order per station
+  }
+  return d;
+}
+function cartStock(type){ let n=0; for(const c of S.carts) if(c.type===type) n += c.count; return n; }
+function spawnType(){
+  const types = S.L.gemTypes;
+  const dem = {}; let sum = 0;
+  for(const t of types){ dem[t] = demandOf(t); sum += dem[t]; }
+  const denom = Math.max(1, sum);
+  const k = DBG.kOverride !== null ? DBG.kOverride : S.k;
+  const w = []; let wsum = 0;
+  for(const t of types){
+    let x = 1 + k * dem[t] / denom;
+    if(cartStock(t) > 0 && dem[t] === 0) x *= 0.5;   // anti-clog damper
+    if(S.retired.has(t)) x *= 0.4;                   // retired types keep flowing back
+    w.push(x); wsum += x;
+  }
+  let roll = Math.random() * wsum;
+  for(let i=0;i<types.length;i++){ roll -= w[i]; if(roll <= 0) return types[i]; }
+  return types[types.length-1];
+}
+
+function generateBoard(){
+  boardInner.innerHTML = '';
+  let tries = 0;
+  do {
+    boardInner.innerHTML = '';
+    S.grid = Array.from({length:S.rows}, ()=>new Array(S.cols).fill(null));
+    for(let r=0;r<S.rows;r++) for(let c=0;c<S.cols;c++){
+      const g = newGem(spawnType(), r, c);
+      placeGem(g,false);
+      g.el.classList.add('born');
+    }
+    tries++;
+  } while(!boardHasGroup() && tries < 50);
+  if(tries >= 50) console.warn('[LinkNLoad] board reroll cap (50) hit — shipping board without guaranteed move');
+  scheduleTwinkles();
+}
+function boardHasGroup(){
+  for(const t of S.L.gemTypes) if(largestGroup(t) >= CFG.MIN_LINK) return true;
+  return false;
+}
+function largestGroup(type){
+  const seen = new Set(); let best = 0;
+  for(let r=0;r<S.rows;r++) for(let c=0;c<S.cols;c++){
+    const g = S.grid[r][c];
+    if(!g || g.type !== type || seen.has(g.id)) continue;
+    let n = 0; const st = [[r,c]];
+    seen.add(g.id);
+    while(st.length){
+      const [rr,cc] = st.pop(); n++;
+      for(let dr=-1;dr<=1;dr++) for(let dc=-1;dc<=1;dc++){
+        if(!dr && !dc) continue;
+        const nr=rr+dr, nc=cc+dc;
+        if(nr<0||nc<0||nr>=S.rows||nc>=S.cols) continue;
+        const h = S.grid[nr][nc];
+        if(h && h.type===type && !seen.has(h.id)){ seen.add(h.id); st.push([nr,nc]); }
+      }
+    }
+    if(n > best) best = n;
+  }
+  return best;
+}
+
+/* --------------------------------------------- anti-gravity collapse 6.1 */
+function collapseAndRefill(){
+  const bottomY = S.oy + S.rows*S.cell;
+  for(let c=0;c<S.cols;c++){
+    const stack = [];
+    for(let r=0;r<S.rows;r++) if(S.grid[r][c]) stack.push(S.grid[r][c]);
+    for(let r=0;r<S.rows;r++) S.grid[r][c] = null;
+    /* pack existing gems toward the TOP (gems below slide up) */
+    for(let i=0;i<stack.length;i++){
+      const g = stack[i];
+      g.r = i; S.grid[i][c] = g;
+      placeGem(g, true);
+    }
+    /* new gems enter from BELOW the bottom edge, in rigid formation */
+    const nNew = S.rows - stack.length;
+    for(let k=0;k<nNew;k++){
+      const r = stack.length + k;
+      const nt = spawnType();
+      if(!nt) continue;                       // all types retired — leave the hole
+      const g = newGem(nt, r, c);
+      const size = S.cell*0.94;
+      const p = cellCenter(r,c);
+      const startY = bottomY + S.cell/2 + k*S.cell;
+      g.el.style.transform = 'translate(' + (p.x-size/2).toFixed(2) + 'px,' + (startY-size/2).toFixed(2) + 'px)';
+      void g.el.offsetWidth;
+      requestAnimationFrame(()=>{ placeGem(g,true);
+        setTimeout(()=>{ g.el.classList.add('land'); setTimeout(()=>g.el.classList.remove('land'),240); }, CFG.boardRefillSlide);
+      });
+    }
+  }
+  setTimeout(()=>{ refreshTypeGating(); }, CFG.boardRefillSlide+20);
+}
+
+/* twinkle: subtle random glints on a few gems */
+let twinkleTimer = null;
+function scheduleTwinkles(){
+  if(twinkleTimer) clearInterval(twinkleTimer);
+  twinkleTimer = setInterval(()=>{
+    if(!S || document.hidden) return;
+    const all = [];
+    for(let r=0;r<S.rows;r++) for(let c=0;c<S.cols;c++) if(S.grid[r][c]) all.push(S.grid[r][c]);
+    if(!all.length) return;
+    const g = all[(Math.random()*all.length)|0];
+    g.el.classList.remove('twinkle'); void g.el.offsetWidth; g.el.classList.add('twinkle');
+    setTimeout(()=>g.el.classList.remove('twinkle'), 1300);
+  }, 620);
+}
+
+/* ================================================== CAPACITY (rule 6.2) */
+function capacityFor(type){
+  let cap = 0;
+  for(const c of S.carts){
+    if(isNeutral(c)) cap += S.cap;
+    else if(c.type === type) cap += Math.max(0, S.cap - eff(c));
+  }
+  return cap;
+}
+function refreshTypeGating(){
+  const unlinkable = {};
+  for(const t of S.L.gemTypes) unlinkable[t] = capacityFor(t) < CFG.MIN_LINK;
+  for(let r=0;r<S.rows;r++) for(let c=0;c<S.cols;c++){
+    const g = S.grid[r][c]; if(!g) continue;
+    const bad = !!unlinkable[g.type];
+    if(bad !== !!g.dim){
+      g.dim = bad;
+      g.el.classList.toggle('dim', bad);
+      if(bad){
+        const b = document.createElement('div'); b.className='badgeFull'; g.el.appendChild(b);
+      } else {
+        const b = g.el.querySelector('.badgeFull'); if(b) b.remove();
+      }
+    }
+  }
+  refreshCapTags();
+  if(DBG.showCap) renderCapOverlay();
+}
+function refreshCapTags(){
+  for(let r=0;r<S.rows;r++) for(let c=0;c<S.cols;c++){
+    const g = S.grid[r][c]; if(!g) continue;
+    let tag = g.el.querySelector('.capTag');
+    if(DBG.showCap){
+      if(!tag){ tag = document.createElement('div'); tag.className='capTag'; g.el.appendChild(tag); }
+      tag.textContent = capacityFor(g.type);
+    } else if(tag) tag.remove();
+  }
+}
+function renderCapOverlay(){
+  let h = '<div style="color:#FFCC5C;letter-spacing:.1em;font-size:9.5px;margin-bottom:3px">CAPACITY FOR(t)</div>';
+  for(const t of S.L.gemTypes){
+    const v = capacityFor(t);
+    h += '<div><b>' + GEMS[t].name.padEnd(9,' ') + '</b> ' +
+         (v < CFG.MIN_LINK ? '<span class="no">' + v + ' · locked</span>' : v) +
+         ' <span style="opacity:.6">dmd ' + demandOf(t).toFixed(1) + ' · stk ' + cartStock(t) + '</span></div>';
+  }
+  capOverlay.innerHTML = h;
+}
+
+/* ------------------------------------------- distribution plan (rule 6.3) */
+function planDistribution(type, L){
+  const plan = [];
+  const used = new Set();
+  const partials = S.carts.filter(c => !isNeutral(c) && c.type === type && eff(c) < S.cap)
+                          .sort((a,b) => (eff(b)-eff(a)) || (a.i-b.i));
+  let rem = L;
+  for(const c of partials){
+    if(rem <= 0) break;
+    const space = S.cap - eff(c);
+    const amt = Math.min(space, rem);
+    if(amt > 0){ plan.push({cart:c, amount:amt, before:eff(c), claimed:false}); used.add(c.i); rem -= amt; }
+  }
+  while(rem > 0){
+    const empties = S.carts.filter(c => isNeutral(c) && !used.has(c.i));
+    if(!empties.length) break;
+    empties.sort((a,b) => fwdDist(LOAD_ANCHOR_S, cartS(a)) - fwdDist(LOAD_ANCHOR_S, cartS(b)));
+    const c = empties[0];
+    const amt = Math.min(S.cap, rem);
+    plan.push({cart:c, amount:amt, before:0, claimed:true});
+    used.add(c.i); rem -= amt;
+  }
+  return plan;
+}
+
+/* ================================================================ INPUT */
+let ptrActive = false;
+function localFromEvent(e, el){
+  const r = el.getBoundingClientRect();
+  return { x:(e.clientX - r.left)/SCALE, y:(e.clientY - r.top)/SCALE };
+}
+function cellFromPoint(p){
+  const c = Math.floor((p.x - S.ox)/S.cell), r = Math.floor((p.y - S.oy)/S.cell);
+  if(r<0||c<0||r>=S.rows||c>=S.cols) return null;
+  const ctr = cellCenter(r,c);
+  const dx = p.x-ctr.x, dy = p.y-ctr.y;
+  if(dx*dx+dy*dy > (S.cell*0.52)*(S.cell*0.52)) return null;  // forgiving hit disc
+  return {r,c};
+}
+function adjacent8(a,b){ const dr=Math.abs(a.r-b.r), dc=Math.abs(a.c-b.c); return (dr<=1&&dc<=1)&&(dr+dc>0); }
+
+const boardHit = document.createElement('div');
+boardHit.style.cssText = 'position:absolute;inset:0;z-index:8';
+$('boardArea').appendChild(boardHit);
+
+boardHit.addEventListener('pointerdown', e=>{
+  if(!S || S.inputLocked || S.over) return;
+  if(S.movesLeft <= 0){ showToast('NO MOVES LEFT'); return; }
+  boardHit.setPointerCapture(e.pointerId);
+  const p = localFromEvent(e, boardHit);
+  const cc = cellFromPoint(p); if(!cc) return;
+  const g = S.grid[cc.r][cc.c]; if(!g) return;
+  if(capacityFor(g.type) < CFG.MIN_LINK){ blockFeedback(g); return; }
+  ptrActive = true;
+  S.link.active = true; S.link.type = g.type; S.link.cells = [cc];
+  markSelected();
+  sfxSelect(1);
+  updateDrag(p);
+});
+boardHit.addEventListener('pointermove', e=>{
+  if(!ptrActive || !S.link.active) return;
+  const p = localFromEvent(e, boardHit);
+  updateDrag(p);
+  const cc = cellFromPoint(p); if(!cc) return;
+  const cells = S.link.cells;
+  const last = cells[cells.length-1];
+  if(cc.r===last.r && cc.c===last.c) return;
+  /* backtrack-deselect */
+  if(cells.length >= 2){
+    const prev = cells[cells.length-2];
+    if(cc.r===prev.r && cc.c===prev.c){
+      cells.pop(); markSelected(); updateDrag(p); sfxSelect(cells.length); return;
+    }
+  }
+  const g = S.grid[cc.r][cc.c]; if(!g || g.type !== S.link.type) return;
+  if(cells.some(x=>x.r===cc.r&&x.c===cc.c)) return;     // simple path, no revisit
+  if(!adjacent8(last, cc)) return;
+  /* capacity gating */
+  if(cells.length + 1 > capacityFor(S.link.type)){ blockFeedback(g); return; }
+  cells.push(cc);
+  markSelected();
+  updateDrag(p);              // keep the ×N bubble in sync with the new length
+  sfxSelect(cells.length);
+});
+function endDrag(){
+  if(!ptrActive) return;
+  ptrActive = false;
+  dragCount.classList.remove('on');
+  resolveLink();
+}
+boardHit.addEventListener('pointerup', endDrag);
+boardHit.addEventListener('pointercancel', endDrag);
+window.addEventListener('pointerup', endDrag);
+
+let lastBlock = 0;
+function blockFeedback(g){
+  g.el.classList.remove('shake'); void g.el.offsetWidth; g.el.classList.add('shake');
+  setTimeout(()=>g.el.classList.remove('shake'), 320);
+  if(Date.now() - lastBlock > 260){ lastBlock = Date.now(); showToast('NO EMPTY SPACE'); sfxErr(); }
+  if(navigator.vibrate) try{ navigator.vibrate(28); }catch(e){}
+}
+let toastT = null;
+function showToast(msg){
+  toastEl.textContent = msg;
+  toastEl.classList.add('on');
+  clearTimeout(toastT);
+  toastT = setTimeout(()=>toastEl.classList.remove('on'), CFG.toastTime);
+}
+
+/* ------------------------------------------------- link visual + preview */
+function markSelected(){
+  const set = new Set(S.link.cells.map(c=>c.r+':'+c.c));
+  for(let r=0;r<S.rows;r++) for(let c=0;c<S.cols;c++){
+    const g = S.grid[r][c]; if(!g) continue;
+    g.el.classList.toggle('sel', set.has(r+':'+c));
+  }
+  drawLinkPath();
+  updatePreview();
+}
+function drawLinkPath(tipX, tipY){
+  const cells = S.link.cells;
+  if(!S.link.active || cells.length === 0){ clearLinkPath(); return; }
+  const col = GEMS[S.link.type].color;
+  let pts = cells.map(c=>cellCenter(c.r,c.c));
+  let d = 'M' + pts.map(p=>p.x.toFixed(1)+' '+p.y.toFixed(1)).join(' L');
+  if(tipX !== undefined) d += ' L' + tipX.toFixed(1) + ' ' + tipY.toFixed(1);
+  let h = '<path d="'+d+'" fill="none" stroke="rgba(0,0,0,.30)" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/>';
+  h += '<path d="'+d+'" fill="none" stroke="'+col+'" stroke-width="9" stroke-linecap="round" stroke-linejoin="round" opacity=".92"/>';
+  h += '<path d="'+d+'" fill="none" stroke="'+shade(col,.55)+'" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" opacity=".85"/>';
+  for(const p of pts) h += '<circle cx="'+p.x.toFixed(1)+'" cy="'+p.y.toFixed(1)+'" r="5" fill="#fff" opacity=".55"/>';
+  linkSvg.innerHTML = h;
+}
+function clearLinkPath(){ linkSvg.innerHTML = ''; }
+function updateDrag(p){
+  drawLinkPath(p.x, p.y);
+  const n = S.link.cells.length;
+  if(n >= 1){
+    dragCount.classList.add('on');
+    dragCount.style.transform = 'translate(' + p.x.toFixed(1) + 'px,' + (p.y + BOARD_Y - 42).toFixed(1) + 'px)';
+    const bub = dragCount.firstElementChild;
+    bub.textContent = '×' + n;
+    bub.style.background = n >= CFG.MIN_LINK ? 'rgba(20,12,6,.86)' : 'rgba(120,26,26,.86)';
+  } else dragCount.classList.remove('on');
+}
+function updatePreview(){
+  for(const c of S.carts){ c.el.classList.remove('destHi'); c.ghostEl.classList.remove('on'); }
+  const n = S.link.cells.length;
+  if(!S.link.active || n === 0) return;
+  const plan = planDistribution(S.link.type, n);
+  S.link.plan = plan;
+  for(const p of plan){
+    p.cart.el.classList.add('destHi');
+    const g = p.cart.ghostEl;
+    g.textContent = p.claimed
+      ? '+' + p.amount + ' → ' + p.amount + '/' + S.cap
+      : p.before + ' → ' + (p.before + p.amount) + '/' + S.cap;
+    g.classList.remove('on'); void g.offsetWidth; g.classList.add('on');
+  }
+}
+
+/* ==================================================== RESOLVE LINK (6.3) */
+function resolveLink(){
+  const cells = S.link.cells.slice();
+  const type = S.link.type;
+  S.link.active = false; S.link.cells = []; S.link.plan = [];
+  clearLinkPath();
+  for(const c of S.carts){ c.el.classList.remove('destHi'); c.ghostEl.classList.remove('on'); }
+  for(let r=0;r<S.rows;r++) for(let c=0;c<S.cols;c++){ const g=S.grid[r][c]; if(g) g.el.classList.remove('sel'); }
+
+  if(cells.length < CFG.MIN_LINK){
+    for(const cc of cells){
+      const g = S.grid[cc.r][cc.c]; if(!g) continue;
+      g.el.classList.remove('wob'); void g.el.offsetWidth; g.el.classList.add('wob');
+      setTimeout(()=>g.el.classList.remove('wob'), 360);
+    }
+    return;
+  }
+
+  const L = cells.length;
+  if(L > S.stats.biggest) S.stats.biggest = L;
+  S.movesLeft--;
+  renderMoves();
+
+  /* reserve capacity immediately: claim cart types & pending counts */
+  const plan = planDistribution(type, L);
+  const targets = [];
+  for(const p of plan){
+    if(p.claimed){ p.cart.type = type; }
+    p.cart.pending += p.amount;
+    for(let i=0;i<p.amount;i++) targets.push(p.cart);
+  }
+  refreshCartVisuals();
+
+  /* fly gems board -> carts, staggered */
+  let idx = 0;
+  for(const cc of cells){
+    const g = S.grid[cc.r][cc.c]; if(!g) continue;
+    const cart = targets[idx] || targets[targets.length-1];
+    const size = S.cell*0.94;
+    const ctr = cellCenter(cc.r, cc.c);
+    const from = { x: ctr.x, y: ctr.y + BOARD_Y };
+    S.grid[cc.r][cc.c] = null;
+    const el = g.el;
+    setTimeout(()=>{
+      el.classList.add('pop');
+      setTimeout(()=>el.remove(), 170);
+      spawnFly(g.type, from, cart, size*0.8);
+      sfxPop();
+    }, idx * CFG.gemFlyStagger);
+    idx++;
+  }
+
+  /* callouts */
+  if(L >= S.cap) showCallout('PERFECT PLATE!');
+  else if(L >= 7) showCallout('Great!');
+
+  collapseAndRefill();
+  refreshTypeGating();
+}
+function showCallout(txt){
+  const d = document.createElement('div');
+  d.className = 'callout'; d.textContent = txt;
+  fxLayer.appendChild(d);
+  setTimeout(()=>d.remove(), 1100);
+  sfxBurst();
+}
+
+/* -------------------------------------------------------- flying gems fx */
+function spawnFly(type, from, cart, size){
+  const el = document.createElement('div');
+  el.className = 'fly';
+  el.style.width = size+'px'; el.style.height = size+'px';
+  el.innerHTML = gemSVG(type, {glint:false});
+  fxLayer.appendChild(el);
+  const f = { el, type, from, cart, size, t:0, dur:CFG.gemFlyTime,
+              spin:(Math.random()*2-1)*180, arc:(Math.random()*0.5+0.5) };
+  S.flying.push(f);
+  S.pendingLands++;
+  return f;
+}
+function updateFlying(dtms){
+  for(let i=S.flying.length-1;i>=0;i--){
+    const f = S.flying[i];
+    f.t += dtms;
+    let k = Math.min(1, f.t / f.dur);
+    const e = 1 - Math.pow(1-k, 2.2);
+    const to = f.toStatic || cartStagePos(f.cart);
+    const mx = (f.from.x + to.x)/2, my = (f.from.y + to.y)/2;
+    const dx = to.x - f.from.x, dy = to.y - f.from.y;
+    const len = Math.hypot(dx,dy) || 1;
+    const cxp = mx + (-dy/len) * len * 0.22 * f.arc;
+    const cyp = my + ( dx/len) * len * 0.22 * f.arc;
+    const u = 1-e;
+    const x = u*u*f.from.x + 2*u*e*cxp + e*e*to.x;
+    const y = u*u*f.from.y + 2*u*e*cyp + e*e*to.y;
+    const sc = 1 - 0.35*e;
+    f.el.style.transform = 'translate(' + (x - f.size/2).toFixed(2) + 'px,' + (y - f.size/2).toFixed(2) +
+                           'px) rotate(' + (f.spin*e).toFixed(1) + 'deg) scale(' + sc.toFixed(3) + ')';
+    if(k >= 1){
+      f.el.remove();
+      S.flying.splice(i,1);
+      S.pendingLands--;
+      if(f.onLand) f.onLand();
+      else if(f.discard){ f.cart.pending = Math.max(0, f.cart.pending - 1); refreshCartVisuals(); }
+      else landIntoCart(f.cart);
+      if(S.pendingLands === 0){ refreshTypeGating(); settle('flight settled'); }
+    }
+  }
+}
+function landIntoCart(cart){
+  cart.pending = Math.max(0, cart.pending - 1);
+  cart.count = Math.min(S.cap, cart.count + 1);
+  refreshCartVisuals();
+  cart.countEl.classList.remove('tick'); void cart.countEl.offsetWidth; cart.countEl.classList.add('tick');
+  cart.el.classList.remove('squash'); void cart.el.offsetWidth; cart.el.classList.add('squash');
+  setTimeout(()=>cart.el.classList.remove('squash'), 280);
+  blip(300 + cart.count*32, 0.06, 'sine', 0.05);
+}
+function burstParticles(x, y, color, n){
+  for(let i=0;i<(n||10);i++){
+    const p = document.createElement('div');
+    p.className = 'spark';
+    const sz = 5 + Math.random()*7;
+    p.style.width = sz+'px'; p.style.height = sz+'px';
+    p.style.background = i%3===0 ? '#FFF3C4' : color;
+    p.style.transform = 'translate(' + x + 'px,' + y + 'px)';
+    fxLayer.appendChild(p);
+    const a = Math.random()*Math.PI*2, d = 24 + Math.random()*44;
+    requestAnimationFrame(()=>{
+      p.style.transition = 'transform .55s cubic-bezier(.2,.8,.3,1), opacity .55s';
+      p.style.transform = 'translate(' + (x + Math.cos(a)*d) + 'px,' + (y + Math.sin(a)*d + 14) + 'px) scale(.2)';
+      p.style.opacity = '0';
+    });
+    setTimeout(()=>p.remove(), 620);
+  }
+}
+
+/* ================================================ BELT + DOCKING (6.3/6.4) */
+let lastTs = 0;
+function frame(ts){
+  requestAnimationFrame(frame);
+  if(!S) return;
+  const dt = lastTs ? Math.min(60, ts - lastTs) : 16;
+  lastTs = ts;
+  if(!S.beltPaused && !S.over){
+    const lap = CFG.lapTime / (S.beltSpeed * DBG.speedMul);
+    advanceBelt(TRACK.P * dt / lap);
+  }
+  updateCartPositions();
+  if(!S.over) processUnloads();
+  updateFlying(dt);
+  if(S.link.active) updatePreview();
+}
+requestAnimationFrame(frame);
+
+function advanceBelt(ds){ S.beltPos = (S.beltPos + ds) % TRACK.P; }
+
+/* ---- drive-by unloading: the belt never stops. A matching cart starts
+   unloading as it nears a station and is paced so the last gem leaves just
+   before the cart exits the window. ---- */
+const UNLOAD_W = 60;   // px of track on each side of a station
+function processUnloads(){
+  for(const st of S.stations){
+    for(const c of S.carts){
+      const off = (((st.sTrack - cartS(c)) % TRACK.P) + TRACK.P + TRACK.P/2) % TRACK.P - TRACK.P/2;
+      const inWin = off <= UNLOAD_W && off >= -UNLOAD_W;
+      /* a plan lives for one pass through the window only */
+      if(c.unload && c.unload.st === st &&
+         (!inWin || !st.target || c.unload.tgt !== st.target || c.count <= 0)) c.unload = null;
+      if(!st.target || st.refilling || st.target.progress >= st.target.need) continue;
+      if(!inWin || c.count <= 0 || c.type !== st.target.type) continue;
+      const f = (UNLOAD_W - off) / (2*UNLOAD_W);          // 0 entering → 1 leaving
+      if(!c.unload || c.unload.st !== st || c.unload.tgt !== st.target){
+        c.unload = { st, tgt: st.target, planned: Math.min(c.count, st.target.need - st.target.progress), sent: 0 };
+        dbgLog('unload cart#' + c.i + ' (' + c.type + ' ' + c.count + ') → st#' + st.i +
+               ' ' + st.target.progress + '/' + st.target.need + ' ⇒ plan ' + c.unload.planned);
+      }
+      const u = c.unload;
+      const want = Math.min(u.planned, Math.floor(f * (u.planned + 1)));
+      let moved = 0;
+      while(u.sent < want && c.count > 0 && st.target.progress < st.target.need){
+        u.sent++; c.count--; st.target.progress++;
+        flyToStation(c.type, cartStagePos(c), { x: st.dock.x, y: 150 });
+        sfxTick(u.sent, u.planned);
+        moved++;
+      }
+      if(moved){
+        updateStationCounter(st, true);
+        c.countEl.classList.remove('tick'); void c.countEl.offsetWidth; c.countEl.classList.add('tick');
+        refreshCartVisuals();
+        if(st.target.progress >= st.target.need) completeOrder(st);
+        else if(c.count === 0) refreshTypeGating();
+      }
+    }
+  }
+}
+async function completeOrder(st){
+  if(st.refilling) return;
+  const my = S;
+  st.refilling = true;
+  S.stats.done++;
+  st.card.classList.add('done');
+  burstParticles(st.dock.x, 116, GEMS[st.target.type].color, 16);
+  sfxBurst();
+  world.classList.remove('shake'); void world.offsetWidth; world.classList.add('shake');
+  setTimeout(()=>world.classList.remove('shake'), 360);
+  st.target = null;
+  await sleep(560);
+  if(S !== my) return;
+  st.card.classList.remove('done');
+  renderStation(st);
+  await sleep((my.L.stationRefillDelay*1000) || CFG.stationRefillDelay);
+  if(S !== my) return;
+  if(st.queue.length){
+    const q = st.queue.shift();
+    st.target = { type:q.type, need:q.count, progress:q.progress||0 };
+    renderStation(st, true);
+  } else {
+    st.closed = true;
+    renderStation(st);
+  }
+  renderStationQueue(st);
+  st.refilling = false;
+  checkRetirement();
+  refreshTypeGating();
+  settle('delivery finished');
+}
+
+/* =============================================== TYPE RETIREMENT
+   When a type has no remaining demand anywhere (no active target, nothing
+   queued at any station), it leaves the level: wagons shake their leftover
+   gems out, every board copy shatters, and the spawner stops producing it. */
+function typeStillWanted(t){
+  for(const st of S.stations){
+    if(st.target && st.target.type === t) return true;
+    for(const q of st.queue) if(q.type === t) return true;
+  }
+  return false;
+}
+function checkRetirement(){
+  for(const t of S.L.gemTypes){
+    if(!S.retired.has(t) && !typeStillWanted(t)) retireType(t);
+  }
+}
+function retireType(t){
+  S.retired.add(t);
+  for(const f of S.flying) if(f.type === t) f.discard = true;   // gems already airborne get tossed with the rest
+  dbgLog('type retired: ' + t);
+  /* cancel a link of that type mid-drag */
+  if(S.link.active && S.link.type === t){
+    ptrActive = false;
+    S.link.active = false; S.link.cells = [];
+    clearLinkPath(); dragCount.classList.remove('on');
+    for(let r=0;r<S.rows;r++) for(let c=0;c<S.cols;c++){ const g=S.grid[r][c]; if(g) g.el.classList.remove('sel'); }
+    for(const c of S.carts){ c.el.classList.remove('destHi'); c.ghostEl.classList.remove('on'); }
+  }
+  /* wagons shake out their leftover gems */
+  for(const c of S.carts){
+    if(c.type !== t || c.count <= 0) continue;
+    const pos = cartStagePos(c);
+    burstParticles(pos.x, pos.y, GEMS[t].color, 10);
+    c.count = 0;
+    c.unload = null;
+    c.el.classList.remove('shakeC'); void c.el.offsetWidth; c.el.classList.add('shakeC');
+    setTimeout(()=>c.el.classList.remove('shakeC'), 580);
+  }
+  /* board copies shatter simultaneously */
+  let exploded = 0;
+  for(let r=0;r<S.rows;r++) for(let c=0;c<S.cols;c++){
+    const g = S.grid[r][c];
+    if(!g || g.type !== t) continue;
+    S.grid[r][c] = null;
+    exploded++;
+    const ctr = cellCenter(r, c);
+    burstParticles(ctr.x, ctr.y + BOARD_Y, GEMS[t].color, 6);
+    g.el.classList.add('pop');
+    setTimeout(((el)=>()=>el.remove())(g.el), 180);
+  }
+  sfxBurst();
+  showCallout(GEMS[t].name + ' cleared!');
+  if(exploded) collapseAndRefill();
+  refreshCartVisuals();
+  refreshTypeGating();
+}
+
+function flyToStation(type, from, to){
+  const el = document.createElement('div');
+  const size = 22;
+  el.className = 'fly';
+  el.style.width = size+'px'; el.style.height = size+'px';
+  el.innerHTML = gemSVG(type, {glint:false});
+  fxLayer.appendChild(el);
+  const f = { el, from, size, t:0, dur:CFG.transferFlyTime, toStatic:to,
+              spin:(Math.random()*2-1)*140, arc:1, cart:null,
+              onLand(){ burstParticles(to.x, to.y, GEMS[type].color, 4); } };
+  S.flying.push(f); S.pendingLands++;
+}
+
+/* ============================================== WIN / FAIL
+   FAIL = no legal move (NO EMPTY SPACE) AND nothing on the belt can deliver.
+   With 25+ orders, filling every cart with wanted types is the intended
+   strategy (each order takes several cart trips), so carts that still match
+   an active station keep the run alive — they will drain and free space.
+   A belt full of unwanted cargo still fails on the spot. */
+function legalMoveExists(){
+  for(const t of S.L.gemTypes){
+    if(capacityFor(t) >= CFG.MIN_LINK && largestGroup(t) >= CFG.MIN_LINK) return true;
+  }
+  return false;
+}
+function possibleDeliveryExists(){
+  for(const c of S.carts){
+    if(eff(c) <= 0 || !c.type) continue;
+    for(const st of S.stations){
+      if(st.target && st.target.type === c.type && st.target.progress < st.target.need) return true;
+    }
+  }
+  return false;
+}
+function settle(reason){
+  if(!S || S.over) return;
+  if(S.pendingLands > 0) return;
+  /* WIN: queue empty and all stations completed/closed */
+  if(S.stations.every(st => st.target === null && st.queue.length === 0)){
+    endGame(true); return;
+  }
+  const lm = legalMoveExists() && S.movesLeft > 0, pd = possibleDeliveryExists();
+  if(DBG.logFail) dbgLog('failcheck[' + reason + '] legalMove=' + lm + ' moves=' + S.movesLeft + ' delivery=' + pd + ' → ' + (!lm&&!pd ? 'FAIL' : 'ok'));
+  if(!lm && !pd) endGame(false);   // out of moves still lets carts already loaded finish the job
+}
+
+async function endGame(win){
+  const my = S;
+  S.over = true; S.inputLocked = true;
+  S.link.active = false; clearLinkPath(); dragCount.classList.remove('on');
+  if(!win){
+    await sleep(CFG.failFreezeHold);
+    sfxFail();
+  } else {
+    /* let the final act play out on screen first: the last gems settling
+       into wagons and the closing type-retirement explosions on the board */
+    await sleep(1500);
+    sfxWin();
+  }
+  if(S !== my) return;
+  const gems = S.L.gemTypes.slice(0,4).map(t=>gemSVG(t,{glint:false,shadow:false})).join('');
+  const nextIdx = S.lvlIdx + 1;
+  scrEnd.innerHTML =
+    '<div class="gemRow">' + gems + '</div>' +
+    '<h1>' + (win ? 'All orders served!' : (S.movesLeft <= 0 ? 'Out of moves' : 'No empty space')) + '</h1>' +
+    '<p>' + (win ? 'Level ' + S.L.id + ' — ' + S.L.name + ' cleared.'
+                 : (S.movesLeft <= 0 ? 'Moves ran out before the orders were filled.'
+                    : 'No empty space left and nothing on the belt can deliver — the run is stuck.')) + '</p>' +
+    '<div class="statRow">' +
+      '<div class="statBox"><b>' + S.stats.done + '</b><span>Orders done</span></div>' +
+      '<div class="statBox"><b>' + S.stats.biggest + '</b><span>Biggest link</span></div>' +
+    '</div>' +
+    (win && nextIdx < LEVELS.length
+      ? '<button class="bigBtn" id="btnNext">Next level</button>'
+      : '<button class="bigBtn" id="btnAgain">' + (win ? 'Play again' : 'Restart') + '</button>') +
+    '<button class="bigBtn alt" id="btnBack">Level select</button>';
+  scrEnd.classList.remove('hide');
+  const bn = $('btnNext'), ba = $('btnAgain');
+  if(bn) bn.onclick = ()=>startLevel(nextIdx);
+  if(ba) ba.onclick = ()=>startLevel(S.lvlIdx);
+  $('btnBack').onclick = showMenu;
+}
+
+/* ==================================================== MENU / END SCREENS */
+function showMenu(){
+  const gems = ALL_TYPES.map(t=>gemSVG(t,{glint:false,shadow:false})).join('');
+  scrMenu.innerHTML =
+    '<div class="logoWrap">' +
+      '<div class="gemRow">' + gems + '</div>' +
+      '<h1>ROLL N SERVE</h1>' +
+      '<div class="sub">Prep · Plate · Serve</div>' +
+    '</div>' +
+    '<p>Link 2+ matching sushi on the prep board. They stack onto belt plates — one kind, 10 pieces each. Plates auto-serve matching orders as they pass. Clear every ticket within the move budget.</p>' +
+    '<div class="lvlList">' +
+      LEVELS.map((L,i)=>'<button class="lvlBtn" data-i="' + i + '"><b>' + L.id + '. ' + L.name + '</b>' +
+        '<span>' + L.blurb + ' · ' + levelOrders(L).length + ' orders · ' + (L.moves||50) + ' moves · demand ' +
+        levelOrders(L).reduce((a,t)=>a+t.count,0) + '</span></button>').join('') +
+    '</div>';
+  scrMenu.classList.remove('hide');
+  scrEnd.classList.add('hide');
+  scrMenu.querySelectorAll('.lvlBtn').forEach(b=>{
+    b.onclick = ()=>{ ac(); startLevel(+b.dataset.i); };
+  });
+}
+
+/* ============================================================ DEBUG PANEL */
+function dbgLog(s){
+  DBG.lines.push(s);
+  if(DBG.lines.length > 60) DBG.lines.shift();
+  const el = $('dbgLog');
+  if(el){ el.textContent = DBG.lines.slice(-24).join('\n'); el.scrollTop = el.scrollHeight; }
+}
+function renderDbg(){
+  dbgEl.innerHTML =
+    '<h3>Debug</h3>' +
+    '<div class="row">' + LEVELS.map((L,i)=>'<button data-lvl="' + i + '"' +
+      (S && S.lvlIdx===i ? ' class="act"' : '') + '>L' + L.id + '</button>').join('') + '</div>' +
+    '<label>Belt speed <span id="dbgSpd">' + DBG.speedMul.toFixed(2) + '×</span></label>' +
+    '<input type="range" id="rngSpd" min="0.4" max="2.5" step="0.05" value="' + DBG.speedMul + '">' +
+    '<label>Spawner k <span id="dbgK">' + (DBG.kOverride===null ? 'level (' + (S?S.k:'-') + ')' : DBG.kOverride.toFixed(2)) + '</span></label>' +
+    '<input type="range" id="rngK" min="0" max="4" step="0.1" value="' + (DBG.kOverride===null ? (S?S.k:2) : DBG.kOverride) + '">' +
+    '<div class="row">' +
+      '<button id="btnCap"' + (DBG.showCap?' class="act"':'') + '>capacity overlay</button>' +
+    '</div>' +
+    '<div class="row">' +
+      '<button id="btnFail"' + (DBG.logFail?' class="act"':'') + '>log fail-checks</button>' +
+    '</div>' +
+    '<div class="row">' +
+      '<button id="btnFillCarts">fill carts</button>' +
+      '<button id="btnEmptyCarts">empty carts</button>' +
+    '</div>' +
+    '<div class="row"><button id="btnSnd"' + (CFG.sound?' class="act"':'') + '>sound</button>' +
+    '<button id="btnStep">force check</button></div>' +
+    '<div id="dbgLog"></div>';
+
+  dbgEl.querySelectorAll('[data-lvl]').forEach(b=>b.onclick=()=>startLevel(+b.dataset.lvl));
+  $('rngSpd').oninput = e=>{ DBG.speedMul = +e.target.value; $('dbgSpd').textContent = DBG.speedMul.toFixed(2)+'×'; };
+  $('rngK').oninput = e=>{ DBG.kOverride = +e.target.value; $('dbgK').textContent = DBG.kOverride.toFixed(2); };
+  $('btnCap').onclick = e=>{ DBG.showCap = !DBG.showCap; e.target.classList.toggle('act', DBG.showCap);
+    capOverlay.classList.toggle('on', DBG.showCap); refreshCapTags(); if(DBG.showCap) renderCapOverlay(); };
+  $('btnFail').onclick = e=>{ DBG.logFail = !DBG.logFail; e.target.classList.toggle('act', DBG.logFail); };
+  $('btnSnd').onclick = e=>{ CFG.sound = !CFG.sound; e.target.classList.toggle('act', CFG.sound); };
+  $('btnStep').onclick = ()=>{ const l=legalMoveExists(), p=possibleDeliveryExists();
+    dbgLog('manual: legalMove=' + l + ' delivery=' + p + ' win=' + S.stations.every(s=>!s.target && !s.queue.length)); settle('manual'); };
+  $('btnFillCarts').onclick = ()=>{ for(const c of S.carts){ if(!c.type) c.type = S.L.gemTypes[c.i % S.L.gemTypes.length];
+    c.count = S.cap; c.pending = 0; } refreshCartVisuals(); refreshTypeGating(); settle('debug fill'); };
+  $('btnEmptyCarts').onclick = ()=>{ for(const c of S.carts){ c.type=null; c.count=0; c.pending=0; }
+    refreshCartVisuals(); refreshTypeGating(); };
+  $('dbgLog').textContent = DBG.lines.slice(-24).join('\n');
+}
+
+/* ============================================================ BOOSTERS
+   Ad-gated in the real game; the AD tag is cosmetic for now (no economy). */
+let picking = false;
+function boosterShuffle(){
+  if(!S || S.over || S.link.active) return;
+  const gems = [];
+  for(let r=0;r<S.rows;r++) for(let c=0;c<S.cols;c++) if(S.grid[r][c]) gems.push(S.grid[r][c]);
+  let tries = 0;
+  do {
+    for(let i=gems.length-1;i>0;i--){             // permute types across positions
+      const j = (Math.random()*(i+1))|0;
+      const t = gems[i].type; gems[i].type = gems[j].type; gems[j].type = t;
+    }
+    tries++;
+  } while(!boardHasGroup() && tries < 50);
+  for(const g of gems){
+    g.el.querySelector('.gbody').innerHTML = gemSVG(g.type);
+    g.el.classList.remove('born'); void g.el.offsetWidth; g.el.classList.add('born');
+  }
+  refreshTypeGating();
+  sfxBurst();
+  dbgLog('booster: shuffle (' + tries + ' roll' + (tries>1?'s':'') + ')');
+  settle('shuffle');
+}
+function setPicking(on){
+  picking = on;
+  if(S) S.inputLocked = on;
+  stationLayer.classList.toggle('picking', on);
+  $('bTarget').classList.toggle('armed', on);
+  if(on) showToast('PICK AN ORDER');
+}
+function pickTarget(st, qi){
+  const picked = st.queue.splice(qi, 1)[0];
+  if(!picked){ setPicking(false); return; }
+  if(st.target) st.queue.unshift({ type: st.target.type, count: st.target.need, progress: st.target.progress });
+  st.target = { type: picked.type, need: picked.count, progress: picked.progress || 0 };
+  st.closed = false;
+  renderStation(st, true);
+  renderStationQueue(st);
+  refreshTypeGating();
+  dbgLog('booster: target ' + st.target.type + ' → front of st#' + st.i);
+  setPicking(false);
+  settle('target swapped');
+}
+stationLayer.addEventListener('click', e=>{
+  if(!picking) return;
+  const mini = e.target.closest('.qMini');
+  if(!mini){ setPicking(false); return; }
+  pickTarget(S.stations[+mini.dataset.st], +mini.dataset.qi);
+});
+$('bShuffle').onclick = ()=>{ ac(); boosterShuffle(); };
+$('bWagon').onclick   = ()=>{ ac(); if(S && !S.over){ dbgLog('booster: add wagon'); addWagon(); } };
+$('bTarget').onclick  = ()=>{ ac(); if(!S || S.over) return; setPicking(!picking); };
+
+/* ================================================================ BOOT */
+$('btnRestart').onclick = ()=>{ if(S) startLevel(S.lvlIdx); };
+$('btnMenu').onclick = showMenu;
+$('btnDbg').onclick = ()=>{ dbgEl.classList.toggle('on'); if(dbgEl.classList.contains('on')) renderDbg(); };
+document.addEventListener('visibilitychange', ()=>{ lastTs = 0; });
+
+startLevel(0);
+showMenu();
+</script>
+</body>
+</html>
