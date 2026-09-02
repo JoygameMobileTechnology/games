@@ -946,7 +946,7 @@ function spawnType(){
   for(const t of types){
     let x = 1 + k * dem[t] / denom;
     if(cartStock(t) > 0 && dem[t] === 0) x *= 0.5;   // anti-clog damper
-    if(S.retired.has(t)) x *= 0.22;                  // retired types trickle back, rarely
+    if(S.retired.has(t)) x *= 0.4;                   // retired types keep flowing back
     w.push(x); wsum += x;
   }
   let roll = Math.random() * wsum;
