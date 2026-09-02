@@ -55,10 +55,10 @@ html,body{width:100%;height:100%;overflow:hidden;background:#140d08;
 #trackSvg{position:absolute;left:0;top:0;width:390px;height:338px;overflow:visible}
 #cartLayer,#stationLayer{position:absolute;left:0;top:0;width:390px;height:338px}
 #cartLayer,#beltGlow,#trackSvg,#movesPill{pointer-events:none}   /* taps must reach the station queue minis below */
-#movesPill{position:absolute;left:8px;top:8px;z-index:5;width:56px;padding:4px 0 5px;text-align:center;
+#movesPill{position:absolute;left:50%;transform:translateX(-50%);top:4px;z-index:5;width:82px;padding:4px 0 6px;text-align:center;
   background:linear-gradient(#FFF6E6,#EBD9BA);border-radius:12px;box-shadow:0 3px 0 rgba(0,0,0,.4)}
-#movesPill small{display:block;font-size:8px;font-weight:800;letter-spacing:.12em;color:#A98A66}
-#movesPill b{display:block;font-size:19px;font-weight:800;color:#5B3F22;line-height:1.05}
+#movesPill small{display:block;font-size:9px;font-weight:800;letter-spacing:.14em;color:#A98A66}
+#movesPill b{display:block;font-size:27px;font-weight:800;color:#5B3F22;line-height:1.05}
 #movesPill.low b{color:#D63A50}
 #movesPill.low{animation:pulseGlow 1.2s ease-in-out infinite}
 #beltGlow{position:absolute;pointer-events:none;opacity:0;transition:opacity .3s;border-radius:999px}
@@ -331,7 +331,7 @@ const CFG = {
   stationRefillDelay: 600,
   boardRefillSlide: 180,
   failFreezeHold: 1000,
-  lapTime: 8000,           // one full lap ≈ 8s at 1.0× (wagons 1.5× faster)
+  lapTime: 5333,           // one full lap ≈ 5.3s at 1.0× (2.25× the original pace)
   toastTime: 900,
   sound: true
 };
@@ -488,24 +488,40 @@ const LEVELS = [
   { id:2, name:'Double orders', blurb:'5 types · 4 carts · 3 stations',
     board:{cols:7,rows:7}, gemTypes:['ruby','emerald','sapphire','topaz','amethyst'],
     cartCount:4, cartCapacity:10, beltSpeed:1.0, spawnWeightK:2.0,
-    stationRefillDelay:0.6,
+    stationRefillDelay:0.6, moves:30,
     stationQueues:[
-      [{type:'emerald',count:30},{type:'ruby',count:25}],
-      [{type:'ruby',count:25},{type:'amethyst',count:30}],
-      [{type:'sapphire',count:25},{type:'topaz',count:30}]
+      [{type:'emerald',count:25},{type:'ruby',count:25}],
+      [{type:'amethyst',count:25}],
+      [{type:'sapphire',count:25}]
     ] },
   { id:3, name:'Tight rails', blurb:'4 types · 3 carts · 3 stations',
     board:{cols:7,rows:7}, gemTypes:['ruby','emerald','sapphire','topaz'],
     cartCount:3, cartCapacity:10, beltSpeed:1.1, spawnWeightK:1.8,
-    stationRefillDelay:0.6,
+    stationRefillDelay:0.6, moves:30,
     stationQueues:[
       [{type:'sapphire',count:25},{type:'ruby',count:25}],
-      [{type:'topaz',count:25},{type:'emerald',count:25}],
-      [{type:'ruby',count:25},{type:'topaz',count:25}]
+      [{type:'topaz',count:25}],
+      [{type:'ruby',count:25},{type:'emerald',count:25}]
+    ] },
+  { id:4, name:'Deep veins', blurb:'5 types · 4 carts · 3 stations',
+    board:{cols:7,rows:7}, gemTypes:['ruby','emerald','sapphire','topaz','amethyst'],
+    cartCount:4, cartCapacity:10, beltSpeed:1.05, spawnWeightK:1.8,
+    stationRefillDelay:0.6, moves:40,
+    stationQueues:[
+      [{type:'sapphire',count:25},{type:'ruby',count:25}],
+      [{type:'topaz',count:25},{type:'amethyst',count:25}],
+      [{type:'emerald',count:25},{type:'ruby',count:25}]
+    ] },
+  { id:5, name:'Night shift', blurb:'5 types · 4 carts · 2 stations',
+    board:{cols:7,rows:7}, gemTypes:['ruby','sapphire','topaz','amethyst','diamond'],
+    cartCount:4, cartCapacity:10, beltSpeed:1.1, spawnWeightK:1.8,
+    stationRefillDelay:0.6, moves:50,
+    stationQueues:[
+      [{type:'diamond',count:25},{type:'sapphire',count:25},{type:'ruby',count:25},{type:'topaz',count:25}],
+      [{type:'amethyst',count:25},{type:'diamond',count:25},{type:'ruby',count:25}]
     ] }
 ];
-/* every level plays with the same move budget */
-LEVELS.forEach(L => L.moves = 50);
+LEVELS[0].moves = 30;
 function levelOrders(L){ return L.stationQueues.flat(); }
 
 /* --------------------------------------------------------- TRACK GEOMETRY
@@ -1568,14 +1584,19 @@ function settle(reason){
 }
 
 async function endGame(win){
+  const my = S;
   S.over = true; S.inputLocked = true;
   S.link.active = false; clearLinkPath(); dragCount.classList.remove('on');
   if(!win){
     await sleep(CFG.failFreezeHold);
     sfxFail();
   } else {
+    /* let the final act play out on screen first: the last gems settling
+       into wagons and the closing type-retirement explosions on the board */
+    await sleep(1500);
     sfxWin();
   }
+  if(S !== my) return;
   const gems = S.L.gemTypes.slice(0,4).map(t=>gemSVG(t,{glint:false,shadow:false})).join('');
   const nextIdx = S.lvlIdx + 1;
   scrEnd.innerHTML =
@@ -1608,10 +1629,10 @@ function showMenu(){
       '<h1>LINK N LOAD</h1>' +
       '<div class="sub">Mine · Load · Ship</div>' +
     '</div>' +
-    '<p>Link 2+ matching gems. They load into mine carts — one type, 10 gems each. Carts auto-deliver to matching orders on the loop. 50 moves per level.</p>' +
+    '<p>Link 2+ matching gems. They load into mine carts — one type, 10 gems each. Carts auto-deliver to matching orders on the loop. Clear every order within the move budget.</p>' +
     '<div class="lvlList">' +
       LEVELS.map((L,i)=>'<button class="lvlBtn" data-i="' + i + '"><b>' + L.id + '. ' + L.name + '</b>' +
-        '<span>' + L.blurb + ' · ' + levelOrders(L).length + ' orders · demand ' +
+        '<span>' + L.blurb + ' · ' + levelOrders(L).length + ' orders · ' + (L.moves||50) + ' moves · demand ' +
         levelOrders(L).reduce((a,t)=>a+t.count,0) + '</span></button>').join('') +
     '</div>';
   scrMenu.classList.remove('hide');
