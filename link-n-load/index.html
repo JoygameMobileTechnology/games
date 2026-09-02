@@ -937,8 +937,7 @@ function demandOf(type){
 }
 function cartStock(type){ let n=0; for(const c of S.carts) if(c.type===type) n += c.count; return n; }
 function spawnType(){
-  const types = S.L.gemTypes.filter(t => !S.retired.has(t));
-  if(!types.length) return null;   // every type retired — nothing left to spawn
+  const types = S.L.gemTypes;
   const dem = {}; let sum = 0;
   for(const t of types){ dem[t] = demandOf(t); sum += dem[t]; }
   const denom = Math.max(1, sum);
@@ -947,6 +946,7 @@ function spawnType(){
   for(const t of types){
     let x = 1 + k * dem[t] / denom;
     if(cartStock(t) > 0 && dem[t] === 0) x *= 0.5;   // anti-clog damper
+    if(S.retired.has(t)) x *= 0.22;                  // retired types trickle back, rarely
     w.push(x); wsum += x;
   }
   let roll = Math.random() * wsum;
@@ -1356,7 +1356,7 @@ function updateFlying(dtms){
       S.flying.splice(i,1);
       S.pendingLands--;
       if(f.onLand) f.onLand();
-      else if(S.retired.has(f.type)){ f.cart.pending = Math.max(0, f.cart.pending - 1); refreshCartVisuals(); }
+      else if(f.discard){ f.cart.pending = Math.max(0, f.cart.pending - 1); refreshCartVisuals(); }
       else landIntoCart(f.cart);
       if(S.pendingLands === 0){ refreshTypeGating(); settle('flight settled'); }
     }
@@ -1499,6 +1499,7 @@ function checkRetirement(){
 }
 function retireType(t){
   S.retired.add(t);
+  for(const f of S.flying) if(f.type === t) f.discard = true;   // gems already airborne get tossed with the rest
   dbgLog('type retired: ' + t);
   /* cancel a link of that type mid-drag */
   if(S.link.active && S.link.type === t){
