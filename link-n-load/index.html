@@ -54,7 +54,13 @@ html,body{width:100%;height:100%;overflow:hidden;background:#140d08;
 /* ============ belt / track ============ */
 #trackSvg{position:absolute;left:0;top:0;width:390px;height:338px;overflow:visible}
 #cartLayer,#stationLayer{position:absolute;left:0;top:0;width:390px;height:338px}
-#cartLayer,#beltGlow,#trackSvg{pointer-events:none}   /* taps must reach the station queue minis below */
+#cartLayer,#beltGlow,#trackSvg,#movesPill{pointer-events:none}   /* taps must reach the station queue minis below */
+#movesPill{position:absolute;left:8px;top:8px;z-index:5;width:56px;padding:4px 0 5px;text-align:center;
+  background:linear-gradient(#FFF6E6,#EBD9BA);border-radius:12px;box-shadow:0 3px 0 rgba(0,0,0,.4)}
+#movesPill small{display:block;font-size:8px;font-weight:800;letter-spacing:.12em;color:#A98A66}
+#movesPill b{display:block;font-size:19px;font-weight:800;color:#5B3F22;line-height:1.05}
+#movesPill.low b{color:#D63A50}
+#movesPill.low{animation:pulseGlow 1.2s ease-in-out infinite}
 #beltGlow{position:absolute;pointer-events:none;opacity:0;transition:opacity .3s;border-radius:999px}
 #beltGlow.on{opacity:1;animation:pulseGlow 1.5s ease-in-out infinite}
 @keyframes pulseGlow{0%,100%{opacity:.4}50%{opacity:1}}
@@ -263,6 +269,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:#140d08;
   <div id="beltArea">
     <svg id="trackSvg" viewBox="0 0 390 338"></svg>
     <div id="beltGlow"></div>
+    <div id="movesPill"><small>MOVES</small><b id="movesNum">50</b></div>
     <div id="stationLayer"></div>
     <div id="cartLayer"></div>
   </div>
@@ -312,7 +319,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:#140d08;
 
 /* ---------------------------------------------------------------- CONFIG */
 const CFG = {
-  MIN_LINK: 3,
+  MIN_LINK: 2,
   CART_CAPACITY: 10,
   WARN_THRESHOLD: 8,
   gemFlyTime: 260,
@@ -475,7 +482,7 @@ const LEVELS = [
       [{type:'ruby',count:25},{type:'sapphire',count:25}],
       [{type:'emerald',count:25},{type:'topaz',count:25}]
     ],
-    hint:'Link 3+ matching gems. Carts hold one type, 10 gems max.' },
+    hint:'Link 2+ matching gems. Carts hold one type, 10 gems max.' },
   { id:2, name:'Double orders', blurb:'5 types · 4 carts · 3 stations',
     board:{cols:7,rows:7}, gemTypes:['ruby','emerald','sapphire','topaz','amethyst'],
     cartCount:4, cartCapacity:10, beltSpeed:1.0, spawnWeightK:2.0,
@@ -485,16 +492,18 @@ const LEVELS = [
       [{type:'ruby',count:25},{type:'amethyst',count:30}],
       [{type:'sapphire',count:25},{type:'topaz',count:30}]
     ] },
-  { id:3, name:'Tight rails', blurb:'6 types · 3 carts · 3 stations',
-    board:{cols:7,rows:7}, gemTypes:['ruby','emerald','sapphire','topaz','amethyst','diamond'],
-    cartCount:3, cartCapacity:10, beltSpeed:1.1, spawnWeightK:1.5,
+  { id:3, name:'Tight rails', blurb:'4 types · 3 carts · 3 stations',
+    board:{cols:7,rows:7}, gemTypes:['ruby','emerald','sapphire','topaz'],
+    cartCount:3, cartCapacity:10, beltSpeed:1.1, spawnWeightK:1.8,
     stationRefillDelay:0.6,
     stationQueues:[
-      [{type:'sapphire',count:30},{type:'ruby',count:25}],
-      [{type:'topaz',count:25},{type:'emerald',count:30},{type:'diamond',count:25}],
-      [{type:'diamond',count:30},{type:'amethyst',count:25}]
+      [{type:'sapphire',count:25},{type:'ruby',count:25}],
+      [{type:'topaz',count:25},{type:'emerald',count:25}],
+      [{type:'ruby',count:25},{type:'topaz',count:25}]
     ] }
 ];
+/* every level plays with the same move budget */
+LEVELS.forEach(L => L.moves = 50);
 function levelOrders(L){ return L.stationQueues.flat(); }
 
 /* --------------------------------------------------------- TRACK GEOMETRY
@@ -600,6 +609,7 @@ function startLevel(idx){
     flying: [], pendingLands: 0,
     inputLocked: false, over: false,
     stats: { done:0, biggest:0 },
+    movesLeft: L.moves || 50,
     beltSpeed: L.beltSpeed, k: L.spawnWeightK
   };
 
@@ -619,6 +629,7 @@ function startLevel(idx){
   renderDbg();
   clearLinkPath();
   setPicking(false);
+  renderMoves();
   scrEnd.classList.add('hide');
   scrMenu.classList.add('hide');
   dbgLog('level ' + L.id + ' started · demand ' + levelOrders(L).reduce((a,t)=>a+t.count,0));
@@ -808,6 +819,11 @@ function buildStations(){
       dock: {x:p.x, y:p.y + BELT_Y}
     });
   }
+}
+function renderMoves(){
+  const el = $("movesNum");
+  el.textContent = S.movesLeft;
+  $("movesPill").classList.toggle("low", S.movesLeft <= 10);
 }
 /* per-station upcoming stack: next target sits closest to the active card */
 function renderStationQueue(st){
@@ -1102,6 +1118,7 @@ $('boardArea').appendChild(boardHit);
 
 boardHit.addEventListener('pointerdown', e=>{
   if(!S || S.inputLocked || S.over) return;
+  if(S.movesLeft <= 0){ showToast('NO MOVES LEFT'); return; }
   boardHit.setPointerCapture(e.pointerId);
   const p = localFromEvent(e, boardHit);
   const cc = cellFromPoint(p); if(!cc) return;
@@ -1234,6 +1251,8 @@ function resolveLink(){
 
   const L = cells.length;
   if(L > S.stats.biggest) S.stats.biggest = L;
+  S.movesLeft--;
+  renderMoves();
 
   /* reserve capacity immediately: claim cart types & pending counts */
   const plan = planDistribution(type, L);
@@ -1478,9 +1497,9 @@ function settle(reason){
   if(S.stations.every(st => st.target === null && st.queue.length === 0)){
     endGame(true); return;
   }
-  const lm = legalMoveExists(), pd = possibleDeliveryExists();
-  if(DBG.logFail) dbgLog('failcheck[' + reason + '] legalMove=' + lm + ' delivery=' + pd + ' → ' + (!lm&&!pd ? 'FAIL' : 'ok'));
-  if(!lm && !pd) endGame(false);
+  const lm = legalMoveExists() && S.movesLeft > 0, pd = possibleDeliveryExists();
+  if(DBG.logFail) dbgLog('failcheck[' + reason + '] legalMove=' + lm + ' moves=' + S.movesLeft + ' delivery=' + pd + ' → ' + (!lm&&!pd ? 'FAIL' : 'ok'));
+  if(!lm && !pd) endGame(false);   // out of moves still lets carts already loaded finish the job
 }
 
 async function endGame(win){
@@ -1496,9 +1515,10 @@ async function endGame(win){
   const nextIdx = S.lvlIdx + 1;
   scrEnd.innerHTML =
     '<div class="gemRow">' + gems + '</div>' +
-    '<h1>' + (win ? 'All orders shipped!' : 'No empty space') + '</h1>' +
+    '<h1>' + (win ? 'All orders shipped!' : (S.movesLeft <= 0 ? 'Out of moves' : 'No empty space')) + '</h1>' +
     '<p>' + (win ? 'Level ' + S.L.id + ' — ' + S.L.name + ' cleared.'
-                 : 'No empty space left and nothing on the belt can deliver — the run is stuck.') + '</p>' +
+                 : (S.movesLeft <= 0 ? 'Moves ran out before the orders were filled.'
+                    : 'No empty space left and nothing on the belt can deliver — the run is stuck.')) + '</p>' +
     '<div class="statRow">' +
       '<div class="statBox"><b>' + S.stats.done + '</b><span>Orders done</span></div>' +
       '<div class="statBox"><b>' + S.stats.biggest + '</b><span>Biggest link</span></div>' +
@@ -1523,7 +1543,7 @@ function showMenu(){
       '<h1>LINK N LOAD</h1>' +
       '<div class="sub">Mine · Load · Ship</div>' +
     '</div>' +
-    '<p>Link 3+ matching gems. They load into mine carts — one type, 10 gems each. Carts auto-deliver to matching orders on the loop.</p>' +
+    '<p>Link 2+ matching gems. They load into mine carts — one type, 10 gems each. Carts auto-deliver to matching orders on the loop. 50 moves per level.</p>' +
     '<div class="lvlList">' +
       LEVELS.map((L,i)=>'<button class="lvlBtn" data-i="' + i + '"><b>' + L.id + '. ' + L.name + '</b>' +
         '<span>' + L.blurb + ' · ' + levelOrders(L).length + ' orders · demand ' +
