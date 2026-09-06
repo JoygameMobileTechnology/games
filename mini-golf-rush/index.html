@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no"
+    />
+    <meta name="theme-color" content="#0b0f14" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <title>Mini Golf Rush</title>
+    <!--
+      Inline data-URI icon: `publicDir` is false (vite.config.ts), so without this every page load
+      logs a 404 for /favicon.ico. A golf ball on the app's background colour.
+    -->
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230b0f14'/%3E%3Ccircle cx='16' cy='16' r='9' fill='%23f5f2e8'/%3E%3Cg fill='%23c9c4b4'%3E%3Ccircle cx='13' cy='13' r='1.3'/%3E%3Ccircle cx='19' cy='13' r='1.3'/%3E%3Ccircle cx='16' cy='16.5' r='1.3'/%3E%3Ccircle cx='13' cy='20' r='1.3'/%3E%3Ccircle cx='19' cy='20' r='1.3'/%3E%3C/g%3E%3C/svg%3E"
+    />
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        background: #0b0f14;
+        color: #fff;
+        overflow: hidden;
+        overscroll-behavior: none;
+        touch-action: none;
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-tap-highlight-color: transparent;
+        -webkit-touch-callout: none;
+        font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+      }
+      /* The stage is the portrait letterbox. On phones it is the full screen; on wide screens it is a
+         centered portrait box. client/render/Renderer.ts (GameRenderer.resize) sets exact pixel sizes
+         inline once a hole or the dev viewer exists — but the renderer is created LAZILY, so these CSS
+         values must reproduce `letterboxSize()` (height = viewport height, width = min(vw, height ×
+         9/16)) or the menus would render edge-to-edge landscape on a wide window until the first hole. */
+      #stage {
+        position: fixed;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        height: 100vh;
+        width: min(100vw, calc(100vh * 9 / 16));
+        background: #000;
+        overflow: hidden;
+      }
+      canvas#game {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        display: block;
+        touch-action: none;
+      }
+      /* DOM overlay root for screens/HUD. Transparent to touches so the pull gesture (GDD §5.1: any
+         canvas touch not on a UI element) reaches the canvas. Touch handling is OPT-IN PER CONTROL:
+         only elements carrying class "tap" (buttons, chips, inputs, modal backdrops) receive pointer
+         events. Screen/HUD roots mounted as full-size children MUST NOT opt in themselves. */
+      #ui {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
+          env(safe-area-inset-left);
+        box-sizing: border-box;
+      }
+      #ui .tap {
+        pointer-events: auto;
+      }
+    </style>
+    <script type="module" crossorigin src="./assets/index-CTnUY_ED.js"></script>
+  </head>
+  <body>
+    <div id="stage">
+      <canvas id="game"></canvas>
+      <div id="ui"></div>
+    </div>
+  </body>
+</html>
