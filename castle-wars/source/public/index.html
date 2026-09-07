@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+  <meta name="theme-color" content="#d4edf1">
+  <meta name="description" content="Little castles. Ridiculous firepower. A turn-based artillery duel for your local network.">
+  <title>Castle Wars · Little castles. Big trouble.</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='24' fill='%232f776e'/%3E%3Cpath d='M20 75V25h12v15h12V25h12v15h12V25h12v50Z' fill='%23fff6d9'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <main id="app" data-screen="menu">
+    <canvas id="arena" aria-label="Castle Wars battlefield. Drag backwards and release to shoot on your turn." tabindex="0"></canvas>
+    <div class="vignette" aria-hidden="true"></div>
+    <div class="utility-bar">
+      <a class="wordmark" href="/" aria-label="Castle Wars home">CW<span>✦</span></a>
+      <div class="utility-actions">
+        <span id="connection" class="connection"><i></i> LOCAL PLAY</span>
+        <button id="help-button" class="icon-button" aria-label="How to play" title="How to play">?</button>
+        <button id="sound-button" class="icon-button" aria-label="Enable sound" title="Enable sound" aria-pressed="false">♪<span class="sound-slash">/</span></button>
+        <button id="settings-button" class="icon-button" aria-label="Game settings" title="Game settings">⚙</button>
+      </div>
+    </div>
+
+    <section id="menu-screen" class="screen menu-screen" aria-labelledby="game-title">
+      <div class="menu-copy">
+        <div class="eyebrow"><span></span> A LITTLE FRIENDLY DESTRUCTION</div>
+        <h1 id="game-title"><span>CASTLE</span><span>WARS<span class="title-spark">✦</span></span></h1>
+        <p class="tagline">Little castles.<br>Ridiculous firepower.</p>
+        <div class="menu-buttons">
+          <button id="play-ai" class="button primary"><span class="button-emblem">✦</span><span>Play the computer<small>A quick solo skirmish</small></span><span class="button-arrow">↗</span></button>
+          <button id="play-lan" class="button secondary"><span class="button-emblem">⚑</span><span>Challenge a friend<small>Two devices. One Wi-Fi.</small></span><span class="button-arrow">→</span></button>
+        </div>
+        <div class="menu-facts"><span>3 SHOOTERS</span><i>·</i><span>4 MIN + SUDDEN DEATH</span><i>·</i><span>ZERO MERCY*</span></div>
+        <p class="menu-footnote">*Some very polite explosions.</p>
+      </div>
+      <div class="arena-caption"><span class="caption-line"></span><b>THE QUIET BEFORE THE BONK.</b><span>Pull back. Let go. Regret nothing.</span></div>
+      <div class="menu-bottom"><span>AN ARTILLERY DUEL, WITH FEELINGS.</span><button id="how-to-play" class="text-button">First time? Learn the ropes <span>↗</span></button></div>
+    </section>
+
+    <section id="lan-screen" class="screen overlay-screen hidden" aria-labelledby="lan-title">
+      <div class="panel lan-panel">
+        <button class="panel-close icon-button" data-back aria-label="Back to main menu">×</button>
+        <div class="eyebrow">GOOD FRIENDS. BAD NEIGHBOURS.</div>
+        <h2 id="lan-title">Bring a rival.</h2>
+        <p>Open this game on two devices connected to the same Wi-Fi.</p>
+        <label class="field-label" for="player-name">YOUR CALL SIGN</label>
+        <input id="player-name" maxlength="20" placeholder="Captain" autocomplete="nickname" value="Captain">
+        <button id="host-room" class="button primary"><span>Host a castle duel</span><span>↗</span></button>
+        <div class="or-divider"><span>OR JOIN A FRIEND</span></div>
+        <div class="join-row"><input id="room-code" maxlength="5" placeholder="CODE" aria-label="Five-letter room code" autocomplete="off" autocapitalize="characters" spellcheck="false"><button id="join-room" class="button secondary">Join →</button></div>
+        <p class="panel-note">The computer running Node.js keeps the match in sync.</p>
+      </div>
+    </section>
+
+    <section id="lobby-screen" class="screen overlay-screen hidden" aria-labelledby="lobby-title">
+      <div class="panel lobby-panel">
+        <button id="leave-lobby" class="panel-close icon-button" aria-label="Leave lobby">×</button>
+        <div class="eyebrow">YOUR BATTLEFIELD IS RESERVED</div>
+        <h2 id="lobby-title">Waiting for trouble.</h2>
+        <div class="room-share"><div><span class="field-label">ROOM CODE</span><strong id="lobby-code">—</strong><button id="copy-link" class="text-button">Copy invite link ↗</button></div><img id="room-qr" alt="Scan to join this local room" width="112" height="112"></div>
+        <div id="lobby-players" class="lobby-players"></div>
+        <button id="ready-button" class="button primary">I'm ready <span>✓</span></button>
+        <p id="lobby-status" class="panel-note">Your opponent can scan the code or enter the room code.</p>
+        <details class="connection-details"><summary>Connecting from another device</summary><p>Use the same Wi-Fi and open this address:</p><a id="lan-address" href="#"></a><p>If the room is unreachable, allow Node.js through the host computer’s firewall.</p></details>
+      </div>
+    </section>
+
+    <section id="game-screen" class="screen game-screen hidden" aria-label="Match controls">
+      <header class="match-hud">
+        <div id="team-0" class="team-panel teal">
+          <div class="team-heading"><span class="team-mark">♜</span><strong class="team-name">YOUR CASTLE</strong><span class="crew-number">300/300</span></div>
+          <div class="crew-health"><span class="health-label">CREW</span><div class="crew-track" role="progressbar" aria-label="Combined shooter health" aria-valuemin="0" aria-valuemax="300" aria-valuenow="300"><i></i></div></div>
+          <div class="core-health"><span class="health-label">CORE</span><div class="core-track" role="progressbar" aria-label="Castle core health" aria-valuemin="0" aria-valuemax="120" aria-valuenow="120"><i></i></div><span class="core-number">120/120</span></div>
+          <div class="roster"></div>
+        </div>
+        <div class="match-clock"><span id="match-clock-label">REGULATION</span><strong id="match-time">4:00</strong><small id="round-number">ROUND 1</small><span id="formation-name" class="formation-name"></span></div>
+        <div id="team-1" class="team-panel coral">
+          <div class="team-heading"><span class="team-mark">♜</span><strong class="team-name">RIVAL CASTLE</strong><span class="crew-number">300/300</span></div>
+          <div class="crew-health"><span class="health-label">CREW</span><div class="crew-track" role="progressbar" aria-label="Combined shooter health" aria-valuemin="0" aria-valuemax="300" aria-valuenow="300"><i></i></div></div>
+          <div class="core-health"><span class="health-label">CORE</span><div class="core-track" role="progressbar" aria-label="Castle core health" aria-valuemin="0" aria-valuemax="120" aria-valuenow="120"><i></i></div><span class="core-number">120/120</span></div>
+          <div class="roster"></div>
+        </div>
+      </header>
+      <div id="turn-callout" class="turn-callout"><span id="turn-label">YOUR TURN</span><span id="turn-timer">20</span><small id="turn-instruction">Pull back from your shooter. Release to fire.</small></div>
+      <div id="wind-meter" class="wind-meter" aria-label="Wind calm" title="Wind stays fixed for one turn per player, then changes."><span id="wind-direction" aria-hidden="true">≈</span><span>WIND</span><b id="wind-strength">CALM</b><i id="wind-bars" aria-hidden="true"></i><span class="wind-cycle">TWO SHOTS · ONE WIND</span></div>
+      <div id="countdown" class="countdown hidden" aria-live="polite"><span>MAKE SOME TROUBLE</span><strong>3</strong></div>
+      <div id="cancel-aim" class="cancel-aim hidden">×<span>Release here to cancel</span></div>
+      <div id="power-meter" class="power-meter hidden"><span>POWER</span><div><i></i></div><b>0%</b></div>
+      <footer class="arsenal">
+        <div class="arsenal-heading"><div><span class="eyebrow">YOUR ARSENAL</span><span id="weapon-description">Classic rocket · reliable trouble</span></div><span id="next-unlock">First unlock after round 1</span></div>
+        <div id="weapon-palette" class="weapon-palette" role="group" aria-label="Choose your weapon"></div>
+        <div class="arsenal-bottom"><span id="aim-hint">DRAG BACK · RELEASE TO FIRE</span><button id="leave-match" class="text-button">Leave match ↗</button></div>
+      </footer>
+    </section>
+
+    <section id="result-screen" class="screen overlay-screen hidden" aria-labelledby="result-title">
+      <div class="panel result-panel"><span id="result-medal" class="result-medal">♜</span><div id="result-eyebrow" class="eyebrow">THE DUST HAS SETTLED</div><h2 id="result-title">Castle closed.</h2><p id="result-description"></p><div id="result-stats" class="result-stats"></div><button id="rematch-button" class="button primary">One more round <span>↻</span></button><button id="back-menu" class="text-button">Back to the quiet life →</button><p id="rematch-status" class="panel-note"></p></div>
+    </section>
+
+    <dialog id="help-dialog" class="panel help-panel"><button class="panel-close icon-button" data-close-dialog aria-label="Close instructions">×</button><div class="eyebrow">A VERY SHORT FIELD MANUAL</div><h2>Make an entrance.</h2><ol class="instructions"><li><b>Pull back. Let it fly.</b><span>On your turn, drag backwards from the glowing shooter. Short pulls make softer shots; longer pulls add power. The dots show the start of your shot. Release to fire. You have 20 seconds.</span></li><li><b>Break their heart. Or their crew.</b><span>Destroy the golden core, or eliminate all three shooters. Low walls are tougher, but removing supports brings the castle down.</span></li><li><b>Save the good stuff.</b><span>Each completed round unlocks the same new weapon for both teams. Ammo stays until you use it. Construction tools use your turn too. All construction kits float without support. Build inside your original castle outline, including up to two bricks above its highest roof.</span></li><li><b>Read the fortress and wind.</b><span>Each match uses a pre-designed mirrored formation. Shooters behind cover need a higher arc. The arrow shows wind direction and strength. Wind bends every rocket and changes after one turn per player. Both shots share the same wind.</span></li><li><b>Mind the rising tide.</b><span>After four minutes, water rises after each of six final turns. Shooters drown at head height. Both last crews drowning together is a draw.</span></li></ol><p class="panel-note">Keyboard: ← / → aim · ↑ / ↓ power · hold Space then release to fire · Esc cancels. Choose weapons with their buttons. Construction: arrows move the ghost; release Space to place.</p><button class="button primary" data-close-dialog>Understood. Mostly. <span>✓</span></button></dialog>
+    <dialog id="settings-dialog" class="panel settings-panel"><button class="panel-close icon-button" data-close-dialog aria-label="Close settings">×</button><div class="eyebrow">SMALL ADJUSTMENTS</div><h2>Your battle, your way.</h2><label class="toggle-row"><span><b>Sound effects</b><small>Handmade booms, bonks and plops</small></span><input id="sound-toggle" type="checkbox"></label><label class="toggle-row"><span><b>Reduced motion</b><small>Calmer particles and scenery</small></span><input id="motion-toggle" type="checkbox"></label><label class="toggle-row"><span><b>Screen shake</b><small>A little oomph on impact</small></span><input id="shake-toggle" type="checkbox" checked></label><p class="panel-note">The match clock keeps running while this panel is open.</p></dialog>
+    <dialog id="leave-dialog" class="panel settings-panel"><div class="eyebrow">RETREAT IS AN OPTION</div><h2>Leave the battle?</h2><p>Leaving an active match concedes to your opponent.</p><button id="confirm-leave" class="button primary">Leave match <span>→</span></button><button class="button secondary" data-close-dialog>Stay and fight</button></dialog>
+    <div id="reconnecting" class="reconnecting hidden"><span class="spinner"></span><b>Rejoining your castle…</b><small>The battle clock is still running.</small></div>
+    <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+    <div class="rotate-prompt"><div class="rotate-icon">▱ ↻</div><b>A little more elbow room.</b><span>Turn your phone sideways to play.</span></div>
+    <div id="fatal-error" class="fatal-error hidden"><strong>The battlefield couldn't load.</strong><p>Refresh the page to try again.</p><button onclick="location.reload()" class="button primary">Reload ↻</button></div>
+    <noscript><div class="fatal-error">Castle Wars needs JavaScript enabled to play.</div></noscript>
+  </main>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,25 @@
+{
+  "name": "castle-wars",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A mobile castle artillery duel over your local network",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node --watch server/index.js",
+    "dev:lan": "node server/index.js",
+    "test": "node --test tests/*.test.js",
+    "check": "node --check server/index.js && node --check server/ai.js && node --check shared/game.js && node --check shared/content.js && node --check shared/formations.js && node --check public/app.js && node --check public/aim-input.js && node --check public/renderer.js && node --check public/audio.js && node --check shared/presentation.js && node --check public/cosmic-effects.js && node --check scripts/build-pages.mjs && node --check public/solo-transport.js",
+    "build": "node scripts/build-pages.mjs"
+  },
+  "dependencies": {
+    "qrcode": "1.5.4",
+    "ws": "8.21.3"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  }
+}
