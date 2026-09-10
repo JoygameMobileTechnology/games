@@ -1,0 +1,6 @@
+node_modules/
+dist/
+.gdd-build/
+.playtest/
+.DS_Store
+dist-pages/

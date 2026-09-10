@@ -1,0 +1,128 @@
+/* The parent modal owns the usable viewport height and safe-area padding. */
+.dialog.shop-dialog {
+  --dialog-pad: 0px;
+  padding: 0;
+  height: min(760px, 100%);
+  max-height: 100%;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  scroll-padding-top: 110px;
+}
+
+/* The close control stays available while the full shop scrolls. */
+.shop-header {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  background: #0e1218;
+}
+
+.compact-ui .shop-header {
+  padding: 5px 12px;
+  gap: 12px;
+  min-height: 54px;
+}
+
+.compact-ui .shop-header h2 {
+  font-size: 20px;
+  margin: 0;
+}
+
+.compact-ui .shop-header .eyebrow {
+  display: none;
+}
+
+.compact-ui .shop-tabs button {
+  min-height: 44px;
+  font-size: 8px;
+  letter-spacing: 0.5px;
+}
+
+/* Keep a useful preview and enough room for the item action. On short screens
+   the whole dialog scrolls instead of squeezing controls behind its footer. */
+.shop-content {
+  flex: 1 0 250px;
+  min-height: 250px;
+}
+
+.shop-header > div:first-child,
+.shop-tabs > button,
+.shop-showroom,
+.shop-detail {
+  min-width: 0;
+}
+
+.shop-item .item-name,
+.shop-detail h3,
+.shop-detail p,
+.shop-footer p {
+  overflow-wrap: anywhere;
+}
+
+/* Use the measured visible viewport, including keyboard/zoom changes. Preview
+ controls keep their full touch size in one readable, scrollable column. */
+.narrow-ui .shop-header {
+  padding: 12px;
+  gap: 10px;
+}
+
+.narrow-ui .shop-header h2 {
+  font-size: 22px;
+  line-height: 1.1;
+  letter-spacing: -0.5px;
+}
+
+.narrow-ui .shop-header .eyebrow {
+  font-size: 7px;
+  letter-spacing: 1px;
+  line-height: 1.5;
+}
+
+.narrow-ui .shop-wallet {
+  flex: none;
+}
+
+.narrow-ui .shop-wallet b {
+  font-size: clamp(16px, calc(var(--ui-width, 100vw) / 20), 24px);
+}
+
+.narrow-ui .shop-tabs {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.narrow-ui .shop-tabs button {
+  min-height: 44px;
+  padding: 9px 5px;
+  font-size: 8px;
+  line-height: 1.4;
+  letter-spacing: 0.5px;
+}
+
+.narrow-ui .shop-content {
+  grid-template-columns: minmax(0, 1fr);
+  flex: none;
+  min-height: 0;
+}
+
+.narrow-ui .shop-showroom {
+  height: 260px;
+  min-height: 260px;
+  border-right: 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.narrow-ui .shop-catalog {
+  flex: none;
+  min-height: 98px;
+  max-height: 220px;
+}
+
+.narrow-ui .shop-detail {
+  padding: 14px;
+}
+
+.narrow-ui .shop-footer {
+  padding: 12px 14px;
+}

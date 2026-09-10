@@ -1,0 +1,8 @@
+.profile-transfer { margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--line, #4b4842); }
+.profile-file-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.profile-file-actions button, .profile-file-button { min-height: 44px; flex: 1 1 170px; padding: 12px 14px; }
+.profile-file-button { display: flex; align-items: center; justify-content: center; position: relative; background: #27282b; border: 1px solid #5a5550; font-size: 11px; letter-spacing: .08em; cursor: pointer; }
+.profile-file-button:focus-within { outline: 2px solid #f5c579; outline-offset: 2px; }
+.profile-file-button input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+.profile-transfer [data-preview] { margin-top: 16px; padding: 12px; border: 1px solid #6a5c46; }
+.profile-transfer [data-summary] { overflow-wrap: anywhere; line-height: 1.6; }

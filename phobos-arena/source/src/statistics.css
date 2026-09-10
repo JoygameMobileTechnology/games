@@ -1,0 +1,8 @@
+.statistics-filter { margin-top: 28px; }
+.weapon-statistics { overflow-x: auto; margin: 12px 0; }
+.weapon-statistics table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.weapon-statistics th, .weapon-statistics td { padding: 12px 10px; border-bottom: 1px solid #46413c; text-align: right; white-space: nowrap; }
+.weapon-statistics th:first-child { text-align: left; white-space: normal; min-width: 110px; }
+.weapon-statistics thead { color: #b0a492; font-size: 10px; letter-spacing: .06em; }
+.stat-grid > div { min-width: 0; }
+.stat-grid b { overflow-wrap: anywhere; }

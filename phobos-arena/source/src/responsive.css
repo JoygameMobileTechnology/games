@@ -1,0 +1,148 @@
+/* Fit UI to the visible browser area, including the on-screen keyboard.
+   The renderer and combat input still use the full game viewport. */
+#app {
+  inset: var(--ui-top, 0px) auto auto var(--ui-left, 0px);
+  width: var(--ui-width, 100%);
+  height: var(--ui-height, 100%);
+  --ui-pad-top: max(12px, env(safe-area-inset-top));
+  --ui-pad-right: max(12px, env(safe-area-inset-right));
+  --ui-pad-bottom: max(12px, env(safe-area-inset-bottom));
+  --ui-pad-left: max(12px, env(safe-area-inset-left));
+}
+/* Text and gaps must receive a swipe too; otherwise it reaches the arena canvas. */
+#menu, #arena-card {
+  pointer-events: auto;
+  touch-action: pan-y;
+  overscroll-behavior-y: contain;
+}
+#menu { bottom: max(58px, calc(env(safe-area-inset-bottom) + 36px)); overflow-y: auto; scrollbar-width: thin; }
+#app:not(.compact-ui) #menu h1 { font-size: clamp(42px, 5.4vw, 60px); }
+#topbar { top: max(17px, env(safe-area-inset-top)); }
+#footer { bottom: max(22px, env(safe-area-inset-bottom)); }
+.profile-chip { min-width: 0; }
+#profile-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 35vw; }
+.modal-backdrop, #panel:has(.shop-dialog) {
+  position: fixed;
+  inset: var(--ui-top, 0px) auto auto var(--ui-left, 0px);
+  width: var(--ui-width, 100%);
+  height: var(--ui-height, 100%);
+  padding: var(--ui-pad-top) var(--ui-pad-right) var(--ui-pad-bottom) var(--ui-pad-left);
+}
+.dialog {
+  --dialog-pad: 28px;
+  min-width: 0;
+  min-height: 0;
+  max-height: 100%;
+  padding: var(--dialog-pad);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  overflow-wrap: anywhere;
+  scroll-padding-top: 75px;
+}
+.dialog-heading {
+  position: sticky;
+  top: calc(-1 * var(--dialog-pad));
+  z-index: 2;
+  background: #101318;
+  margin: calc(-1 * var(--dialog-pad)) calc(-1 * var(--dialog-pad)) 18px;
+  padding: 16px calc(var(--dialog-pad) + 44px) 12px var(--dialog-pad);
+  border-bottom: 1px solid var(--line);
+}
+.dialog-heading h2 { margin: 8px 0 0; }
+.dialog-heading .close-button { top: 10px; right: 10px; width: 44px; height: 44px; }
+.options-grid, .match-settings, .team-color-settings, .bot-roster,
+.control-columns, .arsenal-reference { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.options-grid > *, .match-settings > *, .team-color-settings > *, .bot-roster > *,
+.control-columns > *, .arsenal-reference > *, .stat-grid > * { min-width: 0; }
+.dialog input, .dialog select { min-width: 0; max-width: 100%; }
+.dialog input:not([type="checkbox"]):not([type="range"]):not([type="color"]) { min-height: 44px; }
+.dialog button, .dialog select, .switch-row, .select-row { min-height: 44px; }
+.select-row, .switch-row { gap: 12px; }
+.select-row select { flex-shrink: 0; max-width: 55%; }
+.name-setting { grid-template-columns: minmax(0, 1fr) 105px; }
+.board-header, .board-row { grid-template-columns: minmax(0, 1fr) 60px 60px; }
+.board-row > span:first-child { overflow-wrap: anywhere; }
+.stat-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+#orientation-note { color: #edb989; }
+#resume:disabled { opacity: .5; }
+/* Portrait is useful for menus; play starts/remains paused until landscape. */
+body:not([data-screen="game"]) #rotate { display: none; }
+.compact-pickers { display: none; }
+
+/* Phone landscape: four rows of actions and native mode/arena pickers. */
+body[data-screen="menu"] #app.compact-ui {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-areas: "header header" "menu arena" "footer footer";
+  gap: 10px 24px;
+  padding: var(--ui-pad-top) var(--ui-pad-right) var(--ui-pad-bottom) var(--ui-pad-left);
+}
+.compact-ui #topbar, .compact-ui #footer { min-width: 0; }
+body[data-screen="menu"] .compact-ui :is(#topbar, #menu, #arena-card, #footer) {
+  position: relative;
+  inset: auto;
+  width: auto;
+  max-width: none;
+  min-width: 0;
+  min-height: 0;
+  margin: 0;
+}
+body[data-screen="menu"] .compact-ui #topbar { grid-area: header; height: 30px; }
+body[data-screen="menu"] .compact-ui #footer { grid-area: footer; font-size: 7px; line-height: 1.5; flex-wrap: wrap; gap: 3px 12px; }
+body[data-screen="menu"] .compact-ui #footer span { gap: 5px; flex-wrap: wrap; }
+body[data-screen="menu"] .compact-ui #performance { display: none; }
+body[data-screen="menu"] .compact-ui #menu { grid-area: menu; overflow-y: auto; }
+body[data-screen="menu"] .compact-ui #arena-card { grid-area: arena; overflow-y: auto; border: 0; padding: 0 4px 0 0; }
+.compact-ui #menu > :is(.eyebrow, h1, .intro) { display: none; }
+.compact-ui .menu-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; max-width: none; gap: 4px 10px; }
+.compact-ui .play-button { grid-column: 1 / -1; min-height: 52px; padding: 8px 14px; }
+.compact-ui .play-button span { font-size: 21px; }
+.compact-ui .play-button small { font-size: 7px; margin-bottom: 3px; }
+.compact-ui .menu-actions .setup-row { position: relative; min-width: 0; min-height: 44px; display: flex; align-items: flex-start; justify-content: center; flex-direction: column; gap: 4px; padding: 5px 16px 5px 0; text-align: left; }
+.compact-ui .setup-row > span, .compact-ui .setup-row b { font-size: 9px; letter-spacing: .5px; }
+.compact-ui .setup-row b { margin-left: 0; text-align: left; }
+.compact-ui .setup-row i { position: absolute; right: 0; top: 12px; }
+.compact-ui .controls-link { grid-column: 2; grid-row: 3; min-height: 44px; align-items: center; padding: 5px 0; font-size: 9px; letter-spacing: .5px; border-bottom: 1px solid var(--line); }
+.compact-ui .secondary-actions { grid-column: 1 / -1; gap: 10px; }
+.compact-ui .secondary-actions button { min-height: 44px; padding: 8px 0; font-size: 9px; letter-spacing: .8px; }
+.compact-ui .secondary-actions span { margin-right: 0; }
+.compact-ui #arena-card > :is(.eyebrow, .mode-switch, .map-switch) { display: none; }
+.compact-ui .compact-pickers { display: grid; gap: 8px; }
+.compact-pickers label { display: grid; gap: 4px; min-width: 0; font-size: 8px; letter-spacing: 1.3px; color: #a6a6a4; }
+.compact-pickers select { width: 100%; min-width: 0; min-height: 44px; font-size: 12px; color: #f0e6d8; }
+.compact-ui #arena-card #mode-description { min-height: 0; margin: 8px 0; font-size: 10px; line-height: 1.5; }
+.compact-ui #arena-card strong { margin: 8px 0; font-size: 18px; }
+.compact-ui #arena-card #map-description { display: none; }
+.compact-ui .arena-coordinates { font-size: 8px; line-height: 1.5; }
+.compact-ui .dialog { --dialog-pad: 18px; }
+.compact-ui .dialog-heading { padding-top: 12px; padding-bottom: 12px; }
+.compact-ui .dialog-heading > .eyebrow { display: none; }
+.compact-ui .dialog-heading h2 { font-size: 25px; margin: 0; min-height: 30px; display: flex; align-items: center; }
+.compact-ui .dialog-heading .close-button { top: 5px; }
+
+/* A narrow window/portrait phone uses one scroll surface, not two cramped columns. */
+body[data-screen="menu"] #app.narrow-ui {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: repeat(4, max-content);
+  grid-template-areas: "header" "menu" "arena" "footer";
+  align-content: start;
+  gap: 20px;
+  overflow-y: auto;
+  pointer-events: auto;
+  touch-action: pan-y;
+  overscroll-behavior-y: contain;
+}
+body[data-screen="menu"] .narrow-ui :is(#menu, #arena-card) { overflow: visible; }
+.narrow-ui .options-grid, .narrow-ui .match-settings, .narrow-ui .team-color-settings,
+.narrow-ui .bot-roster, .narrow-ui .control-columns, .narrow-ui .arsenal-reference { grid-template-columns: minmax(0, 1fr); }
+.narrow-ui .stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.narrow-ui .stat-grid b { font-size: 34px; }
+.narrow-ui .dialog { --dialog-pad: 18px; }
+@media (max-width: 600px) {
+  .options-grid, .match-settings, .team-color-settings, .bot-roster,
+  .control-columns, .arsenal-reference { grid-template-columns: minmax(0, 1fr); }
+  .stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .stat-grid b { font-size: 34px; }
+}

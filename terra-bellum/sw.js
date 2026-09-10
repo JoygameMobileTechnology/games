@@ -24,7 +24,7 @@ self.addEventListener('activate', (event) => {
     caches
       .keys()
       .then((keys) =>
-        Promise.all(keys.filter((k) => !k.startsWith(VERSION)).map((k) => caches.delete(k))),
+        Promise.all(keys.filter((k) => k.startsWith('tb-') && !k.startsWith(VERSION)).map((k) => caches.delete(k))),
       )
       .then(() => self.clients.claim()),
   );
