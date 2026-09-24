@@ -33,7 +33,8 @@ export class BonusSystem {
     }
     this.arenaEntryZ = w.arenaZ;
     // the Dark Lord waits in the arena from the start: visible at the end of the bridge
-    const bossHp = this.lastRow.weakHp * CONFIG.bonus.bossHpFactor;
+    // 6x the weak guard of segment 19, whatever the bridge length: on the FTUE bridges he is hopeless on purpose (motivation for later levels)
+    const bossHp = guardHp(CONFIG.bonus.segments, L) * CONFIG.bonus.weakHpFrac * CONFIG.bonus.bossHpFactor;
     this.boss = g.enemies.spawn('brute', 5, 0, this.arenaEntryZ - CONFIG.bonus.bossStart, { isBoss: true, hp: bossHp, scale: 2.1, black: true, eyes: true, name: 'The Dark Lord', force: true });
     if (this.boss) { this.boss.pieces = ['helmet', 'chest', 'pauldrons', 'gauntlets', 'knees', 'visor', 'boots', 'cape']; this.boss.k = 8; this.boss.radius = 2.2; this.boss.speed = 0; }
     g.ui.showBonusHud(true);
@@ -82,8 +83,7 @@ export class BonusSystem {
       }
     }
 
-    // arena (levels 1-2 have the short bridge only: the run ends after the last row)
-    if (this.phase === 'run' && L < 3 && this.lastRow.passed && pl.z < this.lastRow.z - 6) { this.phase = 'done'; g.endBonus(this.mult, null); return; }
+    // arena: every level ends face to face with the Dark Lord, even the short FTUE bridges
     if (this.phase === 'run' && pl.z <= this.arenaEntryZ) {
       this.phase = 'arena'; pl.z = this.arenaEntryZ;
       g.audio.roar(); g.shake(0.5); g.ui.bossBar(1, 'The Dark Lord');
@@ -112,7 +112,12 @@ export class BonusSystem {
     const g = this.game;
     this.phase = 'stopped'; this.stopT = 0;
     this.stopper = { name: guard.name, tier: guard.tier, hp: Math.round(guard.hp), segment: guard.segment, isBoss };
-    g.player.fallT = 0.001; g.audio.death(); g.shake(0.4);
+    g.player.fallT = 0.001; g.audio.death(); g.shake(isBoss ? 0.8 : 0.4);
+    if (isBoss) { // the execution: sword comes down, screen flashes, squad scatters
+      g.audio.impact(); g.audio.roar(); g.ui.flash();
+      g.fx.particles.burst(g.player.x, 0.8, g.player.z, 40, 0x6b7280, 6, 0.16, 0.8); g.fx.particles.burst(g.player.x, 1.2, g.player.z, 16, PALETTE.player, 4, 0.12, 0.6);
+      g.ui.toast('Too strong... for now', 2.5);
+    }
     for (const a of g.allies.list) if (a.alive) g.allies.kill(a, 'guard');
     g.setTimeScale(0.4, 0.1);
     g.ui.bossBar(null);

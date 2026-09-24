@@ -211,7 +211,7 @@ export class UI {
   // ---------- results / fail / end ----------
   showResults({ mult, coins, reward, stopper }) {
     this.show('results'); this.$('r-mult').textContent = '×' + mult; this.$('r-calc').textContent = `${fmt(coins)} × ${mult} = ${fmt(reward)}`;
-    this.$('r-stopper').textContent = stopper ? (stopper.isBoss ? 'The Dark Lord reached you' : `Stopped by: ${stopper.name} · T${stopper.tier} · HP ${fmt(stopper.hp)}`) : (mult >= CONFIG.bonus.segments + 1 ? 'Reached the boss arena' : 'Cleared the bridge');
+    this.$('r-stopper').textContent = stopper ? (stopper.isBoss ? 'The Dark Lord crushed you. Come back stronger.' : `Stopped by: ${stopper.name} · T${stopper.tier} · HP ${fmt(stopper.hp)}`) : (mult >= CONFIG.bonus.segments + 1 ? 'Reached the boss arena' : 'Cleared the bridge');
     const el = this.$('r-coins'); let t = 0; const g = this.game; const start = performance.now();
     const tick = () => { const u = Math.min(1, (performance.now() - start) / 1300); el.textContent = fmt(reward * u); if (u < 1) { if (Math.floor(u * 10) !== t) { t = Math.floor(u * 10); g.audio.coin(); } requestAnimationFrame(tick); } };
     tick();

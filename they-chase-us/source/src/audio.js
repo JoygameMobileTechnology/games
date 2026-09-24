@@ -66,27 +66,31 @@ export class GameAudio {
   }
 
   // ---- game sounds ----
+  // Bow draw: a quiet low hum (two sines a few Hz apart give a slow, gentle vibration) that creeps up as the string tightens.
   startDraw() {
     if (!this.ok()) return;
     this.stopDraw();
     const c = this.ctx;
-    const o = c.createOscillator(); const g = c.createGain();
-    o.type = 'triangle'; o.frequency.value = 180;
-    g.gain.value = 0.0001;
-    g.gain.setTargetAtTime(0.06, c.currentTime, 0.05);
-    o.connect(g); g.connect(this.master); o.start();
-    this.drawOsc = o; this.drawGain = g;
+    const o1 = c.createOscillator(); o1.type = 'sine'; o1.frequency.value = 72;
+    const o2 = c.createOscillator(); o2.type = 'sine'; o2.frequency.value = 74.5;
+    const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 260; lp.Q.value = 0.4;
+    const g = c.createGain(); g.gain.value = 0.0001; g.gain.setTargetAtTime(0.03, c.currentTime, 0.15);
+    o1.connect(lp); o2.connect(lp); lp.connect(g); g.connect(this.master); o1.start(); o2.start();
+    this.drawOsc = o1; this.drawOsc2 = o2; this.drawGain = g; this.drawLp = lp;
   }
-  updateDraw(p) { // p 0..1
+  updateDraw(p) { // p 0..1: 72 -> 104 Hz, filter opens a little
     if (!this.drawOsc) return;
-    this.drawOsc.frequency.setTargetAtTime(180 + 420 * p, this.ctx.currentTime, 0.03);
+    const t = this.ctx.currentTime;
+    this.drawOsc.frequency.setTargetAtTime(72 + 32 * p, t, 0.06);
+    this.drawOsc2.frequency.setTargetAtTime(74.5 + 33 * p, t, 0.06);
+    this.drawLp.frequency.setTargetAtTime(260 + 160 * p, t, 0.06);
   }
   stopDraw() {
     if (!this.drawOsc) return;
-    const o = this.drawOsc, g = this.drawGain, c = this.ctx;
-    g.gain.setTargetAtTime(0.0001, c.currentTime, 0.02);
-    o.stop(c.currentTime + 0.1);
-    this.drawOsc = null; this.drawGain = null;
+    const c = this.ctx, g = this.drawGain;
+    g.gain.setTargetAtTime(0.0001, c.currentTime, 0.03);
+    this.drawOsc.stop(c.currentTime + 0.15); this.drawOsc2.stop(c.currentTime + 0.15);
+    this.drawOsc = null; this.drawOsc2 = null; this.drawGain = null; this.drawLp = null;
   }
   release(count = 1) {
     this.stopDraw();
