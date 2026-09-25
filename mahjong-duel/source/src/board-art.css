@@ -1,0 +1,82 @@
+/* The PDF's original artwork frames the playable stack, with ornament outside it. */
+.board-space {
+  position: relative;
+  isolation: isolate;
+  container-type: size;
+}
+.board-surround {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-color: var(--board-base);
+  background-image: var(--board-image);
+  background-position: center;
+  background-size: auto 145%;
+  background-repeat: no-repeat;
+  background-origin: border-box;
+  border: 20px solid transparent;
+  border-image-source: var(--board-image);
+  border-image-slice: var(--board-slice);
+  border-image-width: 18px;
+  border-image-repeat: round;
+  clip-path: inset(0 round 6px);
+  box-shadow: 0 4px 14px var(--tile-shadow);
+}
+.board-frame {
+  top: -3px;
+  height: min(calc(100cqh - 40px), calc((100cqw - 48px) * 1.76));
+  max-height: none;
+  max-width: calc(100% - 48px);
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+}
+.game-tile { min-width: 0; }
+/* One CSS clock keeps both faces aligned, including WebKit's 3D repaint path. */
+.tile-rotator {
+  transform: rotateY(0deg);
+  transition: transform .32s cubic-bezier(.2,.7,.2,1);
+}
+.game-tile[data-face-up="true"] .tile-rotator { transform: rotateY(180deg); }
+.tile-side { transition: visibility 0s linear 46ms; }
+/* The easing reaches edge-on at 46ms. Inherit active visibility so flight hides it. */
+.game-tile[data-face-up="false"] .tile-front,
+.game-tile[data-face-up="true"] .tile-back { visibility: hidden; }
+.tile-side, .flying-tile {
+  box-shadow: 0 1px 0 var(--tile-light), 0 3px 0 var(--tile-shade),
+    0 5px 0 var(--tile-edge), 1px 8px 7px -3px var(--tile-shadow);
+}
+.tile-side::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  box-shadow: inset 0 1px 0 #fff9, inset 1px 0 0 #fff4, inset -1px -1px 0 #182b3020;
+}
+.game-tile.blocked { filter: brightness(.87) saturate(.9); }
+.game-tile.free:hover { filter: brightness(1.035); }
+.game-tile.tile-selected {
+  outline-color: var(--tile-selection);
+  filter: drop-shadow(0 0 5px color-mix(in srgb, var(--tile-selection), transparent 35%));
+}
+.selected-dot { background: var(--tile-selection); }
+.collision-ring { border-color: var(--tile-selection); }
+.theme-back-preview {
+  width: 100%;
+  background-image: var(--board-image);
+  background-size: 100% 100%;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 3 / 2;
+  padding: 10px 0;
+  box-shadow: none;
+  border-radius: 5px;
+}
+.theme-back-preview > img { width: 38px; height: 51px; box-shadow: 0 2px 0 var(--tile-shade), 0 4px 0 var(--tile-edge), 0 7px 12px #07181e55; }
+
+.world[data-theme="guo-xi"] .board-surround,
+.world[data-theme="xia-gui"] .board-surround,
+.world[data-theme="dunhuang"] .board-surround { border-image-repeat: stretch; }

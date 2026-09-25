@@ -1,0 +1,106 @@
+/* Keep dialog artwork and primary actions usable inside real phone safe areas. */
+.remake .sheet-backdrop {
+  --sheet-top-space: max(28px, calc(env(safe-area-inset-top, 0px) + 12px));
+  --sheet-bottom-space: max(18px, calc(env(safe-area-inset-bottom, 0px) + 8px));
+  padding-top: var(--sheet-top-space);
+  padding-bottom: var(--sheet-bottom-space);
+}
+.remake .sheet {
+  min-height: 0;
+  max-height: calc(var(--viewport-height, 100dvh) - var(--sheet-top-space) - var(--sheet-bottom-space));
+}
+.remake .parchment-body { min-height: 0; overscroll-behavior: contain; }
+.profile-country-control select { min-height: 44px; font-size: 16px; }
+
+/* The native chooser covers the whole decorated field, with a full touch target. */
+.binder-theme-label { position: relative; min-height: 52px; padding: 5px 8px 3px; }
+.binder-theme-label > span { position: relative; z-index: 1; pointer-events: none; font-size: 10px; }
+.binder-theme-select { appearance: none; -webkit-appearance: none; position: absolute; inset: 0; width: 100%; height: 100%; min-height: 44px; padding: 17px 25px 1px 8px; font-size: 16px; }
+.binder-theme-label::after { content: "⌄"; position: absolute; right: 9px; top: 20px; font-size: 18px; line-height: 1; font-weight: 800; pointer-events: none; color: #72401e; }
+.binder-summary > div > span, .binder-page-note { font-size: 10px; }
+.binder-rarity { font-size: 10px; }
+.binder-card figcaption strong { font-size: 11px; line-height: 1.35; min-height: 30px; }
+.binder-card figcaption > span { font-size: 10px; line-height: 1.35; }
+.binder-grid { min-height: 150px; }
+.binder-art { max-height: 145px; }
+.binder-art > img { object-fit: contain; }
+
+.remake .result-overlay {
+  --result-top-space: max(18px, calc(env(safe-area-inset-top, 0px) + 8px));
+  --result-bottom-space: max(18px, calc(env(safe-area-inset-bottom, 0px) + 8px));
+  padding: var(--result-top-space) 24px var(--result-bottom-space);
+}
+.remake .result-card { max-height: calc(var(--viewport-height, 100dvh) - var(--result-top-space) - var(--result-bottom-space)); }
+.victory-bloom > img { position: absolute; inset: 0; width: 100%; height: 100%; max-height: 100%; object-fit: contain; }
+
+@media (max-width: 699px) {
+  .remake .sheet:has(.tile-binder) .parchment-body { display: flex; flex-direction: column; overflow: hidden; }
+  .tile-binder { height: calc(var(--viewport-height, 100dvh) - var(--sheet-top-space) - var(--sheet-bottom-space) - 130px); max-height: 720px; flex-shrink: 1; gap: 8px; }
+}
+@media (max-width: 699px) and (max-height: 740px) {
+  .profile-editor { gap: 11px; }
+  .profile-preview { min-height: 60px; }
+  .profile-preview > .player-avatar { width: 58px; height: 58px; }
+  .profile-avatar-grid { gap: 8px; }
+  .profile-avatar-option { width: min(100%, 62px); height: 62px; max-width: 62px; justify-self: center; }
+  .remake .profile-save-button { min-height: 52px; margin-top: 8px; padding-block: 7px; font-size: 24px; }
+  .binder-intro, .binder-editions, .binder-theme-control > button { display: none; }
+  .binder-compact-edition { display: flex; flex: 0 0 108px; }
+  .binder-summary { gap: 8px; }
+  .binder-summary strong, .binder-summary .binder-match-total strong { font-size: 20px; }
+  .binder-book { width: 36px; height: 36px; }
+  .binder-tiers > button { font-size: 10px; padding-inline: 5px; }
+  .binder-art { max-height: 100px; }
+  .binder-card { padding: 4px 4px 7px; }
+  .binder-card figcaption { padding-top: 5px; }
+  .binder-grid { gap: 9px 7px; padding: 6px; }
+  .remake .result-card { padding: 6px 0; }
+  .victory-bloom { height: 112px; }
+  .bloom-ring { width: 110px; height: 110px; }
+  .bloom-rays { width: 200px; height: 145px; }
+  .victory-bloom > i { transform: rotate(var(--spark-angle)) translateY(-61px); }
+  .remake .result-card h2 { font-size: 40px; margin: 10px 0 8px; }
+  .remake .result-card > p { margin-bottom: 12px; }
+  .remake .result-stats { margin: 12px 0; }
+  .remake .result-stats strong { padding: 9px 0 12px; }
+  .result-memory { margin: 15px 0 18px; padding: 16px 0; }
+  .remake .result-card .primary-button { min-height: 56px; font-size: 27px; }
+  .remake .result-card .plain-button { min-height: 44px; margin-top: 8px; padding: 10px 5px; }
+}
+@media (max-width: 699px) and (max-height: 620px) {
+  .tile-binder { gap: 6px; }
+  .binder-theme-label, .binder-compact-rarity { min-height: 48px; }
+  .binder-theme-label > span { font-size: 9px; }
+  .binder-theme-select { padding-top: 16px; }
+  .binder-grid { min-height: 165px; }
+  .binder-art { max-height: 77px; }
+  .binder-rarity { gap: 1px; }
+  .binder-rarity svg { width: 9px; height: 9px; }
+  .binder-card figcaption strong { min-height: 30px; }
+  .binder-card figcaption > span { white-space: normal; }
+  .profile-editor { gap: 7px; }
+  .profile-preview { min-height: 46px; gap: 15px; }
+  .profile-preview > .player-avatar { width: 44px; height: 44px; }
+  .profile-preview strong { font-size: 18px; }
+  .profile-avatar-grid { gap: 7px; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .profile-avatar-option { width: min(100%, 52px); height: 52px; max-width: 52px; justify-self: center; border-radius: 12px; }
+  .profile-avatar-field > legend { margin-bottom: 6px; }
+  .profile-field { gap: 5px; }
+  .remake .profile-save-button { min-height: 46px; margin-top: 3px; margin-bottom: 3px; padding-block: 6px; font-size: 22px; }
+  .victory-bloom { height: 80px; }
+  .bloom-ring { width: 78px; height: 78px; }
+  .bloom-rays { width: 155px; height: 105px; }
+  .victory-bloom > i { transform: rotate(var(--spark-angle)) translateY(-45px); }
+  .remake .result-card h2 { font-size: 37px; margin: 8px 0 6px; }
+  .remake .result-card > p { margin-bottom: 8px; font-size: 14px; }
+  .remake .result-stats { margin: 10px 0; }
+  .remake .result-stats span { padding: 5px 0; }
+  .remake .result-stats strong { font-size: 24px; padding: 8px 0 10px; }
+  .result-memory { margin: 12px 0 14px; padding: 12px 0; gap: 13px; }
+  .result-memory > span { font-size: 15px; }
+}
+@media (max-width: 350px) {
+  .binder-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .binder-art { height: 77px; aspect-ratio: auto; }
+  .binder-art > img { box-shadow: none; }
+}

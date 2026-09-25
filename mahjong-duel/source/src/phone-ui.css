@@ -1,0 +1,31 @@
+/* Phone audit: readable supporting text and thumb-sized controls. */
+.remake .home-rules > button,
+.remake .collection-label,
+.remake .home-resume { min-height: 44px; }
+.remake .player-score span.opponent-name { display: flex; justify-content: flex-end; gap: 3px; }
+.remake .player-score .opponent-name > span { min-width: 0; }
+.remake .duel-launch { background: linear-gradient(#ce7215 0%, #b95308 45%, #a94007 48%, #c5680c 100%); }
+.remake .primary-button,
+.remake .profile-save-button { background: linear-gradient(#5a9932, #2d7b32); }
+
+@media (max-width: 599px) {
+  .remake .player-score span:not(.player-avatar, .player-avatar-portrait, .player-country-flag, .ghost-portrait) { font-size: 11px; }
+  .remake .duel-progress-labels,
+  .remake .duel-progress-labels strong { font-size: 11px; }
+  .remake .turn-ribbon { max-width: 100%; flex-wrap: wrap; gap: 3px 9px; font-size: 12px; text-align: center; }
+  .remake .turn-ribbon small { font-size: 11px; line-height: 1.4; }
+  .remake .game-tools > button > span:last-child { font-size: 11px; padding-inline: 5px; }
+  .remake .game-tools > button { min-height: 60px; }
+  .remake .game-tools { min-height: 60px; }
+}
+
+/* Keep the title and tile fan while making room for full-size actions. */
+@media (max-width: 599px) and (max-height: 620px) {
+  .home-brand { margin-top: 0; }
+  .home-brand h1 > span { font-size: 44px; }
+  .home-brand h1 > strong { font-size: 57px; }
+  .home-actions { gap: 8px; }
+  .home-collection { min-height: 116px; }
+  .home-collection .menu-fan { height: 72px; min-height: 72px; }
+  .home-collection .tile-showcase { height: 72px; min-height: 72px; transform: scale(.52); transform-origin: 50% 10%; }
+}

@@ -1,0 +1,105 @@
+/* The stack owns the available screen; the controls never impose a tall canvas. */
+.remake.at-table { height: 100dvh; min-height: 0; overflow: hidden; }
+.remake.at-table .app-shell { height: 100%; max-height: none; max-width: 760px; min-height: 0; }
+.remake .game-screen { position: relative; height: 100%; min-height: 0; padding: max(10px, env(safe-area-inset-top)) 10px max(10px, env(safe-area-inset-bottom)); }
+.remake .game-header { position: absolute; right: 12px; top: max(16px, env(safe-area-inset-top)); height: 44px; min-height: 44px; margin: 0; z-index: 5; }
+.remake .duel-scoreboard { position: relative; grid-template-columns: minmax(0, 1fr) 18px minmax(0, 1fr); gap: 4px; padding: 6px 54px 8px 7px; min-height: 0; margin: 0 0 7px; border-width: 1px; border-radius: 15px; }
+.remake .player-score { gap: 5px; padding: 3px; }
+.remake .player-score .player-avatar { width: 30px; height: 30px; --avatar-size: 30px; }
+.remake .player-score strong { font-size: 23px; line-height: 1.1; }
+.remake .player-score span:not(.player-avatar, .player-avatar-portrait, .player-country-flag, .ghost-portrait) { font-size: 10px; }
+.score-versus { font-size: 10px; }
+.duel-progress { grid-column: 1 / -1; margin-right: -45px; padding: 2px 4px 0; }
+.duel-progress-labels { display: flex; justify-content: space-between; align-items: center; color: #e4c698; font-size: 9px; font-weight: 700; margin: 0 0 4px; line-height: 1.2; }
+.duel-progress-labels strong { color: #ffe5a1; font-size: 9px; }
+.duel-progress-track { height: 7px; position: relative; background: #25180d; border-radius: 5px; box-shadow: inset 0 1px 2px #09090199, 0 1px #ac753e; overflow: hidden; }
+.duel-progress-track > span { position: absolute; height: 100%; transition: width .4s ease; }
+.your-progress { left: 0; background: linear-gradient(#c3e76a, #71b94e); border-radius: 5px 0 0 5px; }
+.ghost-progress { right: 0; background: linear-gradient(#d1bef9, #9680d1); border-radius: 0 5px 5px 0; }
+.duel-progress-track > i { position: absolute; top: 0; bottom: 0; left: 50%; border-left: 1px solid #ffeab282; }
+.remake .turn-ribbon { min-height: 22px; padding: 2px 11px; font-size: 11px; line-height: 1.35; border: none; box-shadow: none; gap: 9px; }
+.remake .turn-ribbon small { font-size: 9px; padding-left: 9px; }
+.remake .board-space { margin: 3px 0 6px; flex: 1 1 0; min-height: 0; width: 100%; container-type: size; }
+.remake .board-frame { width: min(100cqw, calc(100cqh * var(--board-ratio))); height: auto; aspect-ratio: var(--board-ratio); max-height: 100%; padding: 0; top: 0; flex: 0 0 auto; }
+.remake .game-tile { border-radius: clamp(5px, 1.5vw, 9px); min-width: 0; }
+.remake .tile-rotator { transition-duration: 160ms; }
+/* Switch visible faces at the midpoint of the faster eased rotation. */
+.remake .tile-side { transition-delay: 23ms; }
+.remake .tile-side { box-shadow: inset 0 1px 0 #ffffffe0, 0 2px 0 var(--tile-light), 1px 4px 0 var(--tile-shade), 2px 6px 0 var(--tile-edge), 2px 8px 7px -2px var(--tile-shadow); }
+.remake .game-tile.blocked { filter: brightness(.87) saturate(.92); }
+.remake .board-status { position: absolute; width: 1px; height: 1px; min-height: 0; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.remake .game-tools { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); width: 100%; max-width: 460px; align-self: center; gap: 5px; padding: 3px 8px 0; min-height: 66px; }
+.remake .game-tools > button { min-width: 0; min-height: 62px; gap: 4px; }
+.remake .game-tools .tool-medallion { width: 46px; height: 46px; border-width: 2px; }
+.remake .game-tools .tool-medallion small { width: 20px; height: 19px; top: -5px; right: -7px; font-size: 11px; }
+.remake .game-tools > button > span:last-child { font-size: 10px; line-height: 1.3; padding: 2px 7px; }
+.remake .game-tools > button.booster-active { opacity: 1; }
+.remake .booster-active .tool-medallion { border-color: #b0e8ef; box-shadow: inset 0 0 12px #66ccec4d, 0 0 12px #85e7f457; color: #c0f7fa; }
+.remake .toast { bottom: 92px; font-size: 11px; padding: 9px 15px; pointer-events: none; }
+.rarity-aura { pointer-events: none; position: absolute; inset: -1px; border: 2px solid var(--rarity-color); border-radius: inherit; opacity: 0; box-shadow: inset 0 0 9px var(--rarity-color), 0 0 11px var(--rarity-color); }
+.rarity-gem { position: absolute; right: 6px; top: 6px; width: 6px; height: 6px; rotate: 45deg; background: var(--rarity-color); border: 1px solid #ffffffc7; box-shadow: 0 0 4px var(--rarity-color); pointer-events: none; }
+.game-tile[data-face-up=true]:not([data-rarity=common]) .rarity-aura { animation: rarity-shine 8s var(--shine-delay) infinite ease-in-out; }
+.game-tile.eagle-lit .rarity-aura { animation: eagle-pulse 1.7s infinite ease-in-out; opacity: .85; }
+.remake .game-tile.hinted { outline: 3px solid #f9ec97; outline-offset: 2px !important; animation: pair-hint .5s infinite ease-in-out; }
+@keyframes rarity-shine { 0%, 70%, 100% { opacity: 0; } 79% { opacity: .8; } 89% { opacity: .15; } }
+@keyframes eagle-pulse { 0%, 100% { opacity: .5; } 50% { opacity: .95; } }
+@keyframes pair-hint { 0%, 100% { filter: brightness(1); box-shadow: 0 0 5px 2px #ffe77788; } 50% { filter: brightness(1.2); box-shadow: 0 0 17px 5px #ffe777c7; } }
+.home-links { display: grid; grid-template-columns: 1.2fr 1fr; gap: 10px; }
+.home-links button { min-height: 44px; width: 100%; display: flex; align-items: center; justify-content: center; gap: 7px; border-radius: 24px; font-size: 12px; font-weight: 800; }
+.binder-launch { background: linear-gradient(#ffedc3, #deb277); color: #6d391b; box-shadow: inset 0 1px #fff8db, 0 3px #88572e; }
+.booster-rules { display: grid; gap: 8px; margin-top: 17px; }
+.booster-rules h3 { font-size: 15px; }.booster-rules p { font-size: 12px; line-height: 1.6; }
+.remake .sheet:has(.tile-binder) { max-width: 720px; }
+@media (max-height: 700px) {
+  .home-screen { padding: max(10px, env(safe-area-inset-top)) 20px max(12px, env(safe-area-inset-bottom)); }
+  .home-toolbar { flex-basis: 55px; }.profile-launch .player-avatar { width: 42px; height: 42px; }.profile-launch { gap: 4px; }
+  .home-brand { margin-top: 7px; }.home-brand h1 > span { font-size: 47px; }.home-brand h1 > strong { font-size: 61px; }.brand-rule { margin-top: 10px; }
+  .home-collection { min-height: 115px; }.home-collection .menu-fan { min-height: 86px; height: 86px; }.home-collection .tile-showcase { transform: scale(.56); transform-origin: 50% 15%; height: 86px; min-height: 86px; }
+  .collection-label { min-height: 38px; padding: 6px 13px; }.home-actions { gap: 9px; padding: 0 5px; }.home-rules button { height: 38px; }.duel-launch { min-height: 57px; font-size: 27px; }.home-resume { min-height: 35px; }
+  .remake .game-screen { padding-top: max(6px, env(safe-area-inset-top)); padding-bottom: max(7px, env(safe-area-inset-bottom)); }
+  .remake .game-header { top: max(12px, env(safe-area-inset-top)); }
+  .remake .duel-scoreboard { margin-bottom: 5px; }.remake .player-score strong { font-size: 21px; }
+  .remake .game-tools { min-height: 61px; }.remake .game-tools .tool-medallion { width: 43px; height: 43px; }
+}
+@media (min-width: 600px) and (min-height: 700px) {
+  .remake .game-screen { padding: max(16px, env(safe-area-inset-top)) 22px max(16px, env(safe-area-inset-bottom)); }
+  .remake .game-header { right: 30px; top: max(25px, env(safe-area-inset-top)); }
+  .remake .duel-scoreboard { padding: 9px 68px 11px 12px; margin-bottom: 9px; }.remake .player-score { gap: 11px; }
+  .remake .player-score .player-avatar { width: 42px; height: 42px; }.remake .player-score strong { font-size: 28px; }
+  .remake .player-score span:not(.player-avatar, .player-avatar-portrait, .player-country-flag, .ghost-portrait) { font-size: 12px; }
+  .duel-progress { margin-right: -54px; padding-top: 4px; }.duel-progress-labels, .duel-progress-labels strong { font-size: 11px; }.duel-progress-track { height: 9px; }
+  .remake .turn-ribbon { font-size: 13px; min-height: 27px; }.remake .turn-ribbon small { font-size: 11px; }
+  .remake .game-tools { min-height: 82px; }.remake .game-tools .tool-medallion { width: 57px; height: 57px; }.remake .game-tools > button > span:last-child { font-size: 12px; }
+}
+@media (orientation: portrait) and (max-height: 650px) {
+  .remake .duel-scoreboard { padding-top: 3px; padding-bottom: 5px; gap: 1px; margin-bottom: 3px; }
+  .remake .player-score { padding: 2px; gap: 4px; }.remake .player-score strong { font-size: 18px; }
+  .remake .player-score .player-avatar { width: 24px; height: 24px; --avatar-size: 24px; }
+  .remake .player-score span:not(.player-avatar, .player-avatar-portrait, .player-country-flag, .ghost-portrait) { font-size: 9px; }
+  .remake .game-header { top: max(7px, env(safe-area-inset-top)); }
+  .duel-progress { padding-top: 4px; }.duel-progress-labels { margin-bottom: 3px; }.duel-progress-track { height: 6px; }
+  .remake .turn-ribbon { min-height: 19px; font-size: 10px; }.remake .turn-ribbon small { font-size: 9px; }
+  .remake .game-tools { min-height: 56px; padding-top: 0; }.remake .game-tools > button { min-height: 56px; gap: 3px; }
+  .remake .game-tools .tool-medallion { width: 39px; height: 39px; }.remake .game-tools > button > span:last-child { font-size: 9px; }
+}
+@media (orientation: landscape) and (min-width: 650px) {
+  .remake.at-table .app-shell { max-width: 1200px; }
+  .remake .game-screen { display: grid; grid-template-columns: minmax(0, 1fr) minmax(240px, 30%); grid-template-rows: 1fr auto auto auto 1fr; gap: 12px 22px; padding: max(16px, env(safe-area-inset-top)) 24px max(16px, env(safe-area-inset-bottom)); }
+  .remake .game-header { grid-column: 2; grid-row: 2; position: absolute; top: 12px; right: 6px; }
+  .remake .duel-scoreboard { grid-column: 2; grid-row: 2; margin: 0; padding: 8px 50px 10px 5px; }
+  .remake .player-score { flex-direction: column; gap: 5px; text-align: center; }.remake .player-score.opponent { flex-direction: column-reverse; }
+  .remake .player-score strong { font-size: 24px; }.remake .player-score span:not(.player-avatar, .player-avatar-portrait, .player-country-flag, .ghost-portrait) { font-size: 10px; }.remake .player-score .player-avatar { width: 32px; height: 32px; }
+  .duel-progress { margin-right: -41px; }.duel-progress-labels, .duel-progress-labels strong { font-size: 9px; }
+  .remake .turn-ribbon { grid-column: 2; grid-row: 3; justify-self: center; flex-wrap: wrap; gap: 4px; font-size: 11px; }.remake .turn-ribbon small { font-size: 9px; }
+  .remake .board-space { grid-column: 1; grid-row: 1 / -1; margin: 0; height: 100%; }
+  .remake .game-tools { grid-column: 2; grid-row: 4; grid-template-columns: repeat(2, 1fr); min-height: 0; gap: 15px; }
+  .remake .game-tools .tool-medallion { width: 48px; height: 48px; }.remake .game-tools > button > span:last-child { font-size: 10px; }
+  .remake .toast { bottom: 16px; right: 24px; left: auto; transform: none; max-width: 280px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .game-tile .rarity-aura { animation: none !important; }.game-tile.eagle-lit .rarity-aura { opacity: .8; }
+  .remake .game-tile.hinted { animation: none; }.duel-progress-track > span { transition: none; }
+}
+.gentle-motion .game-tile .rarity-aura, .gentle-motion .game-tile.hinted { animation: none !important; }
+.gentle-motion .game-tile.eagle-lit .rarity-aura { opacity: .8; }
+.game-screen[inert] .rarity-aura, .game-screen[inert] .game-tile.hinted { animation-play-state: paused; }

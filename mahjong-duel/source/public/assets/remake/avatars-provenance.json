@@ -1,0 +1,11 @@
+{
+  "tool": "Built-in ImageGen",
+  "asset": "avatars-presets.png",
+  "source": "/Users/can.kalsin/.codex/generated_images/01a0a44c-0ee9-71f3-8f5d-9df727830286/exec-31fab24c-a85b-4054-9843-57a1db417c4d.png",
+  "width": 1774,
+  "height": 887,
+  "columns": 4,
+  "rows": 2,
+  "processing": "Copied unchanged. CSS background-position selects individual portraits; the source image is not cropped or repainted.",
+  "prompt": "Use case: stylized-concept. Asset type: a production avatar sprite sheet for a polished casual mobile Mahjong game. Generate ONE WIDE 2:1 image, precisely 4 columns by 2 rows of EIGHT equal square avatar portraits, edge-to-edge grid with NO gutters, borders, dividers or text. Each tile is its own full square image with an individual softly colored pastel background. Each friendly fictional adult human has head and upper shoulders centered at exactly the same scale; full hairstyle stays inside their tile; face is large, crisply readable at 64px; eyes look toward viewer. Premium warm stylized 3D game art, soft rounded sculpted forms, expressive brows and clear eyes, gentle smiles, beautiful soft studio lighting, subtle subsurface skin, NOT photographic, NOT flat vector, NOT plastic emoji. Top row left to right: 1 woman with warm medium-brown skin, black curly bob, teal sweater on pale peach; 2 man with light skin, wavy chestnut hair, short tidy beard, rust shirt on pale blue; 3 woman with light East Asian appearance, straight black bob, round glasses, coral top on mint; 4 man with dark brown skin, short coiled hair, clean shaven, gold shirt on lavender. Bottom row left to right: 5 woman with fair skin, auburn ponytail, a few freckles, sky blue top on pale pink; 6 man with medium olive skin, swept dark hair, round glasses, forest green top on warm sand; 7 older woman with tan skin, silver wavy short hair, plum cardigan on pale aqua; 8 older man with brown skin, salt-and-pepper hair and moustache, navy polo on pale yellow. Ensure all eight are distinctive yet a cohesive illustrated cast. Square cells must occupy exactly quarters of the image width and halves of its height, no exterior margin or empty space, no floating or repeated heads, no frames or accessories outside the portraits, no typography, no watermark. Requested output 2048x1024 or same 2:1 proportion."
+}

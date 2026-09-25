@@ -1,0 +1,33 @@
+/* Native sizing stays untouched on browsers that support these units. */
+@supports not (height: 100dvh) {
+  :root { --viewport-height: 100vh; }
+  .world.remake { min-height: var(--viewport-height); height: var(--viewport-height); }
+  .remake .app-shell, .remake.at-table .app-shell { height: 100%; min-height: 0; }
+  .remake.at-table { height: var(--viewport-height); min-height: 0; }
+  .remake .sheet { max-height: calc(var(--viewport-height) - 40px); }
+  .remake .result-card { max-height: calc(var(--viewport-height) - 48px); }
+  .collection-scroll { height: min(calc(var(--viewport-height) * .47), 460px); }
+  .tile-binder { max-height: calc(var(--viewport-height) - 190px); }
+  @media (min-height: 741px) and (max-width: 599px) {
+    .home-brand { margin-top: clamp(20px, calc(var(--viewport-height) * .06), 72px); }
+  }
+  @media (max-height: 740px) {
+    .remake .sheet { max-height: calc(var(--viewport-height) - 34px); }
+  }
+  @media (max-height: 720px) {
+    .tile-binder { max-height: calc(var(--viewport-height) - 165px); }
+  }
+  @media (max-height: 620px) {
+    .tile-binder { max-height: calc(var(--viewport-height) - 158px); }
+  }
+  @media (min-width: 700px) {
+    .tile-binder { max-height: min(calc(var(--viewport-height) * .76), 850px); }
+  }
+  @media (orientation: landscape) and (max-height: 599px) {
+    .remake .sheet { max-height: calc(var(--viewport-height) - 36px); }
+  }
+}
+
+@supports not (width: 1cqw) {
+  .remake .board-frame { width: var(--board-width-fallback, 100%); }
+}

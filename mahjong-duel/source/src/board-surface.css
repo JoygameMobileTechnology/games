@@ -1,0 +1,19 @@
+/* One continuous source image: no sliced borders, repeated motifs, or joins. */
+.world .table-surface.art-frame {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  box-sizing: border-box;
+  overflow: hidden;
+  pointer-events: none;
+  border: 0;
+  border-image: none;
+  background-color: var(--board-base);
+  background-image: var(--surface-image, none);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-origin: border-box;
+  animation: none;
+  transition: none;
+}

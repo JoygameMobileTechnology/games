@@ -1,0 +1,36 @@
+/* Shared-board Duel uses the existing score/status rows, preserving board geometry. */
+.duel-scoreboard .player-score {
+  border-radius: 12px;
+  padding: 3px 5px;
+  margin: -3px -5px;
+  transition: background-color 180ms, box-shadow 180ms;
+}
+.duel-scoreboard .player-score.active-turn {
+  background: color-mix(in srgb, var(--ui-action, #295b58) 13%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ui-ink, #243b3b) 25%, transparent);
+}
+.duel-scoreboard .game-clock.duel-turn { min-width: 100px; text-align: center; }
+.duel-scoreboard .game-clock.duel-turn > span { font-size: 9px; letter-spacing: .08em; }
+.duel-scoreboard .game-clock.duel-turn > strong {
+  font-family: Manrope, sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.6;
+  white-space: nowrap;
+}
+.duel-scoreboard .player-score strong small { font-size: 9px; }
+.game-tile:disabled { cursor: default; }
+.game-screen[data-turn] .game-tile:disabled { opacity: 1; }
+.game-tile.duel-ai-selected .selected-dot { background: var(--ui-ink, #243b3b); }
+.game-tile.duel-mismatch { outline: 2px solid var(--ui-warning, #ad563d); outline-offset: 2px; }
+.duel-status > span { max-width: 100%; text-align: center; }
+.duel-status > span > small { white-space: normal; }
+@media (min-width: 600px) and (min-height: 600px) {
+  .duel-scoreboard .game-clock.duel-turn > strong { font-size: 15px; }
+  .duel-scoreboard .game-clock.duel-turn > span { font-size: 10px; }
+}
+@media (max-width: 359px) {
+  .duel-scoreboard .game-clock.duel-turn { min-width: 86px; }
+  .duel-scoreboard .game-clock.duel-turn > strong { font-size: 11px; }
+  .duel-scoreboard .game-clock.duel-turn > span { font-size: 8px; }
+}

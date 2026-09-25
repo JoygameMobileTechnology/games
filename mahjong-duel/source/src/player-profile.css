@@ -1,0 +1,120 @@
+.player-avatar {
+  position: relative;
+  display: inline-block;
+  flex: 0 0 auto;
+  width: var(--avatar-size, 64px);
+  height: var(--avatar-size, 64px);
+  vertical-align: middle;
+  isolation: isolate;
+}
+.player-avatar-portrait {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-radius: 19%;
+  background-size: 400% 200%;
+  background-repeat: no-repeat;
+  background-color: #e6c99b;
+  box-shadow: 0 0 0 2px #fff2d2, 0 0 0 4px #906b38, 0 3px 7px #3d281947;
+}
+.player-country-flag {
+  position: absolute;
+  z-index: 1;
+  right: -5px;
+  bottom: -5px;
+  display: grid;
+  place-items: center;
+  min-width: 26px;
+  height: 22px;
+  padding: 1px 3px;
+  border: 1px solid #9c783f;
+  border-radius: 5px;
+  background: #fff7de;
+  box-shadow: 0 2px 3px #3021112b;
+  font-family: 'Apple Color Emoji', 'Segoe UI Emoji', sans-serif;
+  font-size: 18px;
+  line-height: 1;
+}
+.profile-editor { display: flex; flex-direction: column; gap: 17px; color: #51371e; }
+.profile-preview { display: flex; align-items: center; justify-content: center; gap: 19px; margin: 2px 0 1px; min-height: 89px; }
+.profile-preview > div { display: flex; flex-direction: column; min-width: 0; max-width: 60%; gap: 5px; }
+.profile-preview strong { overflow-wrap: anywhere; font-size: 22px; font-weight: 800; line-height: 1.2; }
+.profile-preview > div > span { color: #7d6343; font-size: 12px; font-weight: 600; }
+.profile-field { display: flex; flex-direction: column; gap: 7px; }
+.profile-field > label, .profile-avatar-field > legend { color: #684728; font-size: 13px; font-weight: 800; letter-spacing: .02em; }
+.profile-field > label { display: flex; align-items: center; justify-content: space-between; }
+.profile-field > label > span { color: #8a704d; font-size: 11px; font-weight: 600; }
+.profile-field input, .profile-country-control {
+  width: 100%;
+  min-width: 0;
+  min-height: 45px;
+  box-sizing: border-box;
+  border: 1px solid #b2915b;
+  border-radius: 10px;
+  background: #fff8e2;
+  box-shadow: inset 0 2px 4px #7654231c, 0 1px 0 #fff8e2;
+  color: #51371e;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 600;
+}
+.profile-field input { padding: 10px 13px; user-select: text; -webkit-user-select: text; }
+.profile-field input::placeholder { color: #9a825d; font-weight: 400; }
+.profile-field input[aria-invalid='true'] { border-color: #ac392b; }
+.profile-avatar-field { margin: 0; padding: 0; border: 0; min-width: 0; }
+.profile-avatar-field > legend { margin-bottom: 11px; padding: 0; }
+.profile-avatar-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.profile-avatar-option {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  min-width: 0;
+  padding: 3px;
+  border: 2px solid transparent;
+  border-radius: 17px;
+  background: transparent;
+  cursor: pointer;
+  transition: transform 120ms ease, background-color 120ms ease;
+}
+.profile-avatar-option > .player-avatar { width: 100%; height: 100%; }
+.profile-avatar-option .player-avatar-portrait { box-shadow: 0 0 0 1px #b58e57, 0 2px 3px #5b3c242b; }
+.profile-avatar-option:hover { background: #e1cca4; }
+.profile-avatar-option:active { transform: scale(.95); }
+.profile-avatar-option.is-selected { border-color: #4a982a; background: #bfe69a; box-shadow: 0 0 0 2px #fff7dc; }
+.profile-avatar-check { position: absolute; right: -3px; bottom: -3px; z-index: 2; width: 23px; height: 23px; display: grid; place-items: center; border: 2px solid #fff5d9; border-radius: 50%; background: #4a982a; color: white; font-size: 15px; font-weight: 900; line-height: 1; }
+.profile-country-control { position: relative; display: flex; align-items: center; gap: 9px; padding-left: 12px; }
+.profile-country-control > span:first-child { flex: 0 0 auto; font-size: 23px; line-height: 1; }
+.profile-country-control select { appearance: none; -webkit-appearance: none; flex: 1; min-width: 0; padding: 11px 30px 11px 0; border: 0; border-radius: 10px; background: transparent; color: #51371e; font: inherit; font-size: 14px; cursor: pointer; }
+.profile-country-control select option { background: #fff8e2; color: #51371e; }
+.profile-country-chevron { position: absolute; right: 12px; top: 6px; font-size: 24px; pointer-events: none; }
+.profile-save-button {
+  display: block;
+  min-height: 52px;
+  width: 100%;
+  margin: 1px 0 5px;
+  padding: 10px 18px;
+  border: 2px solid #42762c;
+  border-radius: 12px;
+  background: linear-gradient(#8acb4c 0%, #6aaf35 49%, #5a9c2d 50%, #65ab33 100%);
+  box-shadow: inset 0 2px 0 #c5ed898c, 0 4px 0 #345e25, 0 5px 7px #67472932;
+  color: #fffbe9;
+  text-shadow: 0 2px 0 #426c2a;
+  font-size: 19px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.profile-save-button:active { transform: translateY(3px); box-shadow: inset 0 2px 0 #c5ed898c, 0 1px 0 #345e25; }
+.profile-save-button:disabled { opacity: .65; cursor: wait; }
+.profile-editor :is(input, select, button):focus-visible { outline: 3px solid #327cb5; outline-offset: 3px; }
+.profile-error { margin: -5px 0; color: #a1372a; font-size: 12px; font-weight: 700; line-height: 1.4; }
+@media (max-width: 360px), (max-height: 720px) {
+  .profile-editor { gap: 13px; }
+  .profile-preview { min-height: 69px; }
+  .profile-preview > .player-avatar { width: 66px; height: 66px; }
+  .profile-preview strong { font-size: 20px; }
+  .profile-avatar-grid { gap: 9px; }
+  .profile-save-button { min-height: 48px; }
+}
+@media (prefers-reduced-motion: reduce) { .profile-avatar-option { transition: none; } }
