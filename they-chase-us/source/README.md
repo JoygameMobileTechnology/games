@@ -3,6 +3,10 @@
 Playable prototype of the GDD in `GDD.md` (English) / `Backwards Runner Okçu — GDD v0.1.md` (Turkish).
 Three.js, portrait 9:16, single HTML file, all geometry and sound generated in code.
 
+## v2 (auto-attack)
+
+`v2/` is an alternative build: no aiming, volleys fire on their own at the closest chaser within reach, swipe only moves; main-screen upgrades are Health / Attack Speed / Damage and hordes are denser. See `v2/README.md`.
+
 ## Run
 
 ```bash
