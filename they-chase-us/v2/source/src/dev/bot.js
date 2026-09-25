@@ -52,7 +52,7 @@ export function installBot(game) {
       bot.log.push({ level: game.level, state: game.state, kills: game.kills, mult: game.bonus.mult, hp: Math.round(game.player.hp), picks: Object.keys(game.picks) });
       bot.holdStart = -1; bot.lastRelease = -9;
       if (game.state !== 'fail') game.goMain();
-      if (bot.buyUpgrades) { let guard = 0; while (guard++ < 20) { const ids = ['hp', 'atk', 'dmg'].sort((a, b2) => (game.save.upg[a] || 0) - (game.save.upg[b2] || 0)); if (!game.buyUpgrade(ids[0]) && !game.buyUpgrade(ids[1]) && !game.buyUpgrade(ids[2])) break; } }
+      if (bot.buyUpgrades) { let guard = 0; while (guard++ < 20) { const ids = ['hp', 'atk', 'dmg', 'range'].sort((a, b2) => (game.save.upg[a] || 0) - (game.save.upg[b2] || 0)); if (!ids.some((id) => game.buyUpgrade(id))) break; } }
       game.startLevel(game.state === 'fail' ? game.level : game.save.level);
     }
   }, 500);
@@ -60,6 +60,6 @@ export function installBot(game) {
   game.startLevel = (L) => { bot.holdStart = -1; bot.lastRelease = -9; origStart(L); };
   // headless runs: ?auto=<level> starts that level right away with auto restart, ?god=1 makes the player immortal
   const auto = /[?&]auto=(\d+)/.exec(location.search);
-  if (auto) { bot.autoRestart = true; if (/[?&]god=1/.test(location.search)) CONFIG.debug.god = true; setTimeout(() => { if (game.debugGui) game.debugGui.close(); game.save.coins = 0; game.save.level = +auto[1]; game.save.upg = { hp: 0, atk: 0, dmg: 0 }; game.startLevel(+auto[1]); }, 300); }
+  if (auto) { bot.autoRestart = true; if (/[?&]god=1/.test(location.search)) CONFIG.debug.god = true; setTimeout(() => { if (game.debugGui) game.debugGui.close(); game.save.coins = 0; game.save.level = +auto[1]; game.save.upg = { hp: 0, atk: 0, dmg: 0, range: 0 }; game.startLevel(+auto[1]); }, 300); }
   return bot;
 }

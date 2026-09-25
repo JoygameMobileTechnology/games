@@ -142,6 +142,7 @@ export const CONFIG = {
     hpPerLevel: 5,
     atkPerLevel: 0.009, atkCap: 28,     // attack interval -1.2% of base per level
     dmgPerLevel: 0.3, dmgCap: 40,       // +3% of base arrow damage per level
+    rangePerLevel: 0.2, rangeCap: 30,   // +2.5% of base reach per level
     costBase: 40, costGrowth: 1.2,
     incomeBase: 10, incomePerLevel: 2,
     failKeepFrac: 0.5,

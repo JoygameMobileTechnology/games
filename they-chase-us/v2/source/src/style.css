@@ -46,8 +46,8 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: linear-gradi
 .tagline { text-align: center; margin-top: 6px; font-size: 16px; opacity: .9; }
 #main .middle { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 10px; }
 .tap-start { font-size: 34px; margin-bottom: 8px; }
-.upgrades { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-.upg { pointer-events: auto; position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; min-height: 120px; padding: 10px 6px 8px; border-radius: 16px; background: linear-gradient(#f7f2e7, #dcd3c3); color: var(--ink); box-shadow: 0 5px 0 #9c8f78, 0 8px 14px rgba(0,0,0,.25); cursor: pointer; text-align: center; border: 0; font-family: var(--font); transition: transform .08s; }
+.upgrades { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+.upg { pointer-events: auto; position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; min-height: 104px; padding: 8px 6px 8px; border-radius: 16px; background: linear-gradient(#f7f2e7, #dcd3c3); color: var(--ink); box-shadow: 0 5px 0 #9c8f78, 0 8px 14px rgba(0,0,0,.25); cursor: pointer; text-align: center; border: 0; font-family: var(--font); transition: transform .08s; }
 .upg:active { transform: translateY(3px); }
 .upg .ico { font-size: 30px; line-height: 1; }
 .upg .name { font-size: 16px; margin-top: 2px; }

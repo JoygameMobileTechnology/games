@@ -296,7 +296,7 @@ export class Game {
     this.state = 'fail'; this.setTimeScale(1, 0);
     const kept = Math.floor(this.levelCoins * CONFIG.meta.failKeepFrac);
     this.save.coins += kept;
-    const suggest = (this.deathCause === 'enemy') ? ((this.save.upg.dmg || 0) <= (this.save.upg.atk || 0) ? 'dmg' : 'atk') : 'hp';
+    const suggest = (this.deathCause === 'enemy') ? ['atk', 'dmg', 'range'].sort((a, b) => (this.save.upg[a] || 0) - (this.save.upg[b] || 0))[0] : 'hp';
     this.save.suggest = suggest;
     this.save.stats.playTime = (this.save.stats.playTime || 0) + (performance.now() - this.levelStartReal) / 1000;
     writeSave(this.save);
@@ -367,9 +367,9 @@ export class Game {
 
   // ---------- meta ----------
   buyUpgrade(id) {
-    if (id !== 'hp' && id !== 'atk' && id !== 'dmg') return false;
+    if (id !== 'hp' && id !== 'atk' && id !== 'dmg' && id !== 'range') return false;
     const lvl = this.save.upg[id] || 0;
-    const cap = id === 'dmg' ? CONFIG.meta.dmgCap : id === 'atk' ? CONFIG.meta.atkCap : Infinity;
+    const cap = id === 'dmg' ? CONFIG.meta.dmgCap : id === 'atk' ? CONFIG.meta.atkCap : id === 'range' ? CONFIG.meta.rangeCap : Infinity;
     if (lvl >= cap) return false;
     const cost = upgradeCost(lvl);
     if (this.save.coins < cost) return false;
@@ -421,7 +421,7 @@ export class Game {
     // v2: reach arc on the road; turns red while something is inside it
     if (this.state === 'level' && !pl.dead) {
       let hot = false; this.enemies.forEachWithin(pl.x, pl.z, this.stats.maxRange, (e) => { if (e.z - pl.z > -0.5) hot = true; });
-      this.fx.aim.showArc(pl.x, pl.z, this.stats.maxRange, hot);
+      this.fx.aim.showArc(pl.x, pl.z, this.stats.maxRange, hot, CONFIG.player.roadWidth / 2 - 0.35);
     } else this.fx.aim.hide();
 
     // systems

@@ -22,7 +22,7 @@ export function computeStats(picks, upg) {
     attackInterval, drawTime: attackInterval,
     arrowDamage: metaDmg * (1 + sum('sharp_tip')),
     arrows: Math.min(7, 1 + sum('multishot')),
-    maxRange: P.autoRange * (1 + sum('long_range')),
+    maxRange: (P.autoRange + M.rangePerLevel * Math.min(M.rangeCap, upg.range || 0)) * (1 + sum('long_range')),
     explosive: has('explosive_tip') ? { radius: 1.2 + 0.4 * (n('explosive_tip') - 1), pct: 0.5 + 0.1 * (n('explosive_tip') - 1) } : null,
     critChance: Math.min(0.5, sum('headshot')),
     fullDrawBonus: has('full_draw') ? 0.6 + 0.4 * (n('full_draw') - 1) : 0,

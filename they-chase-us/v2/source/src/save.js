@@ -2,7 +2,7 @@ const KEY = 'bra_save_v1';
 
 export const DEFAULT_SAVE = {
   coins: 0,
-  upg: { hp: 0, speed: 0, atk: 0 },
+  upg: { hp: 0, atk: 0, dmg: 0, range: 0 },
   level: 1,
   bestMult: 1,
   lastStopper: null, // { name, tier, hp, segment }

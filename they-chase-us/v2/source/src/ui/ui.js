@@ -8,6 +8,7 @@ const UPG = {
   hp: { name: 'Health', ico: '❤', val: (n) => `${CONFIG.player.baseHp + CONFIG.meta.hpPerLevel * n}`, cap: Infinity },
   atk: { name: 'Attack Speed', ico: '🏹', val: (n) => `${(1 / (CONFIG.player.attackInterval - CONFIG.meta.atkPerLevel * n)).toFixed(2)}/s`, cap: CONFIG.meta.atkCap },
   dmg: { name: 'Damage', ico: '⚔', val: (n) => `${(CONFIG.player.baseArrowDamage + CONFIG.meta.dmgPerLevel * n).toFixed(1)}`, cap: CONFIG.meta.dmgCap },
+  range: { name: 'Attack Range', ico: '🎯', val: (n) => `${(CONFIG.player.autoRange + CONFIG.meta.rangePerLevel * n).toFixed(1)} m`, cap: CONFIG.meta.rangeCap },
 };
 
 const TEMPLATE = `
@@ -92,7 +93,7 @@ export class UI {
     this.$('f-main').addEventListener('click', () => { g.audio.ui(); g.goMain(); });
     this.$('e-main').addEventListener('click', () => { g.audio.ui(); g.goMain(); });
     const up = this.$('m-upgrades');
-    for (const id of ['hp', 'atk', 'dmg']) {
+    for (const id of ['hp', 'atk', 'dmg', 'range']) {
       const b = document.createElement('button'); b.className = 'upg ui-block'; b.dataset.id = id;
       b.innerHTML = `<div class="rec" style="display:none">Recommended</div><div class="ico">${UPG[id].ico}</div><div class="name">${UPG[id].name}</div><div class="lvl"></div><div class="val"></div><div class="cost"></div>`;
       b.addEventListener('click', (e) => { e.stopPropagation(); g.audio.init(); if (!g.buyUpgrade(id)) g.audio.ui(); });

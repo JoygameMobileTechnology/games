@@ -250,10 +250,18 @@ export class AimLine {
     }
   }
   // v2: a dashed arc at the auto-attack reach, opening toward the chasers (+Z)
-  showArc(cx, cz, R, hot) {
+  showArc(cx, cz, R, hot, halfRoad = 3.65) {
+    if (!this.matArc) {
+      const mk = (op) => new LineMaterial({ color: 0x232830, linewidth: 2.2, dashed: true, dashSize: 0.35, gapSize: 0.35, transparent: true, opacity: op, depthTest: true, depthWrite: false });
+      this.matArc = mk(0.32); this.matArcHot = mk(0.55);
+    }
+    this.matArc.resolution.copy(this.matDark.resolution); this.matArcHot.resolution.copy(this.matDark.resolution);
+    // angular span limited so the arc stays on the road: cx + R*sin(t) within +-halfRoad
+    const lim = (x) => Math.asin(Math.max(-1, Math.min(1, x / R)));
+    const t0 = Math.max(-1.1, lim(-halfRoad - cx)), t1 = Math.min(1.1, lim(halfRoad - cx));
     const a = this.pos, l = this.lines[0];
-    for (let k = 0; k < this.N; k++) { const t = -1.1 + 2.2 * k / (this.N - 1); a[k * 3] = cx + R * Math.sin(t); a[k * 3 + 1] = 0.06; a[k * 3 + 2] = cz + R * Math.cos(t); }
-    l.geometry.setPositions(a); l.computeLineDistances(); l.material = hot ? this.matLock : this.matDark; l.visible = true;
+    for (let k = 0; k < this.N; k++) { const t = t0 + (t1 - t0) * k / (this.N - 1); a[k * 3] = cx + R * Math.sin(t); a[k * 3 + 1] = 0.05; a[k * 3 + 2] = cz + R * Math.cos(t); }
+    l.geometry.setPositions(a); l.computeLineDistances(); l.material = hot ? this.matArcHot : this.matArc; l.visible = t1 > t0;
     for (let i = 1; i < this.MAX; i++) this.lines[i].visible = false;
     this.ring.visible = false; this.ringInner.visible = false; this.dot.visible = false; for (const s of this.side) { s.r.visible = false; s.f.visible = false; }
   }
