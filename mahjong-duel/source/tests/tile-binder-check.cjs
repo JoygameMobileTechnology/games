@@ -38,10 +38,13 @@ const { pathToFileURL } = require('node:url');
     for (const faceId of ['K01', 'A11', 'K02', 'A07', 'G02', 'C01']) {
       const rarity = rarityForTile('ming-porcelain', 'eastern', faceId);
       const card = page.locator(`[data-match-key="ming-porcelain:eastern:${faceId}"]`);
-      assert.equal(await card.locator('.tile-rarity-code').innerText(), rarity.code);
+      assert.equal(await page.locator('.tile-rarity-code').count(), 0, 'binder tile art has no corner rarity tags');
+      assert.equal((await card.locator('.binder-rarity').innerText()).trim(), rarity.label);
+      assert.equal(await card.locator('.tile-rarity-frame').count(), 1, 'binder keeps its rarity glow');
       await card.locator('.binder-inspect-button').click();
       await page.locator('.tile-inspector[open]').waitFor();
-      assert.equal(await page.locator('.tile-inspector .tile-rarity-code').innerText(), rarity.code);
+      assert.equal(await page.locator('.tile-rarity-code').count(), 0, 'inspector art has no corner rarity tags');
+      assert.equal(await page.locator('.tile-inspector .tile-rarity-frame').count(), 1, 'inspector keeps its rarity glow');
       assert.match(await page.locator('.tile-inspector-meta').innerText(), new RegExp(rarity.label));
       await page.getByRole('button', { name: 'Close tile preview', exact: true }).click();
     }
@@ -106,7 +109,7 @@ const { pathToFileURL } = require('node:url');
     await page.waitForTimeout(500);
     await page.screenshot({ path: path.join(output, `binder-${browserName}-granite-390x844.png`) });
     assert.deepEqual(errors, []);
-    console.log(`PASS binder: 320 launch images decode, five tiers and corner codes, all launch themes/editions, duplicate counts persist, four responsive sizes, accessible close/focus; no errors (${browserName})`);
+    console.log(`PASS binder: 320 launch images decode, five named tiers with glows and no corner tags, all launch themes/editions, duplicate counts persist, four responsive sizes, accessible close/focus; no errors (${browserName})`);
   } catch (error) {
     await page.screenshot({ path: path.join(output, `binder-${browserName}-failure.png`), fullPage: true }).catch(() => {});
     console.error('Browser errors:', errors); throw error;

@@ -56,7 +56,7 @@
 .tile-inspector-header small { display: block; padding-top: 2px; font-size: 11px; font-weight: 600; color: #775535; }
 .tile-inspector-close { display: grid; place-items: center; flex: 0 0 44px; width: 44px; height: 44px; padding: 0; border: 2px solid #e1ac57; border-radius: 50%; background: linear-gradient(#bc4b24, #9c2c13); color: #fff0bd; box-shadow: 0 2px 0 #7f3c1b; }
 .tile-inspector-art { display: grid; place-items: center; height: clamp(180px, 29vh, 250px); height: clamp(180px, calc(var(--viewport-height, 100dvh) * .29), 250px); margin: 14px 0 15px; border-radius: 15px; background: radial-gradient(ellipse, var(--rarity-tint) 10%, #f2d5a354 72%); }
-.tile-inspector-tile { --rarity-code-size: 16px; display: block; position: relative; height: calc(100% - 18px); aspect-ratio: 3/4; max-width: 88%; min-height: 0; border-radius: 7px; filter: drop-shadow(0 6px 4px #643b293b); }
+.tile-inspector-tile { display: block; position: relative; height: calc(100% - 18px); aspect-ratio: 3/4; max-width: 88%; min-height: 0; border-radius: 7px; filter: drop-shadow(0 6px 4px #643b293b); }
 .tile-inspector-tile > img { display: block; width: 100%; height: 100%; object-fit: contain; }
 .tile-inspector h3 { margin: 0; font-size: 22px; line-height: 1.25; font-weight: 800; overflow-wrap: anywhere; }
 .tile-inspector-description { margin: 10px 0 17px; font-size: 14px; line-height: 1.65; color: #694329; }

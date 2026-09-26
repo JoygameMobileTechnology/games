@@ -1,4 +1,2 @@
 .tile-rarity-frame { position: absolute; inset: 1px; border: 0; border-radius: inherit; pointer-events: none; }
 .tile-rarity-frame::before { content: ''; position: absolute; inset: 0; border-radius: inherit; box-shadow: 0 0 10px 1px var(--rarity-color), inset 0 0 7px -2px var(--rarity-color); opacity: .6; }
-.tile-rarity-code { position: absolute; left: 3%; bottom: 3%; min-width: 1.45em; padding: .1em .22em; border-radius: 2px; background: var(--rarity-tint); color: var(--rarity-ink); font: 800 var(--rarity-code-size, 10px)/1.1 Manrope, sans-serif; text-align: center; letter-spacing: .01em; box-shadow: 0 0 0 1px #ffffff80; }
-.game-tile, .flying-tile { --rarity-code-size: clamp(9px, 1.9vw, 12px); }

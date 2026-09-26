@@ -1,4 +1,4 @@
-/* Launch catalogue, cosmetic rarity badges and testing booster budget.
+/* Launch catalogue, cosmetic rarity glows and testing booster budget.
  * GAME_URL=http://localhost:5173 PLAYWRIGHT_MODULE=/path/to/playwright node tests/launch-rarity-check.cjs [--webkit]
  * Fixtures use public game/save modules; interactions use the rendered UI.
  */
@@ -63,19 +63,20 @@ const browserName = process.argv.includes('--webkit') ? 'webkit' : 'chromium';
       const root = document.querySelector(scope);
       const bounds = node => node.getBoundingClientRect().toJSON();
       return { viewport: { width: innerWidth, height: innerHeight }, documentWidth: document.documentElement.scrollWidth,
-        root: bounds(root), codes: [...root.querySelectorAll('.tile-rarity-code')].map(code => ({
-          text: code.textContent, code: bounds(code), frame: bounds(code.parentElement),
-          borders: ['Top', 'Right', 'Bottom', 'Left'].map(side => getComputedStyle(code.parentElement)[`border${side}Width`]),
-          glow: getComputedStyle(code.parentElement, '::before').boxShadow,
+        root: bounds(root), codeCount: document.querySelectorAll('.tile-rarity-code').length,
+        overlays: [...root.querySelectorAll('.tile-rarity-frame')].map(frame => ({
+          frame: bounds(frame), tile: bounds(frame.parentElement),
+          borders: ['Top', 'Right', 'Bottom', 'Left'].map(side => getComputedStyle(frame)[`border${side}Width`]),
+          glow: getComputedStyle(frame, '::before').boxShadow,
         })) };
     }, scope);
+    assert.equal(result.codeCount, 0, `${label}: no corner rarity tags are rendered anywhere`);
     assert.ok(result.documentWidth <= result.viewport.width, `${label}: no horizontal page overflow`);
     assert.ok(result.root.left >= -1 && result.root.right <= result.viewport.width + 1, `${label}: panel stays within viewport`);
-    for (const { text, code, frame, borders, glow } of result.codes) {
-      assert.ok(borders.every(value => parseFloat(value) === 0), `${label}: ${text} has no physical rarity border`);
-      assert.notEqual(glow, 'none', `${label}: ${text} has a soft rarity glow`);
-      assert.ok(code.left >= frame.left - 1 && code.right <= frame.right + 1 && code.top >= frame.top - 1 && code.bottom <= frame.bottom + 1, `${label}: ${text} stays inside its tile frame`);
-      assert.ok(code.left < frame.left + frame.width / 2 && code.bottom > frame.top + frame.height / 2, `${label}: ${text} is in the bottom-left corner`);
+    for (const { frame, tile, borders, glow } of result.overlays) {
+      assert.ok(borders.every(value => parseFloat(value) === 0), `${label}: tile has no physical rarity border`);
+      assert.notEqual(glow, 'none', `${label}: tile has a soft rarity glow`);
+      assert.ok(frame.left >= tile.left - 1 && frame.right <= tile.right + 1 && frame.top >= tile.top - 1 && frame.bottom <= tile.bottom + 1, `${label}: glow overlay stays aligned with its tile`);
     }
     layouts.push({ label, ...result });
     return result;
@@ -92,13 +93,13 @@ const browserName = process.argv.includes('--webkit') ? 'webkit' : 'chromium';
     return locator.evaluateAll(nodes => nodes.map(node => {
       const frame = node.querySelector('.tile-rarity-frame');
       const glow = frame && getComputedStyle(frame, '::before');
-      return { tier: node.dataset.rarity, code: node.querySelector('.tile-rarity-code')?.textContent,
+      return { tier: node.dataset.rarity, codeCount: node.querySelectorAll('.tile-rarity-code').length,
         borders: frame && ['Top', 'Right', 'Bottom', 'Left'].map(side => getComputedStyle(frame)[`border${side}Width`]),
         shadow: glow?.boxShadow, opacity: Number(glow?.opacity), animation: glow?.animationName };
     }));
   }
   function checkGlow(tile, rarity, context) {
-    assert.equal(tile.code, rarity.code, `${context}: ${rarity.label} keeps its corner code`);
+    assert.equal(tile.codeCount, 0, `${context}: ${rarity.label} has no corner tag`);
     assert.ok(tile.borders.every(value => parseFloat(value) === 0), `${context}: ${rarity.label} has no rarity border`);
     assert.ok(shadowHasColor(tile.shadow, rarity.color), `${context}: ${rarity.label} glow uses its configured color (${tile.shadow})`);
     assert.ok(tile.opacity > 0, `${context}: ${rarity.label} glow remains visible`);
@@ -131,7 +132,8 @@ const browserName = process.argv.includes('--webkit') ? 'webkit' : 'chromium';
         for (const rarity of RARITIES) {
           await page.getByRole('group', { name: 'Rarity filter' }).getByRole('button', { name: rarity.label, exact: true }).click();
           assert.equal(await page.locator('.binder-card').count(), expectedCounts[rarity.id]);
-          assert.deepEqual([...new Set(await page.locator('.binder-card .tile-rarity-code').allTextContents())], [rarity.code]);
+          assert.equal(await page.locator('.tile-rarity-code').count(), 0);
+          assert.deepEqual([...new Set((await page.locator('.binder-rarity').allTextContents()).map(value => value.trim()))], [rarity.label], 'binder keeps its readable tier names');
         }
       }
     }
@@ -150,12 +152,13 @@ const browserName = process.argv.includes('--webkit') ? 'webkit' : 'chromium';
       await page.screenshot({ path: path.join(output, `binder-${browserName}-${width}x${height}.png`) });
       await page.locator('.binder-inspect-button').first().click(); await page.locator('.tile-inspector:modal').waitFor();
       await geometry('.tile-inspector', `inspector ${width}x${height}`);
-      assert.equal(await page.locator('.tile-inspector .tile-rarity-code').count(), 1);
+      assert.equal(await page.locator('.tile-rarity-code').count(), 0);
+      assert.match(await page.locator('.tile-inspector-meta').innerText(), /Celestial/, 'inspector retains its tier name');
       await page.screenshot({ path: path.join(output, `inspector-${browserName}-${width}x${height}.png`) });
       await button('Close tile preview').click();
     }
     assert.deepEqual(await storedCollection(), collection, 'all hidden collection data survives binder browsing');
-    report('binder shows 320 launch faces, every rarity/filter/code and readable phone/tablet previews; hidden collection remains intact');
+    report('binder shows 320 launch faces, every rarity/filter and readable phone/tablet previews; hidden collection remains intact');
 
     await page.setViewportSize({ width: 390, height: 844 });
     await startSaved(savedGame('dancheong', 'brass-meridian'));
@@ -168,10 +171,11 @@ const browserName = process.argv.includes('--webkit') ? 'webkit' : 'chromium';
     await page.waitForFunction(() => JSON.parse(localStorage.getItem('porcelain:session'))?.boosters?.eagle === 20);
     assert.deepEqual((await session()).boosters, { shuffle: 20, hint: 20, freeze: 20, eagle: 20 });
     for (const name of ['Shuffle', 'Hint', 'Freeze', 'Eagle Eye']) assert.ok(await button(`${name}, 20 uses left`).isEnabled());
-    assert.equal(await page.locator('.game-board .tile-rarity-code').count(), 0);
+    assert.equal(await page.locator('.tile-rarity-code').count(), 0);
+    assert.equal(await page.locator('.game-board .tile-rarity-frame').count(), 0);
     assert.equal(await page.locator('.game-tile[data-rarity-visible="true"]').count(), 0);
     assert.doesNotMatch((await page.locator('.game-tile').evaluateAll(nodes => nodes.map(node => node.getAttribute('aria-label')))).join(' '), /Bamboo|Granite|Amethyst|Gold|Celestial/);
-    report('fresh duels have 20 of each booster and face-down tiles reveal no rarity badges or accessible rarity names');
+    report('fresh duels have 20 of each booster and face-down tiles reveal no rarity glows or accessible rarity names');
 
     let allRarities;
     for (let seed = 1; seed <= 200; seed += 1) {
@@ -183,10 +187,11 @@ const browserName = process.argv.includes('--webkit') ? 'webkit' : 'chromium';
     const exposed = allRarities.tiles.find(tile => engine.isFree(tile, allRarities.tiles));
     const stone = page.locator(`.game-tile[data-tile-id="${exposed.id}"]`);
     await stone.click(); await page.waitForFunction(() => document.querySelectorAll('.game-tile[data-face-up="true"]').length === 1);
-    assert.equal(await stone.locator('.tile-rarity-code').innerText(), rarityForTile(allRarities.theme, allRarities.ruleset, exposed.faceId).code);
-    assert.equal(await page.locator('.game-tile[data-face-up="false"] .tile-rarity-code').count(), 0);
+    assert.equal(await page.locator('.tile-rarity-code').count(), 0);
+    checkGlow((await rarityEffects(stone))[0], rarityForTile(allRarities.theme, allRarities.ruleset, exposed.faceId), 'Revealed tile');
+    assert.equal(await page.locator('.game-tile[data-face-up="false"] .tile-rarity-frame').count(), 0);
     await button('Eagle Eye, 20 uses left').click();
-    await page.waitForFunction(() => document.querySelectorAll('.game-board .tile-rarity-code').length === 80);
+    await page.waitForFunction(() => document.querySelectorAll('.game-board .tile-rarity-frame').length === 80);
     assert.equal((await session()).boosters.eagle, 19);
     const lit = await rarityEffects(page.locator('.game-tile'));
     for (const rarity of RARITIES) {
@@ -198,16 +203,17 @@ const browserName = process.argv.includes('--webkit') ? 'webkit' : 'chromium';
     for (const [width, height] of [[320, 568], [390, 844], [768, 1024]]) {
       await page.setViewportSize({ width, height }); await page.waitForTimeout(150);
       const layout = await geometry('.game-board', `board ${width}x${height}`);
-      assert.equal(layout.codes.length, 80);
+      assert.equal(layout.overlays.length, 80);
       assert.ok(layout.root.top >= 0 && layout.root.bottom <= height, 'the complete board fits the viewport');
       await page.screenshot({ path: path.join(output, `board-${browserName}-${width}x${height}.png`) });
     }
     await page.waitForFunction(() => JSON.parse(localStorage.getItem('porcelain:session'))?.eagleMs === 0, undefined, { timeout: 12000 });
-    assert.equal(await page.locator('.game-tile[data-face-up="false"] .tile-rarity-code').count(), 0);
-    assert.equal(await page.locator('.game-board .tile-rarity-code').count(), 1, 'only the manually revealed face retains its code');
+    assert.equal(await page.locator('.game-tile[data-face-up="false"] .tile-rarity-frame').count(), 0);
+    assert.equal(await page.locator('.tile-rarity-code').count(), 0);
+    assert.equal(await page.locator('.game-board .tile-rarity-frame').count(), 1, 'only the manually revealed face retains its glow');
     assert.equal(await page.locator('.game-tile.eagle-lit').count(), 0);
     assert.equal((await session()).boosters.eagle, 19);
-    report('all five glows keep bottom-left codes without physical borders; Eagle Eye exposes hidden rarity then conceals it again');
+    report('all five tiers glow without corner tags or physical borders; Eagle Eye exposes hidden rarity then conceals it again');
 
     await page.setViewportSize({ width: 390, height: 844 });
     await page.emulateMedia({ reducedMotion: 'reduce' });
@@ -219,6 +225,7 @@ const browserName = process.argv.includes('--webkit') ? 'webkit' : 'chromium';
       await page.waitForFunction(id => document.querySelector(`[data-tile-id="${id}"]`)?.dataset.faceUp === 'true', exposed.id);
       const effects = await rarityEffects(tile);
       checkGlow(effects[0], rarity, 'Reduced-motion face-up tile');
+      assert.equal(await page.locator('.tile-rarity-code').count(), 0);
       assert.equal(effects[0].animation, 'none', `${rarity.label} glow becomes static with reduced motion`);
       assert.equal(await page.locator('.game-tile[data-face-up="false"] .tile-rarity-frame').count(), 0, 'hidden tiles have no glow overlay');
       await page.screenshot({ path: path.join(output, `face-up-${rarity.id}-${browserName}.png`) });
