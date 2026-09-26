@@ -27,7 +27,7 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
   page.on('pageerror', error => errors.push(error.message));
   page.on('response', response => { if (response.status() >= 400 && response.url().startsWith(origin)) errors.push(`${response.status()} ${response.url()}`); });
   const button = name => page.getByRole('button', { name, exact: typeof name === 'string' });
-  const booster = name => button(new RegExp(`^${name}, \\d uses left$`));
+  const booster = name => button(new RegExp(`^${name}, \\d+ uses left$`));
   const stone = id => page.locator(`.game-board [data-tile-id="${id}"]`);
   const stored = key => page.evaluate(key => JSON.parse(localStorage.getItem(`porcelain:${key}`)), key);
   const session = () => stored('session');
@@ -51,7 +51,7 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
       ...createDuelState(), elapsed: 12, hints: 0, shuffles: 0, flips: 0,
       score: Math.floor(cleared / 2) * 100, aiScore: Math.ceil(cleared / 2) * 100,
       aiMemory: {}, ghostMemoryVersion: GHOST_MEMORY_VERSION, duelView: { revealed: [], pending: null },
-      boosters: { shuffle: 3, hint: 3, freeze: 3, eagle: 3 }, freezeReady: false, hintEffect: null, eagleMs: 0, ...extra };
+      boosters: { shuffle: 20, hint: 20, freeze: 20, eagle: 20 }, freezeReady: false, hintEffect: null, eagleMs: 0, ...extra };
   }
   async function waitState(predicate, label, timeout = 12000) {
     const deadline = Date.now() + timeout;
@@ -111,14 +111,14 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
     assert.equal(await page.locator('.game-clock').count(), 0);
     assert.equal(await button('Rules').count(), 0);
     assert.equal(await page.locator('.game-tools button').count(), 4);
-    assert.deepEqual(state.boosters, { shuffle: 3, hint: 3, freeze: 3, eagle: 3 });
+    assert.deepEqual(state.boosters, { shuffle: 20, hint: 20, freeze: 20, eagle: 20 });
     for (const name of ['Shuffle', 'Hint', 'Freeze', 'Eagle Eye']) assert.equal(await booster(name).isEnabled(), true);
-    report('fresh 80-tile face-down duel, one pause control and four three-use boosters');
+    report('fresh 80-tile face-down duel, one pause control and four twenty-use boosters');
 
     const beforeMemory = state.aiMemory;
     await booster('Hint').click();
     state = await waitState(value => value.hintEffect, 'hint starts');
-    assert.equal(state.boosters.hint, 2);
+    assert.equal(state.boosters.hint, 19);
     const hinted = state.hintEffect.ids;
     assert.equal(hinted.length, 2);
     assert.ok(engine.canMatch(...hinted.map(id => state.tiles.find(tile => tile.id === id))));
@@ -134,7 +134,7 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
     await booster('Eagle Eye').click();
     state = await waitState(value => value.eagleMs > 0, 'Eagle Eye starts');
-    assert.equal(state.boosters.eagle, 2);
+    assert.equal(state.boosters.eagle, 19);
     assert.equal(await page.locator('.game-tile.eagle-lit[data-face-up="false"]').count(), 80, 'covered stones also get rarity glow');
     assert.equal(await page.locator('.game-tile[data-rarity-visible="true"]').count(), 80);
     assert.deepEqual(state.aiMemory, beforeMemory);
@@ -156,7 +156,7 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
     const shortDeal = smallDeal();
     const shortStart = await fixture(shortDeal, {
       eagleMs: 200, hintEffect: { ids: shortDeal.pairs[0], remainingMs: 200 },
-      boosters: { shuffle: 3, hint: 2, freeze: 3, eagle: 2 },
+      boosters: { shuffle: 20, hint: 19, freeze: 20, eagle: 19 },
     }, () => page.evaluate(() => {
       // Capture the actual mount, before browser-protocol polling can consume a
       // 200 ms effect. The old ungated clock expires during the menu exit here.
@@ -192,11 +192,11 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
     const game = smallDeal();
     await fixture(game);
     await booster('Freeze').click(); state = await waitState(value => value.freezeReady, 'Freeze queued');
-    assert.equal(state.boosters.freeze, 2); assert.equal(await booster('Freeze').isDisabled(), true);
+    assert.equal(state.boosters.freeze, 19); assert.equal(await booster('Freeze').isDisabled(), true);
     state = await attempt(game.pairs[0], 1);
-    assert.equal(state.turn, 'you'); assert.equal(state.freezeReady, true); assert.equal(state.boosters.freeze, 2);
+    assert.equal(state.turn, 'you'); assert.equal(state.freezeReady, true); assert.equal(state.boosters.freeze, 19);
     state = await attempt([game.pairs[1][0], game.pairs[2][0]], 2);
-    assert.equal(state.turn, 'you'); assert.equal(state.freezeReady, false); assert.equal(state.boosters.freeze, 2);
+    assert.equal(state.turn, 'you'); assert.equal(state.freezeReady, false); assert.equal(state.boosters.freeze, 19);
     assert.equal(await booster('Freeze').isEnabled(), true);
     state = await attempt([game.pairs[1][0], game.pairs[2][0]], 3);
     assert.equal(state.turn, 'ai');
@@ -220,7 +220,7 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
     state = await waitState(value => value.shuffles === 1, 'shuffle finishes');
     assert.equal(remaining(state), remaining(shuffleStart));
     assert.equal(state.score, shuffleStart.score); assert.equal(state.aiScore, shuffleStart.aiScore);
-    assert.equal(state.boosters.shuffle, 2); assert.deepEqual(state.aiMemory, {});
+    assert.equal(state.boosters.shuffle, 19); assert.deepEqual(state.aiMemory, {});
     assert.deepEqual(state.tiles.map(tile => [tile.id, tile.matchKey, tile.removed]), shuffleStart.tiles.map(tile => [tile.id, tile.matchKey, tile.removed]));
     report('Shuffle spends one charge while preserving inventory and scores and clearing ghost memory');
 
@@ -249,7 +249,7 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
         assert.equal(await page.locator('.binder-card').count(), 40);
         for (const rarity of RARITIES) {
           await page.getByRole('group', { name: 'Rarity filter' }).getByRole('button', { name: rarity.label, exact: true }).click();
-          assert.equal(await page.locator('.binder-card').count(), { common: 22, rare: 10, epic: 6, legendary: 2 }[rarity.id]);
+          assert.equal(await page.locator('.binder-card').count(), { bamboo: 22, granite: 10, amethyst: 5, gold: 2, celestial: 1 }[rarity.id]);
           assert.equal(await page.locator(`.binder-card:not([data-rarity="${rarity.id}"])`).count(), 0);
         }
       }
@@ -259,7 +259,7 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
     assert.notEqual(await page.getByLabel('Collection theme', { exact: true }).inputValue(), lastTheme);
     await button('Previous collection theme').click();
     assert.equal(await page.getByLabel('Collection theme', { exact: true }).inputValue(), lastTheme);
-    report('human matches award once across reload; binder filters all nine themes and both editions');
+    report('human matches award once across reload; binder filters every launch theme and both editions');
 
     for (const ruleset of ['eastern', 'western']) {
       const finalGame = smallDeal(ruleset, 2);

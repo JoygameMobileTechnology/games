@@ -23,7 +23,7 @@
 .binder-card figcaption > span { font-size: 10px; line-height: 1.35; }
 .binder-grid { min-height: 150px; }
 .binder-art { max-height: 145px; }
-.binder-art > img { object-fit: contain; }
+.binder-art img { object-fit: contain; }
 
 .remake .result-overlay {
   --result-top-space: max(18px, calc(env(safe-area-inset-top, 0px) + 8px));
@@ -50,6 +50,8 @@
   .binder-summary strong, .binder-summary .binder-match-total strong { font-size: 20px; }
   .binder-book { width: 36px; height: 36px; }
   .binder-tiers > button { font-size: 10px; padding-inline: 5px; }
+  .binder-tiers { display: none; }
+  .binder-compact-rarity { display: flex; flex: 0 0 auto; }
   .binder-art { max-height: 100px; }
   .binder-card { padding: 4px 4px 7px; }
   .binder-card figcaption { padding-top: 5px; }
@@ -102,5 +104,5 @@
 @media (max-width: 350px) {
   .binder-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .binder-art { height: 77px; aspect-ratio: auto; }
-  .binder-art > img { box-shadow: none; }
+  .binder-art img { box-shadow: none; }
 }

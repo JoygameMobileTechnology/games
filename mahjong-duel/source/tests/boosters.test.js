@@ -8,18 +8,26 @@ import { boardMetrics, tilePosition } from '../src/table-layout.js';
 const tile = (id, matchKey, x, z = 0) => ({ id, matchKey, x, y: 0, z, removed: false });
 const game = () => restoreBoosters({ mode: 'duel', ...createDuelState(), tiles: [tile('a', 'A', 0), tile('b', 'A', 1), tile('c', 'C', 2), tile('d', 'C', 3)], aiMemory: {} });
 
-test('each of the four boosters starts with three uses, is player-only and cannot overspend', () => {
+test('each of the four boosters starts with twenty uses, is player-only and cannot overspend', () => {
   const first = game();
-  assert.deepEqual(first.boosters, { shuffle: 3, hint: 3, freeze: 3, eagle: 3 });
+  assert.deepEqual(first.boosters, { shuffle: 20, hint: 20, freeze: 20, eagle: 20 });
   for (const id of Object.keys(first.boosters)) {
-    assert.equal(useBooster({ ...first, turn: 'ai' }, id).boosters[id], 3);
+    assert.equal(useBooster({ ...first, turn: 'ai' }, id).boosters[id], 20);
     const used = useBooster(first, id);
-    assert.equal(used.boosters[id], 2);
-    assert.equal(first.boosters[id], 3);
+    assert.equal(used.boosters[id], 19);
+    assert.equal(first.boosters[id], 20);
     const empty = { ...first, boosters: { ...first.boosters, [id]: 0 } };
     assert.equal(canUseBooster(empty, id), false);
     assert.strictEqual(useBooster(empty, id), empty);
   }
+});
+
+test('restoring booster charges preserves spent uses and clamps invalid saved counts', () => {
+  const first = game();
+  assert.deepEqual(restoreBoosters({ ...first, boosters: { shuffle: 0, hint: 2, freeze: 3, eagle: 19 } }).boosters,
+    { shuffle: 0, hint: 2, freeze: 3, eagle: 19 }, 'existing games do not refill on reload');
+  assert.deepEqual(restoreBoosters({ ...first, boosters: { shuffle: -1, hint: 21, freeze: 2.5 } }).boosters,
+    { shuffle: 0, hint: 20, freeze: 20, eagle: 20 });
 });
 
 test('Hint picks a legal exact pair without revealing faces or changing ghost memory and expires at 1.5s', () => {
@@ -41,7 +49,7 @@ test('Eagle Eye lasts ten seconds without teaching identities, cannot stack and 
   assert.equal(lit.eagleMs, 10000); assert.strictEqual(lit.aiMemory, first.aiMemory);
   assert.strictEqual(useBooster(lit, 'eagle'), lit);
   const saved = restoreBoosters(JSON.parse(JSON.stringify(advanceBoosterEffects(lit, 4300))));
-  assert.equal(saved.eagleMs, 5700); assert.equal(saved.boosters.eagle, 2);
+  assert.equal(saved.eagleMs, 5700); assert.equal(saved.boosters.eagle, 19);
   assert.equal(advanceBoosterEffects(saved, 5700).eagleMs, 0);
 });
 

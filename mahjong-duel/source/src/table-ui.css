@@ -22,6 +22,7 @@
 .remake .board-space { margin: 3px 0 6px; flex: 1 1 0; min-height: 0; width: 100%; container-type: size; }
 .remake .board-frame { width: min(100cqw, calc(100cqh * var(--board-ratio))); height: auto; aspect-ratio: var(--board-ratio); max-height: 100%; padding: 0; top: 0; flex: 0 0 auto; }
 .remake .game-tile { border-radius: clamp(5px, 1.5vw, 9px); min-width: 0; }
+.remake .game-tile.tile-selected:not(:focus-visible) { outline: none; }
 .remake .tile-rotator { transition-duration: 160ms; }
 /* Switch visible faces at the midpoint of the faster eased rotation. */
 .remake .tile-side { transition-delay: 23ms; }
@@ -36,12 +37,10 @@
 .remake .game-tools > button.booster-active { opacity: 1; }
 .remake .booster-active .tool-medallion { border-color: #b0e8ef; box-shadow: inset 0 0 12px #66ccec4d, 0 0 12px #85e7f457; color: #c0f7fa; }
 .remake .toast { bottom: 92px; font-size: 11px; padding: 9px 15px; pointer-events: none; }
-.rarity-aura { pointer-events: none; position: absolute; inset: -1px; border: 2px solid var(--rarity-color); border-radius: inherit; opacity: 0; box-shadow: inset 0 0 9px var(--rarity-color), 0 0 11px var(--rarity-color); }
-.rarity-gem { position: absolute; right: 6px; top: 6px; width: 6px; height: 6px; rotate: 45deg; background: var(--rarity-color); border: 1px solid #ffffffc7; box-shadow: 0 0 4px var(--rarity-color); pointer-events: none; }
-.game-tile[data-face-up=true]:not([data-rarity=common]) .rarity-aura { animation: rarity-shine 8s var(--shine-delay) infinite ease-in-out; }
-.game-tile.eagle-lit .rarity-aura { animation: eagle-pulse 1.7s infinite ease-in-out; opacity: .85; }
+.game-tile[data-face-up=true] .tile-rarity-frame::before { animation: rarity-shine 4s var(--shine-delay) infinite ease-in-out; }
+.game-tile.eagle-lit .tile-rarity-frame::before { animation: eagle-pulse 1.7s infinite ease-in-out; }
 .remake .game-tile.hinted { outline: 3px solid #f9ec97; outline-offset: 2px !important; animation: pair-hint .5s infinite ease-in-out; }
-@keyframes rarity-shine { 0%, 70%, 100% { opacity: 0; } 79% { opacity: .8; } 89% { opacity: .15; } }
+@keyframes rarity-shine { 0%, 100% { opacity: .45; } 50% { opacity: .8; } }
 @keyframes eagle-pulse { 0%, 100% { opacity: .5; } 50% { opacity: .95; } }
 @keyframes pair-hint { 0%, 100% { filter: brightness(1); box-shadow: 0 0 5px 2px #ffe77788; } 50% { filter: brightness(1.2); box-shadow: 0 0 17px 5px #ffe777c7; } }
 .home-links { display: grid; grid-template-columns: 1.2fr 1fr; gap: 10px; }
@@ -97,9 +96,8 @@
   .remake .toast { bottom: 16px; right: 24px; left: auto; transform: none; max-width: 280px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .game-tile .rarity-aura { animation: none !important; }.game-tile.eagle-lit .rarity-aura { opacity: .8; }
+  .game-tile .tile-rarity-frame::before { animation: none !important; }
   .remake .game-tile.hinted { animation: none; }.duel-progress-track > span { transition: none; }
 }
-.gentle-motion .game-tile .rarity-aura, .gentle-motion .game-tile.hinted { animation: none !important; }
-.gentle-motion .game-tile.eagle-lit .rarity-aura { opacity: .8; }
-.game-screen[inert] .rarity-aura, .game-screen[inert] .game-tile.hinted { animation-play-state: paused; }
+.gentle-motion .game-tile .tile-rarity-frame::before, .gentle-motion .game-tile.hinted { animation: none !important; }
+.game-screen[inert] .tile-rarity-frame::before, .game-screen[inert] .game-tile.hinted { animation-play-state: paused; }

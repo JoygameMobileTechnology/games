@@ -18,7 +18,7 @@ test('only a successful player award adds one matched pair, without mutating the
   assert.notStrictEqual(next, previous);
   assert.equal(collectionCount(next, key), 1);
   assert.deepEqual(previous, createCollection());
-  assert.deepEqual(collectionStats(next), { unique: 1, totalMatches: 1, totalTiles: 720 });
+  assert.deepEqual(collectionStats(next), { unique: 1, totalMatches: 1, totalTiles: 320 });
   assert.strictEqual(awardCollectedPair(next, award({ actor: 'ai', pairId: ['tile-3', 'tile-4'] })), next);
 });
 
@@ -30,7 +30,7 @@ test('duplicate matches increase pair counts, but replaying a physical pair is i
   value = awardCollectedPair(value, award({ pairId: ['tile-3', 'tile-4'] }));
   value = awardCollectedPair(value, award({ gameId: 'round-2' }));
   assert.equal(collectionCount(value, key), 3);
-  assert.deepEqual(collectionStats(value), { unique: 1, totalMatches: 3, totalTiles: 720 });
+  assert.deepEqual(collectionStats(value), { unique: 1, totalMatches: 3, totalTiles: 320 });
 });
 
 test('persistence keeps the replay receipt and count atomic through reloads', () => {
@@ -47,13 +47,13 @@ test('persistence keeps the replay receipt and count atomic through reloads', ()
 
 test('theme and ruleset identities remain distinct even when local IDs are alike', () => {
   let value = createCollection();
-  for (const [index, matchKey] of [key, 'guo-xi:eastern:K01', 'ming-porcelain:western:W01'].entries()) {
+  for (const [index, matchKey] of [key, 'dancheong:eastern:K01', 'ming-porcelain:western:W01'].entries()) {
     value = awardCollectedPair(value, award({ gameId: `round-${index}`, matchKey }));
   }
-  assert.deepEqual(collectionStats(value), { unique: 3, totalMatches: 3, totalTiles: 720 });
+  assert.deepEqual(collectionStats(value), { unique: 3, totalMatches: 3, totalTiles: 320 });
   assert.deepEqual(collectionStats(value, { themeId: 'ming-porcelain', ruleset: 'eastern' }), { unique: 1, totalMatches: 1, totalTiles: 40 });
   assert.deepEqual(collectionStats(value, { themeId: 'ming-porcelain' }), { unique: 2, totalMatches: 2, totalTiles: 80 });
-  assert.deepEqual(collectionStats(value, { ruleset: 'western' }), { unique: 1, totalMatches: 1, totalTiles: 360 });
+  assert.deepEqual(collectionStats(value, { ruleset: 'western' }), { unique: 1, totalMatches: 1, totalTiles: 160 });
 });
 
 test('invalid awards, unknown faces, empty identities and missing actors are exact no-ops', () => {
@@ -81,4 +81,17 @@ test('malformed storage is recoverable and invalid inventory is not admitted', (
   const blocked = { getItem() { throw new Error('unavailable'); }, setItem() { throw new Error('full'); } };
   assert.deepEqual(loadCollection(blocked), createCollection());
   assert.equal(saveCollection(createCollection(), blocked), false);
+});
+
+
+test('later-theme progress survives reload while launch binder totals hide it', () => {
+  const laterKey = 'neon-shrine:western:W01';
+  const value = awardCollectedPair(createCollection(), award({ matchKey: laterKey }));
+  const target = storage();
+  assert.equal(saveCollection(value, target), true);
+  const restored = loadCollection(target);
+  assert.equal(collectionCount(restored, laterKey), 1);
+  assert.deepEqual(collectionStats(restored), { unique: 0, totalMatches: 0, totalTiles: 320 });
+  assert.deepEqual(collectionStats(restored, { themeId: 'neon-shrine' }), { unique: 0, totalMatches: 0, totalTiles: 0 });
+  assert.deepEqual(restored, value);
 });

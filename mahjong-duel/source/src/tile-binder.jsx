@@ -5,6 +5,7 @@ import { themeTileSets } from './tile-data.js';
 import { RARITIES, rarityForTile } from './rarity.js';
 import { collectionCount, collectionStats } from './collection.js';
 import { tileDescription } from './tile-descriptions.js';
+import { TileRarity } from './tile-rarity.jsx';
 import './tile-binder.css';
 
 function TileInspector({ tile, theme, ruleset, opener, onClose }) {
@@ -26,7 +27,7 @@ function TileInspector({ tile, theme, ruleset, opener, onClose }) {
       if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) onClose();
     }}>
     <header className="tile-inspector-header"><span>{theme.name}<small>{ruleset === 'eastern' ? 'Eastern' : 'Western'} collection</small></span><button type="button" className="tile-inspector-close" aria-label="Close tile preview" onClick={onClose} autoFocus><X size={23} weight="bold" /></button></header>
-    <div className="tile-inspector-art"><img src={tile.src} alt={tile.name} draggable="false" /></div>
+    <div className="tile-inspector-art"><span className="tile-inspector-tile"><img src={tile.src} alt={tile.name} draggable="false" /><TileRarity rarity={tile.rarity} /></span></div>
     <h3 id={`${id}-title`}>{tile.name}</h3>
     <p id={`${id}-description`} className="tile-inspector-description">{tileDescription(theme.id, ruleset, tile.id)}</p>
     <footer className="tile-inspector-meta"><span><Sparkle size={15} weight={tile.rarity.order ? 'fill' : 'regular'} aria-hidden="true" />{tile.rarity.label}</span><span>Matched ×{tile.count.toLocaleString()}</span></footer>
@@ -70,7 +71,7 @@ export function TileBinder({ collection, initialTheme = defaultTheme.id, initial
     <div className="binder-grid" ref={grid} role="region" aria-label={`${theme.name} ${ruleset} tiles`} tabIndex={0}>
       {visible.map(tile => <figure key={tile.matchKey} className={`binder-card ${tile.count ? 'is-collected' : 'is-locked'}`} data-match-key={tile.matchKey} data-rarity={tile.rarity.id} data-collected={Boolean(tile.count)} style={{ '--rarity-color': tile.rarity.color, '--rarity-ink': tile.rarity.ink, '--rarity-tint': tile.rarity.tint }}>
         <span className="binder-rarity"><Sparkle size={11} weight={tile.rarity.order ? 'fill' : 'regular'} aria-hidden="true" />{tile.rarity.label}</span>
-        <div className="binder-art"><img src={tile.src} alt={tile.name} loading="lazy" decoding="async" />{tile.count ? <CheckCircle className="binder-found" size={20} weight="fill" aria-label="Collected" /> : <span className="binder-lock" aria-hidden="true"><LockKey size={17} /></span>}</div>
+        <div className="binder-art"><span className="binder-art-tile"><img src={tile.src} alt={tile.name} loading="lazy" decoding="async" /><TileRarity rarity={tile.rarity} /></span>{tile.count ? <CheckCircle className="binder-found" size={20} weight="fill" aria-label="Collected" /> : <span className="binder-lock" aria-hidden="true"><LockKey size={17} /></span>}</div>
         <figcaption><strong>{tile.name}</strong><span>{tile.count ? `Matched ×${tile.count.toLocaleString()}` : 'Not found yet'}</span></figcaption>
         {tile.count > 0 && <button type="button" className="binder-inspect-button" aria-label={`Inspect ${tile.name}`} aria-haspopup="dialog" onClick={event => setInspectedTile({ tile, opener: event.currentTarget })}><MagnifyingGlassPlus className="binder-inspect-hint" size={22} weight="bold" aria-hidden="true" /></button>}
       </figure>)}

@@ -160,7 +160,7 @@ const { pathToFileURL } = require('node:url');
     fs.writeFileSync(path.join(output, `${browserName}-layouts.json`), JSON.stringify(layouts, null, 2));
     assert.equal(await page.evaluate(key => localStorage.getItem(key), COLLECTION_STORAGE_KEY), initialCollection, 'inspection never modifies collection or duplicate counts');
     assert.deepEqual(errors, [], 'no runtime or resource errors');
-    console.log(`PASS tile inspector: collected-only access; enlarged art, description and metadata across nine themes/two editions; Escape/backdrop/close, focus and scroll restoration; six responsive sizes; collection unchanged (${browserName})`);
+    console.log(`PASS tile inspector: collected-only access; enlarged art, description and metadata across ${themes.length} launch themes/two editions; Escape/backdrop/close, focus and scroll restoration; six responsive sizes; collection unchanged (${browserName})`);
   } catch (error) {
     await page.screenshot({ path: path.join(output, `${browserName}-failure.png`), fullPage: true }).catch(() => {});
     console.error('Browser errors:', errors);

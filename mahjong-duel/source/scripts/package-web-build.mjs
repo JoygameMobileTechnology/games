@@ -1,6 +1,10 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { themes } from '../src/themes.js';
+import { themeTileSets } from '../src/tile-data.js';
+import { boardVariants } from '../src/board-variants.js';
+import { boardArt } from '../src/board-art.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const dist = path.join(root, 'dist');
@@ -11,10 +15,32 @@ if (!script || !stylesheet) throw new Error('Expected one Vite JavaScript bundle
 const resolveAsset = value => path.join(dist, value.replace(/^\.\//, '').replace(/^\//, ''));
 let js = await fs.readFile(resolveAsset(script[1]), 'utf8');
 let css = await fs.readFile(resolveAsset(stylesheet[1]), 'utf8');
-const tilePaths = [...new Set(js.match(/\.\/assets\/(?:tiles|backs|boards)\/[A-Za-z0-9\/-]+\.webp/g) || [])];
-if (tilePaths.filter(source => source.includes('/tiles/')).length !== 720 || tilePaths.filter(source => source.includes('/backs/')).length !== 9 || tilePaths.filter(source => source.includes('/boards/')).length < 9) {
-  throw new Error('Expected 720 tile faces, nine backs and at least nine board images.');
+const launchFaces = themes.flatMap(theme => Object.values(themeTileSets[theme.id]).flat());
+const launchArtwork = new Set([
+  ...launchFaces.map(tile => tile.src),
+  ...themes.map(theme => theme.back),
+  ...themes.flatMap(theme => [boardArt[theme.id].src, ...Object.values(boardVariants[theme.id]).map(art => art.src)]),
+]);
+const allTilePaths = [...new Set(js.match(/\.\/assets\/(?:tiles|backs|boards)\/[A-Za-z0-9\/-]+\.webp/g) || [])];
+const tilePaths = allTilePaths.filter(source => launchArtwork.has(source));
+if (tilePaths.filter(source => source.includes('/tiles/')).length !== launchFaces.length || tilePaths.filter(source => source.includes('/backs/')).length !== themes.length || tilePaths.filter(source => source.includes('/boards/')).length < themes.length) {
+  throw new Error(`Expected ${launchFaces.length} launch tile faces, ${themes.length} backs and at least ${themes.length} board images.`);
 }
+// Keep catalogue metadata and old collection receipts, but do not ship later-theme art.
+// Vite copies public/ wholesale, so prune only the generated distribution, never source assets.
+for (const source of allTilePaths.filter(source => !launchArtwork.has(source))) js = js.split(source).join('');
+await fs.writeFile(resolveAsset(script[1]), js);
+const retainedPaths = new Set(tilePaths.map(resolveAsset));
+async function pruneArtwork(directory) {
+  for (const entry of await fs.readdir(directory, { withFileTypes: true })) {
+    const filename = path.join(directory, entry.name);
+    if (entry.isDirectory()) {
+      await pruneArtwork(filename);
+      if (!(await fs.readdir(filename)).length) await fs.rmdir(filename);
+    } else if (!retainedPaths.has(filename)) await fs.unlink(filename);
+  }
+}
+for (const directory of ['tiles', 'backs', 'boards']) await pruneArtwork(path.join(dist, 'assets', directory));
 for (const source of tilePaths) {
   const data = await fs.readFile(resolveAsset(source));
   js = js.split(source).join(`data:image/webp;base64,${data.toString('base64')}`);

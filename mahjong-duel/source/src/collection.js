@@ -1,4 +1,5 @@
 import { themeTileSets } from './tile-data.js';
+import { launchThemeIds } from './themes.js';
 
 export const COLLECTION_STORAGE_KEY = 'porcelain:collection';
 export const COLLECTION_VERSION = 1;
@@ -53,8 +54,10 @@ export function awardCollectedPair(collection, { gameId, pairId, matchKey, actor
 }
 
 export function collectionStats(collection, { themeId, ruleset } = {}) {
-  const tiles = themeId ? Object.entries(themeTileSets[themeId] ?? {}).filter(([rule]) => !ruleset || rule === ruleset).flatMap(([, faces]) => faces)
-    : Object.values(themeTileSets).flatMap(sets => Object.entries(sets).filter(([rule]) => !ruleset || rule === ruleset).flatMap(([, faces]) => faces));
+  // Preserve every saved collection, but only count artwork available in this release.
+  const visibleThemes = themeId ? launchThemeIds.filter(id => id === themeId) : launchThemeIds;
+  const tiles = visibleThemes.flatMap(id => Object.entries(themeTileSets[id] ?? {})
+    .filter(([rule]) => !ruleset || rule === ruleset).flatMap(([, faces]) => faces));
   return tiles.reduce((stats, tile) => {
     const count = collectionCount(collection, tile.matchKey);
     stats.unique += Number(count > 0); stats.totalMatches += count;

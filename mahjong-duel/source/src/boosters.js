@@ -1,6 +1,6 @@
 import { getAvailablePairs } from './engine.js';
 
-export const BOOSTER_USES = 3;
+export const BOOSTER_USES = 20;
 export const HINT_MS = 1500;
 export const EAGLE_MS = 10000;
 export const BOOSTER_IDS = ['shuffle', 'hint', 'freeze', 'eagle'];

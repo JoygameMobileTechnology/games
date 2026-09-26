@@ -26,6 +26,7 @@ import { restoreBoosters, canUseBooster, useBooster, advanceBoosterEffects } fro
 import { boardMetrics, tilePosition } from './table-layout.js';
 import { chooseFormationId } from './formations.js';
 import { rarityForTile } from './rarity.js';
+import { TileRarity } from './tile-rarity.jsx';
 import { loadCollection, saveCollection, awardCollectedPair } from './collection.js';
 import { createGameId } from './game-id.js';
 import { useViewportCompatibility } from './viewport-compat.js';
@@ -61,7 +62,7 @@ function TileArt({ face, badge = true }) {
 }
 function IconButton({ label, children, ...props }) { return <button className="icon-button" aria-label={label} title={label} {...props}>{children}</button>; }
 
-function MatchFlight({ flight, faces, paused, onComplete }) {
+function MatchFlight({ flight, faces, themeId, ruleset, paused, onComplete }) {
   const layer = useRef(null);
   const animations = useRef([]);
   useEffect(() => {
@@ -113,7 +114,7 @@ function MatchFlight({ flight, faces, paused, onComplete }) {
     });
   }, [paused]);
   return <div className="match-flight" ref={layer} aria-hidden="true">
-    {flight.stones.map(tile => <div className="flying-tile" key={tile.id} style={{ left: tile.x, top: tile.y, width: tile.width, height: tile.height }}><TileArt face={faces[tile.faceId]} /></div>)}
+    {flight.stones.map(tile => <div className="flying-tile" key={tile.id} style={{ left: tile.x, top: tile.y, width: tile.width, height: tile.height }}><TileArt face={faces[tile.faceId]} /><TileRarity rarity={rarityForTile(themeId, ruleset, tile.faceId)} /></div>)}
     <span className="collision-ring" style={{ left: flight.centerX, top: flight.centerY }} />
     {!flight.reduced && Array.from({ length: 18 }, (_, i) => <i className="ceramic-chip" key={i} style={{ left: flight.centerX, top: flight.centerY, width: 4 + i % 6, height: 6 + i % 7 }} />)}
   </div>;
@@ -181,7 +182,7 @@ function Rules({ ruleset }) {
     <div className="rule-step"><span>03</span><div><h3>{ruleset === 'eastern' ? 'Know your families.' : 'Trust the picture.'}</h3><p>{ruleset === 'eastern' ? 'Match two identical faces. Counts and tiers form ordered groups; symbols, kin, and anchors are unranked pictures. Sharing a family does not make two different faces a match.' : 'Every pair must show the exact same picture. Each picture has four identical copies.'}</p></div></div>
     <div className="rule-note"><Ghost size={24} /><p><strong>Your ghost</strong> shares your name and avatar. It is a simulated opponent with imperfect memory. Match for 100 points and play again. Miss, and the turn passes. The highest score when the board is clear wins.</p></div>
     <p className="rules-footnote">First to 21 pairs secures the win; keep playing until all 40 pairs are cleared. Your matches collect artwork in your binder. The ghost remembers both players’ reveals from the last two turns.</p>
-    <div className="booster-rules"><h3>Three of each, every duel</h3><p><strong>Shuffle</strong> rearranges the stones and clears the ghost’s memory.</p><p><strong>Hint</strong> highlights an uncovered matching pair for 1.5 seconds, keeping it face down.</p><p><strong>Freeze</strong> skips the ghost’s next turn after your next miss.</p><p><strong>Eagle Eye</strong> lights up hidden tile rarities for 10 seconds.</p></div>
+    <div className="booster-rules"><h3>20 of each, every duel</h3><p><strong>Shuffle</strong> rearranges the stones and clears the ghost’s memory.</p><p><strong>Hint</strong> highlights an uncovered matching pair for 1.5 seconds, keeping it face down.</p><p><strong>Freeze</strong> skips the ghost’s next turn after your next miss.</p><p><strong>Eagle Eye</strong> reveals hidden tile rarity glows and codes for 10 seconds.</p></div>
   </div>;
 }
 
@@ -409,9 +410,10 @@ function App() {
   function start(useSaved = false) {
     let next;
     if (useSaved && saved) {
-      next = { ...saved, difficulty, mode: 'duel', ghostMemoryVersion: GHOST_MEMORY_VERSION,
+      const resumedBoardTheme = themeById[saved.boardTheme] ? saved.boardTheme : saved.theme;
+      next = { ...saved, boardTheme: resumedBoardTheme, difficulty, mode: 'duel', ghostMemoryVersion: GHOST_MEMORY_VERSION,
         aiMemory: rememberGhostFaces(saved.tiles, saved.ghostMemoryVersion === GHOST_MEMORY_VERSION ? saved.aiMemory : {}, saved.duelView?.revealed || [], saved.attempts + saved.aiAttempts) };
-      setRuleset(saved.ruleset); setThemeId(saved.theme); setBoardThemeId(saved.boardTheme || saved.theme);
+      setRuleset(saved.ruleset); setThemeId(saved.theme); setBoardThemeId(resumedBoardTheme);
     }
     else {
       const seed = crypto.getRandomValues(new Uint32Array(1))[0];
@@ -511,9 +513,9 @@ function App() {
                 return <motion.button layout="position" key={tile.id} data-tile-id={tile.id} data-free={free} data-face-up={faceUp} data-rarity={rarity.id} data-rarity-visible={faceUp || eagle} className={`game-tile ${free ? 'free' : 'blocked'} ${active ? 'tile-selected' : ''} ${inFlight ? 'tile-in-flight' : ''} ${hinted ? 'hinted' : ''} ${eagle ? 'eagle-lit' : ''}`} aria-label={faceUp ? `${tile.name}, ${rarity.label}, revealed` : `Hidden stone, row ${tile.y + 1}, column ${tile.x + 1}, layer ${tile.z + 1}, ${free ? 'uncovered' : 'covered'}${eagle ? `, ${rarity.label}` : ''}`} aria-pressed={faceUp} aria-disabled={!free || opponentTurn || (game.mode === 'duel' && Boolean(pending))} tabIndex={free && !opponentTurn && !(game.mode === 'duel' && pending) ? 0 : -1} style={{ ...tilePosition(tile, table), '--rarity-color': rarity.color, '--shine-delay': `${-(index % 11) * .7}s`, zIndex: tile.z * 100 + Math.floor(tile.y * 10) + (active ? 80 : 0) }} initial={{ opacity: 0, scale: 0.86, y: -20 }} animate={{ opacity: 1, scale: active ? 1.035 : 1, y: active ? -3 : 0 }} exit={{ opacity: 0, transition: { duration: 0 } }} transition={{ duration: 0.18, delay: screen === 'game' && game.elapsed < 1 ? index * 0.004 : 0 }} onClick={() => tap(tile)}><span className="tile-rotator">
                     <span className="tile-side tile-back" aria-hidden="true"><img className="tile-art" src={activeTheme.back} alt="" draggable="false" /></span>
                     <span className="tile-side tile-front" aria-hidden={!faceUp}><TileArt face={faces[game.ruleset][tile.faceId]} /></span>
-                  </span><span className="rarity-aura" aria-hidden="true" />{faceUp && rarity.id !== 'common' && <span className="rarity-gem" aria-hidden="true" />} {active && <span className="selected-dot" />}</motion.button>;
+                  </span>{(faceUp || eagle) && <TileRarity rarity={rarity} />}{active && <span className="selected-dot" />}</motion.button>;
               })}</AnimatePresence>
-              {flight && <MatchFlight key={flight.key} flight={flight} faces={faces[game.ruleset]} paused={Boolean(sheet || result)} onComplete={() => setFlight(current => current?.key === flight.key ? null : current)} />}
+              {flight && <MatchFlight key={flight.key} flight={flight} faces={faces[game.ruleset]} themeId={game.theme} ruleset={game.ruleset} paused={Boolean(sheet || result)} onComplete={() => setFlight(current => current?.key === flight.key ? null : current)} />}
             </div>
             <AnimatePresence>{burst && <motion.div key={burst.id} className="match-burst" style={{ left: burst.x, top: burst.y === undefined ? undefined : burst.y - 48 }} initial={{ opacity: 0, scale: 0.7, y: 18 }} animate={{ opacity: 1, scale: 1, y: -10 }} exit={{ opacity: 0, y: -40 }}><Sparkle weight="fill" size={19} /><strong>+{burst.points}</strong>{burst.combo > 1 && <span>{burst.combo}×</span>}</motion.div>}</AnimatePresence>
           </div></div>
