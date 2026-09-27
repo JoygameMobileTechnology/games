@@ -8,10 +8,12 @@ Bee Colony'nin (bkz. [bee-colony/](../bee-colony/)) Cube Land referansına göre
 ## Bee Colony'den farkları
 
 - **Sahne:** dekor ve platform yok; heykel koyu lacivert boşlukta, ekranın üst yarısını doldurur, parmakla serbestçe döndürülür (2 sn dokunulmazsa kendi kendine sola döner). Delik yok: arı küpü söker ve kadrajın yanından uçup gider.
-- **Görüş kuralı:** slottaki kovan yalnızca kameraya dönük ve önü açık küpleri hedefler; rengi görünmüyorsa uyur, heykel çevrilince uyanır. Sıkışma yalnızca renk hiçbir yönden ulaşılamıyorsa sayılır.
-- **Kuyruk:** kovanlar tombul blok shooter'lar (en fazla 80 arı, yuvarlak sayılar). Level 8'den itibaren gizli "?" shooter'lar (önündeki slota çıkınca açılır), level 13'ten itibaren birlikte hareket eden bağlı çiftler.
+- **Görüş önceliği:** slottaki kovan önce kameraya dönük ve önü açık küpleri (en yakından başlayarak) hedefler; kısa bir süre hiç göremezse arılar arkayı da arar. Sıkışma yalnızca renk hiçbir yönden ulaşılamıyorsa sayılır.
+- **Kuyruk:** kovanlar kübik shooter'lar (arılar ön yüzden çıkar) (en fazla 80 arı, yuvarlak sayılar). Level 8'den itibaren gizli "?" shooter'lar (önündeki slota çıkınca açılır), level 13'ten itibaren birlikte hareket eden bağlı çiftler.
 - **Boosterlar** (altta, Cube Land sırasıyla açılır): Geri Al (L6), Slot Ekle (L9), Wild Bee (L12), Shuffle (L15), Vacuum (L18).
-- **FTUE:** L1 (dokun / uyuyan kovan / uyandırma), L2 (döndür / 2x), booster'lar açıldıkları levelde tanıtılır. Türkçe.
+- **Level sonu rush:** kuyruk boşalınca kalan kovanlar iki kat hızda çalışır.
+- **Ayarlar:** üç arka plan varyantı (Lacivert / Orman / Bal) oyun içinden değiştirilebilir (test amaçlı).
+- **FTUE:** L1 (dokun / uyuyan kovan / uyandırma), L2 (döndür / 2x); booster'lar açıldıkları levelde, gizli "?" (L8), bağlı çift (L13) ve gizli cep (L18) ilk göründüklerinde tek balonla tanıtılır. Türkçe.
 - **Pocket levelleri:** 13 Rubik Küpü, 18 Bal Kabağı, 23 Doğum Günü Pastası, 28 Arı Kovanı, 33 Balık — renkler heykelin farklı bölmelerinde gizli, oyuncu soyarak keşfeder.
 
 Canlı: https://joygamemobiletechnology.github.io/games/bee-colony-remaster/
