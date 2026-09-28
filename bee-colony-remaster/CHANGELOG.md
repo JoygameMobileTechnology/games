@@ -3,6 +3,11 @@
 Canlı sürüm: https://joygamemobiletechnology.github.io/games/bee-colony-remaster/
 (GitHub Pages sayfayı ~10 dakika önbellekte tutar; bir değişiklik görünmüyorsa sert yenileyin.)
 
+## 28 Eylül 2026 — Son dalga ve bölüm sonu
+
+- **Son dalga (finale):** Kuyrukta kalan shooter'lar boş slotlara sığdığı anda (ya da kuyruk boşalınca) kalanlar kendiliğinden slotlara yürür (0.12 s arayla), HUD ve booster çubuğu gizlenir, oyun 3x hızda oynar. Bir oyuncu dokunuşu şart; L1/L2 öğreticilerinde kapalı.
+- **Bölüm sonu:** "NEW ITEM" ilerleme çubuğu kaldırıldı; başlık, coin, miktar ve iki buton kaldı.
+
 ## 28 Eylül 2026 — Art geri bildirimi turu 2
 
 - **Varsayılan arka plan Sarı.** Ayarlardaki sıra: Sarı · Lacivert · Orman · Bal · Beyaz · Gri.
