@@ -3,6 +3,11 @@
 Canlı sürüm: https://joygamemobiletechnology.github.io/games/bee-colony-remaster/
 (GitHub Pages sayfayı ~10 dakika önbellekte tutar; bir değişiklik görünmüyorsa sert yenileyin.)
 
+## 28 Eylül 2026 — Slotlar ve booster çubuğu Cube Land ölçüsünde
+
+- **Slotlar:** yumuşak köşeli, ince açık mavi çizgili koyu kareler; genişlik ekranın %13.5'i, aralık %2 (Cube Land ile aynı). Slot içindeki shooter kareyi dolduracak şekilde %12.1'e büyütüldü; kuyruk sıraları birbirinin arkasına basamaklı (öndeki sıra arkadakini örter). 6 slot çerçeveye sığıyor.
+- **Booster butonları:** daire yerine yuvarlak köşeli kare (genişlik %15.4, köşe %22), merkez %94.7, aralık %2.7; mavi şerit %95.4'ten başlar. Kilitli hal gri + kilit + "LV N".
+
 ## 28 Eylül 2026 — Yeni Engel kartı, gizli kovan dokusu, iki tonlu halat
 
 - **Yeni Engel! kartı:** Gizli kovan (L8) ve bağlı kovanlar (L13) ilk göründüğünde Cube Land'in "New Item" ekranının karşılığı: tam ekran kart, içinde o levelin board'unun anlık görüntüsü ve dokunan el; altında "Gizli Kovan / Bağlı Kovanlar — Açıldı!" ve tek satır kural. Dokununca kapanır. Bu iki mekanik için balon ipucu kalktı (cep ipucu balon olarak sürüyor).
