@@ -3,6 +3,10 @@
 Canlı sürüm: https://joygamemobiletechnology.github.io/games/bee-colony-remaster/
 (GitHub Pages sayfayı ~10 dakika önbellekte tutar; bir değişiklik görünmüyorsa sert yenileyin.)
 
+## 28 Eylül 2026 — Arkayı arama beklemesi kaldırıldı
+
+- **Görüş önceliği:** görünür küp yoksa kovan artık 1.5 s beklemeden hemen herhangi bir açık yüzlü küpü hedefler. Tek istisna L2 öğreticisi (turuncu kovan oyuncu çevirene kadar bekler).
+
 ## 28 Eylül 2026 — Ana menü alt bar + tanıtım kartı düzeltmesi
 
 - **Alt navigasyon:** Mağaza (sol) · Ana sayfa (orta, yükseltilmiş) · Dünya Haritası (sağ, Albüm yerine). Mağaza ve Dünya Haritası kilitli, ikonun sağ üstünde kilit rozeti. İkonlar yumuşak düz vektör (kübik değil); barın üstünde altın çizgi.
