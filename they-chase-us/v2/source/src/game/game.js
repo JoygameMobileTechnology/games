@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { CONFIG, PALETTE, xpForLevelUp, upgradeCost, highestTier } from '../config.js';
 import { SceneManager } from '../render/scene.js';
 import { World } from '../render/world.js';
-import { TeamRenderer, P } from '../render/units.js';
+import { TeamRenderer, P, setCharacterLight } from '../render/units.js';
 import { Particles, DamageNumbers, HpBars, DangerZones, AimLine, ArrowRenderer, Lightning, SpearRenderer, CaltropRenderer, Shockwaves, GroundCracks, COLORS } from '../render/fx.js';
 import { GameAudio } from '../audio.js';
 import { Input } from '../input.js';
@@ -418,6 +418,7 @@ export class Game {
     cam.position.set(this.camPos.x + (Math.random() - .5) * sh * 0.8, this.camPos.y + (Math.random() - .5) * sh * 0.5, this.camPos.z);
     cam.lookAt(this.camLook);
     sm.updateSun(pl.x, pl.z);
+    setCharacterLight(_sunDir.subVectors(sm.sun.position, sm.sunTarget.position), sm.sun.color);
     const F = CONFIG.fog, bk = th / Math.PI; this.scene.fog.near = F.levelNear + (F.bonusNear - F.levelNear) * bk; this.scene.fog.far = F.levelFar + (F.bonusFar - F.levelFar) * bk;
     this.fx.aim.setResolution(sm.width, sm.height);
 
@@ -426,7 +427,7 @@ export class Game {
     const v = this._pv; v.x = pl.x; v.y = pl.dy; v.z = pl.z; v.yaw = this.playerFacing > 0 ? 0 : Math.PI; v.pitch = pl.dead || pl.fallT > 0 ? -pl.pitch : 0; v.roll = 0; v.scale = 1;
     v.color = this.stats.fullPlate ? _cFull.copy(C_PLAYER).lerp(C_GOLD, 0.5 + 0.3 * Math.sin(this.realTime * 6)) : C_PLAYER; v.metal = this.stats.fullPlate ? C_GOLD : C_STEEL;
     v.phase = pl.phase; v.run = this.state === 'main' ? 0.25 : (pl.speed > 0 ? 1 : 0); v.armRaise = 0; v.aim = pl.aim; v.flash = pl.flash; v.squash = pl.squash; v.frozen = false; v.shadowScale = 1;
-    let f = P.HOOD | P.CROWN | P.BOW;
+    let f = P.CROWN | P.BOW; // bare round head like the toy-stickman reference; the small crown marks the player
     const A = this.stats.armor; if (A.helmet) f |= P.HELMET; if (A.chestplate) f |= P.CHEST; if (A.gauntlets) f |= P.GAUNTLETS; if (A.leggings) f |= P.LEGGINGS; if (A.boots) f |= P.BOOTS;
     const spd = this.save.upg.dmg || 0; if (spd >= 5) { f |= P.CAPE; v.capeColor = CAPE_COLORS[Math.min(5, Math.floor(spd / 5))]; } else v.capeColor = null;
     v.bowColor = BOW_COLORS[Math.min(4, Math.floor((this.save.upg.atk || 0) / 5))];
@@ -453,4 +454,4 @@ export class Game {
   }
   _pv = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0, roll: 0, scale: 1, color: null, metal: null, phase: 0, run: 1, armRaise: 0, aim: 0, flags: 0, flash: 0, squash: 0, frozen: false, shadowScale: 1, capeColor: null, bowColor: null };
 }
-const _s = new THREE.Vector3(), _e = new THREE.Vector3(), _cFull = new THREE.Color();
+const _s = new THREE.Vector3(), _e = new THREE.Vector3(), _cFull = new THREE.Color(), _sunDir = new THREE.Vector3();

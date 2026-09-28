@@ -66,7 +66,7 @@ export class AllySystem {
     const v = _v;
     for (const a of this.list) {
       v.x = a.x; v.y = a.dy; v.z = a.z; v.scale = 0.82; v.yaw = a.yaw; v.pitch = a.pitch; v.roll = 0; v.color = C_ALLY; v.metal = null;
-      v.phase = a.phase; v.run = a.alive ? 1 : 0; v.armRaise = 0; v.aim = a.fireDelay >= 0 ? 1 : 0.35; v.flags = P.HOOD | P.BOW; v.flash = 0; v.squash = 0; v.frozen = false; v.shadowScale = 1;
+      v.phase = a.phase; v.run = a.alive ? 1 : 0; v.armRaise = 0; v.aim = a.fireDelay >= 0 ? 1 : 0.35; v.flags = P.BOW; v.flash = 0; v.squash = 0; v.frozen = false; v.shadowScale = 1;
       rend.draw(v);
     }
     rend.end();
