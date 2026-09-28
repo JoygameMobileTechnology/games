@@ -3,6 +3,14 @@
 Canlı sürüm: https://joygamemobiletechnology.github.io/games/bee-colony-remaster/
 (GitHub Pages sayfayı ~10 dakika önbellekte tutar; bir değişiklik görünmüyorsa sert yenileyin.)
 
+## 28 Eylül 2026 — Ekonomi
+
+- **Kalıcı booster envanteri:** booster adetleri artık bölümden bölüme taşınıyor ve kayıtta tutuluyor (önceden her bölüm sabit adetle başlıyordu).
+- **Tanıtım hediyesi:** her booster açıldığı bölümde 1 adet bedava verir (bir kez).
+- **Satın alma:** adet 0 olunca butonda yeşil "+" çıkar; dokununca satın alma paneli açılır, panel açıkken oyun durur. Paketler: Geri Al ×3 900, Slot Ekle ×1 1800, Eşek Arısı ×2 1600, Karıştır ×3 900, Vakum ×1 1800 altın. Yetersiz altında "Yetersiz altın" uyarısı, harcama yok.
+- **Altın:** oyun 1000 altınla başlar; bölüm sonu 30 altın (reklamla ×2). Ekonomi öncesi kayıtlara bir kez 1000 altın ve daha önce tanıtılmış her booster için 1 adet eklenir.
+- **İsimler:** Wild Bee / Shuffle / Vacuum yerine Eşek Arısı / Karıştır / Vakum.
+
 ## 28 Eylül 2026 — Arkayı arama beklemesi kaldırıldı
 
 - **Görüş önceliği:** görünür küp yoksa kovan artık 1.5 s beklemeden hemen herhangi bir açık yüzlü küpü hedefler. Tek istisna L2 öğreticisi (turuncu kovan oyuncu çevirene kadar bekler).
