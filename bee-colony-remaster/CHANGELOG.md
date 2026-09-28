@@ -3,6 +3,12 @@
 Canlı sürüm: https://joygamemobiletechnology.github.io/games/bee-colony-remaster/
 (GitHub Pages sayfayı ~10 dakika önbellekte tutar; bir değişiklik görünmüyorsa sert yenileyin.)
 
+## 28 Eylül 2026 — Yeni Engel kartı, gizli kovan dokusu, iki tonlu halat
+
+- **Yeni Engel! kartı:** Gizli kovan (L8) ve bağlı kovanlar (L13) ilk göründüğünde Cube Land'in "New Item" ekranının karşılığı: tam ekran kart, içinde o levelin board'unun anlık görüntüsü ve dokunan el; altında "Gizli Kovan / Bağlı Kovanlar — Açıldı!" ve tek satır kural. Dokununca kapanır. Bu iki mekanik için balon ipucu kalktı (cep ipucu balon olarak sürüyor).
+- **Gizli kovan görünümü:** indigo gövde üstünde tekrarlayan "?" deseni, önde büyük "?" (referansla aynı).
+- **Bağlı kovan halatı:** daha kalın; iki yarısı kendi kovanının renginde, farklı renklerde ortadan ayrılır.
+
 ## 28 Eylül 2026 — Son dalga ve bölüm sonu
 
 - **Son dalga (finale):** Kuyrukta kalan shooter'lar boş slotlara sığdığı anda (ya da kuyruk boşalınca) kalanlar kendiliğinden slotlara yürür (0.12 s arayla), HUD ve booster çubuğu gizlenir, oyun 3x hızda oynar. Bir oyuncu dokunuşu şart; L1/L2 öğreticilerinde kapalı.
