@@ -3,6 +3,11 @@
 Canlı sürüm: https://joygamemobiletechnology.github.io/games/bee-colony-remaster/
 (GitHub Pages sayfayı ~10 dakika önbellekte tutar; bir değişiklik görünmüyorsa sert yenileyin.)
 
+## 28 Eylül 2026 — Ana menü alt bar + tanıtım kartı düzeltmesi
+
+- **Alt navigasyon:** Mağaza (sol) · Ana sayfa (orta, yükseltilmiş) · Dünya Haritası (sağ, Albüm yerine). Mağaza ve Dünya Haritası kilitli, ikonun sağ üstünde kilit rozeti. İkonlar yumuşak düz vektör (kübik değil); barın üstünde altın çizgi.
+- **Yeni Engel! kartları:** eski kayıtlarda gizli/bağlı ipuçları balon döneminde "görüldü" işaretlendiği için kart hiç açılmıyordu. Kartlar artık kendi bayraklarını kullanıyor (herkes bir kez daha görür); aynı levelde iki engel varsa kartlar peş peşe gelir.
+
 ## 28 Eylül 2026 — Slot köşeleri gerçekten yumuşak
 
 - **Slotlar:** plakalar düz yuvarlak-köşeli şekil olarak çizildi (köşe yarıçapı %24, dış çizgi %3). Önceki plaka kalınlığı yüzünden köşe %5'te kalıyor, sert kare görünüyordu. Tanıtım kartları canlı board görüntüsü aldığı için otomatik güncellendi.
