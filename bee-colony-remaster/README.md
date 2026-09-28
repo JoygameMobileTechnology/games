@@ -13,7 +13,7 @@ Bee Colony'nin (bkz. [bee-colony/](../bee-colony/)) Cube Land referansına göre
 - **Boosterlar** (altta, Cube Land sırasıyla açılır): Geri Al (L6), Slot Ekle (L9), Wild Bee (L12), Shuffle (L15), Vacuum (L18).
 - **Son dalga:** kuyrukta kalan kovanlar boş slotlara sığınca kendiliğinden yerleşir, HUD gizlenir ve oyun 3x hızlanır.
 - **Ayarlar:** altı arka plan varyantı (Sarı varsayılan · Lacivert / Orman / Bal / Beyaz / Gri) renk kutucuklarından seçilir (test amaçlı).
-- **FTUE:** L1 (dokun / uyuyan kovan / uyandırma), L2 (döndür / 2x); booster'lar açıldıkları levelde, gizli "?" (L8), bağlı çift (L13) ve gizli cep (L18) ilk göründüklerinde tek balonla tanıtılır. Türkçe.
+- **FTUE:** L1 (dokun / uyuyan kovan / uyandırma), L2 (döndür / 2x); booster'lar açıldıkları levelde, gizli "?" (L8) ve bağlı çift (L13) ilk göründüklerinde tam ekran "Yeni Engel!" kartıyla, gizli cep (L18) tek balonla tanıtılır. Türkçe.
 - **Pocket levelleri:** 13 Rubik Küpü, 18 Bal Kabağı, 23 Doğum Günü Pastası, 28 Arı Kovanı, 33 Balık — renkler heykelin farklı bölmelerinde gizli, oyuncu soyarak keşfeder.
 
 Canlı: https://joygamemobiletechnology.github.io/games/bee-colony-remaster/
