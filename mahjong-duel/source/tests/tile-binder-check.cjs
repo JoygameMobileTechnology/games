@@ -6,16 +6,34 @@ const { pathToFileURL } = require('node:url');
 
 (async () => {
   const root = path.resolve(__dirname, '..');
-  const { createCollection, awardCollectedPair, COLLECTION_STORAGE_KEY } = await import(pathToFileURL(path.join(root, 'src/collection.js')));
-  const { themes } = await import(pathToFileURL(path.join(root, 'src/themes.js')));
-  const { rarityForTile } = await import(pathToFileURL(path.join(root, 'src/rarity.js')));
+  const source = file => import(pathToFileURL(path.join(root, 'src', file)));
+  const { createCollection, awardCollectedPair, COLLECTION_STORAGE_KEY } = await source('collection.js');
+  const { themes } = await source('themes.js');
   const browserName = process.argv.includes('--webkit') ? 'webkit' : 'chromium';
   const browser = await require(process.env.PLAYWRIGHT_MODULE || 'playwright')[browserName].launch({ headless: true });
   const page = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   page.on('response', response => { if (response.status() >= 400) errors.push(`${response.status()} ${response.url()}`); });
-  const output = path.join(root, 'tmp/rarity-review'); fs.mkdirSync(output, { recursive: true });
+  const output = path.join(root, 'tmp/collection-fullscreen'); fs.mkdirSync(output, { recursive: true });
+  const collectionPage = page.getByRole('dialog', { name: 'Collection', exact: true });
+  const filter = label => page.getByRole('group', { name: 'Rarity filter' }).getByRole('button', { name: label, exact: true });
+  async function openCollection() {
+    const launch = page.getByRole('button', { name: 'Collection', exact: true });
+    const back = page.getByRole('button', { name: 'Back to main menu', exact: true });
+    await launch.or(back).first().waitFor();
+    if (await back.isVisible()) await back.click();
+    await launch.click(); await collectionPage.waitFor();
+    assert.equal(await page.getByRole('group', { name: 'Collection ruleset', exact: true }).count(), 0, 'Settings owns the edition; Collection has no edition toggle');
+  }
+  async function selectEditionInSettings(ruleset) {
+    await page.getByRole('button', { name: 'Back to main menu', exact: true }).click();
+    await page.getByRole('button', { name: 'Settings', exact: true }).click();
+    await page.getByRole('group', { name: 'Ruleset', exact: true }).getByRole('button', { name: ruleset, exact: true }).click();
+    await page.getByRole('button', { name: 'Done', exact: true }).click();
+    await openCollection();
+    assert.match(await page.locator('.collection-grid').getAttribute('aria-label'), new RegExp(ruleset.toLowerCase()));
+  }
   try {
     await page.goto(process.env.GAME_URL || 'http://localhost:5173');
     let value = createCollection();
@@ -26,92 +44,76 @@ const { pathToFileURL } = require('node:url');
       localStorage.clear(); localStorage.setItem(key, JSON.stringify(value));
       localStorage.setItem('porcelain:gentle', 'true'); localStorage.setItem('porcelain:sound', 'false');
     }, { key: COLLECTION_STORAGE_KEY, value });
-    await page.reload();
-    await page.getByRole('button', { name: 'Tile binder', exact: true }).click();
-    await page.locator('.tile-binder').waitFor();
-    assert.match(await page.locator('.binder-summary').innerText(), /6\s*\/\s*320/);
-    assert.equal(await page.locator('.binder-match-total strong').innerText(), '8');
+    await page.reload(); await openCollection();
+    const persisted = await page.evaluate(key => localStorage.getItem(key), COLLECTION_STORAGE_KEY);
+    assert.match(await page.locator('.collection-progress-copy').innerText(), /6\s*\/\s*40 collected/);
+    assert.match(await page.locator('.collection-summary').innerText(), /6\s*\/\s*320 total collected/);
+    assert.match(await page.locator('.collection-summary').innerText(), /8 pairs matched/);
     assert.match(await page.locator('[data-match-key="ming-porcelain:eastern:K01"]').innerText(), /Matched ×3/);
-    assert.equal(await page.locator('.binder-card[data-collected="true"]').count(), 6);
+    assert.equal(await page.locator('.collection-card[data-collected="true"]').count(), 6);
     assert.deepEqual(await page.getByLabel('Collection theme', { exact: true }).locator('option').evaluateAll(options => options.map(option => option.value)),
       ['ming-porcelain', 'dancheong', 'stained-glass', 'dutch-golden-age']);
-    for (const faceId of ['K01', 'A11', 'K02', 'A07', 'G02', 'C01']) {
-      const rarity = rarityForTile('ming-porcelain', 'eastern', faceId);
-      const card = page.locator(`[data-match-key="ming-porcelain:eastern:${faceId}"]`);
-      assert.equal(await page.locator('.tile-rarity-code').count(), 0, 'binder tile art has no corner rarity tags');
-      assert.equal((await card.locator('.binder-rarity').innerText()).trim(), rarity.label);
-      assert.equal(await card.locator('.tile-rarity-frame').count(), 1, 'binder keeps its rarity glow');
-      await card.locator('.binder-inspect-button').click();
-      await page.locator('.tile-inspector[open]').waitFor();
-      assert.equal(await page.locator('.tile-rarity-code').count(), 0, 'inspector art has no corner rarity tags');
-      assert.equal(await page.locator('.tile-inspector .tile-rarity-frame').count(), 1, 'inspector keeps its rarity glow');
-      assert.match(await page.locator('.tile-inspector-meta').innerText(), new RegExp(rarity.label));
-      await page.getByRole('button', { name: 'Close tile preview', exact: true }).click();
-    }
-    await page.locator('.binder-grid').evaluate(grid => { grid.scrollTop = 0; });
-    await page.waitForTimeout(500);
-    for (const [width, height] of [[390, 844], [390, 664], [320, 568], [768, 1024]]) {
-      await page.setViewportSize({ width, height }); await page.waitForTimeout(200);
+    assert.deepEqual((await page.getByRole('group', { name: 'Rarity filter' }).getByRole('button').allTextContents()).map(text => text.trim()),
+      ['All', 'Marble', 'Sapphire', 'Amethyst', 'Gold']);
+    assert.equal(await page.locator('.tile-rarity-code').count(), 0, 'tile art has no corner rarity tags');
+    assert.equal(await page.locator('.sheet').count(), 0, 'Collection is a full page, not a Sheet');
+
+    for (const [width, height, columns, split] of [[320, 568, 2, false], [390, 664, 2, false], [390, 844, 2, false], [440, 956, 2, false], [768, 1024, 3, false], [1024, 768, 3, true], [844, 390, null, false]]) {
+      await page.setViewportSize({ width, height });
+      await page.waitForFunction(expected => document.querySelector('.collection-layout').dataset.split === String(expected), split);
       const layout = await page.evaluate(() => {
         const rect = selector => document.querySelector(selector).getBoundingClientRect().toJSON();
-        return { width: innerWidth, height: innerHeight, documentWidth: document.documentElement.scrollWidth,
-          close: rect('[aria-label="Close dialog"]'), binder: rect('.tile-binder'), grid: rect('.binder-grid'), card: rect('.binder-card'),
-          art: rect('.binder-card .binder-art'), artTile: rect('.binder-card .binder-art-tile'), caption: rect('.binder-card figcaption') };
+        const grid = document.querySelector('.collection-grid');
+        return { documentWidth: document.documentElement.scrollWidth, root: rect('.collection-page'), grid: rect('.collection-grid'), back: rect('[aria-label="Back to main menu"]'), art: rect('.collection-art'), image: rect('.collection-art img'), caption: rect('.collection-card figcaption'), columns: getComputedStyle(grid).gridTemplateColumns.split(' ').length,
+          overflow: [...document.querySelectorAll('.collection-theme-control')].some(node => node.scrollWidth > node.clientWidth + 1),
+          targets: [...document.querySelectorAll('.collection-page-header button,.collection-editions button,.collection-tiers button')].filter(node => node.getClientRects().length).map(node => ({ label: node.getAttribute('aria-label') || node.textContent, width: node.getBoundingClientRect().width, height: node.getBoundingClientRect().height })) };
       });
-      assert.ok(layout.documentWidth <= width, `${width}×${height}: document has no horizontal overflow`);
-      assert.ok(layout.close.left >= 0 && layout.close.right <= width && layout.close.top >= 0 && layout.close.bottom <= height, 'close control stays reachable');
-      assert.ok(layout.binder.left >= 0 && layout.binder.right <= width);
-      assert.ok(layout.card.bottom <= layout.grid.bottom, `${width}×${height}: at least one full card row is readable`);
-      assert.ok(layout.artTile.top >= layout.art.top - 1 && layout.artTile.bottom <= layout.art.bottom + 1,
-        `${width}×${height}: tile art stays within its capped row (${JSON.stringify({ art: layout.art, artTile: layout.artTile })})`);
-      assert.ok(layout.artTile.left >= layout.art.left - 1 && layout.artTile.right <= layout.art.right + 1,
-        `${width}×${height}: tile art fits its card width`);
-      assert.ok(layout.caption.top >= layout.artTile.bottom - 1, `${width}×${height}: artwork never obscures the tile name or count`);
-      if (height <= 620) {
-        await page.getByLabel('Collection edition', { exact: true }).selectOption('western');
-        assert.equal(await page.locator('.binder-card').count(), 40);
-        await page.getByLabel('Collection edition', { exact: true }).selectOption('eastern');
-      }
-      if (width <= 350) {
-        await page.getByLabel('Collection rarity', { exact: true }).selectOption('celestial');
-        assert.equal(await page.locator('.binder-card').count(), 1);
-        await page.getByLabel('Collection rarity', { exact: true }).selectOption('all');
-      }
-      await page.screenshot({ path: path.join(output, `binder-${browserName}-${width}x${height}.png`) });
+      assert.ok(layout.documentWidth <= width, `${width}×${height}: no document horizontal overflow`);
+      assert.ok(layout.root.left >= -1 && layout.root.right <= width + 1 && layout.root.top >= -1 && layout.root.bottom <= height + 1, `${width}×${height}: full page fits viewport`);
+      assert.ok(Math.abs(layout.root.width - width) <= 2 && Math.abs(layout.root.height - height) <= 2, 'Collection fills the screen');
+      assert.ok(layout.back.top >= 0 && layout.back.bottom <= height, 'Back stays reachable');
+      assert.ok(layout.image.left >= layout.art.left - 1 && layout.image.right <= layout.art.right + 1 && layout.image.top >= layout.art.top - 1 && layout.image.bottom <= layout.art.bottom + 1, `${width}×${height}: artwork fits its tile area`);
+      assert.ok(layout.caption.top >= layout.image.bottom - 1, `${width}×${height}: artwork never overlaps its caption`);
+      assert.equal(layout.overflow, false, `${width}×${height}: theme selector does not clip`);
+      assert.ok(layout.grid.height >= 100 && layout.grid.width > 200, `${width}×${height}: meaningful gallery space`);
+      if (columns) assert.equal(layout.columns, columns, `${width}×${height}: appropriate grid columns`);
+      for (const target of layout.targets) assert.ok(target.width >= 43.5 && target.height >= 43.5, `${width}×${height}: ${target.label} has a 44px touch target`);
+      await page.locator('.collection-grid').evaluate(node => { node.scrollTop = 0; });
+      await page.screenshot({ path: path.join(output, `collection-${browserName}-${width}x${height}.png`) });
     }
     await page.setViewportSize({ width: 390, height: 844 });
-    for (const theme of themes) {
-      await page.getByLabel('Collection theme', { exact: true }).selectOption(theme.id);
-      for (const ruleset of ['Eastern', 'Western']) {
-        await page.getByRole('group', { name: 'Collection ruleset' }).getByRole('button', { name: new RegExp(ruleset) }).click();
-        assert.equal(await page.locator('.binder-card').count(), 40);
-        await page.locator('.binder-art img').evaluateAll(async images => {
+    for (const ruleset of ['Eastern', 'Western']) {
+      await selectEditionInSettings(ruleset);
+      for (const theme of themes) {
+        await page.getByLabel('Collection theme', { exact: true }).selectOption(theme.id);
+        assert.equal(await page.locator('.collection-card').count(), 40);
+        await page.locator('.collection-art img').evaluateAll(async images => {
           for (const image of images) image.loading = 'eager';
           await Promise.all(images.map(image => image.decode()));
         });
       }
     }
-    for (const [label, count] of [['Bamboo', 22], ['Granite', 10], ['Amethyst', 5], ['Gold', 2], ['Celestial', 1], ['All', 40]]) {
-      const control = page.getByRole('group', { name: 'Rarity filter' }).getByRole('button', { name: label, exact: true });
-      await control.click(); assert.equal(await control.getAttribute('aria-pressed'), 'true');
-      assert.equal(await page.locator('.binder-card').count(), count);
+    for (const [label, count] of [['Marble', 22], ['Sapphire', 10], ['Amethyst', 5], ['Gold', 3], ['All', 40]]) {
+      await filter(label).click(); assert.equal(await filter(label).getAttribute('aria-pressed'), 'true');
+      assert.equal(await page.locator('.collection-card').count(), count);
     }
+    await selectEditionInSettings('Eastern');
+    assert.match(await page.locator('.collection-progress-copy').innerText(), /6\s*\/\s*40 collected/, 'Collection reflects the edition selected in Settings');
     await page.getByLabel('Collection theme', { exact: true }).focus();
     assert.ok(await page.getByLabel('Collection theme', { exact: true }).evaluate(node => parseFloat(getComputedStyle(node).outlineWidth) >= 2));
-    await page.getByRole('button', { name: 'Close dialog', exact: true }).click();
-    await page.reload();
-    await page.getByRole('button', { name: 'Tile binder', exact: true }).click();
-    assert.match(await page.locator('.binder-summary').innerText(), /6\s*\/\s*320/);
-    assert.equal(await page.locator('.binder-match-total strong').innerText(), '8');
-    await page.getByRole('group', { name: 'Rarity filter' }).getByRole('button', { name: 'Granite', exact: true }).click();
-    assert.equal(await page.locator('.binder-card').count(), 10);
-    assert.equal(await page.locator('.binder-card[data-collected="true"]').count(), 1);
-    await page.waitForTimeout(500);
-    await page.screenshot({ path: path.join(output, `binder-${browserName}-granite-390x844.png`) });
+    await page.getByRole('button', { name: 'Back to main menu', exact: true }).click();
+    await page.waitForFunction(() => document.activeElement?.matches('.binder-launch'));
+    await page.reload(); await openCollection();
+    assert.match(await page.locator('.collection-summary').innerText(), /6\s*\/\s*320 total collected/);
+    assert.match(await page.locator('.collection-summary').innerText(), /8 pairs matched/);
+    await filter('Sapphire').click();
+    assert.equal(await page.locator('.collection-card').count(), 10);
+    assert.equal(await page.locator('.collection-card[data-collected="true"]').count(), 1);
+    assert.equal(await page.evaluate(key => localStorage.getItem(key), COLLECTION_STORAGE_KEY), persisted, 'browsing never modifies collected tiles or duplicate counts');
     assert.deepEqual(errors, []);
-    console.log(`PASS binder: 320 launch images decode, five named tiers with glows and no corner tags, all launch themes/editions, duplicate counts persist, four responsive sizes, accessible close/focus; no errors (${browserName})`);
+    console.log(`PASS fullscreen Collection: launch themes/editions, 320 assets decode, four rarity filters, duplicate counts persist, seven responsive sizes, full-screen navigation/focus, no errors (${browserName})`);
   } catch (error) {
-    await page.screenshot({ path: path.join(output, `binder-${browserName}-failure.png`), fullPage: true }).catch(() => {});
+    await page.screenshot({ path: path.join(output, `collection-${browserName}-failure.png`), fullPage: true }).catch(() => {});
     console.error('Browser errors:', errors); throw error;
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

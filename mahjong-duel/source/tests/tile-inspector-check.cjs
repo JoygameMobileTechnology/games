@@ -15,15 +15,14 @@ const { pathToFileURL } = require('node:url');
   const browserName = process.argv.includes('--webkit') ? 'webkit' : 'chromium';
   const browser = await require(process.env.PLAYWRIGHT_MODULE || 'playwright')[browserName].launch({ headless: true });
   const page = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
-  const output = path.join(root, 'output/remake/binder-inspector');
-  fs.mkdirSync(output, { recursive: true });
+  const output = path.join(root, 'tmp/collection-fullscreen'); fs.mkdirSync(output, { recursive: true });
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   page.on('response', response => { if (response.status() >= 400) errors.push(`${response.status()} ${response.url()}`); });
   let value = createCollection();
   for (const theme of themes) {
     for (const ruleset of ['eastern', 'western']) {
-      for (const id of (ruleset === 'eastern' ? ['C01', 'A01', 'K01'] : ['W01', 'W10', 'W40'])) {
+      for (const id of (ruleset === 'eastern' ? ['C01', 'A01', 'A11', 'K01'] : ['W01', 'W10', 'W40'])) {
         const tile = themeTileSets[theme.id][ruleset].find(item => item.id === id);
         assert.ok(tile, `${theme.id} ${ruleset} fixture ${id} exists`);
         for (let index = 0; index < (id === 'C01' ? 3 : 1); index += 1) {
@@ -32,138 +31,143 @@ const { pathToFileURL } = require('node:url');
       }
     }
   }
-  const initialCollection = JSON.stringify(value);
-  const card = key => page.locator(`.binder-card[data-match-key="${key}"]`);
-  const inspector = page.locator('dialog.tile-inspector');
-  async function selectEdition(ruleset) {
-    const compact = page.getByLabel('Collection edition', { exact: true });
-    if (await compact.isVisible()) await compact.selectOption(ruleset);
-    else await page.getByRole('group', { name: 'Collection ruleset' }).getByRole('button', { name: new RegExp(ruleset, 'i') }).click();
-  }
-  async function verifyPreview(themeId, ruleset, id, count = 1) {
+  const card = key => page.locator(`.collection-card[data-match-key="${key}"]`);
+  const detail = page.locator('.collection-detail');
+  const previous = page.getByRole('button', { name: 'Previous tile', exact: true });
+  const next = page.getByRole('button', { name: 'Next tile', exact: true });
+  const back = () => page.getByRole('button', { name: 'Back to collection', exact: true }).click();
+  async function verifyDetails(themeId, ruleset, id, count = 1) {
     const tile = themeTileSets[themeId][ruleset].find(item => item.id === id);
-    await inspector.waitFor({ state: 'visible' });
-    await inspector.locator('img').evaluate(image => image.decode());
-    await inspector.evaluate(node => Promise.all(node.getAnimations().map(animation => animation.finished.catch(() => {}))));
-    assert.equal(await inspector.evaluate(node => node.open && node.matches(':modal')), true, 'preview uses a native modal');
-    assert.equal(await inspector.getByRole('heading').innerText(), tile.name);
-    const description = await inspector.locator('.tile-inspector-description').innerText();
-    assert.ok(description.length > 25, 'description is informative');
-    assert.equal(description, tileDescription(themeId, ruleset, id), 'description follows tile, theme and edition');
-    assert.equal(await inspector.locator('img').getAttribute('alt'), tile.name);
-    assert.equal(await inspector.locator('img').getAttribute('src'), tile.src);
-    assert.match(await inspector.locator('.tile-inspector-meta').innerText(), new RegExp(rarityForTile(themeId, ruleset, id).label));
-    assert.match(await inspector.locator('.tile-inspector-meta').innerText(), new RegExp(`Matched ×${count}`));
-    assert.equal(await inspector.getAttribute('aria-describedby'), await inspector.locator('.tile-inspector-description').getAttribute('id'));
-    const paintedSize = image => {
-      const rect = image.getBoundingClientRect();
-      const scale = Math.min(rect.width / image.naturalWidth, rect.height / image.naturalHeight);
-      return { width: image.naturalWidth * scale, height: image.naturalHeight * scale };
-    };
-    const previewArt = await inspector.locator('img').evaluate(paintedSize);
-    const thumbnail = await card(tile.matchKey).locator('.binder-art img').evaluate(paintedSize);
-    assert.ok(previewArt.height > thumbnail.height && previewArt.width > thumbnail.width, `inspected art ${JSON.stringify(previewArt)} is larger than its thumbnail ${JSON.stringify(thumbnail)}`);
+    await detail.waitFor({ state: 'visible' });
+    await detail.locator('img').evaluate(image => image.decode());
+    assert.equal(await detail.getByRole('heading', { level: 3 }).innerText(), tile.name);
+    assert.equal(await detail.locator('.collection-detail-description').innerText(), tileDescription(themeId, ruleset, id), 'retains historic theme-specific lore');
+    assert.equal(await detail.locator('img').getAttribute('alt'), tile.name);
+    assert.equal(await detail.locator('img').getAttribute('src'), tile.src);
+    assert.equal((await detail.locator('.collection-detail-rarity').innerText()).trim(), rarityForTile(themeId, ruleset, id).label);
+    assert.match(await detail.locator('.collection-detail-status').innerText(), new RegExp(`Matched ${count} ${count === 1 ? 'time' : 'times'}`));
+    assert.equal(await detail.locator('.tile-rarity-frame').count(), 1, 'details retain rarity glow');
+    assert.equal(await page.locator('.tile-rarity-code').count(), 0, 'no corner rarity tags');
+    const artLayout = await detail.evaluate(node => { const rect = selector => node.querySelector(selector).getBoundingClientRect().toJSON(); return { art: rect('.collection-detail-art'), image: rect('img'), copy: rect('.collection-detail-copy') }; });
+    assert.ok(artLayout.image.left >= artLayout.art.left - 1 && artLayout.image.right <= artLayout.art.right + 1 && artLayout.image.top >= artLayout.art.top - 1 && artLayout.image.bottom <= artLayout.art.bottom + 1, 'detail artwork stays within its image area');
+    const overlapWidth = Math.min(artLayout.copy.right, artLayout.image.right) - Math.max(artLayout.copy.left, artLayout.image.left);
+    const overlapHeight = Math.min(artLayout.copy.bottom, artLayout.image.bottom) - Math.max(artLayout.copy.top, artLayout.image.top);
+    assert.ok(overlapWidth <= 1 || overlapHeight <= 1, 'detail artwork never overlaps the tile title in stacked or side-by-side layouts');
     return tile;
   }
-  async function assertBinderStillOpen() {
-    await inspector.waitFor({ state: 'detached' });
-    assert.equal(await page.locator('.tile-binder').isVisible(), true, 'closing inspector leaves binder open');
+  async function selectEdition(ruleset) {
+    await page.getByRole('button', { name: 'Back to main menu', exact: true }).click();
+    await page.getByRole('button', { name: 'Settings', exact: true }).click();
+    await page.getByRole('group', { name: 'Ruleset', exact: true }).getByRole('button', { name: ruleset === 'eastern' ? 'Eastern' : 'Western', exact: true }).click();
+    await page.getByRole('button', { name: 'Done', exact: true }).click();
+    await page.getByRole('button', { name: 'Collection', exact: true }).click();
+    assert.equal(await page.getByRole('group', { name: 'Collection ruleset', exact: true }).count(), 0, 'no edition toggle inside Collection');
+    assert.match(await page.locator('.collection-grid').getAttribute('aria-label'), new RegExp(ruleset));
   }
   try {
     await page.goto(process.env.GAME_URL || 'http://localhost:5173');
     await page.evaluate(({ key, value }) => {
-      localStorage.clear();
-      localStorage.setItem(key, value);
-      localStorage.setItem('porcelain:gentle', 'true');
-      localStorage.setItem('porcelain:sound', 'false');
-    }, { key: COLLECTION_STORAGE_KEY, value: initialCollection });
+      localStorage.clear(); localStorage.setItem(key, JSON.stringify(value));
+      localStorage.setItem('porcelain:gentle', 'true'); localStorage.setItem('porcelain:sound', 'false');
+    }, { key: COLLECTION_STORAGE_KEY, value });
     await page.reload();
-    await page.getByRole('button', { name: 'Tile binder', exact: true }).click();
-    await page.locator('.tile-binder').waitFor();
-    assert.equal(await page.locator('.binder-card.is-collected .binder-inspect-button').count(), 3);
-    assert.equal(await page.locator('.binder-card.is-locked button').count(), 0, 'locked art has no inspection affordance');
-    await page.locator('.binder-card.is-locked').first().click();
-    assert.equal(await inspector.count(), 0, 'tapping locked artwork does not inspect it');
+    const launch = page.getByRole('button', { name: 'Collection', exact: true });
+    const home = page.getByRole('button', { name: 'Back to main menu', exact: true });
+    await launch.or(home).first().waitFor();
+    if (await home.isVisible()) await home.click();
+    await launch.click();
+    await page.locator('.collection-browser').waitFor();
+    const persisted = await page.evaluate(key => localStorage.getItem(key), COLLECTION_STORAGE_KEY);
+    assert.equal(await page.locator('.collection-card.is-collected .collection-inspect-button').count(), 4);
+    assert.equal(await page.locator('.collection-card.is-locked button').count(), 0, 'locked tiles have no inspection affordance');
+    await page.locator('.collection-card.is-locked').first().click();
+    assert.equal(await detail.count(), 0, 'locked tile does not reveal a details screen');
 
-    const key = 'ming-porcelain:eastern:C01';
-    const opener = card(key).getByRole('button', { name: 'Inspect 1 peach', exact: true });
-    await opener.scrollIntoViewIfNeeded();
-    await opener.focus();
-    const scrollBefore = await page.locator('.binder-grid').evaluate(node => node.scrollTop);
+    const peach = card('ming-porcelain:eastern:C01').getByRole('button', { name: 'Inspect 1 peach', exact: true });
+    await peach.scrollIntoViewIfNeeded(); await peach.focus();
+    const scrollBefore = await page.locator('.collection-grid').evaluate(node => node.scrollTop);
     assert.ok(scrollBefore > 0, 'fixture exercises a scrolled collection');
-    await page.keyboard.press('Enter');
-    await verifyPreview('ming-porcelain', 'eastern', 'C01', 3);
-    const close = inspector.getByRole('button', { name: 'Close tile preview', exact: true });
-    assert.equal(await close.evaluate(node => node === document.activeElement), true, 'close receives initial focus');
-    for (const key of ['Tab', 'Shift+Tab']) {
-      await page.keyboard.press(key);
-      assert.equal(await page.evaluate(() => document.activeElement === document.body || Boolean(document.activeElement?.closest('.tile-inspector'))), true, 'Tab cannot reach binder controls behind modal');
-      await page.keyboard.press('Escape');
-      await assertBinderStillOpen();
-      assert.equal(await opener.evaluate(node => node === document.activeElement), true, 'Escape after Tab restores tile focus');
-      await page.keyboard.press('Enter');
-      await inspector.waitFor({ state: 'visible' });
+    await page.keyboard.press('Enter'); await verifyDetails('ming-porcelain', 'eastern', 'C01', 3);
+    assert.equal(await page.locator('.collection-browser').isVisible(), false, 'phone details replace the gallery');
+    assert.equal(await page.getByRole('dialog', { name: 'Tile details', exact: true }).count(), 1, 'one full-page detail surface');
+    for (let i = 0; i < 5; i += 1) {
+      await page.keyboard.press('Tab');
+      const active = await page.evaluate(() => ({ inPage: Boolean(document.activeElement?.closest('.collection-page')), inGallery: Boolean(document.activeElement?.closest('.collection-browser')), tag: document.activeElement?.tagName, name: document.activeElement?.getAttribute('aria-label'), html: document.activeElement?.outerHTML.slice(0, 240) }));
+      assert.equal(active.inPage && !active.inGallery, true, `keyboard cannot reach the hidden gallery or menu: ${JSON.stringify({ iteration: i, ...active })}`);
     }
-    await page.keyboard.press('Escape');
-    await assertBinderStillOpen();
-    assert.equal(await opener.evaluate(node => node === document.activeElement), true, 'Escape restores tile focus');
-    assert.ok(Math.abs(await page.locator('.binder-grid').evaluate(node => node.scrollTop) - scrollBefore) <= 1, 'inspection preserves collection scroll');
+    await page.keyboard.press('Escape'); await detail.waitFor({ state: 'detached' });
+    assert.equal(await peach.evaluate(node => node === document.activeElement), true, 'Escape returns focus to originating tile');
+    assert.ok(Math.abs(await page.locator('.collection-grid').evaluate(node => node.scrollTop) - scrollBefore) <= 1, 'return preserves exact grid scroll');
 
-    await opener.click();
-    await verifyPreview('ming-porcelain', 'eastern', 'C01', 3);
-    await page.mouse.click(2, 2);
-    await assertBinderStillOpen();
-    assert.equal(await opener.evaluate(node => node === document.activeElement), true, 'backdrop dismissal restores tile focus');
-    await opener.click();
-    await inspector.getByRole('button', { name: 'Close tile preview', exact: true }).click();
-    await assertBinderStillOpen();
+    // Previous/next browse collected tiles only, in the selected rarity and grid order.
+    await page.getByRole('group', { name: 'Rarity filter' }).getByRole('button', { name: 'Gold', exact: true }).click();
+    const foundKeys = await page.locator('.collection-card.is-collected').evaluateAll(nodes => nodes.map(node => node.dataset.matchKey));
+    assert.equal(foundKeys.length, 2, 'fixture has two found Gold tiles and one locked Gold tile');
+    await card(foundKeys[0]).getByRole('button').click();
+    assert.equal(await previous.isDisabled(), true, 'first found tile cannot go previous');
+    assert.equal(await next.isEnabled(), true);
+    await next.click(); await verifyDetails('ming-porcelain', 'eastern', foundKeys[1].split(':').at(-1));
+    assert.equal(await next.isDisabled(), true, 'next stops at last found tile, skipping locked tiles');
+    await previous.click(); await verifyDetails('ming-porcelain', 'eastern', foundKeys[0].split(':').at(-1));
+    await back();
+    await page.getByRole('group', { name: 'Rarity filter' }).getByRole('button', { name: 'All', exact: true }).click();
 
-    for (const theme of themes) {
-      await page.getByLabel('Collection theme', { exact: true }).selectOption(theme.id);
-      for (const ruleset of ['eastern', 'western']) {
-        await selectEdition(ruleset);
+    for (const ruleset of ['eastern', 'western']) {
+      await selectEdition(ruleset);
+      for (const theme of themes) {
+        await page.getByLabel('Collection theme', { exact: true }).selectOption(theme.id);
         const id = ruleset === 'eastern' ? 'A01' : 'W10';
         await card(`${theme.id}:${ruleset}:${id}`).getByRole('button').click();
-        await verifyPreview(theme.id, ruleset, id);
-        await inspector.getByRole('button', { name: 'Close tile preview', exact: true }).click();
-        await assertBinderStillOpen();
+        await verifyDetails(theme.id, ruleset, id); await back();
       }
     }
-    await page.getByLabel('Collection theme', { exact: true }).selectOption('ming-porcelain');
     await selectEdition('eastern');
-    const layouts = [];
-    for (const [width, height] of [[320, 568], [375, 553], [390, 844], [440, 956], [768, 1024], [844, 390]]) {
+    await page.getByLabel('Collection theme', { exact: true }).selectOption('ming-porcelain');
+    await card('ming-porcelain:eastern:K01').getByRole('button').click();
+    for (const [width, height, split] of [[320, 568, false], [390, 664, false], [440, 956, false], [768, 1024, false], [1024, 768, true], [844, 390, false], [390, 844, false]]) {
       await page.setViewportSize({ width, height });
-      await opener.click();
-      await verifyPreview('ming-porcelain', 'eastern', 'C01', 3);
+      await page.waitForFunction(expected => document.querySelector('.collection-layout').dataset.split === String(expected), split);
+      await verifyDetails('ming-porcelain', 'eastern', 'K01');
+      assert.equal(await page.locator('.collection-browser').isVisible(), split, 'orientation switches between single details and a simultaneous gallery');
+      assert.equal(await detail.count(), 1, 'rotation preserves one selected tile/details instance');
       const layout = await page.evaluate(() => {
-        const dialog = document.querySelector('.tile-inspector');
-        const rect = node => node.getBoundingClientRect().toJSON();
-        return { width: innerWidth, height: innerHeight, documentWidth: document.documentElement.scrollWidth,
-          dialog: rect(dialog), close: rect(dialog.querySelector('.tile-inspector-close')),
-          horizontalOverflow: dialog.scrollWidth > dialog.clientWidth + 1 };
+        const root = document.querySelector('.collection-page'), detail = document.querySelector('.collection-detail');
+        return { width: innerWidth, height: innerHeight, documentWidth: document.documentElement.scrollWidth, root: root.getBoundingClientRect().toJSON(), back: root.querySelector('header button').getBoundingClientRect().toJSON(), detailOverflow: detail.scrollWidth > detail.clientWidth + 1 };
       });
-      assert.ok(layout.documentWidth <= width, `${width}×${height}: document stays within viewport`);
-      assert.equal(layout.horizontalOverflow, false, `${width}×${height}: popup has no horizontal overflow`);
-      for (const [label, rect] of [['dialog', layout.dialog], ['close', layout.close]]) {
-        assert.ok(rect.left >= 0 && rect.right <= width + 1 && rect.top >= 0 && rect.bottom <= height + 1, `${width}×${height}: ${label} is fully visible`);
-      }
-      assert.ok(layout.close.width >= 44 && layout.close.height >= 44, 'close has a 44px target');
-      await inspector.locator('.tile-inspector-meta').scrollIntoViewIfNeeded();
-      assert.equal(await inspector.locator('.tile-inspector-meta').isVisible(), true, 'count and rarity remain reachable');
-      await inspector.evaluate(node => { node.scrollTop = 0; });
-      await page.screenshot({ path: path.join(output, `${browserName}-${width}x${height}.png`) });
-      layouts.push(layout);
-      await inspector.getByRole('button', { name: 'Close tile preview', exact: true }).click();
-      await assertBinderStillOpen();
+      assert.ok(layout.documentWidth <= width && !layout.detailOverflow, `${width}×${height}: detail content has no horizontal overflow`);
+      assert.ok(layout.root.left >= -1 && layout.root.right <= width + 1 && layout.root.top >= -1 && layout.root.bottom <= height + 1, 'page fits viewport');
+      assert.ok(layout.back.width >= 44 && layout.back.height >= 44 && layout.back.bottom <= height, 'Back is reachable and touch-sized');
+      await detail.locator('.collection-detail-description').scrollIntoViewIfNeeded();
+      await next.scrollIntoViewIfNeeded();
+      const nav = await next.boundingBox();
+      assert.ok(nav.y >= 0 && nav.y + nav.height <= height + 1, 'detail navigation can be reached');
+      await detail.locator('img').scrollIntoViewIfNeeded();
+      await page.screenshot({ path: path.join(output, `details-${browserName}-${width}x${height}.png`) });
     }
-    fs.writeFileSync(path.join(output, `${browserName}-layouts.json`), JSON.stringify(layouts, null, 2));
-    assert.equal(await page.evaluate(key => localStorage.getItem(key), COLLECTION_STORAGE_KEY), initialCollection, 'inspection never modifies collection or duplicate counts');
+    await back();
+    assert.equal(await card('ming-porcelain:eastern:K01').getByRole('button').evaluate(node => node === document.activeElement), true, 'rotation and Back preserve tile focus');
+    // Short landscape scrolls the browser pane instead of squeezing the grid.
+    await page.setViewportSize({ width: 844, height: 390 });
+    await peach.scrollIntoViewIfNeeded();
+    const shortScroll = await page.evaluate(() => ['.collection-grid', '.collection-browser', '.progression-page-scroll'].map(selector => document.querySelector(selector).scrollTop));
+    assert.ok(shortScroll.some(value => value > 0), 'short-landscape fixture is scrolled');
+    await peach.click(); await verifyDetails('ming-porcelain', 'eastern', 'C01', 3); await back();
+    const restoredShortScroll = await page.evaluate(() => ['.collection-grid', '.collection-browser', '.progression-page-scroll'].map(selector => document.querySelector(selector).scrollTop));
+    assert.ok(shortScroll.every((value, index) => Math.abs(value - restoredShortScroll[index]) <= 1), 'short-landscape return restores the active scroll owner');
+    await page.setViewportSize({ width: 1024, height: 768 });
+    await page.waitForFunction(() => document.querySelector('.collection-layout').dataset.split === 'true');
+    await card('ming-porcelain:eastern:K01').getByRole('button').click();
+    assert.equal(await card('ming-porcelain:eastern:K01').getByRole('button').getAttribute('aria-pressed'), 'true', 'split view exposes selected tile');
+    await page.getByRole('group', { name: 'Rarity filter' }).getByRole('button', { name: 'Marble', exact: true }).click();
+    assert.equal(await detail.count(), 0, 'filter change clears a no-longer-visible selection');
+    assert.equal(await page.locator('.collection-detail-empty').isVisible(), true, 'split view gives useful empty-state instructions');
+    await page.getByRole('button', { name: 'Back to main menu', exact: true }).click();
+    await page.waitForFunction(() => document.activeElement?.matches('.binder-launch'));
+    assert.equal(await page.evaluate(key => localStorage.getItem(key), COLLECTION_STORAGE_KEY), persisted, 'inspection never changes earned collection or counts');
     assert.deepEqual(errors, [], 'no runtime or resource errors');
-    console.log(`PASS tile inspector: collected-only access; enlarged art, description and metadata across ${themes.length} launch themes/two editions; Escape/backdrop/close, focus and scroll restoration; six responsive sizes; collection unchanged (${browserName})`);
+    console.log(`PASS fullscreen tile details: collected-only navigation/filter boundaries, lore/counts, scroll/focus restoration, orientation continuity, split view, seven sizes, read-only collection (${browserName})`);
   } catch (error) {
-    await page.screenshot({ path: path.join(output, `${browserName}-failure.png`), fullPage: true }).catch(() => {});
-    console.error('Browser errors:', errors);
-    throw error;
+    await page.screenshot({ path: path.join(output, `details-${browserName}-failure.png`), fullPage: true }).catch(() => {});
+    console.error('Browser errors:', errors); throw error;
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

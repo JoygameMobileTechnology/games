@@ -15,7 +15,7 @@ const browserName = process.argv.includes('--webkit') ? 'webkit' : 'chromium';
   const [engine, { createDuelState }, { GHOST_MEMORY_VERSION }, { themes }, { RARITIES, rarityForTile }, { themeTileSets }] =
     await Promise.all(['engine', 'duel', 'ghost', 'themes', 'rarity', 'tile-data'].map(moduleAt));
   const expectedIds = ['ming-porcelain', 'dancheong', 'stained-glass', 'dutch-golden-age'];
-  const expectedCounts = { bamboo: 22, granite: 10, amethyst: 5, gold: 2, celestial: 1 };
+  const expectedCounts = { marble: 22, sapphire: 10, amethyst: 5, gold: 3 };
   assert.deepEqual(themes.map(theme => theme.id), expectedIds);
   const browser = await require(process.env.PLAYWRIGHT_MODULE || 'playwright')[browserName].launch({ headless: true });
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
@@ -121,44 +121,44 @@ const browserName = process.argv.includes('--webkit') ? 'webkit' : 'chromium';
     await closeSheet();
     report('only four launch themes appear for tiles and boards; hidden selections/saves fall back with no unlock switch');
 
-    await button('Tile binder').click(); await page.locator('.tile-binder').waitFor();
+    await button('Collection').click(); await page.locator('.collection-page').waitFor();
+    const collectionEdition = await page.evaluate(() => JSON.parse(localStorage.getItem('porcelain:ruleset')) || 'eastern');
+    assert.match(await page.locator('.collection-progress-copy').innerText(), new RegExp(collectionEdition, 'i'));
+    assert.equal(await page.getByRole('group', { name: 'Collection ruleset' }).count(), 0, 'Collection follows Settings');
     assert.deepEqual(await page.getByLabel('Collection theme', { exact: true }).locator('option').evaluateAll(nodes => nodes.map(node => node.value)), expectedIds);
-    assert.match(await page.locator('.binder-summary').innerText(), /320\s*\/\s*320/);
-    assert.equal(await page.locator('.binder-match-total strong').innerText(), '320');
+    assert.match(await page.locator('.collection-summary').innerText(), /320\s*\/\s*320/);
+    assert.match(await page.locator('.collection-summary').innerText(), /\b320 pairs matched\b/);
     for (const theme of themes) {
       await page.getByLabel('Collection theme', { exact: true }).selectOption(theme.id);
-      for (const ruleset of ['Eastern', 'Western']) {
-        await page.getByRole('group', { name: 'Collection ruleset' }).getByRole('button', { name: new RegExp(`^${ruleset}`) }).click();
-        for (const rarity of RARITIES) {
-          await page.getByRole('group', { name: 'Rarity filter' }).getByRole('button', { name: rarity.label, exact: true }).click();
-          assert.equal(await page.locator('.binder-card').count(), expectedCounts[rarity.id]);
-          assert.equal(await page.locator('.tile-rarity-code').count(), 0);
-          assert.deepEqual([...new Set((await page.locator('.binder-rarity').allTextContents()).map(value => value.trim()))], [rarity.label], 'binder keeps its readable tier names');
-        }
+      for (const rarity of RARITIES) {
+        await page.getByRole('group', { name: 'Rarity filter' }).getByRole('button', { name: rarity.label, exact: true }).click();
+        assert.equal(await page.locator('.collection-card').count(), expectedCounts[rarity.id]);
+        assert.equal(await page.locator('.tile-rarity-code').count(), 0);
+        assert.deepEqual([...new Set((await page.locator('.collection-rarity').allTextContents()).map(value => value.trim()))], [rarity.label], 'Collection keeps its readable tier names');
       }
     }
     await page.getByLabel('Collection theme', { exact: true }).selectOption('ming-porcelain');
     await page.getByRole('group', { name: 'Rarity filter' }).getByRole('button', { name: 'All', exact: true }).click();
     for (const [width, height] of [[320, 568], [390, 844], [768, 1024]]) {
       await page.setViewportSize({ width, height }); await page.waitForTimeout(200);
-      await geometry('.tile-binder', `binder ${width}x${height}`);
-      const close = await button('Close dialog').boundingBox();
-      assert.ok(close.width >= 44 && close.height >= 44 && close.y >= 0 && close.y + close.height <= height, 'binder close remains comfortably reachable');
+      await geometry('.collection-page', `collection ${width}x${height}`);
+      const back = await button('Back to main menu').boundingBox();
+      assert.ok(back.width >= 44 && back.height >= 44 && back.y >= 0 && back.y + back.height <= height, 'Collection Back remains comfortably reachable');
       if (width === 320) {
-        await page.getByLabel('Collection rarity', { exact: true }).selectOption('celestial');
-        assert.equal(await page.locator('.binder-card').count(), 1);
-        await page.getByLabel('Collection rarity', { exact: true }).selectOption('all');
+        await page.getByRole('group', { name: 'Rarity filter' }).getByRole('button', { name: 'Gold', exact: true }).click();
+        assert.equal(await page.locator('.collection-card').count(), 3);
+        await page.getByRole('group', { name: 'Rarity filter' }).getByRole('button', { name: 'All', exact: true }).click();
       }
       await page.screenshot({ path: path.join(output, `binder-${browserName}-${width}x${height}.png`) });
-      await page.locator('.binder-inspect-button').first().click(); await page.locator('.tile-inspector:modal').waitFor();
-      await geometry('.tile-inspector', `inspector ${width}x${height}`);
+      await page.locator('.collection-inspect-button').first().click(); await page.getByRole('dialog', { name: 'Tile details', exact: true }).waitFor();
+      await geometry('.collection-page', `details ${width}x${height}`);
       assert.equal(await page.locator('.tile-rarity-code').count(), 0);
-      assert.match(await page.locator('.tile-inspector-meta').innerText(), /Celestial/, 'inspector retains its tier name');
+      assert.match(await page.locator('.collection-detail-rarity').innerText(), /Gold/, 'details retain the tier name');
       await page.screenshot({ path: path.join(output, `inspector-${browserName}-${width}x${height}.png`) });
-      await button('Close tile preview').click();
+      await button('Back to collection').click();
     }
     assert.deepEqual(await storedCollection(), collection, 'all hidden collection data survives binder browsing');
-    report('binder shows 320 launch faces, every rarity/filter and readable phone/tablet previews; hidden collection remains intact');
+    report('Collection retains 320 launch faces in total, filters the Settings edition and has readable phone/tablet details pages; hidden collection remains intact');
 
     await page.setViewportSize({ width: 390, height: 844 });
     await startSaved(savedGame('dancheong', 'brass-meridian'));
@@ -174,13 +174,13 @@ const browserName = process.argv.includes('--webkit') ? 'webkit' : 'chromium';
     assert.equal(await page.locator('.tile-rarity-code').count(), 0);
     assert.equal(await page.locator('.game-board .tile-rarity-frame').count(), 0);
     assert.equal(await page.locator('.game-tile[data-rarity-visible="true"]').count(), 0);
-    assert.doesNotMatch((await page.locator('.game-tile').evaluateAll(nodes => nodes.map(node => node.getAttribute('aria-label')))).join(' '), /Bamboo|Granite|Amethyst|Gold|Celestial/);
+    assert.doesNotMatch((await page.locator('.game-tile').evaluateAll(nodes => nodes.map(node => node.getAttribute('aria-label')))).join(' '), /Marble|Sapphire|Amethyst|Gold/);
     report('fresh duels have 20 of each booster and face-down tiles reveal no rarity glows or accessible rarity names');
 
     let allRarities;
     for (let seed = 1; seed <= 200; seed += 1) {
       const candidate = savedGame('ming-porcelain', 'ming-porcelain', seed);
-      if (new Set(candidate.tiles.filter(tile => engine.isFree(tile, candidate.tiles)).map(tile => rarityForTile(candidate.theme, candidate.ruleset, tile.faceId).id)).size === 5) { allRarities = candidate; break; }
+      if (new Set(candidate.tiles.filter(tile => engine.isFree(tile, candidate.tiles)).map(tile => rarityForTile(candidate.theme, candidate.ruleset, tile.faceId).id)).size === RARITIES.length) { allRarities = candidate; break; }
     }
     assert.ok(allRarities, 'a standard unmodified deal includes every cosmetic tier');
     await startSaved(allRarities);
@@ -213,7 +213,7 @@ const browserName = process.argv.includes('--webkit') ? 'webkit' : 'chromium';
     assert.equal(await page.locator('.game-board .tile-rarity-frame').count(), 1, 'only the manually revealed face retains its glow');
     assert.equal(await page.locator('.game-tile.eagle-lit').count(), 0);
     assert.equal((await session()).boosters.eagle, 19);
-    report('all five tiers glow without corner tags or physical borders; Eagle Eye exposes hidden rarity then conceals it again');
+    report('all four tiers glow without corner tags or physical borders; Eagle Eye exposes hidden rarity then conceals it again');
 
     await page.setViewportSize({ width: 390, height: 844 });
     await page.emulateMedia({ reducedMotion: 'reduce' });
@@ -230,7 +230,7 @@ const browserName = process.argv.includes('--webkit') ? 'webkit' : 'chromium';
       assert.equal(await page.locator('.game-tile[data-face-up="false"] .tile-rarity-frame').count(), 0, 'hidden tiles have no glow overlay');
       await page.screenshot({ path: path.join(output, `face-up-${rarity.id}-${browserName}.png`) });
     }
-    report('flipping every tier, including Bamboo, reveals a borderless colored glow that stays visible without animation under reduced motion');
+    report('flipping every tier, including Marble, reveals a borderless colored glow that stays visible without animation under reduced motion');
     assert.deepEqual(errors, []);
     fs.writeFileSync(path.join(output, `${browserName}-report.json`), JSON.stringify({ checks, errors, layouts }, null, 2));
     console.log(JSON.stringify({ browser: browserName, passed: checks.length, errors }, null, 2));

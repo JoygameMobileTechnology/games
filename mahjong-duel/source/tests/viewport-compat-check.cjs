@@ -81,12 +81,13 @@ async function checkTable(page, mode, width, height) {
           await checkTable(page, mode, 375, 520);
           await page.getByRole('button', { name: 'Pause game', exact: true }).click();
           await page.getByRole('button', { name: 'Save & return home', exact: true }).click();
-          await page.getByRole('button', { name: 'Tile binder', exact: true }).click();
-          const dialog = page.getByRole('dialog', { name: 'Tile binder', exact: true });
+          await page.getByRole('button', { name: 'Collection', exact: true }).click();
+          const dialog = page.getByRole('dialog', { name: 'Collection', exact: true });
           await dialog.waitFor();
+          assert.equal(await page.getByRole('group', { name: 'Collection ruleset' }).count(), 0, 'Collection has no separate edition switch');
           const bounds = await dialog.boundingBox();
-          assert.ok(bounds.y >= 0 && bounds.y + bounds.height <= 521, 'binder fits resized viewport');
-          await page.getByRole('button', { name: 'Close dialog', exact: true }).click();
+          assert.ok(bounds.y >= 0 && bounds.y + bounds.height <= 521, 'Collection page fits resized viewport');
+          await page.getByRole('button', { name: 'Back to main menu', exact: true }).click();
           await page.getByRole('button', { name: /^Continue duel/ }).click();
           await page.locator('.game-board').waitFor();
           await checkTable(page, mode, 375, 667);

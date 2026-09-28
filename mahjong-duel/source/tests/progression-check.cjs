@@ -237,29 +237,31 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
     await attempt(game.pairs[0], 1);
     collection = await stored('collection');
     assert.equal(collection.counts[firstKey], 1, 'replaying the same physical pair after reload is idempotent');
-    await home(); await button('Tile binder').click();
-    await page.getByRole('dialog', { name: 'Tile binder', exact: true }).waitFor();
-    assert.equal(await page.locator('.binder-match-total strong').innerText(), '1');
-    assert.equal(await page.locator(`.binder-card[data-match-key="${firstKey}"]`).getAttribute('data-collected'), 'true');
+    await home(); await button('Collection').click();
+    await page.getByRole('dialog', { name: 'Collection', exact: true }).waitFor();
+    const collectionEdition = await stored('ruleset') || 'eastern';
+    assert.match(await page.locator('.collection-progress-copy').innerText(), new RegExp(collectionEdition, 'i'));
+    assert.equal(await page.getByRole('group', { name: 'Collection ruleset' }).count(), 0, 'Collection follows Settings');
+    assert.match(await page.locator('.collection-summary').innerText(), /\b1 pair matched\b/);
+    assert.equal(await page.locator(`.collection-card[data-match-key="${firstKey}"]`).getAttribute('data-collected'), 'true');
     for (const theme of themes) {
       await page.getByLabel('Collection theme', { exact: true }).selectOption(theme.id);
-      for (const ruleset of ['Eastern', 'Western']) {
-        await page.getByRole('group', { name: 'Collection ruleset' }).getByRole('button', { name: new RegExp(`^${ruleset}`) }).click();
-        await page.getByRole('group', { name: 'Rarity filter' }).getByRole('button', { name: 'All', exact: true }).click();
-        assert.equal(await page.locator('.binder-card').count(), 40);
-        for (const rarity of RARITIES) {
-          await page.getByRole('group', { name: 'Rarity filter' }).getByRole('button', { name: rarity.label, exact: true }).click();
-          assert.equal(await page.locator('.binder-card').count(), { bamboo: 22, granite: 10, amethyst: 5, gold: 2, celestial: 1 }[rarity.id]);
-          assert.equal(await page.locator(`.binder-card:not([data-rarity="${rarity.id}"])`).count(), 0);
-        }
+      await page.getByRole('group', { name: 'Rarity filter' }).getByRole('button', { name: 'All', exact: true }).click();
+      assert.equal(await page.locator('.collection-card').count(), 40);
+      for (const rarity of RARITIES) {
+        await page.getByRole('group', { name: 'Rarity filter' }).getByRole('button', { name: rarity.label, exact: true }).click();
+        assert.equal(await page.locator('.collection-card').count(), { marble: 22, sapphire: 10, amethyst: 5, gold: 3 }[rarity.id]);
+        assert.equal(await page.locator(`.collection-card:not([data-rarity="${rarity.id}"])`).count(), 0);
       }
     }
     const lastTheme = await page.getByLabel('Collection theme', { exact: true }).inputValue();
-    await button('Next collection theme').click();
+    const otherTheme = themes.find(theme => theme.id !== lastTheme).id;
+    await page.getByLabel('Collection theme', { exact: true }).selectOption(otherTheme);
     assert.notEqual(await page.getByLabel('Collection theme', { exact: true }).inputValue(), lastTheme);
-    await button('Previous collection theme').click();
+    await page.getByLabel('Collection theme', { exact: true }).selectOption(lastTheme);
     assert.equal(await page.getByLabel('Collection theme', { exact: true }).inputValue(), lastTheme);
-    report('human matches award once across reload; binder filters every launch theme and both editions');
+    await button('Back to main menu').click(); await page.locator('.collection-page').waitFor({ state: 'detached' });
+    report('human matches award once across reload; Collection filters every launch theme in the Settings edition');
 
     for (const ruleset of ['eastern', 'western']) {
       const finalGame = smallDeal(ruleset, 2);

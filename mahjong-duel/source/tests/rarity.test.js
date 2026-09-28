@@ -15,19 +15,18 @@ test('all 720 faces have a curated rarity with progressively smaller tiers', () 
         for (const swatch of [rarity.color, rarity.ink, rarity.tint]) assert.match(swatch, /^#[0-9a-f]{6}$/i);
         counts[rarity.id]++; total++;
       }
-      assert.deepEqual(counts, { bamboo: 22, granite: 10, amethyst: 5, gold: 2, celestial: 1 }, `${theme} ${ruleset}`);
+      assert.deepEqual(counts, { marble: 22, sapphire: 10, amethyst: 5, gold: 3 }, `${theme} ${ruleset}`);
     }
   }
   assert.equal(total, 720);
 });
 
-test('rarity labels and corner codes match the five cosmetic tiers', () => {
+test('rarity metadata matches the four cosmetic tiers', () => {
   assert.deepEqual(RARITIES.map(({ id, label, code, order }) => ({ id, label, code, order })), [
-    { id: 'bamboo', label: 'Bamboo', code: 'B', order: 0 },
-    { id: 'granite', label: 'Granite', code: 'G', order: 1 },
+    { id: 'marble', label: 'Marble', code: 'M', order: 0 },
+    { id: 'sapphire', label: 'Sapphire', code: 'S', order: 1 },
     { id: 'amethyst', label: 'Amethyst', code: 'A', order: 2 },
     { id: 'gold', label: 'Gold', code: 'AU', order: 3 },
-    { id: 'celestial', label: 'Celestial', code: 'GK', order: 4 },
   ]);
   assert.ok(Object.isFrozen(RARITIES));
   for (const rarity of RARITIES) {
@@ -36,18 +35,18 @@ test('rarity labels and corner codes match the five cosmetic tiers', () => {
   }
 });
 
-test('Celestial curation follows the signature artwork of each launch theme', () => {
+test('Gold includes the former Celestial signature artwork of each launch theme', () => {
   const showpieces = [
     ['ming-porcelain', 'eastern', 'K01'], ['ming-porcelain', 'western', 'W01'],
     ['dancheong', 'eastern', 'A01'], ['dancheong', 'western', 'W33'],
     ['stained-glass', 'eastern', 'A13'], ['stained-glass', 'western', 'W01'],
     ['dutch-golden-age', 'eastern', 'K06'], ['dutch-golden-age', 'western', 'W36'],
   ];
-  for (const identity of showpieces) assert.equal(rarityForTile(...identity).id, 'celestial', identity.join(':'));
+  for (const identity of showpieces) assert.equal(rarityForTile(...identity).id, 'gold', identity.join(':'));
   assert.equal(rarityForTile('ming-porcelain', 'western', 'W34').id, 'gold');
-  assert.equal(rarityForTile('brass-meridian', 'western', 'W01').id, 'granite');
+  assert.equal(rarityForTile('brass-meridian', 'western', 'W01').id, 'sapphire');
   assert.equal(rarityForTile('stained-glass', 'eastern', 'A12').id, 'gold');
-  assert.equal(rarityForTile('guo-xi', 'eastern', 'A12').id, 'bamboo');
+  assert.equal(rarityForTile('guo-xi', 'eastern', 'A12').id, 'marble');
   assert.equal(rarityForTile('missing', 'eastern', 'C01'), null);
   assert.equal(rarityForTile('ming-porcelain', 'western', 'C01'), null);
   assert.equal(rarityForTile('ming-porcelain', 'eastern', 'F01'), null);

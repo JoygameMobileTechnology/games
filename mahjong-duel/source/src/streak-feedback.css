@@ -1,0 +1,100 @@
+/* Celebrations float over the board; no row or board space is reserved. */
+.remake .duel-scoreboard .local-player { position: static; }
+.remake .game-screen .player-score > div.streak-feedback {
+  position: absolute; left: -5px; right: -5px; top: calc(100% + 4px); height: clamp(128px, 38vw, 174px);
+  z-index: 7; display: block; flex: none; min-width: 0; padding: 0; margin: 0;
+  pointer-events: none; user-select: none; color: #633307; font-family: Manrope, sans-serif; text-align: center;
+  --streak-gold: #d9a548; --streak-blue: #205889;
+}
+.streak-feedback, .streak-feedback * { pointer-events: none !important; }
+.streak-feedback .streak-primary { position: relative; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding: 10px 4px 8px; isolation: isolate; animation: streak-reveal var(--streak-duration) both cubic-bezier(.16,.8,.22,1); }
+.streak-feedback .streak-primary::before { content: ''; position: absolute; z-index: -1; inset: 5% 4% 6%; border-radius: 50%; background: radial-gradient(ellipse, #fff9e5f5 0%, #fff3cacc 37%, #fff6d44a 64%, transparent 77%); filter: blur(7px); }
+.streak-celebration-art { position: absolute; inset: -4% 0 -6%; width: 100%; height: 110%; z-index: -1; overflow: visible; }
+.streak-feedback .streak-player-signature { display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 8px; height: 35px; min-height: 35px; max-width: 62%; margin: 0 0 1px; }
+.remake .streak-feedback .streak-player-signature > .player-avatar { --avatar-size: 34px; width: 34px; height: 34px; flex: 0 0 34px; border: 1.5px solid #b9873c; border-radius: 50%; padding: 2px; background: #fff4cb; box-shadow: 0 0 0 2px #fffae4cc, 0 2px 6px #6a45152e; }
+.remake .streak-feedback .streak-player-signature .player-avatar-portrait { border-radius: 50%; }
+.remake .player-score .streak-feedback .streak-player-signature > span:not(.player-avatar) { min-width: 0; display: block; color: #274a65; font: 800 11px/1.2 Manrope, sans-serif; letter-spacing: 1.3px; text-transform: uppercase; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.streak-feedback .streak-copy { display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; min-width: 0; gap: 0; z-index: 1; }
+.streak-feedback .streak-title { font: 700 clamp(34px, 10.5vw, 57px)/.98 'Cormorant Garamond', Georgia, serif; text-transform: uppercase; letter-spacing: -1.3px; color: #6a3407; text-shadow: 0 1px #fff9da, 0 2px 1px #d7aa517a, 0 0 9px #fff8d6, 0 0 17px #fff8d6; white-space: nowrap; max-width: 98%; }
+.streak-feedback .streak-subtitle { display: flex; align-items: center; justify-content: center; gap: 3px; min-height: 23px; margin-top: 3px; max-width: 100%; }
+.streak-feedback .streak-subtitle small { color: #304652; font: 700 clamp(12px, 3.2vw, 16px)/1.25 Manrope, sans-serif; white-space: nowrap; text-shadow: 0 1px #fff9e3, 0 0 8px #fff8d6; }
+.remake .streak-feedback .streak-subtitle strong { color: #304652; font: inherit; font-weight: 800; }
+.streak-pair-motif { width: 28px; height: 22px; flex: 0 0 28px; color: #215887; overflow: visible; }
+.streak-pair-motif rect { fill: #fff6dd; stroke: #5c8eaf; stroke-width: 1.2; }
+.streak-pair-motif path { fill: none; stroke: currentColor; stroke-width: 1.2; }
+.streak-feedback .streak-secondary { position: relative; margin-top: 2px; display: flex; align-items: center; justify-content: center; gap: 5px; padding: 2px 11px; border-radius: 20px; background: #fff7dfdb; border: 1px solid #bb965553; box-shadow: 0 2px 6px #51411214; max-width: 90%; color: #754712; }
+.streak-feedback .streak-secondary b { font: 800 10px/1.2 Manrope, sans-serif; white-space: nowrap; letter-spacing: .3px; }
+.streak-feedback .streak-secondary small { font: 600 10px/1.2 Manrope, sans-serif; white-space: nowrap; }
+.streak-feedback .streak-secondary i { color: #ba8b39; font-size: 9px; font-style: normal; }
+.streak-rays { transform-origin: 260px 108px; animation: streak-rays var(--streak-duration) both ease-out; }
+.streak-radiance { animation: streak-light var(--streak-duration) both ease-out; }
+.streak-laurel { opacity: calc(.7 + var(--streak-intensity) * .3); }
+.streak-star { animation: streak-glint var(--streak-duration) both ease-out; }
+.streak-star:nth-of-type(even) { animation-delay: 45ms; }
+.streak-primary.streak-peak .streak-celebration-art { filter: drop-shadow(0 0 4px #fff0a1a3); }
+.streak-primary.streak-reinforcement { animation-name: streak-reinforce; }
+/* Turning Points form a vertical portrait seal; pair chains keep broad winged laurels. */
+.streak-feedback.streak-primary-turning .streak-player-signature { flex-direction: column; gap: 3px; height: 47px; min-height: 47px; margin-top: -4px; margin-bottom: 3px; }
+.remake .player-score .streak-primary-turning .streak-player-signature > span:not(.player-avatar) { font-size: 9px; letter-spacing: 1px; }
+.streak-primary-turning .streak-title { font-size: clamp(32px, 9.5vw, 54px); }
+.streak-primary-turning .streak-laurel .blue-leaf { opacity: .3; }
+.streak-banner-seal { position: absolute; width: 65px; height: 66px; left: calc(50% - 32.5px); top: 0; z-index: -1; }
+.streak-banner-seal .streak-seal-motif { width: 100%; height: 100%; fill: none; stroke: #bb8c3e; stroke-width: .7; filter: drop-shadow(0 0 3px #fbdc82); }
+.streak-banner-seal .seal-core { display: none; }
+.streak-seal-motif .seal-left,.streak-seal-motif .seal-right { fill: none; animation: streak-seal-open var(--streak-duration) both ease-out; transform-origin: center; }
+.streak-seal-motif.seal-recovery { animation: streak-recover var(--streak-duration) both ease-out; }
+.streak-seal-motif.seal-focus .seal-left,.streak-seal-motif.seal-focus .seal-right { animation-name: streak-seal-focus; }
+.streak-seal-motif.seal-balanced .seal-left,.streak-seal-motif.seal-draw .seal-left { animation: streak-align-left var(--streak-duration) ease-out both; }
+.streak-seal-motif.seal-balanced .seal-right,.streak-seal-motif.seal-draw .seal-right { animation: streak-align-right var(--streak-duration) ease-out both; }
+/* The old turn label retains its existing height beneath this temporary overlay. */
+.has-streak .turn-ribbon { visibility: hidden; }
+.remake .player-score > div.local-avatar-wrap { position: relative; flex: 0 0 auto; display: block; min-width: 0; }
+.streak-portrait-ring { position: absolute; inset: -5px; pointer-events: none; z-index: 2; }
+.streak-portrait-ring .streak-seal-motif { width: 100%; height: 100%; fill: none; stroke: #ffdda0; stroke-width: 1.1; overflow: visible; filter: drop-shadow(0 0 3px #eac47b90); }
+.streak-portrait-ring .seal-core { display: none; }
+.streak-portrait-ring .seal-left,.streak-portrait-ring .seal-right { transform-origin: 15px 17px; }
+.streak-feedback.streak-paused,.streak-feedback.streak-paused *,.streak-portrait-ring.streak-paused * { animation-play-state: paused !important; }
+.streak-feedback.streak-gentle *,.streak-portrait-ring.streak-gentle * { animation: none !important; }
+@keyframes streak-reveal { 0% { opacity: 0; transform: translateY(-7px) scale(.84); } 16% { opacity: 1; transform: translateY(0) scale(1.02); } 26%,79% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: translateY(-4px) scale(1.015); } }
+@keyframes streak-rays { 0% { opacity: 0; transform: scale(.35) rotate(-5deg); } 29% { opacity: 1; transform: scale(1.04) rotate(0); } 77% { opacity: .85; transform: scale(1); } 100% { opacity: 0; transform: scale(1.1); } }
+@keyframes streak-light { 0% { opacity: .25; } 24%,75% { opacity: 1; } 100% { opacity: .2; } }
+@keyframes streak-glint { 0%,10% { opacity: 0; } 38% { opacity: 1; } 68% { opacity: .7; } 100% { opacity: 0; } }
+@keyframes streak-seal-open { from { transform: scale(.55, .85); opacity: .4; } 35%,100% { transform: scale(1); opacity: 1; } }
+@keyframes streak-seal-focus { from { transform: scale(1.35); opacity: .2; } 40%,100% { transform: scale(1); opacity: 1; } }
+@keyframes streak-recover { from { transform: translateY(6px) rotate(-15deg); } 40%,100% { transform: translateY(0) rotate(0); } }
+@keyframes streak-align-left { from { transform: translateX(-5px); } 35%,100% { transform: translateX(0); } }
+@keyframes streak-align-right { from { transform: translateX(5px); } 35%,100% { transform: translateX(0); } }
+@keyframes streak-reinforce { 0%,100% { opacity: 0; transform: scale(.98); } 20%,75% { opacity: 1; transform: scale(1); } }
+@media (min-width: 700px) {
+  .remake .game-screen .player-score > div.streak-feedback { left: 0; right: 0; height: 195px; }
+  .streak-feedback .streak-primary { padding-top: 13px; }
+  .streak-feedback .streak-player-signature { height: 47px; min-height: 47px; margin-bottom: 3px; }
+  .remake .streak-feedback .streak-player-signature > .player-avatar { width: 44px; height: 44px; flex-basis: 44px; }
+  .remake .player-score .streak-feedback .streak-player-signature > span:not(.player-avatar) { font-size: 13px; }
+  .streak-feedback .streak-subtitle { margin-top: 5px; }
+  .streak-feedback.streak-primary-turning .streak-player-signature { height: 61px; min-height: 61px; }
+  .streak-banner-seal { width: 79px; height: 81px; left: calc(50% - 39.5px); }
+  .streak-feedback .streak-secondary b,.streak-feedback .streak-secondary small { font-size: 12px; }
+}
+@media (max-width: 360px) {
+  .streak-feedback .streak-primary { padding-top: 7px; }
+  .streak-feedback .streak-title { letter-spacing: -1.2px; }
+  .streak-primary-turning .streak-subtitle small { font-size: 11px; }
+  .streak-feedback .streak-secondary { margin-top: 1px; padding-block: 1px; }
+}
+@media (orientation: landscape) and (max-height: 600px) {
+  .remake .game-screen .player-score > div.streak-feedback { left: -9px; right: -9px; top: calc(100% + 12px); height: 125px; }
+  .streak-feedback .streak-title { font-size: clamp(25px, 4.2vw, 37px); letter-spacing: -1px; }
+  .streak-feedback .streak-player-signature { height: 30px; min-height: 30px; margin-bottom: 0; }
+  .remake .streak-feedback .streak-player-signature > .player-avatar { width: 28px; height: 28px; flex-basis: 28px; }
+  .streak-feedback .streak-subtitle small { font-size: 11px; white-space: normal; }
+  .streak-feedback.streak-primary-turning .streak-player-signature { height: 43px; min-height: 43px; }
+  .streak-banner-seal { width: 57px; height: 60px; left: calc(50% - 28.5px); }
+}
+@media (prefers-reduced-motion: reduce) { .streak-feedback *,.streak-portrait-ring * { animation: none !important; } }
+.streak-feedback .streak-celebration-art { transform: scale(calc(.94 + var(--streak-intensity) * .06)); transform-origin: 50% 50%; }
+/* Rotated layouts put controls in a right sidebar; celebrate over the board column. */
+@media (orientation: landscape) and (min-width: 650px) {
+  .remake .game-screen .duel-scoreboard { position: static; }
+  .remake .game-screen .player-score > div.streak-feedback { left: 24px; right: max(286px, calc(30% + 32px)); top: max(18px, env(safe-area-inset-top)); height: clamp(140px, 24vh, 195px); }
+}

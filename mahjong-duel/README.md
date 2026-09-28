@@ -2,20 +2,22 @@
 
 [Play Mahjong Duel](https://joygamemobiletechnology.github.io/games/mahjong-duel/)
 
-A portrait memory duel with four launch themes, a wood-and-parchment interface, ceramic collision sounds, optional profiles and responsive phone/tablet layouts.
+A face-down memory duel with four launch themes, a wood-and-parchment interface, optional profiles and responsive phone/tablet layouts.
 
-- **Duel:** play your own simulated ghost on one shared 80-tile board. Match to earn 100 points and play again; miss to pass the turn. The ghost learns from visible flips over the last two completed attempts and otherwise guesses.
-- **Face down:** only an overlapping tile above blocks a flip; horizontal neighbors do not. Both Eastern and Western editions require identical artwork.
-- **Finish the board:** 21 pairs secures the win, but all 40 pairs are played. A 20–20 result is a draw.
-- **Collection:** your matches unlock binder entries and increase duplicate counts across 320 faces. Tap a found tile for a larger view and a note about its cultural or thematic meaning. Five cosmetic tiers—Bamboo, Granite, Amethyst, Gold and Celestial—use soft glows on revealed tiles, without corner tags. Face-down rarity stays hidden unless Eagle Eye is active.
-- **Boosters:** 20 each of Shuffle, Hint, Freeze and Eagle Eye per fresh match for testing, for the player only.
-- **Variety:** twelve formations with no consecutive repeat, plus independent tile and background selection across four launch themes.
+- **Duel:** play your profile’s simulated ghost on one shared 80-tile board. Match to earn 100 points and play again; miss to pass the turn. The ghost learns from visible flips over the last two completed attempts and otherwise guesses.
+- **Face down:** only overlapping tiles above block a flip. Both Eastern and Western editions require identical artwork. Settings controls the edition in both gameplay and Collection.
+- **Finish the board:** 21 pairs secures the win, but all 40 pairs are played. A 20–20 result is a draw. Duels cannot be saved or continued after leaving or reloading.
+- **Collection:** your matches unlock artwork and increase duplicate counts across 320 launch faces. Browse the full-screen gallery and inspect collected tiles for their cultural meaning. Phones show full-screen details; landscape tablets use an adjacent details pane.
+- **Rarities:** Marble, Sapphire, Amethyst and Gold have gem icons beside their Collection labels. Revealed tiles use soft rarity glows, without borders or corner tags. Eagle Eye reveals hidden glows for ten seconds. Rarity does not affect draw odds or scoring.
+- **Progression:** accumulated daily rewards, categorized achievements, achievement banners, prominent match streaks and simulated leaderboards. Rewarded ads run in test mode: double claims simulate completion without showing video.
+- **Boosters:** Shuffle, Hint, Freeze and Eagle Eye draw from the player’s persistent earned inventory. Only the player uses boosters.
+- **Menu:** each launch randomly chooses bamboo doors, a moonlit lantern garden or an autumn bridge, excluding the previous launch. Leaves and fireflies animate each scene; reduced motion is supported.
 
-First launch assigns a default profile. Name, preset avatar and country flag can be edited at any time. There are no accounts, backend or live multiplayer. Profiles, settings, collection and resumable duels are stored on the current browser/device. Audio starts after interaction; gentle motion is available.
+First launch assigns a default profile. Name, preset avatar and country flag can be edited at any time. There are no accounts, backend or live multiplayer. Profiles, settings, collection, rewards and achievements stay on the current browser/device. Audio starts after interaction.
 
 ## Publishing and local preview
 
-`index.html` is the complete standalone game, containing 335 images and 16 font files alongside its code and styles. It can be downloaded for offline play and requires no external assets or game server. The hosted game installs no service worker.
+`index.html` is the complete standalone game, containing 337 images and 16 font files alongside its code and styles. It supports offline play and requires no external assets or game server. The hosted game installs no service worker.
 
 From the repository root:
 
@@ -26,12 +28,14 @@ python3 -m http.server -d _site 8080
 
 Open `http://localhost:8080/mahjong-duel/`. Pages publishes this folder at `/games/mahjong-duel/` using the existing hub workflow.
 
-The editable [source](source/README.md), runtime artwork, lockfile, tests and tile-lore references are included under `source/`. Run `npm ci`, `npm test` and `npm run build` there; copy `source/output/mahjong-duel-web.html` over this folder’s `index.html` for future releases.
+Editable [source](source/README.md), runtime artwork, lockfile, tests and tile-lore references are included under `source/`. Run `npm ci`, `npm test` and `npm run build` there; copy `source/output/mahjong-duel-web.html` over this folder’s `index.html` for future releases.
 
 ## Release provenance
 
-Updated from development `main`, source checkpoint `8eab32ac405769d75ea5aed2b00811cdc6fede77`. The previously published game remains in Git history. Existing compatible Duel saves and preferences are retained. The four launch themes are Ming porcelain, Dancheong, Stained Glass and Dutch Golden Age; other themes have no in-game enable switch and their artwork is excluded from the runtime build. Hidden-theme collection progress remains stored, while unavailable theme selections fall back to Ming porcelain. Retired wildcard boards, Solo saves and unavailable-theme duels are not offered for continuation. Existing saved matches retain their remaining booster charges; fresh matches start with 20 each.
+Updated from development `main`, source checkpoint `017052c4c5151e4a390e8998afee7fa8e7f4fa6f`. Previous releases remain in Git history. Collection counts and earned achievement unlocks are preserved: Bamboo becomes Marble, Granite becomes Sapphire, and Celestial joins Gold. Rarity-dependent achievement progress uses the four current tiers.
 
-Build SHA-256: `f7aceebca46d03752d047de69b8b42c038cda6b92d48566bfe4801394abf1fd7`.
+The four launch themes are Ming porcelain, Dancheong, Stained Glass and Dutch Golden Age. Other themes have no in-game enable switch and their artwork is excluded from the runtime build. Hidden-theme collection progress remains stored; unavailable theme selections fall back to Ming porcelain. Legacy duel snapshots are discarded.
+
+Build SHA-256: `d220d045e53024fbe6c5dabf18dca9a6c538aba739011e2c5e69b7f933876202`.
 
 See [third-party notices](THIRD_PARTY_NOTICES.md) for bundled library and font licenses.

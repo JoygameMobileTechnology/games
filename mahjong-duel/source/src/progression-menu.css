@@ -1,0 +1,46 @@
+.progression-glyph { display: inline-flex; width: 27px; height: 27px; flex: 0 0 auto; }
+.progression-glyph > svg { display: block; width: 100%; height: 100%; }
+.remake .progression-toolbar { gap: 12px; }
+.remake .progression-toolbar .profile-launch { width: 66px; min-width: 44px; flex: 0 1 66px; padding-inline: 0; }
+.remake .progression-toolbar .profile-launch > span:last-of-type { max-width: 76px; }
+.remake .progression-utilities { gap: 8px; flex-shrink: 0; }
+.remake .progression-utilities .icon-button { position: relative; display: grid; place-items: center; }
+.daily-menu-count { position: absolute; right: -2px; bottom: -3px; min-width: 19px; max-width: 32px; height: 19px; display: grid; place-items: center; padding: 0 3px; border: 1px solid #986c35; border-radius: 11px; background: #fff1c3; color: #593617; box-shadow: 0 1px 2px #3d2108; font-size: 10px; font-weight: 800; line-height: 1; pointer-events: none; }
+.remake .home-brand.progression-brand { --ranking-control: 64px; width: 100%; max-width: none; }
+.remake .progression-brand h1 > span { padding-inline: 0; }
+.remake .progression-brand .brand-leaf { left: 76%; }
+.remake .progression-brand .leaderboard-menu-control { position: absolute; right: -20px; top: calc((clamp(58px, 16vw, 96px) * .93 - var(--ranking-control)) / 2); width: var(--ranking-control); height: var(--ranking-control); }
+.remake .leaderboard-menu-control .progression-glyph { width: 39px; height: 39px; }
+@media (max-width: 350px) {
+  .remake .progression-toolbar { gap: 8px; }
+  .remake .progression-utilities { gap: 6px; }
+  .remake .progression-toolbar .profile-launch { width: 56px; flex-basis: 56px; }
+  .remake .progression-toolbar .profile-launch > span:last-of-type { max-width: 58px; }
+  .remake .home-brand.progression-brand { --ranking-control: 48px; }
+  .remake .leaderboard-menu-control .progression-glyph { width: 29px; height: 29px; }
+}
+@media (max-height: 700px) and (orientation: portrait) {
+  .remake .progression-brand .leaderboard-menu-control { right: -16px; top: calc((clamp(54px, 15vw, 68px) * .93 - var(--ranking-control)) / 2); }
+}
+@media (min-width: 700px) {
+  .remake .home-screen:has(.progression-toolbar) { overflow: visible; }
+  .remake .home-toolbar.progression-toolbar, .remake .home-brand.progression-brand { width: min(calc(100vw - 80px), 1080px); justify-self: center; }
+  .remake .progression-utilities { gap: 13px; }
+  .remake .progression-utilities .icon-button { width: 48px; height: 48px; flex-basis: 48px; }
+  .remake .progression-utilities .progression-glyph, .remake .progression-utilities .icon-button > svg { width: 29px; height: 29px; }
+  .remake .home-brand.progression-brand { --ranking-control: 80px; }
+  .remake .progression-brand .leaderboard-menu-control { right: 0; }
+  .remake .progression-brand .brand-leaf { left: calc(50% + 98px); }
+  .remake .leaderboard-menu-control .progression-glyph { width: 48px; height: 48px; }
+}
+@media (orientation: landscape) and (max-height: 599px) {
+  .remake .home-toolbar.progression-toolbar, .remake .home-brand.progression-brand { width: 100%; }
+  .remake .home-brand.progression-brand { --ranking-control: 48px; }
+  .remake .progression-brand .brand-leaf { left: 76%; }
+  .remake .progression-brand .leaderboard-menu-control { right: -12px; top: calc((clamp(49px, 9vw, 72px) * .93 - var(--ranking-control)) / 2); }
+  .remake .leaderboard-menu-control .progression-glyph { width: 29px; height: 29px; }
+}
+/* Safari otherwise clips the tablet-only header expansion at the home shell. */
+@media (min-width: 700px) {
+  .remake.at-home .app-shell:has(.progression-toolbar) { overflow: visible; }
+}

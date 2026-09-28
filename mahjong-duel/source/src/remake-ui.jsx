@@ -4,8 +4,9 @@ import { Check } from '@phosphor-icons/react';
 import { themes } from './themes.js';
 import { themeTileSets } from './tile-data.js';
 import { boardVariants } from './board-variants.js';
+import { menuBackgrounds } from './menu-backgrounds.js';
 
-export const doorArt = './assets/remake/shoji-doors.png';
+export const doorArt = menuBackgrounds.find(background => background.id === 'bamboo').src;
 
 export function DoorScene({ opening = false, onComplete }) {
   return <div className={`door-scene ${opening ? 'door-transition' : ''}`} aria-hidden="true">

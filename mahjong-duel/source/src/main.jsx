@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { AnimatePresence, motion, MotionConfig } from 'motion/react';
+import { AnimatePresence, motion, MotionConfig, useIsPresent } from 'motion/react';
 import { ArrowRight, ArrowLeft, ArrowsClockwise, Check, CaretRight, Diamond, FlowerLotus, GearSix, Info, Leaf, Lightbulb, Play, SpeakerHigh, SpeakerSlash, Sparkle, Sword, X, Palette, List, Ghost, BookOpen, Snowflake, Eye } from '@phosphor-icons/react';
 import '@fontsource/cormorant-garamond/latin-400.css';
 import '@fontsource/cormorant-garamond/latin-500.css';
@@ -18,7 +18,9 @@ import { BoardSurface } from './board-surface.jsx';
 import { themeUiStyle } from './theme-ui.js';
 import { playGhostTurn, ghostName, rememberGhostFaces, GHOST_MEMORY_VERSION } from './ghost.js';
 import { ProfileEditor, PlayerAvatar, loadProfile, saveProfile } from './player-profile.jsx';
-import { DoorScene, FallingLeaves, ThemeChooser, VictoryBloom } from './remake-ui.jsx';
+import { ThemeChooser, VictoryBloom } from './remake-ui.jsx';
+import { chooseMenuBackground } from './menu-backgrounds.js';
+import { MenuScene } from './menu-scene.jsx';
 import { playEffect } from './remake-sound.js';
 import { flipMemoryTile } from './memory-turn.js';
 import { createDuelState, resolveDuelAttempt, getDuelOutcome } from './duel.js';
@@ -27,11 +29,15 @@ import { boardMetrics, tilePosition } from './table-layout.js';
 import { chooseFormationId } from './formations.js';
 import { rarityForTile } from './rarity.js';
 import { TileRarity } from './tile-rarity.jsx';
-import { loadCollection, saveCollection, awardCollectedPair } from './collection.js';
+import { loadCollection } from './collection.js';
+import { loadProgression, saveProgression, reduceProgression, consumeRankingPresentation } from './progression.js';
+import { getDailyView } from './daily-rewards.js';
+import { requestRewardedAd } from './rewarded-ad.js';
+import { createDuelTracker, observeFlip, resolveTrackedAttempt, trackBooster, trackAutomaticShuffle, completedDuelEvent } from './duel-progress.js';
 import { createGameId } from './game-id.js';
 import { useViewportCompatibility } from './viewport-compat.js';
 import { TileBinder } from './tile-binder.jsx';
-import { createGame, isFree, getAvailablePairs, removePair, shuffleBoard, remainingCount, isCurrentCatalogueDeal } from './engine.js';
+import { createGame, isFree, getAvailablePairs, shuffleBoard, remainingCount } from './engine.js';
 import { chime, tileSmack, unlockAudio } from './sound.js';
 import './style.css';
 import './board-art.css';
@@ -42,10 +48,15 @@ import './table-ui.css';
 import './viewport-compat.css';
 import './phone-ui.css';
 import './phone-dialogs.css';
+import { ProgressionMenuHeader } from './progression-menu.jsx';
+import { DailyRewardsPage, AchievementsPage, LeaderboardsPage } from './progression-pages.jsx';
+import { StreakFeedback, StreakPortrait } from './streak-feedback.jsx';
+import { AchievementNotifications } from './achievement-toast.jsx';
 
 const store = {
   get(key, fallback) { try { return JSON.parse(localStorage.getItem(`porcelain:${key}`)) ?? fallback; } catch { return fallback; } },
   set(key, value) { try { localStorage.setItem(`porcelain:${key}`, JSON.stringify(value)); } catch { /* Private browsing can disable storage. */ } },
+  remove(key) { try { localStorage.removeItem(`porcelain:${key}`); } catch { /* Private browsing can disable storage. */ } },
 };
 const facesByTheme = Object.fromEntries(Object.entries(themeTileSets).map(([theme, sets]) => [theme, Object.fromEntries(Object.entries(sets).map(([key, set]) => [key, Object.fromEntries(set.map(face => [face.id, face]))]))]));
 const secondsLabel = seconds => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
@@ -149,7 +160,9 @@ function TileFan({ faces, theme, sound, gentle }) {
 
 function Sheet({ title, subtitle, onClose, children }) {
   const panel = useRef(null);
+  const isPresent = useIsPresent();
   useEffect(() => {
+    if (!isPresent) return;
     const previous = document.activeElement;
     const node = panel.current;
     node?.focus();
@@ -166,8 +179,8 @@ function Sheet({ title, subtitle, onClose, children }) {
     }
     document.addEventListener('keydown', key);
     return () => { document.removeEventListener('keydown', key); previous?.focus(); };
-  }, []);
-  return <motion.div className="sheet-backdrop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose}>
+  }, [isPresent]);
+  return <motion.div className="sheet-backdrop" inert={!isPresent} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={isPresent ? onClose : undefined}>
     <motion.section className="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title" tabIndex={-1} ref={panel} initial={{ y: 70 }} animate={{ y: 0 }} exit={{ y: 70 }} transition={{ type: 'spring', stiffness: 340, damping: 32 }} onClick={e => e.stopPropagation()}>
       <header className="parchment-header"><h2 id="sheet-title">{title}</h2><IconButton label="Close dialog" onClick={onClose}><X size={27} weight="bold" /></IconButton><span className="red-tassel" aria-hidden="true" /></header>
       <div className="parchment-body">{subtitle && <p className="sheet-subtitle">{subtitle}</p>}{children}</div>
@@ -182,15 +195,51 @@ function Rules({ ruleset }) {
     <div className="rule-step"><span>03</span><div><h3>{ruleset === 'eastern' ? 'Know your families.' : 'Trust the picture.'}</h3><p>{ruleset === 'eastern' ? 'Match two identical faces. Counts and tiers form ordered groups; symbols, kin, and anchors are unranked pictures. Sharing a family does not make two different faces a match.' : 'Every pair must show the exact same picture. Each picture has four identical copies.'}</p></div></div>
     <div className="rule-note"><Ghost size={24} /><p><strong>Your ghost</strong> shares your name and avatar. It is a simulated opponent with imperfect memory. Match for 100 points and play again. Miss, and the turn passes. The highest score when the board is clear wins.</p></div>
     <p className="rules-footnote">First to 21 pairs secures the win; keep playing until all 40 pairs are cleared. Your matches collect artwork in your binder. The ghost remembers both players’ reveals from the last two turns.</p>
-    <div className="booster-rules"><h3>20 of each, every duel</h3><p><strong>Shuffle</strong> rearranges the stones and clears the ghost’s memory.</p><p><strong>Hint</strong> highlights an uncovered matching pair for 1.5 seconds, keeping it face down.</p><p><strong>Freeze</strong> skips the ghost’s next turn after your next miss.</p><p><strong>Eagle Eye</strong> reveals hidden tile rarity glows for 10 seconds.</p></div>
+    <div className="booster-rules"><h3>Your booster collection</h3><p>Claim Daily Rewards to earn boosters. Unused boosters carry over to your next duel.</p><p><strong>Shuffle</strong> rearranges the stones and clears the opponent’s memory. Automatic board recovery is free.</p><p><strong>Hint</strong> highlights an uncovered matching pair for 1.5 seconds, keeping it face down.</p><p><strong>Freeze</strong> skips the opponent’s next turn after your next miss.</p><p><strong>Eagle Eye</strong> reveals hidden tile rarity glows for 10 seconds.</p></div>
   </div>;
 }
 
 function App() {
   const [screen, setScreen] = useState('menu');
+  const [menuBackground] = useState(() => chooseMenuBackground(store.get('menuBackground', null)));
+  useEffect(() => { store.set('menuBackground', menuBackground.id); }, [menuBackground]);
+  const [pageHidden, setPageHidden] = useState(() => document.hidden);
   const [profile, setProfile] = useState(loadProfile);
-  const [collection, setCollection] = useState(loadCollection);
-  useEffect(() => { saveCollection(collection); }, [collection]);
+  const [launchProgress] = useState(() => {
+    const previous = loadProgression({ collection: loadCollection() });
+    const next = reduceProgression(previous, { type: 'login', now: Date.now() });
+    const achievementIds = Object.keys(next.unlocked).filter(id => !Object.hasOwn(previous.unlocked, id));
+    return { progression: next, notifications: achievementIds.length ? [{ id: achievementIds.join(':'), achievementIds }] : [] };
+  });
+  const [progression, setProgression] = useState(launchProgress.progression);
+  const [achievementBatches, setAchievementBatches] = useState(launchProgress.notifications);
+  const progressionRef = useRef(progression);
+  const collection = progression.collection;
+  const [page, setPage] = useState(() => getDailyView(progression).shouldAutoOpen ? 'daily' : null);
+  const [adState, setAdState] = useState('idle');
+  const pageOpener = useRef('.duel-launch');
+  const adBusy = useRef(false);
+  const [rankingPresentation, setRankingPresentation] = useState(null);
+  const tracker = useRef(null);
+  const [streakCues, setStreakCues] = useState([]);
+  function commitProgress(next) {
+    const achievementIds = Object.keys(next.unlocked).filter(id => !Object.hasOwn(progressionRef.current.unlocked, id));
+    progressionRef.current = next;
+    saveProgression(next);
+    setProgression(next);
+    if (achievementIds.length) setAchievementBatches(current => [...current, { id: achievementIds.join(':'), achievementIds }]);
+    return next;
+  }
+  function progressEvent(event) {
+    if (!event) return progressionRef.current;
+    const before = progressionRef.current;
+    const next = reduceProgression(before, event);
+    return next === before ? before : commitProgress(next);
+  }
+  useEffect(() => {
+    saveProgression(progressionRef.current);
+    if (page === 'daily') progressEvent({ type: 'daily-presented', dayId: getDailyView(progressionRef.current).dayId });
+  }, []);
   useEffect(() => { saveProfile(profile); }, []);
   const [entering, setEntering] = useState(false);
   const [boardThemeId, setBoardThemeId] = useState(() => themeById[store.get('boardTheme', store.get('theme', defaultTheme.id))] ? store.get('boardTheme', store.get('theme', defaultTheme.id)) : defaultTheme.id);
@@ -214,7 +263,6 @@ function App() {
   const attachBoard = useCallback(node => { boardRef.current = node; setBoardReady(Boolean(node)); }, []);
   const pendingTime = useRef({ key: null, ms: 0 });
   const [toast, setToast] = useState(null);
-  const [combo, setCombo] = useState(0);
   const [burst, setBurst] = useState(null);
   const [result, setResult] = useState(null);
   useEffect(() => {
@@ -230,12 +278,11 @@ function App() {
     document.addEventListener('keydown', trap);
     return () => document.removeEventListener('keydown', trap);
   }, [result]);
-  const [saved, setSaved] = useState(() => {
-    const value = store.get('session', null);
-    return value?.version === 3 && isCurrentCatalogueDeal(value) && (value.tiles.some(t => !t.removed) || (value.mode === 'duel' && value.duelVersion === 1)) && themeById[value.theme] && ['eastern', 'western'].includes(value.ruleset) && value.mode === 'duel' && Number.isFinite(value.elapsed) && (value.mode !== 'duel' || (value.duelVersion === 1 && ['you', 'ai'].includes(value.turn) && Number.isFinite(value.aiScore))) ? value : null;
-  });
+  // Duels last only for this visit; discard snapshots from older builds.
+  useEffect(() => { store.remove('session'); }, []);
   const lock = useRef(false);
   const gameRef = useRef(game); gameRef.current = game;
+  function commitGame(next) { gameRef.current = next; setGame(next); }
   const playSound = kind => chime(kind, sound);
   const announce = message => setToast({ message, id: Date.now() });
   useEffect(() => { store.set('ruleset', ruleset); }, [ruleset]);
@@ -255,10 +302,10 @@ function App() {
   useEffect(() => { if (burst) { const timeout = setTimeout(() => setBurst(null), 850); return () => clearTimeout(timeout); } }, [burst]);
 
   useEffect(() => {
-    if (screen === 'game' && game && !result) saveSession();
-  }, [game, screen, result, pending, flippedIds, sheet]);
-  useEffect(() => {
-    const pauseOnHide = () => { if (document.hidden && screen === 'game' && !result) setSheet(current => current || 'pause'); };
+    const pauseOnHide = () => {
+      setPageHidden(document.hidden);
+      if (document.hidden && screen === 'game' && !result && remainingCount(gameRef.current?.tiles || [])) setSheet(current => current || 'pause');
+    };
     document.addEventListener('visibilitychange', pauseOnHide);
     return () => document.removeEventListener('visibilitychange', pauseOnHide);
   }, [screen, result]);
@@ -277,21 +324,23 @@ function App() {
     const interval = setInterval(tick, 100);
     return () => { clearInterval(interval); };
   }, [screen, sheet, result, entering, boardReady, Boolean(game?.hintEffect), Boolean(game?.eagleMs)]);
+  // Record the completed board immediately; presentation waits for the final impact/cue.
   useEffect(() => {
-    if (screen !== 'game' || !game || result) return;
-    if (!remainingCount(game.tiles)) {
-      const outcome = getDuelOutcome(game);
-      setResult(outcome); setSaved(null); store.set('session', null); setSelected(null); setSheet(null);
-      playEffect(outcome === 'win' ? 'win' : 'turn', sound);
-    }
-  }, [game, screen, result]);
+    if (screen !== 'game' || !game || remainingCount(game.tiles)) return;
+    const outcome = getDuelOutcome(game);
+    progressEvent(completedDuelEvent(tracker.current, game, outcome, Date.now()));
+    if (result || flight || streakCues.length || pending || sheet || pageHidden) return;
+    setResult(outcome); setSelected(null);
+    playEffect(outcome === 'win' ? 'win' : 'turn', sound);
+  }, [game, screen, result, flight, streakCues, pending, sheet, pageHidden]);
 
   // Both players use this board. Rescue a blocked deal without consuming a turn.
   useEffect(() => {
     if (screen !== 'game' || sheet || result || pending || flippedIds.length || game?.mode !== 'duel' || !remainingCount(game.tiles)) return;
     if (!getAvailablePairs(game.tiles).length) {
       const shuffled = shuffleBoard(game.tiles, game.seed + game.shuffles + 1, { formationId: game.formationId });
-      setGame(current => ({ ...current, tiles: shuffled.tiles, shuffles: current.shuffles + 1, aiMemory: {}, hintEffect: null }));
+      tracker.current = trackAutomaticShuffle(tracker.current);
+      commitGame({ ...gameRef.current, tiles: shuffled.tiles, shuffles: gameRef.current.shuffles + 1, aiMemory: {}, hintEffect: null });
       announce('No open pairs. The shared board has been shuffled.');
     }
   }, [game?.tiles, game?.mode, screen, sheet, result, pending, flippedIds.length]);
@@ -330,35 +379,26 @@ function App() {
         beginResolution({ kind: 'collision', ids: pending.ids, matched: true, actor: pending.actor }, MATCH_IMPACT_MS);
         return;
       }
-      if (pending.kind === 'collision') {
-        const nextTiles = removePair(current.tiles, pending.ids[0], pending.ids[1]);
-        if (nextTiles !== current.tiles) {
-          const nextCombo = 1;
-          const points = 100;
-          setCombo(nextCombo);
-          setGame(g => {
-            const next = resolveDuelAttempt(g, pending.ids);
-            return { ...next, aiMemory: rememberGhostFaces(next.tiles, next.aiMemory, [], next.attempts + next.aiAttempts) };
+      if (pending.kind === 'collision' || pending.kind === 'pair') {
+        const resolved = resolveDuelAttempt(current, pending.ids);
+        if (resolved !== current) {
+          const tile = current.tiles.find(value => value.id === pending.ids[0]);
+          const transition = resolveTrackedAttempt(tracker.current, current, resolved, pending.ids, {
+            rarity: rarityForTile(current.theme, current.ruleset, tile.faceId).id, now: Date.now(),
           });
-          if (pending.actor === 'you') {
-            const tile = current.tiles.find(value => value.id === pending.ids[0]);
-            setCollection(value => awardCollectedPair(value, { gameId: current.gameId,
-              pairId: [...pending.ids].sort().join(':'), matchKey: tile.matchKey, actor: 'you' }));
+          tracker.current = transition.tracker;
+          progressEvent(transition.event);
+          if (transition.cues.length) setStreakCues(transition.cues);
+          commitGame({ ...resolved, aiMemory: rememberGhostFaces(resolved.tiles, resolved.aiMemory, [], resolved.attempts + resolved.aiAttempts) });
+          if (pending.kind === 'collision') {
+            setBurst({ id: Date.now(), points: 100, x: flight?.burstX, y: flight?.burstY });
+            tileSmack(sound, { strength: 1 });
+            if (!transition.cues.length) playEffect('match', sound);
+          } else {
+            announce(pending.actor === 'ai' ? 'Your turn' : current.freezeReady ? 'Opponent frozen. Play again!' : 'Opponent’s turn');
+            if (pending.actor === 'ai' && !transition.cues.length) playEffect('turn', sound);
           }
-          setBurst({ id: Date.now(), points, combo: nextCombo, x: flight?.burstX, y: flight?.burstY });
-          tileSmack(sound, { strength: 1 });
-          playEffect('match', sound);
         }
-      } else if (pending.kind === 'pair') {
-        setCombo(0);
-        if (current.mode === 'duel') {
-          setGame(g => {
-            const next = resolveDuelAttempt(g, pending.ids);
-            return { ...next, aiMemory: rememberGhostFaces(next.tiles, next.aiMemory, [], next.attempts + next.aiAttempts) };
-          });
-          announce(pending.actor === 'ai' ? 'Your turn' : current.freezeReady ? 'Ghost frozen. Play again!' : 'Ghost’s turn');
-          if (pending.actor === 'ai') playEffect('turn', sound);
-        } else announce('Keep those faces in mind.');
       }
       setFlippedIds([]); setSelected(null); setPending(null); lock.current = false;
       pendingTime.current = { key: null, ms: 0 };
@@ -372,14 +412,10 @@ function App() {
     };
   }, [pending, screen, sheet, result, sound, boardReady, entering]);
 
-  function saveSession() {
-    const timer = pendingTime.current;
-    const duration = Math.max(0, timer.ms - (timer.started == null ? 0 : performance.now() - timer.started));
-    const snapshot = game.mode === 'duel' ? { ...game, duelView: { revealed: flippedIds, pending: pending ? { ...pending, duration } : null } } : game;
-    store.set('session', snapshot); setSaved(snapshot);
-  }
   function rememberFaces(ids) {
-    setGame(current => ({ ...current, aiMemory: rememberGhostFaces(current.tiles, current.aiMemory, ids, current.attempts + current.aiAttempts) }));
+    for (const id of ids) tracker.current = observeFlip(tracker.current, id);
+    const current = gameRef.current;
+    commitGame({ ...current, aiMemory: rememberGhostFaces(current.tiles, current.aiMemory, ids, current.attempts + current.aiAttempts) });
   }
 
   function resetTurn() {
@@ -407,33 +443,20 @@ function App() {
     setPending({ key, ...details });
   }
 
-  function start(useSaved = false) {
-    let next;
-    if (useSaved && saved) {
-      const resumedBoardTheme = themeById[saved.boardTheme] ? saved.boardTheme : saved.theme;
-      next = { ...saved, boardTheme: resumedBoardTheme, difficulty, mode: 'duel', ghostMemoryVersion: GHOST_MEMORY_VERSION,
-        aiMemory: rememberGhostFaces(saved.tiles, saved.ghostMemoryVersion === GHOST_MEMORY_VERSION ? saved.aiMemory : {}, saved.duelView?.revealed || [], saved.attempts + saved.aiAttempts) };
-      setRuleset(saved.ruleset); setThemeId(saved.theme); setBoardThemeId(resumedBoardTheme);
-    }
-    else {
-      const seed = crypto.getRandomValues(new Uint32Array(1))[0];
-      const formationId = chooseFormationId(seed, { excludeIds: [store.get('lastFormation', null)] });
-      const deal = createGame(ruleset, seed, difficulty, themeId, { formationId });
-      store.set('lastFormation', deal.formationId);
-      next = { version: 3, ...deal, ruleset, boardTheme: boardThemeId, mode: 'duel', tiles: deal.tiles, aiMemory: {}, ghostMemoryVersion: GHOST_MEMORY_VERSION, elapsed: 0, score: 0, hints: 0, shuffles: 0, flips: 0, attempts: 0, ...createDuelState() };
-    }
-    next = restoreBoosters({ ...next, gameId: next.gameId || createGameId() });
-    setGame(next); setScreen('game'); setResult(null); resetTurn(); setCombo(0); setSheet(null); setToast(null); setEntering(!gentle && !matchMedia('(prefers-reduced-motion: reduce)').matches); playEffect('doors', sound);
-    if (useSaved && next.mode === 'duel' && next.duelView) {
-      const view = next.duelView;
-      const revealed = (view.revealed || []).filter(id => next.tiles.some(tile => tile.id === id && !tile.removed));
-      setFlippedIds(revealed); setSelected(revealed[0] || null);
-      if (view.pending) {
-        const { key, duration, ghostMemory, ...details } = view.pending;
-        beginResolution(details, Math.max(0, duration));
-      }
-    }
+  function start() {
+    const seed = crypto.getRandomValues(new Uint32Array(1))[0];
+    const formationId = chooseFormationId(seed, { excludeIds: [store.get('lastFormation', null)] });
+    const deal = createGame(ruleset, seed, difficulty, themeId, { formationId });
+    store.set('lastFormation', deal.formationId);
+    const next = restoreBoosters({ ...deal, gameId: createGameId(), ruleset, boardTheme: boardThemeId, mode: 'duel',
+      boosters: { ...progressionRef.current.wallet }, aiMemory: {}, ghostMemoryVersion: GHOST_MEMORY_VERSION, elapsed: 0, score: 0, hints: 0, shuffles: 0, flips: 0, attempts: 0, ...createDuelState() });
+    tracker.current = createDuelTracker(next);
+    commitGame(next); setScreen('game'); setResult(null); resetTurn(); setStreakCues([]); setBurst(null); setSheet(null); setPage(null); setToast(null);
+    setEntering(!gentle && !matchMedia('(prefers-reduced-motion: reduce)').matches); playEffect('doors', sound);
     try { const promise = window.screen.orientation?.lock?.('portrait'); promise?.catch(() => {}); } catch { /* Portrait canvas is retained when orientation locking is unsupported. */ }
+  }
+  function leaveDuel() {
+    resetTurn(); tracker.current = null; commitGame(null); setResult(null); setStreakCues([]); setBurst(null); setToast(null); setEntering(false); setSheet(null); setScreen('menu');
   }
   function tap(tile) {
     if (lock.current || pending || sheet || result || entering) return;
@@ -445,7 +468,8 @@ function App() {
     playSound('tap');
     setFlippedIds(turn.revealed);
     setSelected(turn.revealed[0]);
-    setGame(g => ({ ...g, flips: (g.flips || 0) + 1, aiMemory: rememberGhostFaces(g.tiles, g.aiMemory, [tile.id], g.attempts + g.aiAttempts) }));
+    tracker.current = observeFlip(tracker.current, tile.id);
+    commitGame({ ...current, flips: (current.flips || 0) + 1, aiMemory: rememberGhostFaces(current.tiles, current.aiMemory, [tile.id], current.attempts + current.aiAttempts) });
     if (turn.revealed.length === 2) beginResolution({ kind: 'pair', ids: turn.revealed, matched: turn.match, actor: 'you' }, turn.duration);
   }
   function activateBooster(id) {
@@ -453,12 +477,15 @@ function App() {
     const current = gameRef.current;
     const next = useBooster(current, id);
     if (next === current) return;
+    const activation = trackBooster(tracker.current, current, next, id);
+    tracker.current = activation.tracker;
+    progressEvent(activation.event);
     if (id === 'shuffle') {
       const shuffled = shuffleBoard(current.tiles, Date.now(), { formationId: current.formationId });
-      setGame({ ...next, tiles: shuffled.tiles, shuffles: current.shuffles + 1, aiMemory: {}, hintEffect: null });
-      resetTurn(); setCombo(0); playEffect('shuffle', sound);
-    } else { setGame(next); playEffect('confirm', sound); }
-    announce({ shuffle: 'A fresh arrangement.', hint: 'A matching pair is glowing.', freeze: 'Ghost’s next turn is frozen.', eagle: 'Rarities revealed for 10 seconds.' }[id]);
+      commitGame({ ...next, boosters: { ...progressionRef.current.wallet }, tiles: shuffled.tiles, shuffles: current.shuffles + 1, aiMemory: {}, hintEffect: null });
+      resetTurn(); playEffect('shuffle', sound);
+    } else { commitGame({ ...next, boosters: { ...progressionRef.current.wallet } }); playEffect('confirm', sound); }
+    announce({ shuffle: 'A fresh arrangement.', hint: 'A matching pair is glowing.', freeze: 'Opponent’s next turn is frozen.', eagle: 'Rarities revealed for 10 seconds.' }[id]);
   }
   const uncoveredCount = useMemo(() => game ? game.tiles.filter(tile => isFree(tile, game.tiles)).length : 0, [game?.tiles]);
   const activeTheme = themeById[screen === 'game' ? game.theme : themeId] || defaultTheme;
@@ -474,31 +501,82 @@ function App() {
     if (!saveProfile(next)) { announce('Profile updated for this visit. Browser storage is unavailable.'); }
     setProfile(next); setSheet(null); playEffect('confirm', sound);
   }
-  function closeSheet() { setSheet(null); playSound('tap'); }
+  function closeSheet() {
+    setSheet(current => {
+      if (current === 'rules') return 'settings';
+      if (current === 'settings' && screen === 'game') return 'pause';
+      if (current === 'restart' || current === 'leave') return 'pause';
+      return null;
+    });
+    playSound('tap');
+  }
   function openSheet(value) { setSheet(value); playSound('tap'); }
+
+  function openPage(value) {
+    pageOpener.current = { daily: '.daily-menu-control', achievements: '[aria-label="Achievements"]', collection: '.binder-launch', leaderboards: '.leaderboard-menu-control' }[value];
+    if (value === 'daily') {
+      const current = progressEvent({ type: 'login', now: Date.now() });
+      progressEvent({ type: 'daily-presented', dayId: getDailyView(current).dayId });
+      setAdState('idle');
+    }
+    setRankingPresentation(null);
+    setPage(value); playSound('tap');
+  }
+  function returnToMenu() {
+    setPage(null);
+    requestAnimationFrame(() => document.querySelector(pageOpener.current || '.duel-launch')?.focus({ preventScroll: true }));
+  }
+  function closePage() { returnToMenu(); setRankingPresentation(null); playSound('tap'); }
+  function claimDaily() {
+    if (adBusy.current || !getDailyView(progressionRef.current).hasClaim) return;
+    progressEvent({ type: 'daily-claim', eventId: `claim:${createGameId()}`, now: Date.now() });
+    returnToMenu(); playEffect('confirm', sound); announce('Daily rewards collected.');
+  }
+  async function doubleDaily() {
+    if (adBusy.current || !getDailyView(progressionRef.current).hasClaim) return;
+    adBusy.current = true; setAdState('loading');
+    const attemptId = `ad:${createGameId()}`;
+    progressEvent({ type: 'daily-ad-start', eventId: `${attemptId}:start`, attemptId, now: Date.now() });
+    const result = await requestRewardedAd({ attemptId });
+    progressEvent({ type: 'daily-ad-complete', eventId: `${attemptId}:complete`, attemptId, status: result.status, now: Date.now() });
+    adBusy.current = false; setAdState(result.status);
+    if (result.status === 'completed') {
+      returnToMenu(); playEffect('confirm', sound); announce('Double daily rewards collected.');
+    }
+  }
+  function continueResult() {
+    const current = progressionRef.current;
+    const presentation = current.pendingRankingPresentation;
+    commitProgress(consumeRankingPresentation(current));
+    progressEvent({ type: 'achievements-seen', ids: [...current.newAchievementIds] });
+    leaveDuel(); pageOpener.current = '.duel-launch'; setRankingPresentation(presentation); setPage('leaderboards');
+  }
 
   return <MotionConfig reducedMotion={gentle ? 'always' : 'user'}><div className={`world remake ${screen === 'menu' ? 'at-home' : 'at-table'} ${gentle ? 'gentle-motion' : ''} ${pips ? '' : 'hide-pips'}`} data-theme={activeTheme.id} data-board-theme={surfaceTheme.id} style={{ '--theme-accent': activeTheme.accent, '--theme-ink': activeTheme.ink, '--theme-surface': activeTheme.surface, '--theme-tint': activeTheme.tint, ...boardArtStyle(surfaceTheme.id), ...themeUiStyle(surfaceTheme.id) }}>
     <BoardSurface variants={boardVariants[surfaceTheme.id]} />
-    {screen === 'menu' && <><DoorScene /><FallingLeaves /></>}
-    <main className={`app-shell ${screen === 'game' ? 'is-playing' : ''}`}>
+    {screen === 'menu' && <MenuScene background={menuBackground} paused={Boolean(page || sheet || pageHidden)} />}
+    <main className={`app-shell ${screen === 'game' ? 'is-playing' : ''} ${page ? 'has-progression-page' : ''}`}>
+      {page ? <>
+        {page === 'collection' && <TileBinder collection={collection} initialTheme={themeId} initialRuleset={ruleset} onClose={closePage} />}
+        {page === 'daily' && <DailyRewardsPage progression={progression} onClose={closePage} onClaim={claimDaily} onDoubleClaim={doubleDaily} adState={adState} gentle={gentle} />}
+        {page === 'achievements' && <AchievementsPage progression={progression} onClose={closePage} gentle={gentle} />}
+        {page === 'leaderboards' && <LeaderboardsPage progression={progression} profile={profile} onClose={closePage} presentation={rankingPresentation} sound={sound} gentle={gentle} />}
+      </> : <>
       <AnimatePresence mode="wait">
         {screen === 'menu' ? <motion.div className="home-screen" inert={Boolean(sheet || result)} key="menu" {...fade}>
-          <header className="home-toolbar">
-            <button className="profile-launch" onClick={() => openSheet('profile')} aria-label="Edit profile"><PlayerAvatar profile={profile} /><span>{profile.name}</span></button>
-            <div className="home-utilities"><IconButton label="Choose tile theme" onClick={() => openSheet('themes')}><Palette weight="fill" size={27} /></IconButton><IconButton label="Settings" onClick={() => openSheet('settings')}><GearSix weight="fill" size={27} /></IconButton></div>
-          </header>
-          <div className="home-brand"><span className="brand-leaf" aria-hidden="true"><Leaf weight="fill" /></span><h1><span>Mahjong</span><strong>DUEL</strong></h1></div>
-          <div className="home-collection"><TileFan faces={[faces.western.W28, faces.western.W07, dragon, faces.western.W16, faces.western.W08]} theme={activeTheme} sound={sound} gentle={gentle} /><button className="collection-label" onClick={() => openSheet('themes')}>{activeTheme.name}<CaretRight size={16} weight="bold" /></button></div>
+          <ProgressionMenuHeader profile={profile} loginDays={getDailyView(progression).loginDays}
+            onProfile={() => openSheet('profile')} onDaily={() => openPage('daily')}
+            onAchievements={() => openPage('achievements')} onThemes={() => openSheet('themes')}
+            onSettings={() => openSheet('settings')} onLeaderboards={() => openPage('leaderboards')} />
+          <div className="home-collection" hidden aria-hidden="true"><TileFan faces={[faces.western.W28, faces.western.W07, dragon, faces.western.W16, faces.western.W08]} theme={activeTheme} sound={sound} gentle={gentle} /></div>
           <section className="home-actions" aria-label="Play Duel">
-            <div className="home-rules" role="group" aria-label="Ruleset">{['eastern', 'western'].map(value => <button key={value} className={ruleset === value ? 'active' : ''} aria-pressed={ruleset === value} onClick={() => { setRuleset(value); playSound('tap'); }}>{value === 'eastern' ? <FlowerLotus size={21} weight="duotone" /> : <Diamond size={21} weight="duotone" />}{value === 'eastern' ? 'Eastern' : 'Western'}</button>)}</div>
-            <motion.button className="duel-launch" whileTap={{ y: 4, scale: .985 }} onClick={() => start(false)}><Sword weight="fill" size={31} /><span>Play Duel</span><ArrowRight size={25} weight="bold" /></motion.button>
-            {saved && <button className="home-resume" onClick={() => start(true)}><Play size={16} weight="fill" />{remainingCount(saved.tiles) === 0 ? 'View results' : 'Continue duel'}<span>{Math.round((80 - remainingCount(saved.tiles)) / 80 * 100)}%</span></button>}
-            <div className="home-links"><button className="binder-launch" onClick={() => openSheet('binder')}><BookOpen size={23} weight="duotone" />Tile binder</button><button className="home-help" onClick={() => openSheet('rules')}><Info size={19} weight="bold" />Rules</button></div>
+            <motion.button className="duel-launch" whileTap={{ y: 4, scale: .985 }} onClick={start}><Sword weight="fill" size={31} /><span>Play Duel</span><ArrowRight size={25} weight="bold" /></motion.button>
+            <div className="home-links"><button className="binder-launch" onClick={() => openPage('collection')}><BookOpen size={23} weight="duotone" />Collection</button></div>
           </section>
-        </motion.div> : <motion.div key="game" className="game-screen" inert={Boolean(sheet || result || entering)} {...fade}>
-          <header className="game-header"><IconButton label="Pause game" onClick={() => openSheet('pause')}><List size={26} weight="bold" /></IconButton></header>
+        </motion.div> : <motion.div key="game" className={`game-screen ${streakCues.length ? 'has-streak' : ''}`} inert={Boolean(sheet || result || entering)} {...fade}>
+          <header className="game-header"><IconButton label="Pause game" disabled={!freeCount} onClick={() => openSheet('pause')}><List size={26} weight="bold" /></IconButton></header>
           <div className="scoreboard duel-scoreboard" data-turn={game.turn}>
-            <div className={`player-score ${!opponentTurn ? 'active-turn' : ''}`}><PlayerAvatar profile={profile} /><div><span>{profile.name}</span><strong>{game.score.toLocaleString()}</strong></div></div>
+            <div className={`player-score local-player ${!opponentTurn ? 'active-turn' : ''}`}><div className="local-avatar-wrap"><PlayerAvatar profile={profile} /><StreakPortrait cues={streakCues} paused={Boolean(sheet || result || entering)} gentle={gentle} /></div><div><span>{profile.name}</span><strong>{game.score.toLocaleString()}</strong></div><StreakFeedback cues={streakCues} profile={profile} paused={Boolean(sheet || result || entering)} sound={sound} gentle={gentle} onComplete={completedCues => setStreakCues(current => current === completedCues ? [] : current)} /></div>
             <div className="score-versus" aria-hidden="true">VS</div>
             <div className={`player-score opponent ${opponentTurn ? 'active-turn' : ''}`}><div><span className="opponent-name" title={opponentName}><span>{profile.name}’s</span> Ghost</span><strong>{game.aiScore.toLocaleString()}</strong></div><span className="ghost-portrait"><PlayerAvatar profile={profile} /><Ghost weight="fill" size={15} /></span></div>
             <div className="duel-progress"><div className="duel-progress-labels"><span>{game.score / 100} pairs</span><strong>{game.score >= 2100 ? 'You secured the win' : game.aiScore >= 2100 ? 'Ghost secured the win' : 'First to 21'}</strong><span>{game.aiScore / 100} pairs</span></div><div className="duel-progress-track" role="progressbar" aria-label="Duel pair progress" aria-valuemin={0} aria-valuemax={40} aria-valuenow={(game.score + game.aiScore) / 100} aria-valuetext={`You ${game.score / 100} pairs, ghost ${game.aiScore / 100} pairs; ${freeCount / 2} pairs remain`}><span className="your-progress" style={{ width: `${game.score / 4000 * 100}%` }} /><span className="ghost-progress" style={{ width: `${game.aiScore / 4000 * 100}%` }} /><i /></div></div>
@@ -515,7 +593,7 @@ function App() {
                     <span className="tile-side tile-front" aria-hidden={!faceUp}><TileArt face={faces[game.ruleset][tile.faceId]} /></span>
                   </span>{(faceUp || eagle) && <TileRarity rarity={rarity} />}{active && <span className="selected-dot" />}</motion.button>;
               })}</AnimatePresence>
-              {flight && <MatchFlight key={flight.key} flight={flight} faces={faces[game.ruleset]} themeId={game.theme} ruleset={game.ruleset} paused={Boolean(sheet || result)} onComplete={() => setFlight(current => current?.key === flight.key ? null : current)} />}
+              {flight && <MatchFlight key={flight.key} flight={flight} faces={faces[game.ruleset]} themeId={game.theme} ruleset={game.ruleset} paused={Boolean(sheet || result || pageHidden)} onComplete={() => setFlight(current => current?.key === flight.key ? null : current)} />}
             </div>
             <AnimatePresence>{burst && <motion.div key={burst.id} className="match-burst" style={{ left: burst.x, top: burst.y === undefined ? undefined : burst.y - 48 }} initial={{ opacity: 0, scale: 0.7, y: 18 }} animate={{ opacity: 1, scale: 1, y: -10 }} exit={{ opacity: 0, y: -40 }}><Sparkle weight="fill" size={19} /><strong>+{burst.points}</strong>{burst.combo > 1 && <span>{burst.combo}×</span>}</motion.div>}</AnimatePresence>
           </div></div>
@@ -526,18 +604,25 @@ function App() {
         </motion.div>}
       </AnimatePresence>
       <AnimatePresence>{toast && <motion.div className="toast" role="status" key={toast.id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5 }}>{toast.message}</motion.div>}</AnimatePresence>
-      <AnimatePresence>{sheet && <Sheet key={sheet} title={{ binder: 'Tile binder', themes: 'Theme', rules: 'How to play', settings: 'Settings', profile: 'Profile', pause: 'Paused', restart: 'New duel' }[sheet]} onClose={closeSheet}>
+      <AnimatePresence>{sheet && <Sheet key={sheet} title={{ themes: 'Theme', rules: 'How to play', settings: 'Settings', profile: 'Profile', pause: 'Paused', restart: 'New duel', leave: 'Leave duel?' }[sheet]} onClose={closeSheet}>
         {sheet === 'profile' && <ProfileEditor profile={profile} onSave={updateProfile} />}
-        {sheet === 'binder' && <TileBinder collection={collection} initialTheme={themeId} initialRuleset={ruleset} />}
         {sheet === 'rules' && <><Rules ruleset={screen === 'game' ? game.ruleset : ruleset} /><button className="primary-button" onClick={closeSheet}>Got it <Check size={22} weight="bold" /></button></>}
         {sheet === 'themes' && <ThemeChooser themeId={themeId} boardThemeId={boardThemeId} ruleset={ruleset} onConfirm={(tiles, board) => { setThemeId(tiles); setBoardThemeId(board); setSheet(null); playEffect('confirm', sound); }} />}
-        {sheet === 'settings' && <div className="settings-content"><label className="setting-row"><span><SpeakerHigh size={25} weight="fill" /><span><strong>Sound</strong><small>Tiles, buttons & celebrations</small></span></span><input type="checkbox" role="switch" checked={sound} onChange={e => { setSound(e.target.checked); chime('tap', e.target.checked); }} /><span className="toggle" /></label><label className="setting-row"><span><Sparkle size={25} weight="fill" /><span><strong>Gentle motion</strong><small>Fewer animated effects</small></span></span><input type="checkbox" role="switch" checked={gentle} onChange={e => setGentle(e.target.checked)} /><span className="toggle" /></label><label className="setting-row"><span><Diamond size={25} weight="fill" /><span><strong>Rank pips</strong><small>Help identify count & tier tiles</small></span></span><input type="checkbox" role="switch" checked={pips} onChange={e => setPips(e.target.checked)} /><span className="toggle" /></label><button className="primary-button" onClick={closeSheet}>Done <Check size={22} weight="bold" /></button></div>}
-        {sheet === 'pause' && <div className="pause-content"><div className="pause-flower"><FlowerLotus size={70} weight="duotone" /></div><button className="primary-button" onClick={closeSheet}>Continue <Play size={21} weight="fill" /></button><button className="secondary-button" onClick={() => openSheet('settings')}>Settings <GearSix size={21} /></button><button className="secondary-button" onClick={() => openSheet('restart')}>New duel <ArrowsClockwise size={21} /></button><button className="plain-button" onClick={() => { saveSession(); resetTurn(); setScreen('menu'); setSheet(null); setToast(null); }}>Save & return home</button></div>}
-        {sheet === 'restart' && <div className="pause-content"><p className="restart-copy">Start a fresh board against your ghost?</p><button className="primary-button" onClick={() => start(false)}>Play again <ArrowsClockwise size={22} /></button><button className="plain-button" onClick={() => setSheet('pause')}>Keep this duel</button></div>}
+        {sheet === 'settings' && <div className="settings-content">
+          <section className="settings-ruleset" aria-labelledby="settings-ruleset-heading">
+            <h3 id="settings-ruleset-heading" className="settings-ruleset-heading">Ruleset</h3>
+            {screen === 'game' && <p className="settings-ruleset-note">Applies to your next duel.</p>}
+            <div className="settings-ruleset-switch" role="group" aria-label="Ruleset">{['eastern', 'western'].map(value => <button key={value} className={ruleset === value ? 'active' : ''} aria-pressed={ruleset === value} onClick={() => { setRuleset(value); playSound('tap'); }}>{value === 'eastern' ? <FlowerLotus size={21} weight="duotone" /> : <Diamond size={21} weight="duotone" />}{value === 'eastern' ? 'Eastern' : 'Western'}</button>)}</div>
+          </section><label className="setting-row"><span><SpeakerHigh size={25} weight="fill" /><span><strong>Sound</strong><small>Tiles, buttons & celebrations</small></span></span><input type="checkbox" role="switch" checked={sound} onChange={e => { setSound(e.target.checked); chime('tap', e.target.checked); }} /><span className="toggle" /></label><label className="setting-row"><span><Sparkle size={25} weight="fill" /><span><strong>Gentle motion</strong><small>Fewer animated effects</small></span></span><input type="checkbox" role="switch" checked={gentle} onChange={e => setGentle(e.target.checked)} /><span className="toggle" /></label><label className="setting-row"><span><Diamond size={25} weight="fill" /><span><strong>Rank pips</strong><small>Help identify count & tier tiles</small></span></span><input type="checkbox" role="switch" checked={pips} onChange={e => setPips(e.target.checked)} /><span className="toggle" /></label><button className="secondary-button settings-rules-button" onClick={() => openSheet('rules')}><span><Info size={21} weight="bold" />Rules</span><CaretRight size={21} /></button><button className="primary-button" onClick={closeSheet}>Done <Check size={22} weight="bold" /></button></div>}
+        {sheet === 'pause' && <div className="pause-content"><div className="pause-flower"><FlowerLotus size={70} weight="duotone" /></div><button className="primary-button" onClick={closeSheet}>Continue <Play size={21} weight="fill" /></button><button className="secondary-button" onClick={() => openSheet('settings')}>Settings <GearSix size={21} /></button><button className="secondary-button" onClick={() => openSheet('restart')}>New duel <ArrowsClockwise size={21} /></button><button className="plain-button" onClick={() => openSheet('leave')}>Leave duel</button></div>}
+        {sheet === 'restart' && <div className="pause-content"><p className="restart-copy">End this duel and start a fresh board against your ghost?</p><button className="primary-button" onClick={start}>Play again <ArrowsClockwise size={22} /></button><button className="plain-button" onClick={() => setSheet('pause')}>Keep this duel</button></div>}
+        {sheet === 'leave' && <div className="pause-content"><p className="restart-copy">Leaving ends this duel. Tiles you collected stay in your binder.</p><button className="primary-button" onClick={leaveDuel}>Leave duel <ArrowRight size={22} /></button><button className="plain-button" onClick={() => setSheet('pause')}>Keep playing</button></div>}
       </Sheet>}</AnimatePresence>
-      <AnimatePresence>{result && <motion.div className="result-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }}><motion.section className="result-card" role="dialog" aria-modal="true" aria-label="Game results" initial={{ y: 25, scale: .9 }} animate={{ y: 0, scale: 1 }} transition={{ type: 'spring', damping: 20 }}><VictoryBloom /><h2>{result === 'win' ? 'Victory!' : result === 'tie' ? 'A perfect tie!' : 'Well played!'}</h2><p>{result === 'win' ? 'You outmatched your ghost.' : result === 'tie' ? 'A memory match, perfectly balanced.' : 'Your ghost takes this round.'}</p><div className="result-stats"><div><span>You</span><strong>{game.score.toLocaleString()}</strong></div><div><span>Ghost</span><strong>{game.aiScore.toLocaleString()}</strong></div><div><span>Your pairs</span><strong>{game.score / 100}</strong></div></div><div className="result-memory"><PlayerAvatar profile={profile} /><span>{(80 - freeCount) / 2} pairs cleared<small>Every duel starts with a fresh board.</small></span></div><button className="primary-button" onClick={() => start(false)}>Play again <ArrowRight size={25} weight="bold" /></button><button className="plain-button" onClick={() => { setResult(null); setScreen('menu'); setGame(null); }}>Home</button></motion.section></motion.div>}</AnimatePresence>
+      <AnimatePresence>{result && <motion.div className="result-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }}><motion.section className="result-card" role="dialog" aria-modal="true" aria-label="Game results" initial={{ y: 25, scale: .9 }} animate={{ y: 0, scale: 1 }} transition={{ type: 'spring', damping: 20 }}><VictoryBloom /><h2>{result === 'win' ? 'Victory!' : result === 'tie' ? 'A perfect tie!' : 'Well played!'}</h2><p>{result === 'win' ? 'You outmatched your ghost.' : result === 'tie' ? 'A memory match, perfectly balanced.' : 'Your ghost takes this round.'}</p><div className="result-stats"><div><span>You</span><strong>{game.score.toLocaleString()}</strong></div><div><span>Ghost</span><strong>{game.aiScore.toLocaleString()}</strong></div><div><span>Your pairs</span><strong>{game.score / 100}</strong></div></div><div className="result-memory"><PlayerAvatar profile={profile} /><span>{(80 - freeCount) / 2} pairs cleared<small>Every duel starts with a fresh board.</small></span></div>{progression.newAchievementIds.length > 0 && <p className="result-achievement-summary">{progression.newAchievementIds.length} achievement{progression.newAchievementIds.length === 1 ? '' : 's'} unlocked</p>}<button className="primary-button" onClick={continueResult}>Continue <ArrowRight size={25} weight="bold" /></button></motion.section></motion.div>}</AnimatePresence>
+      </>}
     </main>
-    {entering && <DoorScene opening onComplete={() => setEntering(false)} />}
+    <AchievementNotifications batches={achievementBatches} onComplete={id => setAchievementBatches(current => current.filter(batch => batch.id !== id))} paused={Boolean(sheet || entering || pageHidden)} sound={sound} gentle={gentle} />
+    {entering && <MenuScene background={menuBackground} opening onComplete={() => setEntering(false)} />}
   </div></MotionConfig>;
 }
 

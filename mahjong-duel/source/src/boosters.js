@@ -1,13 +1,12 @@
 import { getAvailablePairs } from './engine.js';
 
-export const BOOSTER_USES = 20;
 export const HINT_MS = 1500;
 export const EAGLE_MS = 10000;
 export const BOOSTER_IDS = ['shuffle', 'hint', 'freeze', 'eagle'];
 
 export function restoreBoosters(game) {
   const boosters = Object.fromEntries(BOOSTER_IDS.map(id => [id,
-    Number.isInteger(game.boosters?.[id]) ? Math.max(0, Math.min(BOOSTER_USES, game.boosters[id])) : BOOSTER_USES]));
+    Number.isSafeInteger(game.boosters?.[id]) && game.boosters[id] >= 0 ? game.boosters[id] : 0]));
   const live = new Set(game.tiles.filter(tile => !tile.removed).map(tile => tile.id));
   return { ...game, boosters, freezeReady: Boolean(game.freezeReady),
     hintEffect: game.hintEffect && game.hintEffect.remainingMs > 0 ? {
