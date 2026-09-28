@@ -3,7 +3,7 @@ import { CONFIG, PALETTE, xpForLevelUp, upgradeCost, highestTier } from '../conf
 import { SceneManager } from '../render/scene.js';
 import { World } from '../render/world.js';
 import { TeamRenderer, P } from '../render/units.js';
-import { Particles, DamageNumbers, HpBars, DangerZones, AimLine, ArrowRenderer, Lightning, SpearRenderer, CaltropRenderer, COLORS } from '../render/fx.js';
+import { Particles, DamageNumbers, HpBars, DangerZones, AimLine, ArrowRenderer, Lightning, SpearRenderer, CaltropRenderer, Shockwaves, GroundCracks, COLORS } from '../render/fx.js';
 import { GameAudio } from '../audio.js';
 import { Input } from '../input.js';
 import { loadSave, writeSave } from '../save.js';
@@ -37,15 +37,15 @@ export class Game {
     const s = this.scene;
     this.fx = {
       particles: new Particles(s, CONFIG.perf.maxParticles), numbers: new DamageNumbers(s, CONFIG.perf.maxDamageGlyphs), hpBars: new HpBars(s, CONFIG.perf.maxHpBars),
-      danger: new DangerZones(s, 40), aim: new AimLine(s), arrows: new ArrowRenderer(s, CONFIG.arrow.maxActive + 20), lightning: new Lightning(s), spears: new SpearRenderer(s, 10), caltrops: new CaltropRenderer(s, 120),
+      danger: new DangerZones(s, 40), aim: new AimLine(s), arrows: new ArrowRenderer(s, CONFIG.arrow.maxActive + 20), lightning: new Lightning(s), spears: new SpearRenderer(s, 10), caltrops: new CaltropRenderer(s, 120), shock: new Shockwaves(s, 14), cracks: new GroundCracks(s, 40),
     };
     this.rend = {
       enemies: new TeamRenderer(s, { capacity: CONFIG.perf.maxEnemies, debrisExtra: CONFIG.perf.maxDebris * 2 }),
-      allies: new TeamRenderer(s, { capacity: CONFIG.ally.max, parts: ['head', 'torso', 'armL', 'armR', 'legL', 'legR', 'hood', 'bow', 'shadow'], castShadow: true }),
+      allies: new TeamRenderer(s, { capacity: CONFIG.ally.max, parts: ['head', 'torso', 'armL', 'armR', 'legL', 'legR', 'calfL', 'calfR', 'hood', 'bow', 'shadow'], castShadow: true }),
       brute: new TeamRenderer(s, { capacity: 2, castShadow: true }),
       boss: new TeamRenderer(s, { capacity: 1, castShadow: true }),
       player: new TeamRenderer(s, { capacity: 1, castShadow: true }),
-      obstacles: new TeamRenderer(s, { capacity: 4, parts: ['head', 'torso', 'armL', 'armR', 'legL', 'legR', 'sword', 'helmet', 'shadow'], castShadow: true }),
+      obstacles: new TeamRenderer(s, { capacity: 4, parts: ['head', 'torso', 'armL', 'armR', 'legL', 'legR', 'calfL', 'calfR', 'sword', 'helmet', 'shadow'], castShadow: true }),
     };
     this.grid = new Grid(3);
     this.enemies = new EnemySystem(this); this.arrows = new ArrowSystem(this); this.allies = new AllySystem(this);
@@ -86,7 +86,7 @@ export class Game {
     const layout = { levelLength: 200, segments: 19, segmentLength: CONFIG.bonus.segmentLength, level: this.level, bestMult: this.save.bestMult || 1, prevMult: this.save.prevMult || 0 };
     this.world.build(layout);
     this.player = this._newPlayer(); this.player.z = 0; this.playerFacing = 1;
-    this.enemies.reset(); this.allies.reset(); this.arrows.reset(); this.obstacles.reset(); this.fx.particles.clear(); this.fx.numbers.clear(); this.fx.lightning.clear();
+    this.enemies.reset(); this.allies.reset(); this.arrows.reset(); this.obstacles.reset(); this.fx.particles.clear(); this.fx.numbers.clear(); this.fx.lightning.clear(); this.fx.cracks.clear();
     this.sceneM.setSunset(0);
     this.camAngle = 0;
   }
@@ -108,7 +108,7 @@ export class Game {
     const len = this.levelData.duration * this.stats.runSpeed;
     const layout = { levelLength: len, segments: L === 1 ? CONFIG.bonus.ftueSegments : CONFIG.bonus.segments, segmentLength: CONFIG.bonus.segmentLength, level: L, bestMult: this.save.bestMult || 1, prevMult: this.save.prevMult || 0 };
     this.world.build(layout);
-    this.enemies.reset(); this.allies.reset(); this.arrows.reset(); this.obstacles.reset(); this.fx.particles.clear(); this.fx.numbers.clear(); this.fx.lightning.clear();
+    this.enemies.reset(); this.allies.reset(); this.arrows.reset(); this.obstacles.reset(); this.fx.particles.clear(); this.fx.numbers.clear(); this.fx.lightning.clear(); this.fx.cracks.clear();
     this.player = this._newPlayer(); this.player.maxHp = this.stats.maxHp; this.player.hp = this.stats.maxHp; this.player.speed = this.stats.runSpeed;
     this.playerFacing = 1; this.camAngle = 0; this.gateT = 0;
     this.levelCoins = 10 + 2 * L;
@@ -156,7 +156,7 @@ export class Game {
 
     // spatial grid
     this.grid.clear();
-    for (const e of this.enemies.list) if (e.alive) this.grid.insert(e, e.x, e.z);
+    for (const e of this.enemies.list) if (e.alive && !e.airborne) this.grid.insert(e, e.x, e.z); // airborne units can't be hit or targeted
 
     if (st === 'level') this._stepLevel(dt);
     else if (st === 'gate') this._stepGate(dt);
@@ -166,7 +166,7 @@ export class Game {
     if (pl.fallT > 0) { pl.fallT += dt; pl.pitch = Math.min(Math.PI / 2, pl.fallT * 3); }
     this.enemies.update(dt); this.arrows.update(dt); this.allies.update(dt);
     if (st === 'level' || st === 'gate' || st === 'dying') this.obstacles.update(dt, this.camPos.z);
-    this.fx.particles.update(dt); this.fx.numbers.update(dt); this.fx.lightning.update(dt);
+    this.fx.particles.update(dt); this.fx.numbers.update(dt); this.fx.lightning.update(dt); this.fx.shock.update(dt); this.fx.cracks.update(dt);
     if (this.shakeAmt > 0) this.shakeAmt = Math.max(0, this.shakeAmt - dt * 1.6);
   }
 
@@ -176,7 +176,7 @@ export class Game {
     const ev = this.levelData.events;
     while (this.eventIdx < ev.length && ev[this.eventIdx].t <= this.time) this._runEvent(ev[this.eventIdx++]);
     // pacing: never run empty for long. If nothing is within reach for maxIdle seconds, a small filler pack rushes in.
-    let near = false; for (const e of this.enemies.list) if (e.alive && !e.guard && e.z - pl.z < st.maxRange) { near = true; break; }
+    let near = false; for (const e of this.enemies.list) if (e.alive && !e.guard && !e.airborne && e.z - pl.z < st.maxRange) { near = true; break; }
     if (near) { if (this.engageFirst < 0) this.engageFirst = this.time; this.idleT = 0; }
     else { this.idleT += dt; if (this.idleT > this.idleMax) this.idleMax = this.idleT; if (this.idleT > CONFIG.level.maxIdle && this.time < this.levelData.duration - 3) { this.idleT = 0; this._spawnFiller(); } }
     // v2: drag anywhere to move sideways; shooting is automatic
@@ -210,18 +210,18 @@ export class Game {
     const n = CONFIG.level.fillerSize + Math.floor(L / 5);
     const types = typesForLevel(L).filter((t) => t === 'footman' || t === 'runner');
     const tier = L <= 2 ? 0 : Math.max(0, highestTier(L) - 2);
-    for (let i = 0; i < n; i++) this.enemies.spawn(rng.pick(types), tier, clamp(pl.x + rng.range(-2.5, 2.5), -3.2, 3.2), pl.z + CONFIG.enemy.spawnDistance + i * 1.2);
+    for (let i = 0; i < n; i++) this.enemies.spawn(rng.pick(types), tier, clamp(pl.x + rng.range(-2.5, 2.5), -3.2, 3.2), pl.z + CONFIG.enemy.spawnDistance - CONFIG.level.fillerNear + i * 1.0, { delay: i * 0.12 });
     this.fillers++;
   }
 
   _runEvent(ev) {
     const pl = this.player, rng = this.levelRng;
-    const zBase = pl.z + CONFIG.enemy.spawnDistance;
+    const zBase = pl.z + CONFIG.enemy.spawnDistance - (ev.close ? 1.5 : 0);
     if (ev.kind === 'wave') {
       const offs = formationOffsets(ev.formation, ev.units.length, rng);
       ev.units.forEach((u, i) => {
-        const back = (u.type === 'spear_thrower' || u.type === 'drummer') ? 4 : 0;
-        this.enemies.spawn(u.type, u.tier, clamp(ev.x + offs[i].dx, -3.2, 3.2), zBase + offs[i].dz + back + rng.range(0, 1));
+        const back = (u.type === 'spear_thrower' || u.type === 'drummer') ? 3 : 0;
+        this.enemies.spawn(u.type, u.tier, clamp(ev.x + offs[i].dx, -3.2, 3.2), zBase + offs[i].dz * CONFIG.level.formationDepth + back + rng.range(0, 1), { delay: i * 0.07 + rng.range(0, 0.25) }); // meteor-shower stagger
       });
       if (this.level >= 2 && this.time > 4) this.ui.toast(ev.units.length >= 8 ? 'Big wave!' : '', 0);
     } else if (ev.kind === 'single') this.enemies.spawn(ev.type, ev.tier, ev.x, zBase + rng.range(0, 3));
@@ -447,7 +447,7 @@ export class Game {
     this.obstacles.render(this.fx.danger);
     this.bonus.render(this.fx.danger);
     this.fx.danger.end();
-    this.fx.particles.render(); this.fx.numbers.render(cam); this.fx.lightning.render();
+    this.fx.particles.render(); this.fx.numbers.render(cam); this.fx.lightning.render(); this.fx.cracks.render();
     this.ui.update(dt);
     sm.render();
   }

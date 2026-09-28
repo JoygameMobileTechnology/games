@@ -73,9 +73,12 @@ export const CONFIG = {
   rarity: { common: 0.6, rare: 0.3, epic: 0.1, epicFromLevelUp: 3, ownedWeightBonus: 0.5 },
   levelup: { slowIn: 0.25, inputLock: 0.3, slowOut: 0.3 },
   enemy: {
-    spawnDistance: 30,      // out of view, at the fog edge
-    rushDistance: 14,       // chasers sprint (rushMult) until this close, then run at their table speed
-    rushMult: 2.4,
+    spawnDistance: 10,       // chasers touch down this far behind the player (front of a wave), superhero landing
+    dropHeight: 9,          // m above the landing spot where the fall starts (above the top of the screen)
+    dropBack: 4,            // m further back at the start of the fall: a steep dive toward the player
+    dropDur: 0.55,          // s of fall (accelerating)
+    landHold: 0.2,          // s holding the knee-and-fist pose; the head snaps up at the end
+    landRise: 0.25,         // s to stand up into the run
     lateralSpeed: 2.0,
     separation: 0.9,
     radius: 0.45,
@@ -148,8 +151,10 @@ export const CONFIG = {
     waveGapMin: 4.5, waveGapMax: 6.5,
     waveGapMinFtue: 5.5, waveGapMaxFtue: 7.5,
     firstCardTime: 9,
-    maxIdle: 2.0,           // s without anything in reach before a filler pack rushes in
+    maxIdle: 1.5,           // s without anything in reach before a filler pack drops in
     fillerSize: 2,
+    fillerNear: 1,          // fillers land this much closer than spawnDistance
+    formationDepth: 0.7,    // depth spread of wave formations (1 = template values)
     phases: { warmup: 10, rise: 40, peak: 60 },
   },
   perf: { maxEnemies: 80, maxParticles: 800, maxDebris: 60, maxDamageGlyphs: 240, maxHpBars: 96 },

@@ -334,6 +334,73 @@ export class CaltropRenderer {
   end() { this.mesh.count = this.n; if (this.n) this.mesh.instanceMatrix.needsUpdate = true; }
 }
 
+// ---------------- landing shockwaves: expanding fading ground rings ----------------
+export class Shockwaves {
+  constructor(scene, cap = 14) {
+    this.items = [];
+    const geo = new THREE.RingGeometry(0.72, 1, 36); geo.rotateX(-Math.PI / 2);
+    for (let i = 0; i < cap; i++) {
+      const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0xbfb39c, transparent: true, opacity: 0, depthWrite: false }));
+      m.visible = false; m.renderOrder = 3; scene.add(m); this.items.push({ m, t: 1, dur: 0.45, size: 2 });
+    }
+  }
+  spawn(x, z, size = 2.2) {
+    const it = this.items.find((s) => s.t >= s.dur) || this.items[0];
+    it.t = 0; it.size = size; it.m.position.set(x, 0.03, z); it.m.visible = true;
+  }
+  update(dt) {
+    for (const it of this.items) {
+      if (it.t >= it.dur) { it.m.visible = false; continue; }
+      it.t += dt; const u = Math.min(1, it.t / it.dur); const s = it.size * (0.25 + 0.75 * Math.sqrt(u));
+      it.m.scale.set(s, 1, s); it.m.material.opacity = 0.6 * (1 - u);
+    }
+  }
+}
+
+// ---------------- ground cracks: star decals under landings, fading out (per-instance alpha via instanceColor.r) ----------------
+function crackTexture() {
+  const S = 256, cv = document.createElement('canvas'); cv.width = S; cv.height = S;
+  const g = cv.getContext('2d'); g.translate(S / 2, S / 2); g.lineCap = 'round';
+  const grd = g.createRadialGradient(0, 0, 4, 0, 0, 56); grd.addColorStop(0, 'rgba(70,62,52,0.55)'); grd.addColorStop(1, 'rgba(70,62,52,0)');
+  g.fillStyle = grd; g.beginPath(); g.arc(0, 0, 56, 0, Math.PI * 2); g.fill();
+  g.strokeStyle = 'rgba(52,46,40,0.95)';
+  const crack = (a, r0, len, w0) => {
+    let r = r0, x = Math.cos(a) * r, y = Math.sin(a) * r;
+    while (r < len) {
+      const r1 = r + 9 + Math.random() * 10; a += (Math.random() - 0.5) * 0.5;
+      const x1 = Math.cos(a) * r1, y1 = Math.sin(a) * r1;
+      g.lineWidth = Math.max(1.2, w0 * (1 - r / len)); g.beginPath(); g.moveTo(x, y); g.lineTo(x1, y1); g.stroke();
+      if (Math.random() < 0.18 && w0 > 2) crack(a + (Math.random() < 0.5 ? 0.6 : -0.6), r1, r1 + (len - r1) * 0.6, w0 * 0.5);
+      x = x1; y = y1; r = r1;
+    }
+  };
+  for (let i = 0; i < 9; i++) crack((i / 9) * Math.PI * 2 + (Math.random() - 0.5) * 0.4, 8, 72 + Math.random() * 48, 6);
+  const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; return t;
+}
+export class GroundCracks {
+  constructor(scene, cap = 40) {
+    const geo = new THREE.PlaneGeometry(1, 1); geo.rotateX(-Math.PI / 2);
+    const mat = new THREE.MeshBasicMaterial({ map: crackTexture(), transparent: true, depthWrite: false });
+    mat.onBeforeCompile = (sh) => { sh.fragmentShader = sh.fragmentShader.replace('#include <color_fragment>', 'diffuseColor.a *= vColor.r;'); };
+    this.mesh = new THREE.InstancedMesh(geo, mat, cap); this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    this.mesh.setColorAt(0, _c.setRGB(1, 1, 1)); this.mesh.instanceColor.setUsage(THREE.DynamicDrawUsage);
+    this.mesh.frustumCulled = false; this.mesh.count = 0; this.mesh.renderOrder = 2; scene.add(this.mesh);
+    this.items = []; this.cap = cap;
+  }
+  spawn(x, z, size) { if (this.items.length >= this.cap) this.items.shift(); this.items.push({ x, z, size, rot: Math.random() * Math.PI * 2, t: 0, life: 1.5 }); }
+  update(dt) { for (let i = this.items.length - 1; i >= 0; i--) { const it = this.items[i]; it.t += dt; if (it.t >= it.life) this.items.splice(i, 1); } }
+  render() {
+    const m = this.mesh; let n = 0;
+    for (const it of this.items) {
+      const u = it.t / it.life, a = u < 0.55 ? 1 : 1 - (u - 0.55) / 0.45, grow = 0.8 + 0.2 * Math.min(1, it.t / 0.06);
+      _p.set(it.x, 0.02, it.z); _q.setFromAxisAngle(_up, it.rot); _s.set(it.size * grow, 1, it.size * grow);
+      m.setMatrixAt(n, _m.compose(_p, _q, _s)); m.setColorAt(n, _c.setRGB(a * 0.9, 1, 1)); n++;
+    }
+    m.count = n; if (n) { m.instanceMatrix.needsUpdate = true; m.instanceColor.needsUpdate = true; }
+  }
+  clear() { this.items.length = 0; this.mesh.count = 0; }
+}
+
 export const COLORS = {
   normal: 0xffffff, crit: PALETTE.crit, frost: PALETTE.frost, fire: PALETTE.fire, lightning: PALETTE.lightning, heal: 0x7cf29a, hurt: 0xff5a5a,
 };

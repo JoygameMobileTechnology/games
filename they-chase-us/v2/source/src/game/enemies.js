@@ -3,7 +3,9 @@ import { CONFIG, PALETTE, TIER_MULT, TIER_PIECES, SHED_ORDER, TIER_METAL, TIER_N
 import { ENEMY_TYPES } from '../data/enemies.js';
 import { P, piecesToFlags } from '../render/units.js';
 import { COLORS } from '../render/fx.js';
-import { clamp, damp } from '../util/math.js';
+import { clamp, damp, TAU } from '../util/math.js';
+
+const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 
 const C_ENEMY = new THREE.Color(PALETTE.enemy);
 const C_BOSS = new THREE.Color(0x2b1f2e);
@@ -47,8 +49,53 @@ export class EnemySystem {
       obstacleCd: 0, wallStun: 0, xpValue: def.xp * (1 + CONFIG.balance.xpTierBonus * visualTier), isBoss: !!opts.isBoss, drummed: false,
       yawFacing: opts.guard || opts.isBoss ? 0 : Math.PI,
     };
+    if (!e.guard && !e.isBoss && !opts.noDrop) { // superhero drop-in: falls in the player's frame onto a spot 'rel' m behind the player
+      const E = CONFIG.enemy, pz = this.game.player.z, big = !!def.boss;
+      e.entry = { t: -(opts.delay || 0), rel: z - pz, x1: x, x0: x + (Math.random() - 0.5) * 1.6, h0: E.dropHeight * (big ? 1.25 : 1), back: E.dropBack, dur: E.dropDur * (big ? 1.2 : 1), landedAt: -1, whoosh: false };
+      e.airborne = true; e.land = 0; e.look = 0; e.dy = e.entry.h0; e.x = e.entry.x0; e.z = pz + e.entry.rel + e.entry.back;
+    }
     this.list.push(e);
     return e;
+  }
+
+  // superhero landing: steep accelerating dive -> impact (squash, dust ring, cracks, thud) -> knee-and-fist hold, head snaps up -> rise into the run
+  _updateEntry(e, dt) {
+    const en = e.entry, g = this.game, E = CONFIG.enemy, pl = g.player;
+    en.t += dt;
+    if (en.t < 0) { e.z = pl.z + en.rel + en.back; return; } // waiting for its turn in the shower
+    if (en.landedAt < 0) {
+      const u = Math.min(1, en.t / en.dur);
+      if (!en.whoosh) { en.whoosh = true; g.audio.whoosh(); }
+      e.dy = en.h0 * (1 - u * u);
+      e.z = pl.z + en.rel + en.back * (1 - u); // tracks the player, so the landing distance is exact
+      e.x = en.x0 + (en.x1 - en.x0) * u;
+      e.land = 0.55 * smooth(0.62, 1, u);      // brace: knees come up, fist reaches down
+      e.squash = -0.18 * (1 - u * 0.6);        // stretched by speed
+      if (e.dy < 7 && Math.random() < 0.8) g.fx.particles.emit(e.x + (Math.random() - 0.5) * 0.3, e.dy + 1.1 * e.scale, e.z, 0, 0, 0, 0.14, 0.09, 0xffffff, 0, 0); // speed streak
+      if (u >= 1) this._touchdown(e);
+      return;
+    }
+    const k = en.t - en.landedAt;
+    if (k < E.landHold) { e.land = 1; e.look = smooth(E.landHold * 0.4, E.landHold, k); return; }
+    const r = (k - E.landHold) / E.landRise;
+    e.land = 1 - smooth(0, 1, r); e.look = 1;
+    if (r >= 1) { e.entry = null; e.land = 0; e.look = 0; }
+  }
+
+  _touchdown(e) {
+    const en = e.entry, g = this.game, big = !!e.def.boss, s = e.scale;
+    en.landedAt = en.t; e.airborne = false; e.dy = 0; e.land = 1; e.look = 0; e.squash = 0.22;
+    e.z = g.player.z + en.rel; e.x = en.x1;
+    const n = big ? 22 : 12;
+    for (let i = 0; i < n; i++) { // dust ring hugging the ground
+      const a = (i / n) * TAU + Math.random() * 0.4, sp = (big ? 5.5 : 3.4) * (0.7 + Math.random() * 0.5);
+      g.fx.particles.emit(e.x + Math.cos(a) * 0.25 * s, 0.12, e.z + Math.sin(a) * 0.25 * s, Math.cos(a) * sp, 0.5 + Math.random() * 1.1, Math.sin(a) * sp, 0.45 + Math.random() * 0.2, 0.16 * s, 0xd9d0bf, 5, 3.2);
+    }
+    g.fx.particles.burst(e.x, 0.2, e.z, big ? 10 : 4, 0x8f887c, big ? 5 : 3, 0.08, 0.5, 14, 0.9); // stone chips
+    g.fx.shock.spawn(e.x, e.z, big ? 5 : 2.4);
+    g.fx.cracks.spawn(e.x, e.z, big ? 3.6 : 1.8);
+    g.audio.land(big);
+    if (big) g.shake(0.55); else if (Math.hypot(e.x - g.player.x, e.z - g.player.z) < 9) g.shake(0.22);
   }
 
   // ---------- damage & status ----------
@@ -121,11 +168,11 @@ export class EnemySystem {
     g.fx.particles.burst(e.x, 1.0 * e.scale, e.z, e.isBoss ? 60 : 8, PALETTE.enemy, 3.5, 0.13, 0.6);
     // status spreads
     if (e.frozen > 0 && g.stats.shatter) {
-      for (const n of this.list) if (n !== e && n.alive && Math.abs(n.x - e.x) < 2.5 && Math.abs(n.z - e.z) < 2.5) { this.applyFreeze(n, 0.5); }
+      for (const n of this.list) if (n !== e && n.alive && !n.airborne && Math.abs(n.x - e.x) < 2.5 && Math.abs(n.z - e.z) < 2.5) { this.applyFreeze(n, 0.5); }
       g.fx.particles.burst(e.x, 1, e.z, 14, PALETTE.frost, 4, 0.12, 0.5);
     }
     if (e.burn > 0 && g.stats.wildfire) {
-      for (const n of this.list) if (n !== e && n.alive && Math.abs(n.x - e.x) < 2.5 && Math.abs(n.z - e.z) < 2.5) this.applyBurn(n, e.burn, e.burnDps);
+      for (const n of this.list) if (n !== e && n.alive && !n.airborne && Math.abs(n.x - e.x) < 2.5 && Math.abs(n.z - e.z) < 2.5) this.applyBurn(n, e.burn, e.burnDps);
       g.fx.particles.burst(e.x, 1, e.z, 14, PALETTE.fire, 4, 0.12, 0.5);
     }
     g.onEnemyKilled(e, o);
@@ -154,6 +201,7 @@ export class EnemySystem {
         if (e.deathT > (e.isBoss ? 4 : 1.0)) this.list.splice(i, 1);
         continue;
       }
+      if (e.entry) { this._updateEntry(e, dt); continue; }
       if (e.kbCd > 0) e.kbCd -= dt;
       if (e.frozen > 0) e.frozen -= dt;
       if (e.stun > 0) e.stun -= dt;
@@ -186,15 +234,14 @@ export class EnemySystem {
         if (e.state === 'latched') { e.vz = 0; continue; }
       }
       if (e.def.holdMin) { // back-line holders
-        if (dist > e.def.holdMax + 1) vz = -e.speed * (dist > e.def.holdMax + 6 ? CONFIG.enemy.rushMult : 1);
+        if (dist > e.def.holdMax + 1) vz = -e.speed;
         else if (dist < e.def.holdMin - 1) vz = -pl.speed * 0.65;
         else vz = -pl.speed - (e.holdDist - dist) * 0.3;
         vz *= moveMult;
         if (e.type === 'spear_thrower') this._spearAI(e, dt, dist);
         targetX = pl.x + Math.sin(e.id * 1.3 + g.time * 0.4) * 2.2;
       } else {
-        const rush = dist > CONFIG.enemy.rushDistance ? CONFIG.enemy.rushMult : 1; // sprint in from the fog, then settle to table speed
-        vz = -e.speed * moveMult * rush;
+        vz = -e.speed * moveMult;
       }
       // obstacle avoidance: stone walls
       const wall = g.obstacles.wallAhead(e);
@@ -294,12 +341,15 @@ export class EnemySystem {
     rend.begin(); bruteRend.begin(); bossRend.begin();
     fx.hpBars.begin(camera);
     for (const e of this.list) {
+      if (e.entry && e.entry.t < 0) continue; // not dropped in yet
       const v = _v;
       v.x = e.x; v.y = e.dy; v.z = e.z; v.scale = e.scale;
       v.yaw = e.yawFacing; v.pitch = e.dead ? e.pitch : (e.stun > 0 ? Math.sin(t * 30) * 0.08 : 0); v.roll = e.dead ? e.roll : 0;
       v.color = e.isBoss ? C_BOSS : C_ENEMY; v.metal = e.metal;
       v.phase = e.phase; v.run = e.dead || e.frozen > 0 || e.stun > 0 || e.guard || e.isBoss ? 0 : 1;
-      v.armRaise = e.armRaise; v.aim = 0; v.flash = e.flash; v.squash = e.squash; v.frozen = e.frozen > 0; v.shadowScale = e.dead ? 0.6 : 1;
+      v.armRaise = e.armRaise; v.aim = 0; v.flash = e.flash; v.squash = e.squash; v.frozen = e.frozen > 0;
+      v.fall = e.airborne ? 1 : 0; v.land = e.land || 0; v.look = e.look || 0;
+      v.shadowScale = e.dead ? 0.6 : e.airborne ? 0.3 + 0.7 * (1 - Math.min(1, e.dy / e.entry.h0)) : 1 + 0.2 * v.land;
       let f = piecesToFlags(e.pieces);
       if ((e.tier >= 4 || e.black) && !e.isBoss) f |= P.CAPE;
       if (e.eyes) f |= P.EYES;

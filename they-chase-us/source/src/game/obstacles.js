@@ -109,6 +109,7 @@ export class ObstacleSystem {
   }
 
   _hitEnemy(e, o, frac, bruteFrac, flingLow) {
+    if (e.airborne) return;
     const en = this.game.enemies;
     if (o.hits.has(e.id) && e.obstacleCd > 0) return;
     o.hits.add(e.id); e.obstacleCd = 0.8;
@@ -138,7 +139,7 @@ export class ObstacleSystem {
             const target = o.gapX; g.player.x = clamp(target, -CONFIG.player.xRange, CONFIG.player.xRange); g.player.pushVx = pushDir * 2;
           }
           this._killAlliesIn(o.x, o.z, o.w / 2, 0.6);
-          for (const e of en.list) if (e.alive && !e.guard && Math.abs(e.x - o.x) < o.w / 2 + e.radius * 0.6 && e.z - o.z < 0.8 + e.radius && e.z > o.z - 0.6) {
+          for (const e of en.list) if (e.alive && !e.guard && !e.airborne && Math.abs(e.x - o.x) < o.w / 2 + e.radius * 0.6 && e.z - o.z < 0.8 + e.radius && e.z > o.z - 0.6) {
             if (e.wallStun <= 0 && e.obstacleCd <= 0) { e.wallStun = o.def.stun; e.obstacleCd = o.def.stun + 0.2; e.z = o.z + 0.8 + e.radius; g.fx.particles.dust(e.x, e.z, 3); }
           }
           break;

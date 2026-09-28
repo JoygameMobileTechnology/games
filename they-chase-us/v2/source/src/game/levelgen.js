@@ -72,7 +72,7 @@ export function generateLevel(L) {
     }
     if (units.length < 2) add('footman');
     const formation = rng.pick(kind === 'swarm' ? ['blob', 'row', 'wedge'] : kind === 'shield' ? ['row', 'wedge'] : ['column', 'row', 'wedge', 'blob']);
-    events.push({ t: wv.t, kind: 'wave', units, formation, x: rng.range(-2.2, 2.2) });
+    events.push({ t: wv.t, kind: 'wave', units, formation, x: rng.range(-2.2, 2.2), close: wv === waves[0] }); // the opening wave lands inside reach
   }
   // ---- trickle singles ----
   // 15% of the budget, spread evenly between waves

@@ -14,7 +14,7 @@ export function installBot(game) {
       const t = game.time, pl = game.player, st = game.stats, inp = game.input;
       if (inp.down && (bot.holdStart < 0 || !pl.holding)) { window.dispatchEvent(mk('pointerup', bot.curX)); bot.holdStart = -1; bot.lastRelease = t; }
       let best = null, bd = 1e9;
-      for (const e of game.enemies.list) { if (!e.alive) continue; const d = e.z - pl.z; if (d > 0.3 && d < bd) { bd = d; best = e; } }
+      for (const e of game.enemies.list) { if (!e.alive || e.airborne) continue; const d = e.z - pl.z; if (d > 0.3 && d < bd) { bd = d; best = e; } }
       if (!inp.down && !pl.holding && bot.holdStart < 0 && t - bot.lastRelease > 0.2 && best && bd < st.maxRange + 3) {
         const d = Math.min(st.maxRange, Math.max(1.5, bd - 0.5));
         const f = (d - 1.5) / (st.maxRange - 1.5); const u = 1 - Math.sqrt(Math.max(0, 1 - f));

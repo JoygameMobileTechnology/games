@@ -4,6 +4,8 @@ import { PALETTE } from '../config.js';
 // Procedural stickman renderer. Every body part and armor piece type of a team is one InstancedMesh.
 // A pose is computed from a small visual-state object; the same code serves enemies, allies, guards, the player and the boss.
 // Shapes are soft (spheres / capsules, high segment counts) to match the reference's toy-like look.
+// Rig: the upper body pivots at the hips; legs are thigh + calf with a knee, so runs bend the knee and the
+// "superhero landing" can put one knee on the ground.
 
 export const P = { // piece flags
   HELMET: 1, VISOR: 2, CHEST: 4, PAULDRONS: 8, GAUNTLETS: 16, KNEES: 32, CAPE: 64, TRIM: 128, EYES: 256, BOOTS: 512,
@@ -11,9 +13,11 @@ export const P = { // piece flags
 };
 export const PIECE_FLAG = { helmet: P.HELMET, visor: P.VISOR, chest: P.CHEST, pauldrons: P.PAULDRONS, gauntlets: P.GAUNTLETS, knees: P.KNEES, cape: P.CAPE, boots: P.BOOTS, leggings: P.LEGGINGS };
 
-const PARTS = ['head', 'torso', 'armL', 'armR', 'legL', 'legR', 'helmet', 'visor', 'chest', 'pauldronL', 'pauldronR', 'gauntletL', 'gauntletR', 'kneeL', 'kneeR', 'cape', 'eyeL', 'eyeR', 'trim', 'shield', 'spear', 'drum', 'bow', 'sword', 'hood', 'crown', 'ice', 'shadow', 'bootL', 'bootR', 'shinL', 'shinR'];
+// body parts (cloth-colored) are the first 8 entries
+const PARTS = ['head', 'torso', 'armL', 'armR', 'legL', 'legR', 'calfL', 'calfR', 'helmet', 'visor', 'chest', 'pauldronL', 'pauldronR', 'gauntletL', 'gauntletR', 'kneeL', 'kneeR', 'cape', 'eyeL', 'eyeR', 'trim', 'shield', 'spear', 'drum', 'bow', 'sword', 'hood', 'crown', 'ice', 'shadow', 'bootL', 'bootR', 'shinL', 'shinR'];
 const IDX = {}; PARTS.forEach((n, i) => (IDX[n] = i));
 export const PART = IDX;
+const BODY_PARTS = 8;
 
 let GEO = null;
 function geos() {
@@ -24,7 +28,8 @@ function geos() {
     head: new THREE.SphereGeometry(0.30, 24, 16),
     torso: new THREE.CapsuleGeometry(0.235, 0.42, 8, 20),
     arm: cap(0.085, 0.42),
-    leg: cap(0.105, 0.42),
+    thigh: cap(0.105, 0.21),
+    calf: cap(0.1, 0.21),
     helmet: new THREE.SphereGeometry(0.335, 24, 12, 0, Math.PI * 2, 0, Math.PI * 0.6),
     visor: new THREE.SphereGeometry(0.345, 24, 6, Math.PI / 2 - 0.85, 1.7, Math.PI * 0.42, Math.PI * 0.2),
     chest: scaled(new THREE.SphereGeometry(0.3, 22, 14), 1.0, 1.25, 0.95),
@@ -48,7 +53,7 @@ function geos() {
   };
   return GEO;
 }
-const PART_GEO = { head: 'head', torso: 'torso', armL: 'arm', armR: 'arm', legL: 'leg', legR: 'leg', helmet: 'helmet', visor: 'visor', chest: 'chest', pauldronL: 'pauldron', pauldronR: 'pauldron', gauntletL: 'gauntlet', gauntletR: 'gauntlet', kneeL: 'knee', kneeR: 'knee', cape: 'cape', eyeL: 'eye', eyeR: 'eye', trim: 'trim', shield: 'shield', spear: 'spear', drum: 'drum', bow: 'bow', sword: 'sword', hood: 'hood', crown: 'crown', ice: 'ice', shadow: 'shadow', bootL: 'boot', bootR: 'boot', shinL: 'shin', shinR: 'shin' };
+const PART_GEO = { head: 'head', torso: 'torso', armL: 'arm', armR: 'arm', legL: 'thigh', legR: 'thigh', calfL: 'calf', calfR: 'calf', helmet: 'helmet', visor: 'visor', chest: 'chest', pauldronL: 'pauldron', pauldronR: 'pauldron', gauntletL: 'gauntlet', gauntletR: 'gauntlet', kneeL: 'knee', kneeR: 'knee', cape: 'cape', eyeL: 'eye', eyeR: 'eye', trim: 'trim', shield: 'shield', spear: 'spear', drum: 'drum', bow: 'bow', sword: 'sword', hood: 'hood', crown: 'crown', ice: 'ice', shadow: 'shadow', bootL: 'boot', bootR: 'boot', shinL: 'shin', shinR: 'shin' };
 const METAL_PARTS = new Set(['helmet', 'visor', 'chest', 'pauldronL', 'pauldronR', 'gauntletL', 'gauntletR', 'kneeL', 'kneeR', 'shield', 'sword', 'shinL', 'shinR']);
 
 let MATS = null;
@@ -69,19 +74,24 @@ function mats() {
 const PART_MAT = { cape: 'cape', eyeL: 'eye', eyeR: 'eye', trim: 'gold', crown: 'gold', spear: 'wood', drum: 'wood', bow: 'wood', hood: 'cloth', ice: 'ice', shadow: 'shadow', bootL: 'cloth', bootR: 'cloth' };
 
 const _m = new THREE.Matrix4(), _m2 = new THREE.Matrix4(), _root = new THREE.Matrix4();
+const _upper = new THREE.Matrix4(), _headM = new THREE.Matrix4(), _t1 = new THREE.Matrix4(), _t2 = new THREE.Matrix4();
 const _p = new THREE.Vector3(), _q = new THREE.Quaternion(), _s = new THREE.Vector3(), _e = new THREE.Euler();
-const _c = new THREE.Color(), _white = new THREE.Color(0xffffff);
+const _white = new THREE.Color(0xffffff);
 const C_RED = new THREE.Color(0xff2a2a), C_GOLD = new THREE.Color(PALETTE.gold), C_WOOD = new THREE.Color(0x5a3a1e), C_FROST = new THREE.Color(PALETTE.frost), C_STEEL = new THREE.Color(PALETTE.steel), C_BOOT = new THREE.Color(0x4a2f1a), C_DRUM = new THREE.Color(0x8a4b2a);
+const clamp01 = (x) => (x < 0 ? 0 : x > 1 ? 1 : x);
 
-// local part transform helper: root * T(pos) * R(euler) * S(scale)
-function local(out, root, x, y, z, rx, ry, rz, sx = 1, sy = 1, sz = 1) {
+// local part transform helper: parent * T(pos) * R(euler) * S(scale)
+function local(out, parent, x, y, z, rx, ry, rz, sx = 1, sy = 1, sz = 1) {
   _p.set(x, y, z); _e.set(rx, ry, rz); _q.setFromEuler(_e); _s.set(sx, sy, sz);
-  return out.multiplyMatrices(root, _m2.compose(_p, _q, _s));
+  return out.multiplyMatrices(parent, _m2.compose(_p, _q, _s));
 }
 
 /**
- * Visual state v: { x,y,z, yaw,pitch,roll, scale, color:Color, metal:Color, phase, run(0..1), armRaise(0..1), aim(0..1), flags:int, flash(0..1), squash }
+ * Visual state v: { x,y,z, yaw,pitch,roll, scale, color:Color, metal:Color, phase, run(0..1), armRaise(0..1), aim(0..1), flags:int,
+ *                   flash(0..1), squash, fall(0..1 airborne), land(0..1 landing crouch), look(0..1 head up in the crouch) }
  * Writes a Matrix4 per part into out[] (only parts present get `used[i]=true`).
+ * Three poses are blended: base (run / idle / aim / raise), mid-air (arms out, one knee tucked) and the superhero landing
+ * (right knee and right fist on the ground, left foot planted in front, left arm swept back, head bowed then raised).
  */
 export function computePose(v, out, used) {
   for (let i = 0; i < PARTS.length; i++) used[i] = false;
@@ -89,48 +99,66 @@ export function computePose(v, out, used) {
   _p.set(v.x, v.y, v.z); _e.set(v.pitch || 0, v.yaw || 0, v.roll || 0); _q.setFromEuler(_e);
   const sc = v.scale || 1; _s.set(sc * (1 + sq), sc * (1 - sq), sc * (1 + sq));
   _root.compose(_p, _q, _s);
-  const ph = v.phase || 0, run = v.run == null ? 1 : v.run;
-  const swing = Math.sin(ph) * 0.85 * run;
-  const bob = Math.abs(Math.sin(ph)) * 0.06 * run;
-  const lean = 0.12 * run;
-  const raise = v.armRaise || 0; // 0 down .. 1 both arms up
-  const aim = v.aim || 0;        // arms forward for bow
   const f = v.flags || 0;
-  const set = (name, x, y, z, rx = 0, ry = 0, rz = 0, sx = 1, sy = 1, sz = 1) => { const i = IDX[name]; local(out[i], _root, x, y + bob, z, rx, ry, rz, sx, sy, sz); used[i] = true; };
+  const wL = clamp01(v.land || 0), wF = clamp01(v.fall || 0) * (1 - wL), wB = Math.max(0, 1 - wL - wF);
+  const look = v.look || 0;
+  const ph = v.phase || 0, run = (v.run == null ? 1 : v.run) * wB;
+  const sn = Math.sin(ph), cs = Math.cos(ph);
+  const swing = sn * 0.8 * run;
+  const bob = Math.abs(sn) * 0.06 * run;
+  const raise = v.armRaise || 0, aim = v.aim || 0;
 
-  set('head', 0, 1.42, 0.02, lean * 0.5);
-  set('torso', 0, 0.95, 0, lean);
-  // arms: swing opposite to legs; raise lifts them up/forward; aim brings them forward
+  // hips + upper-body pivot: lean while running, deep forward bend in the landing, slight lean back in the air
+  const hipY = 0.6 + bob - 0.3 * wL;
+  const pitchU = 0.12 * run + 0.7 * wL - 0.1 * wF;
+  _t1.makeTranslation(0, hipY, 0); _t2.makeRotationX(pitchU); _t1.multiply(_t2); _t2.makeTranslation(0, -0.6, 0); _t1.multiply(_t2);
+  _upper.multiplyMatrices(_root, _t1);
+  const setU = (name, x, y, z, rx = 0, ry = 0, rz = 0) => { const i = IDX[name]; local(out[i], _upper, x, y, z, rx, ry, rz); used[i] = true; };
+  const setOn = (name, parent, x, y, z, rx = 0, ry = 0, rz = 0) => { const i = IDX[name]; local(out[i], parent, x, y, z, rx, ry, rz); used[i] = true; };
+
+  // head: bows at impact, then snaps up to look at you before standing
+  local(_headM, _upper, 0, 1.42, 0.02, 0.18 * wL - 0.95 * look * wL, 0, 0);
+  out[IDX.head].copy(_headM); used[IDX.head] = true;
+  setU('torso', 0, 0.95, 0);
+
+  // arms: base (swing / raise / aim), mid-air spread, landing (right fist planted, left arm swept back and out)
   let aL = -swing * 0.8, aR = swing * 0.8;
   if (raise > 0) { aL = aL * (1 - raise) - 2.6 * raise; aR = aR * (1 - raise) - 2.6 * raise; }
   if (aim > 0) { aL = aL * (1 - aim) - 1.55 * aim; aR = aR * (1 - aim) - 1.3 * aim; }
-  set('armL', -0.30, 1.22, 0, aL, 0, 0.14);
-  set('armR', 0.30, 1.22, 0, aR, 0, -0.14);
-  set('legL', -0.13, 0.6, 0, swing);
-  set('legR', 0.13, 0.6, 0, -swing);
-  if (f & P.HELMET) set('helmet', 0, 1.43, 0.02, lean * 0.5);
-  if (f & P.VISOR) set('visor', 0, 1.42, 0.02, lean * 0.5);
-  if (f & P.CHEST) set('chest', 0, 1.0, 0, lean);
-  if (f & P.PAULDRONS) { set('pauldronL', -0.34, 1.3, 0, 0, 0, 0.35); set('pauldronR', 0.34, 1.3, 0, 0, 0, -0.35); }
-  if (f & P.GAUNTLETS) { // near hand: along the arm direction
-    const gl = IDX.gauntletL, gr = IDX.gauntletR;
-    local(out[gl], out[IDX.armL], 0, -0.36, 0, 0, 0, 0); used[gl] = true;
-    local(out[gr], out[IDX.armR], 0, -0.36, 0, 0, 0, 0); used[gr] = true;
+  setU('armL', -0.30, 1.22, 0, aL * wB - 0.35 * wF + 0.6 * wL, 0, 0.14 * wB + 1.25 * wF + 0.8 * wL);
+  { // planted arm stretches a little in the crouch so the fist really reaches the ground (stylized)
+    const i = IDX.armR; local(out[i], _upper, 0.30, 1.22 - 0.1 * wL, 0, aR * wB - 0.35 * wF - 0.78 * wL, 0, -0.14 * wB - 1.25 * wF - 0.2 * wL, 1, 1 + 0.3 * wL, 1); used[i] = true;
   }
-  if (f & P.KNEES) { local(out[IDX.kneeL], out[IDX.legL], 0, -0.3, 0.02); used[IDX.kneeL] = true; local(out[IDX.kneeR], out[IDX.legR], 0, -0.3, 0.02); used[IDX.kneeR] = true; }
-  if (f & P.LEGGINGS) { local(out[IDX.shinL], out[IDX.legL], 0, -0.36, 0); used[IDX.shinL] = true; local(out[IDX.shinR], out[IDX.legR], 0, -0.36, 0); used[IDX.shinR] = true; }
-  if (f & P.BOOTS) { local(out[IDX.bootL], out[IDX.legL], 0, -0.5, 0.04); used[IDX.bootL] = true; local(out[IDX.bootR], out[IDX.legR], 0, -0.5, 0.04); used[IDX.bootR] = true; }
-  if (f & P.CAPE) set('cape', 0, 1.3, 0, -0.12 - Math.sin(ph * 0.5) * 0.08 * run - lean);
-  if (f & P.EYES) { set('eyeL', -0.1, 1.44, 0.27); set('eyeR', 0.1, 1.44, 0.27); }
-  if (f & P.TRIM) set('trim', 0, 1.36, 0.02, Math.PI / 2 + lean * 0.5);
-  if (f & P.SHIELD) set('shield', -0.15, 0.95, 0.5, 0, 0, 0);
-  if (f & P.SPEAR) local(out[IDX.spear], out[IDX.armR], 0.08, -0.4, 0.2, Math.PI / 2 - 0.3, 0, 0), used[IDX.spear] = true;
-  if (f & P.DRUM) set('drum', 0, 0.85, 0.42);
-  if (f & P.BOW) local(out[IDX.bow], out[IDX.armL], 0, -0.44, 0.05, 0, Math.PI / 2, 0), used[IDX.bow] = true;
-  if (f & P.SWORD) local(out[IDX.sword], out[IDX.armR], 0, -0.44, 0.05, raise > 0.5 ? -0.3 : -1.4, 0, 0), used[IDX.sword] = true;
-  if (f & P.HOOD) set('hood', 0, 1.42, -0.02, lean * 0.5 - 0.15);
-  if (f & P.CROWN) set('crown', 0, 1.72, 0.02, lean * 0.5);
-  if (f & P.ICE) set('ice', 0, 0, 0);
+
+  // legs: thigh + calf. Running bends the knee on the recovery swing; air tucks the left knee; landing kneels on the right.
+  const kL = run * (0.15 + 1.15 * Math.max(0, -cs)), kR = run * (0.15 + 1.15 * Math.max(0, cs));
+  local(out[IDX.legL], _root, -0.13, hipY, 0, swing - 0.9 * wF - 1.5 * wL, 0, 0); used[IDX.legL] = true;
+  local(out[IDX.legR], _root, 0.13, hipY, 0, -swing + 0.25 * wF + 0.25 * wL, 0, 0); used[IDX.legR] = true;
+  setOn('calfL', out[IDX.legL], 0, -0.21, 0, kL + 1.5 * wF + 1.55 * wL);
+  setOn('calfR', out[IDX.legR], 0, -0.21, 0, kR + 0.5 * wF + 1.35 * wL);
+
+  if (f & P.HELMET) setOn('helmet', _headM, 0, 0.01, 0);
+  if (f & P.VISOR) setOn('visor', _headM, 0, 0, 0);
+  if (f & P.CHEST) setU('chest', 0, 1.0, 0);
+  if (f & P.PAULDRONS) { setU('pauldronL', -0.34, 1.3, 0, 0, 0, 0.35); setU('pauldronR', 0.34, 1.3, 0, 0, 0, -0.35); }
+  if (f & P.GAUNTLETS) { setOn('gauntletL', out[IDX.armL], 0, -0.36, 0); setOn('gauntletR', out[IDX.armR], 0, -0.36, 0); }
+  if (f & P.KNEES) { setOn('kneeL', out[IDX.calfL], 0, 0, 0.03); setOn('kneeR', out[IDX.calfR], 0, 0, 0.03); }
+  if (f & P.LEGGINGS) { setOn('shinL', out[IDX.calfL], 0, -0.14, 0); setOn('shinR', out[IDX.calfR], 0, -0.14, 0); }
+  if (f & P.BOOTS) { setOn('bootL', out[IDX.calfL], 0, -0.28, 0.04); setOn('bootR', out[IDX.calfR], 0, -0.28, 0.04); }
+  if (f & P.CAPE) { // world-space target angle minus the upper-body pitch: flutters when running, flares up in the air, drapes in the crouch
+    const capeW = (-0.12 - Math.sin(ph * 0.5) * 0.08 * run - 0.12 * run) * wB - 1.2 * wF + 0.6 * wL;
+    setU('cape', 0, 1.3, 0, capeW - pitchU);
+  }
+  if (f & P.EYES) { setOn('eyeL', _headM, -0.1, 0.02, 0.25); setOn('eyeR', _headM, 0.1, 0.02, 0.25); }
+  if (f & P.TRIM) setOn('trim', _headM, 0, -0.06, 0, Math.PI / 2);
+  if (f & P.SHIELD) setU('shield', -0.15, 0.95, 0.5);
+  if (f & P.SPEAR) setOn('spear', out[IDX.armR], 0.08, -0.4, 0.2, Math.PI / 2 - 0.3);
+  if (f & P.DRUM) setU('drum', 0, 0.85, 0.42);
+  if (f & P.BOW) setOn('bow', out[IDX.armL], 0, -0.44, 0.05, 0, Math.PI / 2, 0);
+  if (f & P.SWORD) setOn('sword', out[IDX.armR], 0, -0.44, 0.05, raise > 0.5 ? -0.3 : -1.4);
+  if (f & P.HOOD) setOn('hood', _headM, 0, 0, -0.04, -0.15);
+  if (f & P.CROWN) setOn('crown', _headM, 0, 0.30, 0);
+  if (f & P.ICE) setOn('ice', _root, 0, 0, 0);
   // shadow: flat at ground, unaffected by pitch/roll or bob
   {
     const i = IDX.shadow; _p.set(v.x, 0.015, v.z); _q.identity(); const ss = sc * (v.shadowScale || 1); _s.set(ss, 1, ss);
@@ -189,7 +217,7 @@ export class TeamRenderer {
       if (!this.used[i] || !this.meshes[i]) continue;
       const name = PARTS[i];
       let col;
-      if (i <= 5) col = cloth;
+      if (i < BODY_PARTS) col = cloth;
       else if (METAL_PARTS.has(name)) col = name === 'sword' ? C_STEEL : metal;
       else if (name === 'eyeL' || name === 'eyeR') col = C_RED;
       else if (name === 'trim' || name === 'crown') col = C_GOLD;

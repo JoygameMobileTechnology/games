@@ -138,6 +138,20 @@ export class GameAudio {
   arch() { this.tone({ type: 'triangle', f0: 880, f1: 1320, dur: 0.18, vol: 0.14 }); }
   death() { this.tone({ type: 'sawtooth', f0: 200, f1: 40, dur: 0.8, vol: 0.2 }); this.burst({ dur: 0.5, vol: 0.15, hp: 100, lp: 800 }); }
   victory() { [523, 659, 784, 1046, 1318].forEach((f, i) => this.tone({ type: 'triangle', f0: f, dur: 0.5, vol: 0.14, delay: i * 0.12 })); }
+  land(big = false) {
+    const now = performance.now(); if (now - (this.lastLand || 0) < 70) return; this.lastLand = now; // many landings at once -> one thud
+    this.tone({ type: 'sine', f0: big ? 70 : 100, f1: 32, dur: big ? 0.34 : 0.18, vol: big ? 0.38 : 0.22 });
+    this.burst({ dur: big ? 0.26 : 0.12, vol: big ? 0.26 : 0.15, hp: 90, lp: 1400 });
+    this.burst({ dur: 0.07, vol: big ? 0.12 : 0.07, hp: 900, lp: 3500, delay: 0.01 }); // stone crunch
+  }
+  whoosh() { // falling from the sky: band-passed noise sweeping down
+    if (!this.ok()) return; const now = performance.now(); if (now - (this.lastWhoosh || 0) < 140) return; this.lastWhoosh = now;
+    const c = this.ctx, t0 = c.currentTime;
+    const s = c.createBufferSource(); s.buffer = this.noise; s.loop = true;
+    const bp = c.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 1.1; bp.frequency.setValueAtTime(2400, t0); bp.frequency.exponentialRampToValueAtTime(420, t0 + 0.5);
+    const g = c.createGain(); g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(0.06, t0 + 0.32); g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.55);
+    s.connect(bp); bp.connect(g); g.connect(this.master); s.start(t0, Math.random() * 0.5); s.stop(t0 + 0.6);
+  }
   spear() { this.burst({ dur: 0.2, vol: 0.14, hp: 900, lp: 5000 }); }
   ui() { this.tone({ type: 'sine', f0: 700, f1: 900, dur: 0.06, vol: 0.08 }); }
   shieldBlock() { this.tone({ type: 'sine', f0: 500, f1: 900, dur: 0.15, vol: 0.14 }); this.clank(); }

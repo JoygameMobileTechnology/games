@@ -12,7 +12,7 @@ export function installBot(game) {
   game._stepLevel = (dt) => {
     if (bot.enabled) {
       const pl = game.player; let best = null, bd = 1e9;
-      for (const e of game.enemies.list) { if (!e.alive) continue; const d = e.z - pl.z; if (d > 0.3 && d < bd) { bd = d; best = e; } }
+      for (const e of game.enemies.list) { if (!e.alive || e.airborne) continue; const d = e.z - pl.z; if (d > 0.3 && d < bd) { bd = d; best = e; } }
       const want = best && bd < 14 ? best.x : 0;
       pl.x += Math.max(-6 * dt, Math.min(6 * dt, want - pl.x));
     }
