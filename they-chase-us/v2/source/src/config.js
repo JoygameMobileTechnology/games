@@ -3,7 +3,7 @@ export const PALETTE = {
   skyTop: 0x7fd6f2, skyBottom: 0xe6f7ff, sea: 0x3cc7cf,
   road: 0xf5f0e6, chevron: 0xd6e4f2, parapet: 0xe4ae45,
   castleWall: 0xe8e2d6, roofTile: 0xc8614a, slate: 0x6f7d8c,
-  player: 0xffc62e, ally: 0x4cd964, enemy: 0xe0413a, // player: toy-stickman yellow (the gummy shader shades it toward orange)
+  player: 0xf2a33a, ally: 0x4cd964, enemy: 0xe0413a,
   iron: 0x9aa3ad, steel: 0xc9d1d9, blackSteel: 0x3a3f47, gold: 0xd9a93f,
   frost: 0x7fe3ff, fire: 0xff7a2e, lightning: 0xa58bff, crit: 0xffd84a,
   danger: 0xff3b3b,
