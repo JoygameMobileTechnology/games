@@ -35,9 +35,9 @@ export function generateLevel(L) {
 
   // ---- waves ----
   const waves = [];
-  let t = 3;
-  const gapMin = ftue ? 8 : CONFIG.level.waveGapMin, gapMax = ftue ? 11 : CONFIG.level.waveGapMax;
-  while (t < duration - 8) {
+  let t = 0.5; // the first wave is already coming when the run starts
+  const gapMin = ftue ? CONFIG.level.waveGapMinFtue : CONFIG.level.waveGapMin, gapMax = ftue ? CONFIG.level.waveGapMaxFtue : CONFIG.level.waveGapMax;
+  while (t < duration - 5) {
     const ph = t < CONFIG.level.phases.warmup ? 'warmup' : t < CONFIG.level.phases.rise ? 'rise' : t < CONFIG.level.phases.peak ? 'peak' : 'finale';
     const w = ph === 'warmup' ? 0.6 : ph === 'rise' ? 1.0 : ph === 'peak' ? 1.6 : 1.4;
     waves.push({ t, ph, w });
@@ -78,9 +78,9 @@ export function generateLevel(L) {
   // 15% of the budget, spread evenly between waves
   const trickleTypes = types.filter((x) => x === 'footman' || x === 'runner');
   const trickleN = Math.max(1, Math.floor((budget * 0.25) / (ENEMY_TYPES.footman.hp * TIER_MULT[Math.max(0, hi - 1)])));
-  const trickleGap = (duration - 15) / trickleN;
+  const trickleGap = (duration - 11) / trickleN;
   for (let i = 0; i < trickleN; i++) {
-    const tt = 7 + i * trickleGap + rng.range(-1, 1);
+    const tt = 3 + i * trickleGap + rng.range(-1, 1);
     const type = rng.pick(trickleTypes);
     events.push({ t: tt, kind: 'single', type, tier: tierFor(type), x: rng.range(-3, 3) });
   }

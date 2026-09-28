@@ -76,7 +76,9 @@ export const CONFIG = {
   rarity: { common: 0.6, rare: 0.3, epic: 0.1, epicFromLevelUp: 3, ownedWeightBonus: 0.5 },
   levelup: { slowIn: 0.25, inputLock: 0.3, slowOut: 0.3 },
   enemy: {
-    spawnDistance: 22,      // closer: chasers are on screen and in range sooner
+    spawnDistance: 30,      // out of view, at the fog edge
+    rushDistance: 10,       // chasers sprint (rushMult) until this close, then run at their table speed
+    rushMult: 2.4,
     lateralSpeed: 2.0,
     separation: 0.9,
     radius: 0.45,
@@ -149,8 +151,11 @@ export const CONFIG = {
   },
   level: {
     normalDuration: 75,
-    waveGapMin: 6, waveGapMax: 9,
+    waveGapMin: 4.5, waveGapMax: 6.5,
+    waveGapMinFtue: 5.5, waveGapMaxFtue: 7.5,
     firstCardTime: 9,
+    maxIdle: 2.0,           // s without anything in reach before a filler pack rushes in
+    fillerSize: 2,
     maxWaveUnits: 28,
     phases: { warmup: 10, rise: 40, peak: 60 },
   },

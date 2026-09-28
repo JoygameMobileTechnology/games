@@ -49,7 +49,7 @@ export function installBot(game) {
       pick.dispatchEvent(ev('pointerdown')); pick.dispatchEvent(ev('pointerup'));
     }
     if (bot.autoRestart && (game.state === 'fail' || game.state === 'results' || game.state === 'end')) {
-      bot.log.push({ level: game.level, state: game.state, kills: game.kills, mult: game.bonus.mult, hp: Math.round(game.player.hp), picks: Object.keys(game.picks) });
+      bot.log.push({ level: game.level, state: game.state, kills: game.kills, mult: game.bonus.mult, hp: Math.round(game.player.hp), picks: Object.keys(game.picks), engageFirst: +game.engageFirst.toFixed(1), idleMax: +game.idleMax.toFixed(1), fillers: game.fillers });
       bot.holdStart = -1; bot.lastRelease = -9;
       if (game.state !== 'fail') game.goMain();
       if (bot.buyUpgrades) { let guard = 0; while (guard++ < 20) { const ids = ['hp', 'atk', 'dmg', 'range'].sort((a, b2) => (game.save.upg[a] || 0) - (game.save.upg[b2] || 0)); if (!ids.some((id) => game.buyUpgrade(id))) break; } }

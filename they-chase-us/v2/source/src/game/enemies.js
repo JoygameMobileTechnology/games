@@ -186,14 +186,15 @@ export class EnemySystem {
         if (e.state === 'latched') { e.vz = 0; continue; }
       }
       if (e.def.holdMin) { // back-line holders
-        if (dist > e.def.holdMax + 1) vz = -e.speed;
+        if (dist > e.def.holdMax + 1) vz = -e.speed * (dist > e.def.holdMax + 6 ? CONFIG.enemy.rushMult : 1);
         else if (dist < e.def.holdMin - 1) vz = -pl.speed * 0.65;
         else vz = -pl.speed - (e.holdDist - dist) * 0.3;
         vz *= moveMult;
         if (e.type === 'spear_thrower') this._spearAI(e, dt, dist);
         targetX = pl.x + Math.sin(e.id * 1.3 + g.time * 0.4) * 2.2;
       } else {
-        vz = -e.speed * moveMult;
+        const rush = dist > CONFIG.enemy.rushDistance ? CONFIG.enemy.rushMult : 1; // sprint in from the fog, then settle to table speed
+        vz = -e.speed * moveMult * rush;
       }
       // obstacle avoidance: stone walls
       const wall = g.obstacles.wallAhead(e);
@@ -205,7 +206,7 @@ export class EnemySystem {
       e.vx = steer + sep;
       e.x = clamp(e.x + e.vx * dt, -CONFIG.player.xRange - 0.4, CONFIG.player.xRange + 0.4);
       e.z += vz * dt; e.vz = vz;
-      e.phase += dt * (moveMult > 0 ? e.speed * 1.9 / e.scale : 0);
+      e.phase += dt * (moveMult > 0 ? Math.abs(vz) * 1.9 / e.scale : 0);
       // contact: allies first, then the player
       if (moveMult > 0 && e.state === 'run') {
         if (anyAllies) {

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { CONFIG, PALETTE, xpForLevelUp, upgradeCost } from '../config.js';
+import { CONFIG, PALETTE, xpForLevelUp, upgradeCost, highestTier } from '../config.js';
 import { SceneManager } from '../render/scene.js';
 import { World } from '../render/world.js';
 import { TeamRenderer, P } from '../render/units.js';
@@ -17,6 +17,7 @@ import { AllySystem } from './allies.js';
 import { ObstacleSystem } from './obstacles.js';
 import { BonusSystem } from './bonus.js';
 import { generateLevel, formationOffsets } from './levelgen.js';
+import { typesForLevel } from '../data/enemies.js';
 import { CARDS } from '../data/cards.js';
 import { UI } from '../ui/ui.js';
 
@@ -101,6 +102,7 @@ export class Game {
     this.level = L; this.save.level = L;
     this.levelData = generateLevel(L);
     this.eventIdx = 0; this.time = 0; this.xp = 0; this.levelUps = 0; this.pendingOffers = 0; this.kills = 0; this.cardsOpening = false;
+    this.idleT = 0; this.idleMax = 0; this.engageFirst = -1; this.fillers = 0; // pacing stats (debug)
     this.picks = {}; this.stats = computeStats(this.picks, this.save.upg);
     this.levelRng = new RNG(seedForLevel(L, 7));
     const len = this.levelData.duration * this.stats.runSpeed;
@@ -173,6 +175,10 @@ export class Game {
     // events
     const ev = this.levelData.events;
     while (this.eventIdx < ev.length && ev[this.eventIdx].t <= this.time) this._runEvent(ev[this.eventIdx++]);
+    // pacing: never run empty for long. If nothing is within reach for maxIdle seconds, a small filler pack rushes in.
+    let near = false; for (const e of this.enemies.list) if (e.alive && !e.guard && e.z - pl.z < st.maxRange) { near = true; break; }
+    if (near) { if (this.engageFirst < 0) this.engageFirst = this.time; this.idleT = 0; }
+    else { this.idleT += dt; if (this.idleT > this.idleMax) this.idleMax = this.idleT; if (this.idleT > CONFIG.level.maxIdle && this.time < this.levelData.duration - 3) { this.idleT = 0; this._spawnFiller(); } }
     // v2: drag anywhere to move sideways; shooting is automatic
     if (inp.down && !inp.locked && !pl.dead) {
       const dx = inp.consumeDx();
@@ -197,6 +203,15 @@ export class Game {
     if (this.pendingOffers > 0 && !this.cardsOpening) this._openCards();
     // gate
     if (pl.z <= this.world.gateZ + 0.2 && !pl.dead) this._enterGate();
+  }
+
+  _spawnFiller() {
+    const pl = this.player, L = this.level, rng = this.levelRng;
+    const n = CONFIG.level.fillerSize + Math.floor(L / 5);
+    const types = typesForLevel(L).filter((t) => t === 'footman' || t === 'runner');
+    const tier = L <= 2 ? 0 : Math.max(0, highestTier(L) - 2);
+    for (let i = 0; i < n; i++) this.enemies.spawn(rng.pick(types), tier, clamp(pl.x + rng.range(-2.5, 2.5), -3.2, 3.2), pl.z + CONFIG.enemy.spawnDistance + i * 1.2);
+    this.fillers++;
   }
 
   _runEvent(ev) {
