@@ -12,7 +12,7 @@ Bee Colony'nin (bkz. [bee-colony/](../bee-colony/)) Cube Land referansına göre
 - **Kuyruk:** kovanlar kübik shooter'lar (arılar ön yüzden çıkar) (en fazla 80 arı, yuvarlak sayılar). Level 8'den itibaren gizli "?" shooter'lar (önündeki slota çıkınca açılır), level 13'ten itibaren birlikte hareket eden bağlı çiftler.
 - **Boosterlar** (altta, Cube Land sırasıyla açılır): Geri Al (L6), Slot Ekle (L9), Wild Bee (L12), Shuffle (L15), Vacuum (L18).
 - **Level sonu rush:** kuyruk boşalınca kalan kovanlar iki kat hızda çalışır.
-- **Ayarlar:** altı arka plan varyantı (Lacivert / Orman / Bal / Beyaz / Gri / Sarı) renk kutucuklarından seçilir (test amaçlı).
+- **Ayarlar:** altı arka plan varyantı (Sarı varsayılan · Lacivert / Orman / Bal / Beyaz / Gri) renk kutucuklarından seçilir (test amaçlı).
 - **FTUE:** L1 (dokun / uyuyan kovan / uyandırma), L2 (döndür / 2x); booster'lar açıldıkları levelde, gizli "?" (L8), bağlı çift (L13) ve gizli cep (L18) ilk göründüklerinde tek balonla tanıtılır. Türkçe.
 - **Pocket levelleri:** 13 Rubik Küpü, 18 Bal Kabağı, 23 Doğum Günü Pastası, 28 Arı Kovanı, 33 Balık — renkler heykelin farklı bölmelerinde gizli, oyuncu soyarak keşfeder.
 
