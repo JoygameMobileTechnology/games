@@ -3,6 +3,10 @@
 Canlı sürüm: https://joygamemobiletechnology.github.io/games/bee-colony-remaster/
 (GitHub Pages sayfayı ~10 dakika önbellekte tutar; bir değişiklik görünmüyorsa sert yenileyin.)
 
+## 28 Eylül 2026 — L8 gizli kovan tanıtımı referans gibi
+
+- **L8 Toadstool:** kuyruğun ikinci sırasının tamamı gizli "?" kovan (3/3); ön sıra açık, üçüncü sıra olduğu gibi. Toplam 6 gizli kovan. "Yeni Engel!" kartı canlı board görüntüsü aldığı için üç "?" ile açılıyor.
+
 ## 28 Eylül 2026 — Slotlar ve booster çubuğu Cube Land ölçüsünde
 
 - **Slotlar:** yumuşak köşeli, ince açık mavi çizgili koyu kareler; genişlik ekranın %13.5'i, aralık %2 (Cube Land ile aynı). Slot içindeki shooter kareyi dolduracak şekilde %12.1'e büyütüldü; kuyruk sıraları birbirinin arkasına basamaklı (öndeki sıra arkadakini örter). 6 slot çerçeveye sığıyor.
