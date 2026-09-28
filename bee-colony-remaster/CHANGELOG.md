@@ -3,6 +3,16 @@
 Canlı sürüm: https://joygamemobiletechnology.github.io/games/bee-colony-remaster/
 (GitHub Pages sayfayı ~10 dakika önbellekte tutar; bir değişiklik görünmüyorsa sert yenileyin.)
 
+## 28 Eylül 2026 — Art geri bildirimi turu 2
+
+- **Varsayılan arka plan Sarı.** Ayarlardaki sıra: Sarı · Lacivert · Orman · Bal · Beyaz · Gri.
+- **Shooter'larda tek çıkıntı:** iki "kulak" yerine ortada tek, biraz daha geniş bir düğme.
+- **Slot ve kuyruk tam karşıdan:** board kamerası ortografik, aşağı eğim yok. Hizalar korundu (slot %68, sıralar %78 / %83 / %88).
+- **Süpürge (Vacuum):** renk artık menüden değil, heykelde bir küpe dokunarak seçiliyor (buton → heykele dokun). Süpürülen rengin shooter'ları kuyruktan anında kalkıyor; bağlı çiftin halatı çözülüyor.
+- **Booster tanıtım balonu bölümü kilitlemiyor:** oyuncu balonu görmezden gelip devam ederse balon 3 s sonra kendiliğinden kapanır (L6 Geri Al tanıtımı takılabiliyordu).
+- **Tutorial eli** booster butonunun tam ortasına basıyor.
+- **L6 Candy Heart:** kalbin arkasındaki delik bir mor küple kapatıldı (beyaz iç artık görünmüyor); mor shooter 7 → 8.
+
 ## 27 Eylül 2026 — Geri bildirim turu 1b: doğrulama düzeltmeleri (e0f9424)
 
 Ekip kontrolünde "yapıldı" denip çalışmadığı görülen maddeler, referans ekran görüntülerinden ölçülerek yeniden yapıldı.
