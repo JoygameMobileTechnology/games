@@ -426,7 +426,7 @@ export class Game {
     const v = this._pv; v.x = pl.x; v.y = pl.dy; v.z = pl.z; v.yaw = this.playerFacing > 0 ? 0 : Math.PI; v.pitch = pl.dead || pl.fallT > 0 ? -pl.pitch : 0; v.roll = 0; v.scale = 1;
     v.color = this.stats.fullPlate ? _cFull.copy(C_PLAYER).lerp(C_GOLD, 0.5 + 0.3 * Math.sin(this.realTime * 6)) : C_PLAYER; v.metal = this.stats.fullPlate ? C_GOLD : C_STEEL;
     v.phase = pl.phase; v.run = this.state === 'main' ? 0.25 : (pl.speed > 0 ? 1 : 0); v.armRaise = 0; v.aim = pl.aim; v.flash = pl.flash; v.squash = pl.squash; v.frozen = false; v.shadowScale = 1;
-    let f = P.HOOD | P.CROWN | P.BOW;
+    let f = P.BOW; // same body as the enemies: bare head, no hood or crown
     const A = this.stats.armor; if (A.helmet) f |= P.HELMET; if (A.chestplate) f |= P.CHEST; if (A.gauntlets) f |= P.GAUNTLETS; if (A.leggings) f |= P.LEGGINGS; if (A.boots) f |= P.BOOTS;
     const spd = this.save.upg.dmg || 0; if (spd >= 5) { f |= P.CAPE; v.capeColor = CAPE_COLORS[Math.min(5, Math.floor(spd / 5))]; } else v.capeColor = null;
     v.bowColor = BOW_COLORS[Math.min(4, Math.floor((this.save.upg.atk || 0) / 5))];
