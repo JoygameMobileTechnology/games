@@ -3,6 +3,15 @@
 Canlı sürüm: https://joygamemobiletechnology.github.io/games/bee-colony-remaster/
 (GitHub Pages sayfayı ~10 dakika önbellekte tutar; bir değişiklik görünmüyorsa sert yenileyin.)
 
+## 29 Eylül 2026 — Mağaza
+
+- **Mağaza sekmesi açıldı:** ana menünün alt barındaki Mağaza artık kilitli değil; üstteki altın göstergesine dokunmak da mağazayı açar.
+- **Özel Teklif:** Reklamsız (TRY 569.99, "POPÜLER").
+- **Paketler:** Başlangıç (5,000 altın + her booster ×1, TRY 459.99), Pro (10,000 + ×5, TRY 749.99), Ultimate (25,000 + ×10, TRY 1,149.99). Referanstaki sınırsız can döşemesinin yerine beşinci booster konuldu.
+- **Altın Paketleri:** 1,000 / 5,000 / 10,000 / 30,000 / 75,000 / 200,000 altın; TRY 55.99 / 284.99 / 569.99 / 1,439.99 / 2,829.99 / 5,659.99.
+- **Günlük Bedava Altın:** günde bir kez +20 altın.
+- Fiyat yazıları butona sığacak şekilde otomatik küçülür. Satın almalar prototipte test amaçlıdır; ürün anında verilir, ödeme alınmaz.
+
 ## 28 Eylül 2026 — Ekonomi
 
 - **Kalıcı booster envanteri:** booster adetleri artık bölümden bölüme taşınıyor ve kayıtta tutuluyor (önceden her bölüm sabit adetle başlıyordu).
