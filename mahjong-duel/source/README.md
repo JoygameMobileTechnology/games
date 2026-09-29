@@ -22,9 +22,9 @@ The four launch themes offer 320 collectible faces. Packaging prunes unavailable
 
 ## Verification
 
-`npm test` runs 137 tests covering matching, formations, ghost memory, boosters, collection persistence, rarity migration, rewards, achievements, simulated standings, menu scenery and all 720 cultural tile notes.
+`npm test` runs 151 tests covering matching, formations, ghost memory, boosters, collection persistence, rarity migration, rewards, achievements, simulated standings, menu scenery and all 720 cultural tile notes.
 
-Browser checks require a separate Playwright installation with browser binaries. Set `PLAYWRIGHT_MODULE` to that installation and `GAME_URL` to the running game. Current checks include `tests/menu-flow-check.cjs`, `tests/menu-backgrounds-check.cjs`, `tests/tile-binder-check.cjs`, `tests/tile-inspector-check.cjs` and `tests/progression-ui-check.cjs`; use `--webkit` where supported. Earlier scripts using persisted match fixtures document historical behavior: current duels are held only in memory. Captures go under ignored `output/` and `tmp/` directories.
+Browser checks require a separate Playwright installation with browser binaries. Set `PLAYWRIGHT_MODULE` to that installation and `GAME_URL` to the running game. Current checks include `tests/menu-flow-check.cjs`, `tests/menu-backgrounds-check.cjs`, `tests/tile-binder-check.cjs`, `tests/tile-inspector-check.cjs`, `tests/progression-ui-check.cjs` and `tests/achievement-gallery-check.cjs`; use `--webkit` where supported. Earlier scripts using persisted match fixtures document historical behavior: current duels are held only in memory. Captures go under ignored `output/` and `tmp/` directories.
 
 ## Game behavior
 
@@ -32,7 +32,7 @@ One shared face-down board, 40 pairs, one approachable difficulty and your profi
 
 The ghost remembers faces observed during the last two completed attempts and the current attempt. It uses known matches and otherwise guesses without seeing hidden faces. Profile creation is optional. Profiles, preferences and progression stay in browser storage.
 
-Daily rewards grant persistent booster inventory. Double claims use a simulated rewarded-ad completion in this test build; a production provider must report successful completion. Achievements and standings are local, and multiplayer/ranking opponents are simulated.
+Daily rewards grant persistent booster inventory. Double claims use a simulated rewarded-ad completion in this test build; a production provider must report successful completion. Achievements and standings are local, and multiplayer/ranking opponents are simulated. The trophy gallery groups 100 unlocks into 43 achievements, including standalone trophies with detail pages. Milestone levels add richer trophy decoration and increasing rewards. A per-unlock point ledger preserves previously earned points. Five avatar frames unlock at 100, 250, 500, 1,000 and 1,400 points; equipment persists and follows the player portrait throughout the game. Trophy artwork and its generation prompt are documented in `docs/achievement-art.md`.
 
 Collection uses the Eastern/Western preference from Settings. Phones show a two-column gallery and full-screen tile details; portrait tablets show three columns; landscape tablets add an adjacent details pane. Previous/Next browses found tiles within the filter, and Back restores the selected tile and scroll position.
 

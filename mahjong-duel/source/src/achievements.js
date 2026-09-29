@@ -1,5 +1,5 @@
-// Individually defined catalogue from the approved implementation brief.
-export const ACHIEVEMENTS = Object.freeze([
+// Keep the original IDs, conditions and rewards as the migration source.
+const LEGACY_ACHIEVEMENTS = Object.freeze([
   {
     "id": "A001",
     "name": "Complete 1 Duel",
@@ -902,7 +902,21 @@ export const ACHIEVEMENTS = Object.freeze([
     "points": 25
   }
 ].map(Object.freeze));
-export const ACHIEVEMENT_POINTS_MAX = 1465;
+export const ACHIEVEMENT_REWARDS_VERSION = 2;
+export const MILESTONE_REWARD_SCHEDULE = Object.freeze([5, 10, 15, 25, 40, 60, 85, 115, 150, 200]);
+export const LEGACY_ACHIEVEMENT_POINTS = Object.freeze(Object.fromEntries(LEGACY_ACHIEVEMENTS.map(item => [item.id, item.points])));
+const nextRewards = new Map();
+for (const key of new Set(LEGACY_ACHIEVEMENTS.map(item => item.counterKey))) {
+  const levels = LEGACY_ACHIEVEMENTS.filter(item => item.counterKey === key).sort((a, b) => a.target - b.target);
+  let previous = 0;
+  levels.forEach((item, index) => {
+    const points = levels.length === 1 ? item.points : Math.max(item.points, MILESTONE_REWARD_SCHEDULE[index], previous + 5);
+    nextRewards.set(item.id, points);
+    previous = points;
+  });
+}
+export const ACHIEVEMENTS = Object.freeze(LEGACY_ACHIEVEMENTS.map(item => Object.freeze({ ...item, points: nextRewards.get(item.id) })));
+export const ACHIEVEMENT_POINTS_MAX = ACHIEVEMENTS.reduce((sum, item) => sum + item.points, 0);
 export const achievementById = Object.freeze(Object.assign(Object.create(null), Object.fromEntries(ACHIEVEMENTS.map(item => [item.id, item]))));
 export const isAchievementId = id => typeof id === 'string' && Object.hasOwn(achievementById, id);
 export const ACHIEVEMENT_CATEGORIES = Object.freeze([...new Set(ACHIEVEMENTS.map(item => item.category))]);
@@ -927,17 +941,27 @@ export function achievementProgress(achievement, state) {
     unlocked, unlockedAt: unlocked ? state.unlocked[definition.id] : null };
 }
 
+/** An unlocked ID without a receipt predates tiered rewards. Never reprice it. */
+export function awardedAchievementPoints(id, state) {
+  if (!isAchievementId(id) || !Object.hasOwn(state?.unlocked ?? {}, id)) return 0;
+  const amount = Object.hasOwn(state?.awardedPoints ?? {}, id) ? state.awardedPoints[id] : undefined;
+  return amount === LEGACY_ACHIEVEMENT_POINTS[id] || amount === achievementById[id].points
+    ? amount : LEGACY_ACHIEVEMENT_POINTS[id];
+}
+
 export function evaluateAchievements(state, now = Date.now(), allowedIds) {
   const unlocked = Object.fromEntries(Object.entries(state.unlocked ?? {}).filter(([id, timestamp]) =>
     isAchievementId(id) && Number.isSafeInteger(timestamp) && timestamp >= 0 && timestamp <= 8640000000000000));
+  const awardedPoints = Object.fromEntries(Object.keys(unlocked).map(id => [id, awardedAchievementPoints(id, state)]));
   const newlyUnlocked = [];
   const allowed = allowedIds && new Set(allowedIds);
   for (const definition of ACHIEVEMENTS) {
     if ((!allowed || allowed.has(definition.id)) && !Object.hasOwn(unlocked, definition.id) && getCounter(state, definition.counterKey) >= definition.target) {
       unlocked[definition.id] = now;
+      awardedPoints[definition.id] = definition.points;
       newlyUnlocked.push(definition.id);
     }
   }
-  const points = Object.keys(unlocked).reduce((sum, id) => sum + achievementById[id].points, 0);
-  return { unlocked, points, newlyUnlocked };
+  const points = Object.values(awardedPoints).reduce((sum, amount) => sum + amount, 0);
+  return { unlocked, awardedPoints, achievementRewardsVersion: ACHIEVEMENT_REWARDS_VERSION, points, newlyUnlocked };
 }

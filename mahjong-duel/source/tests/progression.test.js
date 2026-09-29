@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ACHIEVEMENTS, ACHIEVEMENT_POINTS_MAX, NUMERIC_COUNTER_KEYS, SET_COUNTER_KEYS, achievementProgress, getCounter, evaluateAchievements } from '../src/achievements.js';
+import { ACHIEVEMENTS, ACHIEVEMENT_POINTS_MAX, LEGACY_ACHIEVEMENT_POINTS, NUMERIC_COUNTER_KEYS, SET_COUNTER_KEYS, achievementProgress, getCounter, evaluateAchievements } from '../src/achievements.js';
 import { createProgression, normalizeProgression, loadProgression, saveProgression, reduceProgression, consumeRankingPresentation, PROGRESSION_STORAGE_KEY } from '../src/progression.js';
 import { createCollection, awardCollectedPair, COLLECTION_STORAGE_KEY } from '../src/collection.js';
 import { themeTileSets } from '../src/tile-data.js';
@@ -36,15 +36,16 @@ function legacyRarityProgression(rarities = Object.keys(legacyRarityFaces)) {
   return state;
 }
 
- test('catalogue has exactly the approved 100 IDs, complete definitions and 1,465 points', () => {
+ test('catalogue retains all 100 IDs and legacy rewards, with 3,730 points available to new players', () => {
   assert.deepEqual(ACHIEVEMENTS.map(item => item.id), Array.from({ length: 100 }, (_, i) => `A${String(i + 1).padStart(3, '0')}`));
   assert.equal(new Set(ACHIEVEMENTS.map(item => item.id)).size, 100);
-  assert.equal(ACHIEVEMENT_POINTS_MAX, 1465);
+  assert.equal(ACHIEVEMENT_POINTS_MAX, 3730);
+  assert.equal(Object.values(LEGACY_ACHIEVEMENT_POINTS).reduce((sum, points) => sum + points, 0), 1465);
   assert.equal(ACHIEVEMENTS.reduce((sum, item) => sum + item.points, 0), ACHIEVEMENT_POINTS_MAX);
   for (const item of ACHIEVEMENTS) {
     assert.ok(item.name && item.description.length > 30 && item.category && item.counterKey);
     assert.ok(Number.isSafeInteger(item.target) && item.target > 0);
-    assert.ok([5, 10, 15, 20, 25, 30, 40].includes(item.points));
+    assert.ok(Number.isSafeInteger(item.points) && item.points >= LEGACY_ACHIEVEMENT_POINTS[item.id]);
     assert.doesNotMatch(item.counterKey, /points/i);
   }
 });

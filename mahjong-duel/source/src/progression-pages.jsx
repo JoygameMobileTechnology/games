@@ -1,9 +1,11 @@
 import React, { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, ArrowUp, BookOpen, Cards, Check, Crown, Eye, Info, Leaf, Lightbulb, LinkSimple, LockKey, MagnifyingGlass, Play, Snowflake, Sparkle, Sword, Trophy, ArrowsClockwise, CaretRight } from '@phosphor-icons/react';
+import { ArrowUp, Check, Eye, Info, Leaf, Lightbulb, Play, Snowflake, Sparkle, ArrowsClockwise, CaretRight } from '@phosphor-icons/react';
 import { PlayerAvatar } from './player-profile.jsx';
 import { playProgressSound } from './sound.js';
 import { ProgressionGlyph } from './progression-menu.jsx';
-import { ACHIEVEMENTS, achievementProgress } from './achievements.js';
+import { ProgressionPage } from './progression-page.jsx';
+export { ProgressionPage } from './progression-page.jsx';
+export { AchievementsPage } from './achievements-page.jsx';
 import { getDailyView, DAILY_REWARD_CONFIG } from './daily-rewards.js';
 import { rankingRows, leagueForWins, LEAGUES } from './leaderboards.js';
 import { themeTileSets } from './tile-data.js';
@@ -11,35 +13,8 @@ import './progression-pages.css';
 const craneArt = themeTileSets['ming-porcelain'].eastern.find(tile => tile.id === 'G03').src;
 
 const BOOSTERS = { hint: { name: 'Hint', Icon: Lightbulb }, shuffle: { name: 'Shuffle', Icon: ArrowsClockwise }, freeze: { name: 'Freeze', Icon: Snowflake }, eagle: { name: 'Eagle Eye', Icon: Eye } };
-const CATEGORY_ICONS = { 'Completed duels': Sword, Wins: Trophy, Pairs: Cards, 'Pair chains': LinkSimple, 'Conditional wins': Crown, Memory: Eye, Boosters: Lightbulb, 'Collection & variety': BookOpen, Participation: Leaf };
 const format = value => Number(value || 0).toLocaleString();
-const categories = [...new Set(ACHIEVEMENTS.map(value => value.category))];
 
-export function ProgressionPage({ title, className = '', onClose, children, bodyRef, closeLabel = 'Back to main menu' }) {
-  const id = useId(), root = useRef(null), heading = useRef(null), onCloseRef = useRef(onClose);
-  onCloseRef.current = onClose;
-  useEffect(() => {
-    const previous = document.activeElement;
-    heading.current?.focus({ preventScroll: true });
-    const keydown = event => {
-      if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); onCloseRef.current(); }
-      if (event.key !== 'Tab') return;
-      const controls = [...root.current.querySelectorAll('button:not(:disabled),input:not(:disabled),select:not(:disabled),[tabindex="0"]')].filter(node => node.tabIndex >= 0 && node.getClientRects().length);
-      if (!controls.length) return;
-      // Safari may skip buttons during native Tab navigation; keep page navigation consistent.
-      const current = controls.indexOf(document.activeElement);
-      const next = current < 0 ? (event.shiftKey ? controls.length - 1 : 0) : (current + (event.shiftKey ? -1 : 1) + controls.length) % controls.length;
-      event.preventDefault(); controls[next].focus();
-    };
-    const node = root.current; node.addEventListener('keydown', keydown);
-    return () => { node.removeEventListener('keydown', keydown); if (previous?.isConnected) previous.focus({ preventScroll: true }); };
-  }, []);
-  useEffect(() => { heading.current?.focus({ preventScroll: true }); }, [title]);
-  return <section className={`progression-page ${className}`} ref={root} role="dialog" aria-modal="true" aria-labelledby={id}>
-    <header className="progression-page-header"><button className="icon-button" type="button" aria-label={closeLabel} onClick={onClose}><ArrowLeft size={27} weight="bold" /></button><h2 id={id} ref={heading} tabIndex={-1}>{title}</h2><span aria-hidden="true" /></header>
-    <div className="progression-page-scroll" ref={bodyRef}><div className="progression-page-content">{children}</div></div>
-  </section>;
-}
 function RewardItems({ rewards, compact = false }) {
   return <div className={`reward-items ${compact ? 'is-compact' : ''}`}>{Object.entries(BOOSTERS).filter(([key]) => rewards?.[key] > 0).map(([key, { Icon, name }]) => <div className="reward-item" key={key} role="img" aria-label={`${name}, ${rewards[key]}`} title={`${name} ×${rewards[key]}`}><span className="reward-coin"><Icon size={compact ? 22 : 30} weight="duotone" /></span><strong>×{format(rewards[key])}</strong>{!compact && <span>{name}</span>}</div>)}</div>;
 }
@@ -67,31 +42,6 @@ export function DailyRewardsPage({ progression, onClose, onClaim, onDoubleClaim,
     <div className={`daily-claim-footer ${exceptional ? 'has-claim-notice' : ''}`}><div className="daily-claim-state" role="status">{busy ? 'Preparing your double rewards…' : !daily.hasClaim ? <><Check size={16} weight="bold" />Claimed — see you another day!</> : adState === 'unavailable' ? '2x unavailable. Standard rewards are ready.' : (adState === 'failed' || adState === 'cancelled') ? '2x did not complete. You can still claim.' : daily.entitlements?.length > 1 ? 'Includes your unclaimed rewards.' : null}</div>
       <div className="daily-claim-actions"><button className="progression-primary" disabled={!daily.hasClaim || busy} onClick={onClaim}>{daily.hasClaim ? 'Claim rewards' : 'Claimed'}{!daily.hasClaim && <Check size={20} weight="bold" />}</button><button className="progression-secondary double-rewards-button" disabled={!daily.hasClaim || busy || adState === 'unavailable'} onClick={onDoubleClaim}><Play size={22} weight="fill" />{busy ? 'Please wait…' : 'Claim rewards 2x'}</button></div>
     </div>
-  </ProgressionPage>;
-}
-
-function AchievementArtwork({ achievement, unlocked, large = false }) {
-  const Icon = CATEGORY_ICONS[achievement.category] || Sparkle;
-  return <span className={`achievement-artwork ${unlocked ? 'is-unlocked' : 'is-locked'} ${large ? 'is-large' : ''}`} aria-hidden="true"><span className="achievement-art-ring"><Icon size={large ? 72 : 31} weight="duotone" /></span><span className="achievement-art-state">{unlocked ? <Check size={large ? 22 : 13} weight="bold" /> : <LockKey size={large ? 22 : 13} weight="fill" />}</span></span>;
-}
-export function AchievementsPage({ progression, onClose, gentle = false }) {
-  const [search, setSearch] = useState(''), [category, setCategory] = useState('all'), [filter, setFilter] = useState('all'), [selectedId, setSelectedId] = useState(null);
-  const body = useRef(null), listScroll = useRef(0), opener = useRef(null);
-  const entries = useMemo(() => ACHIEVEMENTS.map(definition => ({ definition, ...achievementProgress(definition, progression) })), [progression]);
-  const unlockedCount = entries.filter(value => value.unlocked).length;
-  const visible = entries.filter(({ definition, unlocked, current }) => (category === 'all' || definition.category === category) && (filter === 'all' || filter === 'unlocked' && unlocked || filter === 'progress' && !unlocked && current > 0) && `${definition.name} ${definition.description}`.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()));
-  const selected = entries.find(value => value.definition.id === selectedId);
-  const closeDetail = () => { setSelectedId(null); requestAnimationFrame(() => { if (body.current) body.current.scrollTop = listScroll.current; opener.current?.focus({ preventScroll: true }); }); };
-  return <ProgressionPage title={selected ? 'Achievement details' : 'Achievements'} className={`achievements-page ${gentle ? 'is-gentle' : ''}`} bodyRef={body} closeLabel={selected ? 'Back to achievements' : 'Back to main menu'} onClose={selected ? closeDetail : onClose}>
-    <div className="achievement-list-pane" hidden={Boolean(selected)}><div className="achievement-summary"><span><small>Achievement Points</small><strong>{format(progression.points)}</strong></span><span><strong>{unlockedCount}<small> / 100</small></strong><small>Unlocked</small></span></div>
-    <div className="achievement-controls"><label className="achievement-search"><MagnifyingGlass size={21} /><input aria-label="Search achievements" type="search" value={search} onChange={event => setSearch(event.target.value)} placeholder="Search achievements" /></label><fieldset className="achievement-category-browser"><legend>Browse categories</legend><div className="achievement-category-grid">{['all', ...categories].map(value => {
-      const Icon = CATEGORY_ICONS[value] || Sparkle;
-      const count = value === 'all' ? entries.length : entries.filter(entry => entry.definition.category === value).length;
-      const label = value === 'all' ? 'All achievements' : value === 'Conditional wins' ? 'Win challenges' : value === 'Collection & variety' ? 'Collection' : value;
-      return <button key={value} type="button" aria-label={`${label}, ${count} achievements`} aria-pressed={category === value} onClick={() => setCategory(value)}><Icon size={21} weight="duotone" /><span>{label}</span><small>{count}</small></button>;
-    })}</div></fieldset><div className="progression-tabs" role="group" aria-label="Achievement status">{[['all', 'All'], ['progress', 'In progress'], ['unlocked', 'Unlocked']].map(([value, label]) => <button key={value} aria-pressed={filter === value} onClick={() => setFilter(value)}>{label}</button>)}</div></div>
-    <p className="achievement-results-count" aria-live="polite">{visible.length} {visible.length === 1 ? 'achievement' : 'achievements'}</p><ul className="achievement-list">{visible.map(entry => { const { definition, current, target, unlocked } = entry; return <li key={definition.id}><button className={`achievement-entry ${unlocked ? 'is-unlocked' : ''}`} onClick={event => { opener.current = event.currentTarget; listScroll.current = body.current?.scrollTop || 0; setSelectedId(definition.id); if (body.current) body.current.scrollTop = 0; }} aria-label={`${definition.name}, ${unlocked ? 'Unlocked' : 'Locked'}, ${format(current)} of ${format(target)}`}><AchievementArtwork achievement={definition} unlocked={unlocked} /><span className="achievement-entry-copy"><strong>{definition.name}</strong><span>{definition.description}</span><progress value={Math.min(current, target)} max={target} aria-label={`${definition.name} progress`} /><span className="achievement-entry-meta"><span>{format(Math.min(current, target))} / {format(target)}</span><span>{unlocked ? 'Unlocked' : 'Locked'} · {definition.points} AP</span></span></span><CaretRight size={17} /></button></li>; })}</ul>{visible.length === 0 && <div className="progression-empty"><MagnifyingGlass size={35} /><h3>No matching achievements</h3><p>Try a different search or filter.</p><button className="progression-secondary" onClick={() => { setSearch(''); setCategory('all'); setFilter('all'); }}>Show all achievements</button></div>}</div>
-    {selected && <article className="achievement-detail"><span className="achievement-category-note">{selected.definition.category}</span><AchievementArtwork achievement={selected.definition} unlocked={selected.unlocked} large /><h3>{selected.definition.name}</h3><span className={`achievement-detail-status ${selected.unlocked ? 'is-unlocked' : ''}`}>{selected.unlocked ? <Check weight="bold" /> : <LockKey weight="fill" />}{selected.unlocked ? 'Unlocked' : 'Locked'}</span><p>{selected.definition.description}</p><progress value={Math.min(selected.current, selected.target)} max={selected.target} aria-label={`${selected.definition.name} progress`} /><strong className="achievement-detail-progress">{format(Math.min(selected.current, selected.target))} / {format(selected.target)}</strong><div className="achievement-point-reward"><Sparkle size={27} weight="fill" /><strong>{selected.definition.points}</strong><span>Achievement Points{selected.unlocked ? ' earned' : ' on unlock'}</span></div>{selected.unlockedAt && <small className="achievement-unlock-date">Unlocked {new Date(selected.unlockedAt).toLocaleDateString()}</small>}<button className="progression-secondary" onClick={closeDetail}>Back to achievements</button></article>}
   </ProgressionPage>;
 }
 

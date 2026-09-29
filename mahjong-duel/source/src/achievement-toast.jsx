@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { achievementById, isAchievementId } from './achievements.js';
+import { familyForAchievement } from './achievement-milestones.js';
 import { playProgressSound } from './sound.js';
 import './achievement-toast.css';
 
@@ -62,14 +63,27 @@ export function AchievementNotifications({ batches = [], onComplete, paused = fa
   }, [id, held]);
 
   if (!id || !definitions.length || typeof document === 'undefined') return null;
-  const more = definitions.length - 1;
-  const announcement = `Achievement unlocked: ${definitions.map(value => value.name).join('; ')}.`;
+  // A burst may cross several levels of one trophy. Announce its highest new level.
+  const displayed = [...definitions.reduce((families, definition) => {
+    const family = familyForAchievement(definition.id);
+    const key = family?.id || definition.id;
+    const previous = families.get(key);
+    if (!previous || definition.target > previous.target) families.set(key, definition);
+    return families;
+  }, new Map()).values()];
+  const more = displayed.length - 1;
+  const names = displayed.map(definition => {
+    const family = familyForAchievement(definition.id);
+    const level = family?.milestones.find(item => item.id === definition.id)?.level;
+    return family ? `${family.name}${family.totalLevels > 1 ? ` · Level ${level}` : ''}` : definition.name;
+  });
+  const announcement = `Achievement unlocked: ${names.join('; ')}.`;
   return createPortal(<div className={`achievement-toast-stage ${held ? 'is-paused' : ''} ${gentle ? 'is-gentle' : ''}`}
     aria-live="polite" aria-atomic="true" role="status" aria-label={announcement} data-achievement-batch={id}>
     <div className="achievement-toast" key={id} style={{ '--achievement-duration': `${duration}ms` }}>
       <Medal />
       <div className="achievement-toast-copy"><div className="achievement-toast-heading"><span>Achievement unlocked</span>{more > 0 && <b>+{more} more</b>}</div>
-        <strong title={definitions.map(value => value.name).join('\n')}>{definitions[0].name}</strong></div>
+        <strong title={names.join('\n')}>{names[0]}</strong></div>
       <span className="achievement-toast-timer" aria-hidden="true" />
     </div>
   </div>, document.body);

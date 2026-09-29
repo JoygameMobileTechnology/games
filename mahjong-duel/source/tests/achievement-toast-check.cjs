@@ -41,11 +41,12 @@ const origin = process.env.GAME_URL || 'http://localhost:5173';
     assert.equal(await page.evaluate(() => window.fixtureReady), true, JSON.stringify(errors));
     const patch = async value => { await page.evaluate(value => window.toastControl(value), value); await advance(20); };
     const active = () => page.locator('.achievement-toast-stage').getAttribute('data-achievement-batch');
-    const first = { id: 'first', achievementIds: ['A031','A032','A032','unknown'] };
+    const first = { id: 'first', achievementIds: ['A031','A032','A032','A011','unknown'] };
     const second = { id: 'second', achievementIds: ['A033'] }, third = { id: 'third', achievementIds: ['A034'] };
     await patch({ batches: [first, second] });
     assert.equal(await active(), 'first'); assert.equal(await page.locator('.achievement-toast-heading b').textContent(), '+1 more');
-    assert.match(await page.locator('.achievement-toast-copy > strong').textContent(), /2 Consecutive Pairs/);
+    assert.equal(await page.locator('.achievement-toast-copy > strong').textContent(), 'Find Your Flow · Level 2');
+    assert.equal(await page.locator('.achievement-toast-copy > strong').getAttribute('title'), 'Find Your Flow · Level 2\nWinning Form · Level 1', 'several levels of one trophy announce only its highest newly earned level');
     assert.equal(await page.evaluate(() => window.audioStarts), 4);
     assert.doesNotMatch(await page.locator('.achievement-toast').textContent(), /\bAP\b|points/i);
     for (const viewport of [{width:320,height:568},{width:390,height:844},{width:768,height:1024}]) {

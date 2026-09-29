@@ -1,4 +1,4 @@
-import { ACHIEVEMENTS, isAchievementId, NUMERIC_COUNTER_KEYS, SET_COUNTER_KEYS, evaluateAchievements } from './achievements.js';
+import { ACHIEVEMENTS, ACHIEVEMENT_REWARDS_VERSION, isAchievementId, NUMERIC_COUNTER_KEYS, SET_COUNTER_KEYS, evaluateAchievements } from './achievements.js';
 import { normalizeCollection, createCollection, awardCollectedPair, collectionPairId, loadCollection, saveCollection } from './collection.js';
 import { themeTileSets } from './tile-data.js';
 import { launchThemeIds } from './themes.js';
@@ -28,7 +28,8 @@ function freshSeed() {
 }
 export function createProgression({ collection = createCollection(), seed = freshSeed() } = {}) {
   const state = { version: PROGRESSION_VERSION, counters: Object.fromEntries(NUMERIC_COUNTER_KEYS.map(key => [key, 0])),
-    sets: Object.fromEntries(SET_COUNTER_KEYS.map(key => [key, []])), unlocked: {}, points: 0, wallet: emptyWallet(),
+    sets: Object.fromEntries(SET_COUNTER_KEYS.map(key => [key, []])), unlocked: {}, awardedPoints: {}, achievementRewardsVersion: ACHIEVEMENT_REWARDS_VERSION,
+    points: 0, wallet: emptyWallet(),
     collection: normalizeCollection(collection), daily: createDailyState(), ranking: createRanking(seed),
     eventReceipts: {}, attemptCursors: {}, completedGameIds: [], pendingRankingPresentation: null, newAchievementIds: [] };
   return deriveCollectionCounters(state);
@@ -58,7 +59,7 @@ function deriveCollectionCounters(state) {
 }
 function awardAchievements(state, now, allowedIds) {
   const evaluated = evaluateAchievements(state, now, allowedIds);
-  return { ...state, unlocked: evaluated.unlocked, points: evaluated.points,
+  return { ...state, unlocked: evaluated.unlocked, awardedPoints: evaluated.awardedPoints, achievementRewardsVersion: evaluated.achievementRewardsVersion, points: evaluated.points,
     newAchievementIds: [...new Set([...state.newAchievementIds, ...evaluated.newlyUnlocked])] };
 }
 function normalizePresentation(value, completedGameIds) {
@@ -77,6 +78,7 @@ export function normalizeProgression(value, { collection, now = Date.now(), cold
     for (const key of NUMERIC_COUNTER_KEYS) if (safeCount(value.counters?.[key])) state.counters[key] = value.counters[key];
     for (const key of SET_COUNTER_KEYS) state.sets[key] = [...new Set((Array.isArray(value.sets?.[key]) ? value.sets[key] : []).filter(item => validSetValue(key, item)))];
     state.unlocked = Object.fromEntries(Object.entries(record(value.unlocked) ? value.unlocked : {}).filter(([id, timestamp]) => isAchievementId(id) && validTimestamp(timestamp)));
+    state.awardedPoints = record(value.awardedPoints) ? value.awardedPoints : {};
     state.wallet = normalizeWallet(value.wallet);
     state.daily = normalizeDaily(value.daily);
     state.sets.distinctLoginDayIds = [...state.daily.loginDayIds];

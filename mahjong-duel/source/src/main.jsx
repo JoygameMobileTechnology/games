@@ -18,6 +18,7 @@ import { BoardSurface } from './board-surface.jsx';
 import { themeUiStyle } from './theme-ui.js';
 import { playGhostTurn, ghostName, rememberGhostFaces, GHOST_MEMORY_VERSION } from './ghost.js';
 import { ProfileEditor, PlayerAvatar, loadProfile, saveProfile } from './player-profile.jsx';
+import { isFrameUnlocked } from './avatar-frames.js';
 import { ThemeChooser, VictoryBloom } from './remake-ui.jsx';
 import { chooseMenuBackground } from './menu-backgrounds.js';
 import { MenuScene } from './menu-scene.jsx';
@@ -204,13 +205,13 @@ function App() {
   const [menuBackground] = useState(() => chooseMenuBackground(store.get('menuBackground', null)));
   useEffect(() => { store.set('menuBackground', menuBackground.id); }, [menuBackground]);
   const [pageHidden, setPageHidden] = useState(() => document.hidden);
-  const [profile, setProfile] = useState(loadProfile);
   const [launchProgress] = useState(() => {
     const previous = loadProgression({ collection: loadCollection() });
     const next = reduceProgression(previous, { type: 'login', now: Date.now() });
     const achievementIds = Object.keys(next.unlocked).filter(id => !Object.hasOwn(previous.unlocked, id));
     return { progression: next, notifications: achievementIds.length ? [{ id: achievementIds.join(':'), achievementIds }] : [] };
   });
+  const [profile, setProfile] = useState(() => loadProfile(undefined, launchProgress.progression.points));
   const [progression, setProgression] = useState(launchProgress.progression);
   const [achievementBatches, setAchievementBatches] = useState(launchProgress.notifications);
   const progressionRef = useRef(progression);
@@ -240,7 +241,7 @@ function App() {
     saveProgression(progressionRef.current);
     if (page === 'daily') progressEvent({ type: 'daily-presented', dayId: getDailyView(progressionRef.current).dayId });
   }, []);
-  useEffect(() => { saveProfile(profile); }, []);
+  useEffect(() => { saveProfile(profile, undefined, progressionRef.current.points); }, []);
   const [entering, setEntering] = useState(false);
   const [boardThemeId, setBoardThemeId] = useState(() => themeById[store.get('boardTheme', store.get('theme', defaultTheme.id))] ? store.get('boardTheme', store.get('theme', defaultTheme.id)) : defaultTheme.id);
   const [themeId, setThemeId] = useState(() => themeById[store.get('theme', defaultTheme.id)] ? store.get('theme', defaultTheme.id) : defaultTheme.id);
@@ -498,8 +499,14 @@ function App() {
   const surfaceTheme = themeById[screen === 'game' ? game.boardTheme || game.theme : boardThemeId] || activeTheme;
   const opponentName = ghostName(profile);
   function updateProfile(next) {
-    if (!saveProfile(next)) { announce('Profile updated for this visit. Browser storage is unavailable.'); }
+    if (!saveProfile(next, undefined, progressionRef.current.points)) { announce('Profile updated for this visit. Browser storage is unavailable.'); }
     setProfile(next); setSheet(null); playEffect('confirm', sound);
+  }
+  function equipAchievementFrame(frameId) {
+    if (!isFrameUnlocked(frameId, progressionRef.current.points)) return;
+    const next = { ...profile, frameId };
+    if (!saveProfile(next, undefined, progressionRef.current.points)) announce('Frame equipped for this visit. Browser storage is unavailable.');
+    setProfile(next); playEffect('confirm', sound);
   }
   function closeSheet() {
     setSheet(current => {
@@ -559,7 +566,7 @@ function App() {
       {page ? <>
         {page === 'collection' && <TileBinder collection={collection} initialTheme={themeId} initialRuleset={ruleset} onClose={closePage} />}
         {page === 'daily' && <DailyRewardsPage progression={progression} onClose={closePage} onClaim={claimDaily} onDoubleClaim={doubleDaily} adState={adState} gentle={gentle} />}
-        {page === 'achievements' && <AchievementsPage progression={progression} onClose={closePage} gentle={gentle} />}
+        {page === 'achievements' && <AchievementsPage progression={progression} profile={profile} onEquipFrame={equipAchievementFrame} onClose={closePage} gentle={gentle} />}
         {page === 'leaderboards' && <LeaderboardsPage progression={progression} profile={profile} onClose={closePage} presentation={rankingPresentation} sound={sound} gentle={gentle} />}
       </> : <>
       <AnimatePresence mode="wait">
@@ -605,7 +612,7 @@ function App() {
       </AnimatePresence>
       <AnimatePresence>{toast && <motion.div className="toast" role="status" key={toast.id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5 }}>{toast.message}</motion.div>}</AnimatePresence>
       <AnimatePresence>{sheet && <Sheet key={sheet} title={{ themes: 'Theme', rules: 'How to play', settings: 'Settings', profile: 'Profile', pause: 'Paused', restart: 'New duel', leave: 'Leave duel?' }[sheet]} onClose={closeSheet}>
-        {sheet === 'profile' && <ProfileEditor profile={profile} onSave={updateProfile} />}
+        {sheet === 'profile' && <ProfileEditor profile={profile} achievementPoints={progression.points} onSave={updateProfile} />}
         {sheet === 'rules' && <><Rules ruleset={screen === 'game' ? game.ruleset : ruleset} /><button className="primary-button" onClick={closeSheet}>Got it <Check size={22} weight="bold" /></button></>}
         {sheet === 'themes' && <ThemeChooser themeId={themeId} boardThemeId={boardThemeId} ruleset={ruleset} onConfirm={(tiles, board) => { setThemeId(tiles); setBoardThemeId(board); setSheet(null); playEffect('confirm', sound); }} />}
         {sheet === 'settings' && <div className="settings-content">

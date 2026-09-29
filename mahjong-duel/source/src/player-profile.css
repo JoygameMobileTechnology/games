@@ -18,9 +18,40 @@
   background-color: #e6c99b;
   box-shadow: 0 0 0 2px #fff2d2, 0 0 0 4px #906b38, 0 3px 7px #3d281947;
 }
-.player-country-flag {
+.player-avatar.has-frame .player-avatar-portrait { box-shadow: 0 2px 7px #3d281947; }
+.avatar-frame {
+  --frame-dark: #75432b;
+  --frame-main: #bd8753;
+  --frame-light: #f1cf96;
+  --frame-jewel: #784b32;
   position: absolute;
   z-index: 1;
+  inset: -14%;
+  width: 128%;
+  height: 128%;
+  overflow: visible;
+  pointer-events: none;
+  filter: drop-shadow(0 1px 1px #31200d55);
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.avatar-frame-porcelain { --frame-dark: #345e81; --frame-main: #edf5ee; --frame-light: #e3c484; --frame-jewel: #427eab; }
+.avatar-frame-jade { --frame-dark: #28544a; --frame-main: #82be91; --frame-light: #f1d99a; --frame-jewel: #276b56; }
+.avatar-frame-gold { --frame-dark: #89521f; --frame-main: #edbc4f; --frame-light: #fff0a7; --frame-jewel: #c45232; }
+.avatar-frame-celestial { --frame-dark: #44537e; --frame-main: #bddcef; --frame-light: #fff3b5; --frame-jewel: #7972bd; }
+.avatar-frame-outer-ring { stroke: var(--frame-dark); stroke-width: 7; }
+.avatar-frame-inner-ring { stroke: var(--frame-main); stroke-width: 6; }
+.avatar-frame-flourish { stroke: var(--frame-light); stroke-width: 2.2; }
+.avatar-frame-stem { stroke: var(--frame-dark); stroke-width: 2.5; }
+.avatar-frame-leaf { fill: var(--frame-main); stroke: var(--frame-dark); stroke-width: 1; }
+.avatar-frame-jewel { fill: var(--frame-jewel); stroke: var(--frame-light); stroke-width: 2; }
+.avatar-frame-crown { fill: var(--frame-main); stroke: var(--frame-dark); stroke-width: 1.5; }
+.avatar-frame-star { fill: var(--frame-light); stroke: var(--frame-dark); stroke-width: .8; }
+.avatar-frame-spark { fill: var(--frame-light); }
+.player-country-flag {
+  position: absolute;
+  z-index: 2;
   right: -5px;
   bottom: -5px;
   display: grid;
@@ -84,6 +115,21 @@
 .profile-avatar-option:active { transform: scale(.95); }
 .profile-avatar-option.is-selected { border-color: #4a982a; background: #bfe69a; box-shadow: 0 0 0 2px #fff7dc; }
 .profile-avatar-check { position: absolute; right: -3px; bottom: -3px; z-index: 2; width: 23px; height: 23px; display: grid; place-items: center; border: 2px solid #fff5d9; border-radius: 50%; background: #4a982a; color: white; font-size: 15px; font-weight: 900; line-height: 1; }
+.profile-frame-field { margin: 0; padding: 0; border: 0; min-width: 0; }
+.profile-frame-field > legend { display: flex; justify-content: space-between; width: 100%; padding: 0; color: #684728; font-size: 13px; font-weight: 800; }
+.profile-frame-field > legend > span { margin-left: auto; color: #826444; font-size: 10px; font-weight: 700; }
+.profile-frame-field > p { margin: 5px 0 12px; color: #806846; font-size: 11px; line-height: 1.4; }
+.profile-frame-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.profile-frame-option { position: relative; display: flex; flex-direction: column; align-items: center; gap: 5px; min-width: 0; min-height: 110px; padding: 14px 4px 8px; border: 1px solid #c6ab7a; border-radius: 11px; background: #fff8e266; color: #624625; cursor: pointer; }
+.profile-frame-option > .player-avatar { margin-bottom: 7px; }
+.profile-frame-option > strong { width: 100%; font-size: 10px; line-height: 1.2; }
+.profile-frame-option > span:last-of-type { color: #7d6343; font-size: 9px; font-weight: 700; line-height: 1.2; }
+.profile-frame-option:hover:not(:disabled) { background: #f1e4bd; }
+.profile-frame-option.is-selected { border-color: #589039; background: #e2efca; box-shadow: inset 0 0 0 1px #589039; }
+.profile-frame-option.is-selected > span:last-of-type { color: #426e2d; }
+.profile-frame-option.is-locked { border-color: #cdb990; background: #e4d5b633; opacity: 1; cursor: default; }
+.profile-frame-option.is-locked > .player-avatar { opacity: .7; }
+.profile-frame-lock { position: absolute; top: 7px; right: 7px; width: 10px; height: 12px; color: #826d4c; }
 .profile-country-control { position: relative; display: flex; align-items: center; gap: 9px; padding-left: 12px; }
 .profile-country-control > span:first-child { flex: 0 0 auto; font-size: 23px; line-height: 1; }
 .profile-country-control select { appearance: none; -webkit-appearance: none; flex: 1; min-width: 0; padding: 11px 30px 11px 0; border: 0; border-radius: 10px; background: transparent; color: #51371e; font: inherit; font-size: 14px; cursor: pointer; }
