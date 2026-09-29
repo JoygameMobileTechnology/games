@@ -3,6 +3,17 @@
 Canlı sürüm: https://joygamemobiletechnology.github.io/games/bee-colony-remaster/
 (GitHub Pages sayfayı ~10 dakika önbellekte tutar; bir değişiklik görünmüyorsa sert yenileyin.)
 
+## 29 Eylül 2026 — Yeni level seti (35 level, yüksek çözünürlük)
+
+- **35 yeni level:** heykeller baştan, çok daha yüksek çözünürlükte kuruldu. Toplam 43.990 küp (eski set 10.577, ×4,2), level başına 560–1740 küp. Anlaşılmayan eski şekiller (donut, külahta dondurma, akide şekeri, ikinci mercan balığı, arı kovanı) yok; her konu tek. Sırayla: Kiraz İkilisi, Küçük Yıldız, Lastik Ördek, Oklu Kalp, Karpuz, Mantar, Penguen, Gülen Güneş, Roket, 💀 Hediye Kutusu, Çilek, Kardan Adam, Yılbaşı Çanı, Uğur Böceği, Kelebek, 💀 Balkabağı, Palyaço Balığı, Hamburger, Baykuş, Sıcak Hava Balonu, Ananas, 💀 Kumbara, Oyuncak Ayı, Deniz Feneri, Yelkenli, Kurbağa Prens, Kale, Robot, 💀 Hazine Sandığı, Uçan Daire, Kek, Kaktüs, Bal Kavanozu, Ahtapot, 💀 Kraliçe Arı.
+- **Kuyruk kuralları:** kovanlar en fazla 80 ve hepsi 10'un katı; her rengin kovan toplamı küp sayısına eşit; bölünen renk hiçbir şeritte arka arkaya gelmez, aynı renk ikiden fazla şeridin önünde durmaz. Slot sayısı her levelde 5.
+- **Cepler:** 34 levelde en az bir renk heykelin içinde tamamen kapalı; başta tek küpü görünmez, o rengin kovanı cep açılana kadar uyur (ördeğin içine dolan su, penguenin yuttuğu gümüş balık, çanın gümüş özü, hediye kutusunun dört oyuncak bölmesi, kumbaranın altın/gümüş/banknot bölmeleri, kraliçe arının koyu balı ve arı sütü…). 24 levelde cepler her yerden en az 2 kat örtülü. Cep ipucu L5'te bir kez çıkar.
+- **Gizli ve bağlı kovanlar:** gizli "?" L8'den (ikinci sıra tamamen gizli). Bağlı ikili L9'da Slot Ekle ile aynı levelde tanıtılır: önce "Yeni Engel!" kartı, kart kapanınca Slot Ekle balonu. **Üçlü bağ** yalnız zor levellerde (16, 22, 29, 35): üç kovan birlikte gider, 3 boş slot ister, 2 iple çizilir; ilk görüldüğü yerde "Üçlü bağ!" balonu.
+- **Zorluk:** her kuyruk dikkatsiz oyuncuya karşı ölçüldü. Normal levellerde gerçek kazanma %77–96 (kolay level de kaybedilebilir), zor levellerde (10/16/22/29/35) %17–28. Yalnız L1–L2 (FTUE) ve ince L15 Kelebek kaybedilemez.
+- **Süre:** daha çok küp için arı akışı hızlandı (kovan 0,08 sn'de bir arı çıkarır, kovan başına 10 arı yolda, ekranda en fazla 110). Bot ile 1x ortalama L1–14 41 sn (Cube Land 38 sn), L15–35 56 sn.
+- **Eşek Arısı:** joker kovan 30 arı (büyük heykeller için).
+- Leveller `levels/` klasöründe (editör formatı), set açıklaması `levels/README.md`, önizlemeler `levels/preview/`. Not: editör ve Unity şu an yalnız ikili bağı kabul ediyor; üçlü bağlı dört level (16, 22, 29, 35) editörde hata gösterir.
+
 ## 29 Eylül 2026 — Katalog
 
 - **Katalog sekmesi (Dünya Haritası yerine):** ana menü alt barının sağındaki sekme artık Katalog; ikonu mor kitap üstünde altın küp.
