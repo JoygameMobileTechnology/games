@@ -3,6 +3,10 @@
 Canlı sürüm: https://joygamemobiletechnology.github.io/games/bee-colony-remaster/
 (GitHub Pages sayfayı ~10 dakika önbellekte tutar; bir değişiklik görünmüyorsa sert yenileyin.)
 
+## 30 Eylül 2026 — Yolculuk zemini
+
+- **Sade zemin:** Yolculuk ekranındaki adalar, kesik çizgili deniz rotaları ve dalgalar kaldırıldı; zemin artık Mağaza ile aynı lacivert kapitone desen.
+
 ## 30 Eylül 2026 — Yolculuk
 
 - **Yolculuk sekmesi (Katalog yerine):** ana menü alt barının sağındaki sekme artık Yolculuk; ikonu iğneli bir harita.
