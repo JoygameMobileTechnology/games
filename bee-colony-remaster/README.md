@@ -12,6 +12,7 @@ Bee Colony'nin (bkz. [bee-colony/](../bee-colony/)) Cube Land referansına göre
 - **Kuyruk:** kovanlar kübik shooter'lar (arılar ön yüzden çıkar) (en fazla 80 arı, yuvarlak sayılar). Level 8'den itibaren gizli "?" shooter'lar (önündeki slota çıkınca açılır), level 13'ten itibaren birlikte hareket eden bağlı çiftler.
 - **Boosterlar** (altta, Cube Land sırasıyla açılır): Geri Al (L6), Slot Ekle (L9), Eşek Arısı (L12), Karıştır (L15), Vakum (L18). Açıldığı bölümde 1 adet hediye; biten booster'daki "+" satın alma panelini açar.
 - **Mağaza:** alt bardaki Mağaza sekmesi; Reklamsız teklifi, 3 paket (altın + booster), 6 altın paketi ve günlük bedava altın. Satın almalar test amaçlı.
+- **Katalog:** alt bardaki sağ sekme; her bölümün hedef heykeli 2 sütunlu kaydırılabilir ızgarada. Bitirilen bölümler renkli ve Türkçe isimli, diğerleri gri, kilit rozetli.
 - **Ekonomi:** 1000 altınla başlanır, bölüm sonu 30 altın (reklamla ×2). Paketler: Geri Al ×3 900, Slot Ekle ×1 1800, Eşek Arısı ×2 1600, Karıştır ×3 900, Vakum ×1 1800.
 - **Son dalga:** kuyrukta kalan kovanlar boş slotlara sığınca kendiliğinden yerleşir, HUD gizlenir ve oyun 3x hızlanır.
 - **Ayarlar:** altı arka plan varyantı (Sarı varsayılan · Lacivert / Orman / Bal / Beyaz / Gri) renk kutucuklarından seçilir (test amaçlı).

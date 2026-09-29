@@ -3,6 +3,15 @@
 Canlı sürüm: https://joygamemobiletechnology.github.io/games/bee-colony-remaster/
 (GitHub Pages sayfayı ~10 dakika önbellekte tutar; bir değişiklik görünmüyorsa sert yenileyin.)
 
+## 29 Eylül 2026 — Katalog
+
+- **Katalog sekmesi (Dünya Haritası yerine):** ana menü alt barının sağındaki sekme artık Katalog; ikonu mor kitap üstünde altın küp.
+- **İçerik:** 35 bölümün hedef heykeli, bölüm sırasıyla 2 sütunlu ızgarada; aşağı kaydırılarak sona kadar inilir. Resimler oyunun küpleri ve ışığıyla çizilen küçük 3D görüntüler (önden, hafif sol-üstten); sekme açılınca birkaç karede dolar, sonra önbellekten gelir.
+- **Kilitli:** bitirilmemiş bölümün heykeli gri ve soluk, sağ altında altın kilit rozeti, isim yerine "???".
+- **Açık:** bölüm bir kez bitirilince kart renklenir ve altında Türkçe adı yazar (ör. Kiraz İkilisi, Küçük Yıldız). Sol üstte bölüm numarası, zor bölümlerde sağ üstte 💀.
+- Üstte "N / 35 heykel toplandı" sayacı ve ilerleme çubuğu; başlık, lacivert kapitone zemin ve krem kartlar Mağaza ile aynı dilde.
+- **Kayıt:** ilerlemeye bitirilen bölümler listesi eklendi (tekrar oynamak çift saymaz). Eski kayıtlarda ulaşılan bölümün altındaki her bölüm bitmiş sayılır.
+
 ## 29 Eylül 2026 — Mağaza
 
 - **Mağaza sekmesi açıldı:** ana menünün alt barındaki Mağaza artık kilitli değil; üstteki altın göstergesine dokunmak da mağazayı açar.
