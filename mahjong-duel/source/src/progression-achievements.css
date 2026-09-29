@@ -28,6 +28,7 @@
 .achievement-trophy-stage::after { content: ''; position: absolute; z-index: -1; bottom: 0; left: 0; right: 0; height: 13px; background: repeating-linear-gradient(0deg,#f7c06e26 0 1px,transparent 1px 4px),linear-gradient(#e0ae63 0 22%,#9e602d 23%,#693613 80%,#c7944e); border-bottom: 1px solid #75461e; box-shadow: 0 4px 4px #68442635; }
 .achievement-trophy-card > strong { padding: 0 5px; font-size: 12px; font-weight: 800; line-height: 1.3; overflow-wrap: anywhere; text-wrap: balance; min-height: 1.3em; display: flex; align-items: start; justify-content: center; }
 .trophy-card-progress { display: flex; align-items: center; justify-content: center; gap: 3px; font-size: 11px; font-weight: 700; margin-top: 2px; font-variant-numeric: tabular-nums; color: #83603b; }.trophy-card-progress > svg { width: 13px; color: #43713b; }
+/* Deferred art uses the same square wrapper, preserving every shelf's geometry. */
 .achievement-trophy { position: relative; display: block; width: 100%; aspect-ratio: 1; isolation: isolate; }
 .trophy-illustration { position: absolute; display: block; inset: 8%; background-size: 400% 400%; background-repeat: no-repeat; filter: drop-shadow(0 3px 2px #52301c36); transition: filter .2s; }
 .trophy-illustration.sprite-row-2 { clip-path: inset(0 0 4% 0); }

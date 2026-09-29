@@ -9,6 +9,49 @@ import { AchievementTrophy } from './achievement-trophy.jsx';
 const format = value => Number(value || 0).toLocaleString();
 const romans = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
 const levelName = entry => entry.totalLevels === 1 ? (entry.unlocked ? 'Unlocked' : 'Not yet earned') : entry.complete ? `Level ${entry.level} · Mastered` : entry.level ? `Level ${entry.level}` : 'Not yet earned';
+const trophyPreloadMargin = 300;
+
+function AchievementShelf({ shelf, items, bodyRef, eager, isVisible, onOpenEntry }) {
+  const element = useRef(null);
+  const [artMounted, setArtMounted] = useState(eager);
+  useLayoutEffect(() => {
+    if (artMounted || !isVisible) return;
+    const node = element.current;
+    // The ancestor's ref may attach after this child's first layout effect.
+    const root = bodyRef.current || node?.closest('.progression-page-scroll');
+    if (!root || !node) return;
+    if (typeof IntersectionObserver === 'undefined') { setArtMounted(true); return; }
+    const isNearViewport = () => {
+      if (!node.getClientRects().length) return false;
+      const bounds = node.getBoundingClientRect(), viewport = root.getBoundingClientRect();
+      return bounds.bottom >= viewport.top - trophyPreloadMargin && bounds.top <= viewport.bottom + trophyPreloadMargin;
+    };
+    // Include every initially visible shelf before paint, including two-column layouts.
+    if (isNearViewport()) { setArtMounted(true); return; }
+    let observing = true;
+    const checkViewport = () => { if (observing && isNearViewport()) setArtMounted(true); };
+    const observer = new IntersectionObserver(entries => {
+      if (observing && entries.some(entry => entry.isIntersecting)) setArtMounted(true);
+    }, { root, rootMargin: `${trophyPreloadMargin}px 0px` });
+    observer.observe(node);
+    const resizeObserver = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(checkViewport);
+    resizeObserver?.observe(root);
+    resizeObserver?.observe(node);
+    root.addEventListener('scroll', checkViewport, { passive: true });
+    window.addEventListener('resize', checkViewport);
+    return () => {
+      observing = false;
+      observer.disconnect();
+      resizeObserver?.disconnect();
+      root.removeEventListener('scroll', checkViewport);
+      window.removeEventListener('resize', checkViewport);
+    };
+  }, [artMounted, bodyRef, isVisible]);
+  return <section ref={element} className="achievement-shelf" aria-labelledby={`shelf-${shelf.id}`} onFocusCapture={() => setArtMounted(true)}><h3 id={`shelf-${shelf.id}`}><Leaf weight="fill" />{shelf.name}<Leaf weight="fill" /></h3><ul className="achievement-shelf-grid">{items.map(entry => <li key={entry.id}><button className={`achievement-trophy-card ${entry.unlocked ? 'is-earned' : 'is-locked'}`} data-achievement-family={entry.id} onClick={event => onOpenEntry(entry, event)} aria-label={`${entry.name}, ${levelName(entry)}, ${entry.complete ? 'Completed' : `${format(Math.min(entry.current, entry.target))} of ${format(entry.target)}`}`}>
+    <span className="achievement-trophy-stage">{artMounted ? <AchievementTrophy artKey={entry.artKey} level={entry.level} totalLevels={entry.totalLevels} /> : <span className="achievement-trophy" aria-hidden="true" />}{entry.level > 0 && entry.totalLevels > 1 && <span className="trophy-level-seal">{romans[entry.level - 1]}</span>}</span>
+    <strong>{entry.name}</strong><span className="trophy-card-progress">{entry.complete ? <><Check weight="bold" />Complete</> : <>{entry.counterKey.startsWith('best') || entry.counterKey.startsWith('max') ? 'Best ' : ''}{format(Math.min(entry.current, entry.target))} / {format(entry.target)}</>}</span>
+  </button></li>)}</ul></section>;
+}
 
 function FrameReward({ frame, progression, profile, onEquipFrame }) {
   const unlocked = isFrameUnlocked(frame.id, progression.points), equipped = profile?.frameId === frame.id && unlocked;
@@ -50,12 +93,9 @@ export function AchievementsPage({ progression, profile, onEquipFrame, onClose, 
       <div className="achievement-toolbar" hidden><label className="achievement-search"><MagnifyingGlass size={19} /><input aria-label="Search achievements" type="search" placeholder="Find a trophy" value={search} onChange={event => setSearch(event.target.value)} /></label><button className={`achievement-filter-toggle ${filter !== 'all' || category !== 'all' ? 'is-active' : ''}`} aria-label="Filter achievements" aria-expanded={filtersOpen} onClick={() => setFiltersOpen(value => !value)}><SlidersHorizontal size={23} /><span>Filter</span></button></div>
       {filtersOpen && <div className="achievement-filters" hidden><label>Category<select aria-label="Achievement category" value={category} onChange={event => setCategory(event.target.value)}><option value="all">All categories</option>{ACHIEVEMENT_SHELVES.map(shelf => <option key={shelf.id} value={shelf.id}>{shelf.name}</option>)}</select></label><label>Status<select aria-label="Achievement status" value={filter} onChange={event => setFilter(event.target.value)}><option value="all">All trophies</option><option value="progress">In progress</option><option value="unlocked">Unlocked</option><option value="complete">Completed</option></select></label></div>}
       <p className="achievement-results-count" aria-live="polite">{visible.length} {visible.length === 1 ? 'trophy' : 'trophies'} · tap to explore milestones</p>
-      <div className="achievement-shelves">{ACHIEVEMENT_SHELVES.map(shelf => {
+      <div className="achievement-shelves">{ACHIEVEMENT_SHELVES.map((shelf, index) => {
         const items = visible.filter(entry => entry.shelfId === shelf.id);
-        return items.length > 0 && <section className="achievement-shelf" key={shelf.id} aria-labelledby={`shelf-${shelf.id}`}><h3 id={`shelf-${shelf.id}`}><Leaf weight="fill" />{shelf.name}<Leaf weight="fill" /></h3><ul className="achievement-shelf-grid">{items.map(entry => <li key={entry.id}><button className={`achievement-trophy-card ${entry.unlocked ? 'is-earned' : 'is-locked'}`} data-achievement-family={entry.id} onClick={event => openEntry(entry, event)} aria-label={`${entry.name}, ${levelName(entry)}, ${entry.complete ? 'Completed' : `${format(Math.min(entry.current, entry.target))} of ${format(entry.target)}`}`}>
-          <span className="achievement-trophy-stage"><AchievementTrophy artKey={entry.artKey} level={entry.level} totalLevels={entry.totalLevels} />{entry.level > 0 && entry.totalLevels > 1 && <span className="trophy-level-seal">{romans[entry.level - 1]}</span>}</span>
-          <strong>{entry.name}</strong><span className="trophy-card-progress">{entry.complete ? <><Check weight="bold" />Complete</> : <>{entry.counterKey.startsWith('best') || entry.counterKey.startsWith('max') ? 'Best ' : ''}{format(Math.min(entry.current, entry.target))} / {format(entry.target)}</>}</span>
-        </button></li>)}</ul></section>;
+        return items.length > 0 && <AchievementShelf key={shelf.id} shelf={shelf} items={items} bodyRef={body} eager={index === 0} isVisible={!selected && !showFrames} onOpenEntry={openEntry} />;
       })}</div>
       {visible.length === 0 && <div className="progression-empty"><MagnifyingGlass size={35} /><h3>No matching trophies</h3><p>Try another name or category.</p><button className="progression-secondary" onClick={() => { setSearch(''); setCategory('all'); setFilter('all'); }}>Show all achievements</button></div>}
     </div>

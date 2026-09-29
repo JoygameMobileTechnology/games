@@ -1,6 +1,6 @@
 import React, { useId } from 'react';
+import { getTrophyAtlasUrl } from './achievement-artwork.js';
 
-const atlas = './assets/remake/achievement-trophies.png';
 const subjects = ['duelist', 'bamboo', 'banner', 'ribbon', 'heart', 'fan', 'reed', 'scales', 'steps', 'cabinet', 'flower', 'screen', 'lantern', 'compass', 'eagle', 'cup'];
 
 /** One illustrated subject; each earned level adds another pair of laurel leaves. */
@@ -19,7 +19,7 @@ export function AchievementTrophy({ artKey = 'cup', level = 0, totalLevels = 1, 
       {glory >= 4 && <path fill={`url(#laurel-${id})`} stroke="#a86b23" d="m98 24-6-17 19 9 9-14 9 14 19-9-6 17z" />}
       {glory === 5 && <g fill="#fff4b9"><path d="m27 57 3 9 9 3-9 3-3 9-3-9-9-3 9-3zM207 106l3 9 9 3-9 3-3 9-3-9-9-3 9-3z" /></g>}
     </svg>
-    <span className={`trophy-illustration sprite-row-${Math.floor(index / 4)}`} style={{ backgroundImage: `url("${atlas}")`, backgroundPosition: `${(index % 4) * 100 / 3}% ${Math.floor(index / 4) * 100 / 3}%` }} />
+    <span className={`trophy-illustration sprite-row-${Math.floor(index / 4)}`} style={{ backgroundImage: `url("${getTrophyAtlasUrl()}")`, backgroundPosition: `${(index % 4) * 100 / 3}% ${Math.floor(index / 4) * 100 / 3}%` }} />
     {level === 0 && <span className="trophy-lock"><svg viewBox="0 0 24 24"><path d="M7 10V7a5 5 0 0 1 10 0v3M6 10h12v11H6z" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinejoin="round" /><circle cx="12" cy="15" r="1.5" /></svg></span>}
   </span>;
 }

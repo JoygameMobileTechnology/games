@@ -19,6 +19,7 @@ import { themeUiStyle } from './theme-ui.js';
 import { playGhostTurn, ghostName, rememberGhostFaces, GHOST_MEMORY_VERSION } from './ghost.js';
 import { ProfileEditor, PlayerAvatar, loadProfile, saveProfile } from './player-profile.jsx';
 import { isFrameUnlocked } from './avatar-frames.js';
+import { prepareAchievementArtwork } from './achievement-artwork.js';
 import { ThemeChooser, VictoryBloom } from './remake-ui.jsx';
 import { chooseMenuBackground } from './menu-backgrounds.js';
 import { MenuScene } from './menu-scene.jsx';
@@ -217,6 +218,16 @@ function App() {
   const progressionRef = useRef(progression);
   const collection = progression.collection;
   const [page, setPage] = useState(() => getDailyView(progression).shouldAutoOpen ? 'daily' : null);
+  useEffect(() => {
+    if (screen !== 'menu' || page || pageHidden) return;
+    const prepare = () => { void prepareAchievementArtwork(); };
+    if (typeof window.requestIdleCallback === 'function') {
+      const idle = window.requestIdleCallback(prepare, { timeout: 1000 });
+      return () => window.cancelIdleCallback(idle);
+    }
+    const timer = window.setTimeout(prepare, 100);
+    return () => window.clearTimeout(timer);
+  }, [screen, page, pageHidden]);
   const [adState, setAdState] = useState('idle');
   const pageOpener = useRef('.duel-launch');
   const adBusy = useRef(false);
