@@ -1,14 +1,15 @@
 /* Trophy shelves, every milestone, avatar rewards and responsive navigation.
- * GAME_URL=http://localhost:5173 PLAYWRIGHT_MODULE=/path/to/playwright node tests/achievement-gallery-check.cjs [--webkit]
+ * GAME_URL=http://localhost:5173 PLAYWRIGHT_MODULE=/path/to/playwright node tests/achievement-gallery-check.cjs [--webkit] [--layout-only]
  * Presentation fixtures exist only inside the test browser's route fulfillment.
  */
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const browserName = process.argv.includes('--webkit') ? 'webkit' : 'chromium';
+const layoutOnly = process.argv.includes('--layout-only');
 const origin = process.env.GAME_URL || 'http://localhost:5173';
 const output = path.resolve('output/remake/achievement-gallery-review');
-const sizes = [[320, 568], [390, 844], [768, 1024], [1024, 768], [844, 390]];
+const sizes = layoutOnly ? [[320, 568], [768, 1024]] : [[320, 568], [390, 844], [768, 1024], [1024, 768], [844, 390]];
 const fixture = `<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"></head><body><div id="root"></div><script type="module">
 import React from '/node_modules/.vite/deps/react.js';
 import ReactDOM from '/node_modules/.vite/deps/react-dom_client.js';
@@ -48,7 +49,6 @@ ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(
   const cards = () => page.locator('button[data-achievement-family]');
   const card = id => page.locator(`button[data-achievement-family="${id}"]`);
   const scroll = () => page.locator('.achievements-page .progression-page-scroll');
-  const search = () => page.getByRole('searchbox', { name: 'Search achievements' });
   const pass = label => { checks.push(label); console.log(`PASS ${browserName}: ${label}`); };
   const settle = async () => {
     await page.evaluate(async () => {
@@ -86,21 +86,26 @@ ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(
     const after = await scroll().evaluate(node => node.scrollTop);
     assert.ok(Math.abs(after - before) <= 2, `Back restores ${id} scroll: ${before} → ${after}`);
   }
-  async function filters(category = 'all', status = 'all') {
-    if (!await page.getByRole('combobox', { name: 'Achievement category' }).isVisible()) await button('Filter achievements').click();
-    await page.getByRole('combobox', { name: 'Achievement category' }).selectOption(category);
-    await page.getByRole('combobox', { name: 'Achievement status' }).selectOption(status);
+  async function unfilteredGallery() {
+    assert.equal(await page.locator('.achievement-toolbar').isVisible(), false, 'search and filter toolbar stays hidden');
+    assert.equal(await page.getByRole('searchbox', { name: 'Search achievements' }).count(), 0, 'search is absent from accessible controls');
+    assert.equal(await button('Filter achievements').count(), 0, 'filter is absent from accessible controls');
+    assert.equal(await page.getByRole('combobox', { name: /Achievement (category|status)/ }).count(), 0, 'filter options are absent from accessible controls');
+    assert.equal(await cards().count(), 43, 'all trophies stay available without search or filters');
   }
   try {
+    let frames;
+    if (!layoutOnly) {
     await page.setViewportSize({ width: 320, height: 568 });
     await load();
-    const { families, shelves, frames } = await page.evaluate(() => window.fixtureCatalog);
+    const catalog = await page.evaluate(() => window.fixtureCatalog);
+    const { families, shelves } = catalog;
+    frames = catalog.frames;
     assert.equal(families.length, 43);
-    assert.equal(await cards().count(), 43);
+    await unfilteredGallery();
     const visited = [];
     for (const family of families) {
-      await search().fill(family.name);
-      assert.equal(await card(family.id).count(), 1, `${family.name} is searchable`);
+      assert.equal(await card(family.id).count(), 1, `${family.name} is available in its shelf`);
       await card(family.id).scrollIntoViewIfNeeded();
       const before = await scroll().evaluate(node => node.scrollTop);
       await card(family.id).click();
@@ -136,31 +141,22 @@ ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(
       }
       if (family.totalLevels > 1) assert.equal(trophyStages.size, family.totalLevels, `${family.name} has a distinct appearance at every level`);
       await closeDetail(family.id, before);
-      assert.equal(await search().inputValue(), family.name, 'detail preserves search');
+      await unfilteredGallery();
     }
     assert.equal(new Set(visited).size, 100);
-    await search().fill('');
     for (const shelf of shelves) {
-      await filters(shelf.id);
-      assert.equal(await cards().count(), families.filter(family => family.shelfId === shelf.id).length, `${shelf.name} shows its complete family set`);
+      assert.equal(await page.locator(`.achievement-shelf[aria-labelledby="shelf-${shelf.id}"] button[data-achievement-family]`).count(), families.filter(family => family.shelfId === shelf.id).length, `${shelf.name} shows its complete family set`);
     }
-    await filters();
-    await search().fill('nothing matches this trophy');
-    await page.getByRole('heading', { name: 'No matching trophies', exact: true }).waitFor();
-    await button('Show all achievements').click();
-    assert.equal(await cards().count(), 43);
-    pass('all 43 families are searchable/filterable; all 100 milestone targets and increasing rewards are inspectable; Back preserves search, focus and scroll');
+    pass('search and filters stay hidden; all 43 families and 100 milestone targets and increasing rewards are inspectable; Back preserves focus and scroll');
 
     await load('partial');
     const entries = await page.evaluate(() => window.fixtureState.entries);
-    for (const [status, predicate] of [['unlocked', entry => entry.unlocked], ['progress', entry => !entry.complete && entry.current > 0], ['complete', entry => entry.complete]]) {
-      await filters('all', status);
-      assert.deepEqual((await cards().evaluateAll(nodes => nodes.map(node => node.dataset.achievementFamily))).sort(), entries.filter(predicate).map(entry => entry.id).sort(), `${status} filter matches earned/current state`);
-    }
+    await unfilteredGallery();
+    assert.deepEqual((await page.locator('button[data-achievement-family].is-earned').evaluateAll(nodes => nodes.map(node => node.dataset.achievementFamily))).sort(), entries.filter(entry => entry.unlocked).map(entry => entry.id).sort(), 'earned trophies match saved progress');
     await load('complete');
-    await filters('all', 'complete');
-    assert.equal(await cards().count(), 43, 'all completed families remain discoverable');
-    pass('partial and completed collections use honest status filters');
+    await unfilteredGallery();
+    assert.equal(await page.locator('button[data-achievement-family].is-earned').count(), 43, 'all completed families show earned status');
+    pass('partial and completed collections show all trophies with honest earned status');
 
     await load('legacy');
     assert.equal(await page.locator('.achievement-total > strong').innerText(), '25', 'legacy AP total stays unchanged');
@@ -172,13 +168,16 @@ ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(
     assert.match(await page.locator('.achievement-progress-note').innerText(), /40 AP on unlock/, 'future milestone uses the new increasing reward');
     await capture('legacy-earned-and-future-points');
     pass('legacy AP total and earned milestone values stay unchanged while future milestones use increasing rewards');
+    }
 
     for (const [width, height] of sizes) {
       await page.setViewportSize({ width, height });
       await load('locked');
+      await unfilteredGallery();
       await fit(`locked shelves ${width}×${height}`);
       await capture('shelves-locked');
       await load('partial');
+      await unfilteredGallery();
       const result = await fit(`shelves ${width}×${height}`);
       assert.ok(result.scrollHeight > result.clientHeight, 'trophy gallery scrolls as one page');
       await capture('shelves');
@@ -191,6 +190,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(
       await fit(`detail ${width}×${height}`);
       await capture('detail');
       await closeDetail(lastId, before);
+      await unfilteredGallery();
       await card('completed-duels').click();
       await capture('earned-level-five');
       await page.locator('.achievement-detail-frame-link').click();
@@ -202,6 +202,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(
       pass(`${width}×${height}: shelves/details/frames fit horizontally, page scroll works and all controls are at least 44px`);
     }
 
+    if (!layoutOnly) {
     await page.setViewportSize({ width: 390, height: 844 });
     await load('locked');
     await button('View milestones').first().click();
@@ -234,6 +235,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(
     await load('partial');
     assert.deepEqual(await page.locator('.achievements-page').evaluate(node => [...node.querySelectorAll('*')].filter(child => getComputedStyle(child).animationName !== 'none' && getComputedStyle(child).animationDuration.split(',').some(duration => parseFloat(duration) > .01)).map(child => child.className)), [], 'system reduced motion disables decorative animation');
     pass('keyboard opening/Escape restores the card; Gentle and system reduced motion suppress decorative animation');
+    }
 
     assert.deepEqual(errors, []);
     fs.writeFileSync(path.join(output, `${browserName}-report.json`), JSON.stringify({ checks, errors, metrics }, null, 2));
