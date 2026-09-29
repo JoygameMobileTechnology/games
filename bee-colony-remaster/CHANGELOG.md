@@ -3,6 +3,13 @@
 Canlı sürüm: https://joygamemobiletechnology.github.io/games/bee-colony-remaster/
 (GitHub Pages sayfayı ~10 dakika önbellekte tutar; bir değişiklik görünmüyorsa sert yenileyin.)
 
+## 30 Eylül 2026 — Yolculuk
+
+- **Yolculuk sekmesi (Katalog yerine):** ana menü alt barının sağındaki sekme artık Yolculuk; ikonu iğneli bir harita.
+- **Yol:** Cube Land'in dikey Journey haritası referans alındı, şehir kilidi yok. Bölüm 1 en altta, yol yukarı doğru 35. bölüme çıkar; sıradaki bölüme kadar yeşil dolar, üstü mor. Zemin deniz; kenarlardan adalar ve kesik çizgili rotalar görünür.
+- **Adımlar:** her bölüm yolun üstüne oturan mavi bir kapsül: solda "Bölüm N" ve heykelin adı, sağda o bölümün hedef heykeli. Bitirilen bölümde heykel renkli, yeşil tikli; bitirilmeyenlerde gri, kilitli, adı "???". Zor bölümlerde 💀. Sıradaki bölüm altın çerçeveli ve "SIRADAKİ" etiketli.
+- **Gezinme:** ekran sıradaki bölüme ortalanmış açılır; yukarı kaydırınca kilitli heykeller, aşağı kaydırınca toplananlar. Yolun tepesinde kupa ve "N / 35 heykel toplandı" sayacı, dibinde başlangıç kovanı.
+
 ## 29 Eylül 2026 — Yeni level seti (35 level, yüksek çözünürlük)
 
 - **35 yeni level:** heykeller baştan, çok daha yüksek çözünürlükte kuruldu. Toplam 43.990 küp (eski set 10.577, ×4,2), level başına 560–1740 küp. Anlaşılmayan eski şekiller (donut, külahta dondurma, akide şekeri, ikinci mercan balığı, arı kovanı) yok; her konu tek. Sırayla: Kiraz İkilisi, Küçük Yıldız, Lastik Ördek, Oklu Kalp, Karpuz, Mantar, Penguen, Gülen Güneş, Roket, 💀 Hediye Kutusu, Çilek, Kardan Adam, Yılbaşı Çanı, Uğur Böceği, Kelebek, 💀 Balkabağı, Palyaço Balığı, Hamburger, Baykuş, Sıcak Hava Balonu, Ananas, 💀 Kumbara, Oyuncak Ayı, Deniz Feneri, Yelkenli, Kurbağa Prens, Kale, Robot, 💀 Hazine Sandığı, Uçan Daire, Kek, Kaktüs, Bal Kavanozu, Ahtapot, 💀 Kraliçe Arı.

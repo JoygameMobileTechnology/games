@@ -13,7 +13,7 @@ Bee Colony'nin (bkz. [bee-colony/](../bee-colony/)) Cube Land referansına göre
 - **Arı akışı:** kovan 0,08 sn'de bir arı çıkarır, kovan başına 10 arı yolda, ekranda en fazla 110 arı — büyük heykeller Cube Land süresine yakın biter.
 - **Boosterlar** (altta, Cube Land sırasıyla açılır): Geri Al (L6), Slot Ekle (L9), Eşek Arısı (L12), Karıştır (L15), Vakum (L18). Açıldığı bölümde 1 adet hediye; biten booster'daki "+" satın alma panelini açar.
 - **Mağaza:** alt bardaki Mağaza sekmesi; Reklamsız teklifi, 3 paket (altın + booster), 6 altın paketi ve günlük bedava altın. Satın almalar test amaçlı.
-- **Katalog:** alt bardaki sağ sekme; her bölümün hedef heykeli 2 sütunlu kaydırılabilir ızgarada. Bitirilen bölümler renkli ve Türkçe isimli, diğerleri gri, kilit rozetli.
+- **Yolculuk:** alt bardaki sağ sekme; Cube Land'in dikey yolculuk haritası gibi, ama şehir kilidi yerine katalog işlevi görür. Bölüm 1'den yukarı çıkan yol sıradaki bölüme kadar yeşil dolar; her bölüm yolun üstünde bir adım: solda bölüm numarası, sağda hedef heykel. Bitirilenler renkli ve Türkçe isimli, diğerleri gri ve kilitli.
 - **Ekonomi:** 1000 altınla başlanır, bölüm sonu 30 altın (reklamla ×2). Paketler: Geri Al ×3 900, Slot Ekle ×1 1800, Eşek Arısı ×2 1600, Karıştır ×3 900, Vakum ×1 1800.
 - **Son dalga:** kuyrukta kalan kovanlar boş slotlara sığınca kendiliğinden yerleşir, HUD gizlenir ve oyun 3x hızlanır.
 - **Ayarlar:** altı arka plan varyantı (Sarı varsayılan · Lacivert / Orman / Bal / Beyaz / Gri) renk kutucuklarından seçilir (test amaçlı).
