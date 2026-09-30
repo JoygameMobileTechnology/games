@@ -168,7 +168,7 @@
 @keyframes bloom-spin { to { rotate: 360deg; } }
 @keyframes bloom-spark { 0%, 100% { opacity: .15; scale: .6; } 50% { opacity: 1; scale: 1.2; } }
 .remake .result-card h2 { font: 800 clamp(38px, 12vw, 61px)/1.15 Manrope, sans-serif; color: #ffdd7d; margin: 15px 0 12px; letter-spacing: -1.5px; text-shadow: 0 4px #965313, 0 0 25px #b559244f; }
-.remake .result-card > p { font-size: 15px; color: #e5c89a; margin: 0 0 27px; }
+.remake .result-card > p { font-size: 15px; color: #e5c89a; margin: 0 auto 27px; }
 .remake .result-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; border: none; margin: 20px 0; padding: 0; }
 .remake .result-stats > div { display: flex; flex-direction: column; gap: 0; border: 1px solid #755322; border-radius: 10px; overflow: hidden; background: #231d0fc9; }
 .remake .result-stats span { font-size: 13px; letter-spacing: 0; color: #eccc86; background: #5b391c3b; padding: 7px 0; }

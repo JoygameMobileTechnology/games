@@ -35,10 +35,10 @@ Editable [source](source/README.md), runtime artwork, lockfile, tests and tile-l
 
 ## Release provenance
 
-Updated from development `main`, source checkpoint `d7928447d7ddcfc4690b853c66e0010871da2e33`. Previous releases remain in Git history. Collection counts and earned achievement unlocks are preserved: Bamboo becomes Marble, Granite becomes Sapphire, and Celestial joins Gold. Rarity-dependent achievement progress uses the four current tiers. Previously earned achievement points retain their original values through per-unlock receipts; increased rewards apply only to future unlocks.
+Updated from development `main`, source checkpoint `61fdf9c0b3c1b0b601a4ac674d70d8a14223af8a`. Previous releases remain in Git history. Collection counts and earned achievement unlocks are preserved: Bamboo becomes Marble, Granite becomes Sapphire, and Celestial joins Gold. Rarity-dependent achievement progress uses the four current tiers. Previously earned achievement points retain their original values through per-unlock receipts; increased rewards apply only to future unlocks.
 
 The four launch themes are Ming porcelain, Dancheong, Stained Glass and Dutch Golden Age. Other themes have no in-game enable switch and their artwork is excluded from the runtime build. Hidden-theme collection progress remains stored; unavailable theme selections fall back to Ming porcelain. Legacy duel snapshots are discarded. Existing progression remains intact; new currency balances and quest state initialize safely when missing. Shop artwork provenance is included in `source/output/shop-art/prompts.md`.
 
-Build SHA-256: `58443c13b1a87ac3b4ac4d39f15560ce63a6933d72e75f536c8a1121c069709b`.
+Build SHA-256: `9918a988f28de65469cffe6fa0b443d5df9d0e7c062a4704695a40d83b3586bb`.
 
 See [third-party notices](THIRD_PARTY_NOTICES.md) for bundled library and font licenses.
