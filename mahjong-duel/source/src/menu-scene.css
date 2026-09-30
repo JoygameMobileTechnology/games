@@ -41,13 +41,13 @@
 }
 @keyframes menu-moon-kindle {
   0% { opacity: 0; }
-  22% { opacity: .35; }
-  52%,100% { opacity: 1; }
+  18% { opacity: .6; }
+  44%,100% { opacity: 1; }
 }
 @keyframes menu-moon-bloom {
-  0%,8% { opacity: 0; }
-  26% { opacity: .45; }
-  52% { opacity: .95; }
+  0%,5% { opacity: 0; }
+  22% { opacity: .7; }
+  48% { opacity: .97; }
   66%,100% { opacity: 1; }
 }
 @keyframes menu-scene-flash {

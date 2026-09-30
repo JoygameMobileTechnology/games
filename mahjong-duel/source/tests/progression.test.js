@@ -5,19 +5,22 @@ import { createProgression, normalizeProgression, loadProgression, saveProgressi
 import { createCollection, awardCollectedPair, COLLECTION_STORAGE_KEY } from '../src/collection.js';
 import { themeTileSets } from '../src/tile-data.js';
 import { rarityForTile } from '../src/rarity.js';
-import { DAY_POLICY, getDailyView, dayIdFor, rewardsForLogin, emptyWallet } from '../src/daily-rewards.js';
+import { DAY_POLICY, getDailyView, dayIdFor, rewardsForLogin } from '../src/daily-rewards.js';
+import { STARTER_BOOSTERS, STARTER_BOOSTER_VERSION } from '../src/economy.js';
 import { rankingRows, LEAGUES, leagueForWins } from '../src/leaderboards.js';
 
 const NOW = Date.UTC(2026, 8, 28, 12);
 const day = number => Date.UTC(2026, 0, number, 12);
 const fresh = () => createProgression({ seed: 42 });
+const starterReceiptId = `starter-boosters:v${STARTER_BOOSTER_VERSION}`;
+const withStarter = wallet => Object.fromEntries(Object.entries(STARTER_BOOSTERS).map(([id, count]) => [id, (wallet[id] ?? 0) + count]));
 const face = themeTileSets['ming-porcelain'].eastern.find(tile => tile.id === 'K01');
 const context = { gameId: 'duel-1', themeId: 'ming-porcelain', rulesetId: 'eastern', formationId: 'crown' };
 const attempt = (extra = {}) => ({ type: 'attempt', ...context, eventId: 'duel-1:attempt:1', attemptSequence: 1, actor: 'you', matched: true,
   physicalTileIds: ['tile-a', 'tile-b'], matchKey: face.matchKey, rarity: rarityForTile(context.themeId, context.rulesetId, face.id).id,
   beforePairs: { you: 0, ai: 0 }, afterPairs: { you: 1, ai: 0 }, counterDeltas: {}, counterMaxima: {}, now: NOW, ...extra });
 const complete = (extra = {}) => ({ type: 'complete', ...context, eventId: 'duel-1:complete', outcome: 'win',
-  afterPairs: { you: 21, ai: 19 }, winningSnapshot: { conditionalWins: { noBoosters: true, noMismatch: true, closeFinish: false } }, now: NOW, ...extra });
+  afterPairs: { you: 16, ai: 14 }, winningSnapshot: { conditionalWins: { noBoosters: true, noMismatch: true, closeFinish: false } }, now: NOW, ...extra });
 const login = (state, now) => reduceProgression(state, { type: 'login', now });
 const claim = (state, id, now) => reduceProgression(state, { type: 'daily-claim', eventId: id, now });
 function storage() {
@@ -59,6 +62,12 @@ test('rarity achievements use the four current tiers and retain the saved Eagle 
   assert.equal(everyRarity.target, 4);
 });
 
+test('current achievement descriptions use the 30-pair board and 16-pair winning boundary', () => {
+  for (const item of ACHIEVEMENTS) assert.doesNotMatch(item.description, /all 40 pairs|21st pair|exactly 19/);
+  assert.match(ACHIEVEMENTS.find(item => item.id === 'A001').description, /all 30 pairs/);
+  assert.match(ACHIEVEMENTS.find(item => item.id === 'A045').description, /16th pair.*exactly 14/);
+});
+
 test('every achievement evaluator has positive, below-threshold and unrelated-counter cases', () => {
   for (const item of ACHIEVEMENTS) {
     let state = fresh();
@@ -91,7 +100,7 @@ test('collection migration backfills only the eleven permitted collection achiev
   assert.equal(state.counters.bestPairChain, 0);
   assert.equal(getCounter(state, 'distinctLoginDayIds'), 0);
   assert.equal(getCounter(state, 'distinctCompletedFormationIds'), 0);
-  assert.deepEqual(state.wallet, emptyWallet());
+  assert.deepEqual(state.wallet, STARTER_BOOSTERS);
   assert.equal(state.ranking.position, 10000);
 });
 
@@ -111,9 +120,11 @@ test('five-tier version 1 saves preserve collection, receipts, wallet, ranking a
   target.setItem(PROGRESSION_STORAGE_KEY, JSON.stringify(stored));
   let loaded = loadProgression({ storage: target, now: NOW });
   assert.equal(loaded.version, 1);
-  for (const key of ['collection', 'counters', 'wallet', 'ranking', 'unlocked', 'newAchievementIds', 'eventReceipts', 'attemptCursors', 'completedGameIds']) {
+  for (const key of ['collection', 'counters', 'ranking', 'unlocked', 'newAchievementIds', 'attemptCursors', 'completedGameIds']) {
     assert.deepEqual(loaded[key], stored[key], key);
   }
+  assert.deepEqual(loaded.wallet, withStarter(stored.wallet), 'the legacy wallet receives only the once-only sampler');
+  assert.deepEqual(loaded.eventReceipts, { ...stored.eventReceipts, [starterReceiptId]: NOW });
   assert.deepEqual(loaded.sets.distinctCollectedRarityIds, ['marble', 'sapphire', 'amethyst', 'gold']);
   assert.equal(loaded.points, stored.points);
   assert.strictEqual(reduceProgression(loaded, attempt({ gameId: 'legacy-save', attemptSequence: 6 })), loaded);
@@ -194,14 +205,14 @@ test('invalid attempts and unknown or unsafe counter payloads are exact no-ops',
 
 test('only complete boards settle rankings and conditional wins use the winning snapshot', () => {
   const state = fresh();
-  assert.strictEqual(reduceProgression(state, complete({ afterPairs: { you: 21, ai: 0 } })), state);
+  assert.strictEqual(reduceProgression(state, complete({ afterPairs: { you: 16, ai: 0 } })), state);
   assert.strictEqual(reduceProgression(state, complete({ outcome: 'lose' })), state);
   const next = reduceProgression(state, complete({ conditionalWins: { closeFinish: true } }));
   assert.equal(next.counters.completedDuels, 1); assert.equal(next.counters.completedWins, 1);
-  assert.equal(next.counters['conditionalWins.closeFinish'], 0, '21–0 secured followed by 21–19 finish is not Close Finish');
+  assert.equal(next.counters['conditionalWins.closeFinish'], 0, '16–0 secured followed by 16–14 finish is not Close Finish');
   assert.equal(next.counters['conditionalWins.noBoosters'], 1);
   assert.equal(next.counters['conditionalWins.noMismatch'], 1);
-  assert.equal(next.ranking.position, 9800);
+  assert.equal(next.ranking.position, 8500);
   assert.equal(next.pendingRankingPresentation.previousPosition, 10000);
   assert.strictEqual(reduceProgression(next, complete()), next);
   assert.strictEqual(reduceProgression(next, complete({ eventId: 'another-completion' })), next);
@@ -214,17 +225,17 @@ test('every conditional counter requires its exact frozen true fact and a comple
     const next = reduceProgression(state, event);
     assert.equal(next.counters[key], 1, key);
     assert.equal(reduceProgression(state, { ...event, winningSnapshot: { conditionalWins: { [flag]: false } } }).counters[key], 0);
-    assert.equal(reduceProgression(state, { ...event, outcome: 'lose', afterPairs: { you: 19, ai: 21 } }).counters[key], 0);
+    assert.equal(reduceProgression(state, { ...event, outcome: 'lose', afterPairs: { you: 14, ai: 16 } }).counters[key], 0);
   }
 });
 
 test('multiple same-day completions settle immediately; losses and draws preserve rank and league', () => {
   let state = reduceProgression(fresh(), complete());
   state = reduceProgression(state, complete({ gameId: 'duel-2', eventId: 'duel-2:complete' }));
-  assert.equal(state.ranking.position, 9604); assert.equal(state.counters.completedWins, 2);
-  for (const [gameId, outcome, afterPairs] of [['duel-3', 'lose', { you: 19, ai: 21 }], ['duel-4', 'tie', { you: 20, ai: 20 }]]) {
+  assert.equal(state.ranking.position, 7325); assert.equal(state.counters.completedWins, 2);
+  for (const [gameId, outcome, afterPairs] of [['duel-3', 'lose', { you: 14, ai: 16 }], ['duel-4', 'tie', { you: 15, ai: 15 }]]) {
     state = reduceProgression(state, complete({ gameId, eventId: `${gameId}:complete`, outcome, afterPairs }));
-    assert.equal(state.ranking.position, 9604); assert.equal(state.pendingRankingPresentation.improved, false);
+    assert.equal(state.ranking.position, 7325); assert.equal(state.pendingRankingPresentation.improved, false);
   }
   assert.equal(state.counters.completedDuels, 4); assert.equal(state.counters.completedWins, 2);
   assert.equal(getCounter(state, 'distinctDuelCompletionDayIds'), 1);
@@ -245,7 +256,7 @@ test('ranking presentation is consumed once and cold load never revives it', () 
   assert.equal(saveProgression(earned, target), true);
   const loaded = loadProgression({ storage: target, now: NOW + 86400000 });
   assert.deepEqual(loaded.ranking, earned.ranking); assert.equal(loaded.pendingRankingPresentation, null);
-  assert.equal(earned.pendingRankingPresentation.position, 9800);
+  assert.equal(earned.pendingRankingPresentation.position, 8500);
   const viewed = consumeRankingPresentation(earned);
   assert.equal(viewed.pendingRankingPresentation, null); assert.deepEqual(viewed.ranking, earned.ranking);
   assert.strictEqual(consumeRankingPresentation(viewed), viewed);
@@ -284,13 +295,13 @@ test('one UTC qualifying visit per day earns durable entitlement; claims and mis
   state = reduceProgression(state, { type: 'daily-presented', dayId: dayIdFor(day(1)), now: day(1) });
   assert.equal(getDailyView(state, day(1)).shouldAutoOpen, false);
   assert.strictEqual(login(state, day(1) + 1000), state);
-  state = claim(state, 'claim-1', day(1)); assert.equal(state.wallet.hint, 1);
+  state = claim(state, 'claim-1', day(1)); assert.equal(state.wallet.hint, STARTER_BOOSTERS.hint + 1);
   assert.strictEqual(claim(state, 'claim-1', day(1)), state);
   assert.strictEqual(claim(state, 'other-claim', day(1)), state);
   state = login(state, day(7));
   assert.equal(getDailyView(state, day(7)).loginDays, 2);
   assert.equal(getDailyView(state, day(7)).weeklyDay, 2);
-  assert.equal(state.wallet.shuffle, 0);
+  assert.equal(state.wallet.shuffle, STARTER_BOOSTERS.shuffle);
   assert.equal(getCounter(state, 'distinctLoginDayIds'), 2);
   assert.equal(state.ranking.position, 10000);
   assert.equal(dayIdFor(Date.parse('2026-09-28T23:30:00-03:00')), '2026-09-29');
@@ -301,16 +312,17 @@ test('day30 bonus doubles with the weekly reward; day31 remains weekly day3', ()
   let state = fresh();
   for (let i = 1; i <= 29; i++) { state = login(state, day(i)); state = claim(state, `claim-${i}`, day(i)); }
   state = login(state, day(30));
-  assert.deepEqual(getDailyView(state, day(30)).rewards, { shuffle: 6, hint: 5, freeze: 5, eagle: 5 });
-  const wallet = { ...state.wallet };
+  assert.deepEqual(getDailyView(state, day(30)).rewards, { shuffle: 2, hint: 1, freeze: 1, eagle: 1, coins: 25 });
+  const wallet = { ...state.wallet }, coins = state.currencies.coins;
   state = reduceProgression(state, { type: 'daily-ad-start', eventId: 'ad-start', attemptId: 'ad-30', now: day(30) });
   state = reduceProgression(state, { type: 'daily-ad-complete', eventId: 'ad-complete', attemptId: 'ad-30', status: 'completed', now: day(30) });
-  for (const [id, amount] of Object.entries({ shuffle: 12, hint: 10, freeze: 10, eagle: 10 })) assert.equal(state.wallet[id], wallet[id] + amount);
+  for (const [id, amount] of Object.entries({ shuffle: 4, hint: 2, freeze: 2, eagle: 2 })) assert.equal(state.wallet[id], wallet[id] + amount);
+  assert.equal(state.currencies.coins, coins + 50);
   const repeat = reduceProgression(state, { type: 'daily-ad-complete', eventId: 'ad-again', attemptId: 'ad-30', status: 'completed', now: day(30) });
   assert.strictEqual(repeat, state);
   state = login(state, day(31));
   assert.equal(getDailyView(state, day(31)).weeklyDay, 3); assert.equal(getDailyView(state, day(31)).longDay, 1);
-  assert.deepEqual(rewardsForLogin(7), { shuffle: 2, hint: 2, freeze: 2, eagle: 2 });
+  assert.deepEqual(rewardsForLogin(7), { shuffle: 0, hint: 0, freeze: 1, eagle: 0, coins: 0 });
 });
 
 test('rewarded ad doubles its captured entitlement snapshot only, even across a day boundary', () => {
@@ -318,8 +330,9 @@ test('rewarded ad doubles its captured entitlement snapshot only, even across a 
   state = reduceProgression(state, { type: 'daily-ad-start', eventId: 'start-ad', attemptId: 'ad-one', now: day(1) });
   state = login(state, day(2));
   state = reduceProgression(state, { type: 'daily-ad-complete', eventId: 'complete-ad', attemptId: 'ad-one', status: 'completed', now: day(2) });
-  assert.equal(state.wallet.hint, 2); assert.equal(state.wallet.shuffle, 0);
-  assert.deepEqual(getDailyView(state, day(2)).rewards, { shuffle: 1, hint: 0, freeze: 0, eagle: 0 });
+  assert.equal(state.wallet.hint, STARTER_BOOSTERS.hint + 2); assert.equal(state.wallet.shuffle, STARTER_BOOSTERS.shuffle);
+  assert.equal(state.currencies.coins, 0, 'the second day was not in the captured ad reward');
+  assert.deepEqual(getDailyView(state, day(2)).rewards, { shuffle: 1, hint: 0, freeze: 0, eagle: 0, coins: 25 });
   assert.equal(getCounter(state, 'distinctLoginDayIds'), 2);
 });
 
@@ -328,8 +341,8 @@ test('cancelled, failed and unavailable ads leave the standard claim available w
     let state = login(fresh(), day(1));
     state = reduceProgression(state, { type: 'daily-ad-start', eventId: `start-${status}`, attemptId: status, now: day(1) });
     state = reduceProgression(state, { type: 'daily-ad-complete', eventId: `end-${status}`, attemptId: status, status, now: day(1) });
-    assert.equal(state.wallet.hint, 0); assert.equal(getDailyView(state, day(1)).hasClaim, true);
-    assert.equal(claim(state, `claim-${status}`, day(1)).wallet.hint, 1);
+    assert.equal(state.wallet.hint, STARTER_BOOSTERS.hint); assert.equal(getDailyView(state, day(1)).hasClaim, true);
+    assert.equal(claim(state, `claim-${status}`, day(1)).wallet.hint, STARTER_BOOSTERS.hint + 1);
   }
 });
 
@@ -337,22 +350,23 @@ test('standard claim during an ad prevents double payment, and unclaimed rewards
   let state = login(fresh(), day(1)), target = storage();
   state = reduceProgression(state, { type: 'daily-ad-start', eventId: 'start', attemptId: 'ad', now: day(1) });
   saveProgression(state, target); state = loadProgression({ storage: target, now: day(2) });
-  assert.equal(getDailyView(state, day(2)).hasClaim, true); assert.equal(state.wallet.hint, 0);
+  assert.equal(getDailyView(state, day(2)).hasClaim, true); assert.equal(state.wallet.hint, STARTER_BOOSTERS.hint);
   state = claim(state, 'standard', day(2));
   state = reduceProgression(state, { type: 'daily-ad-complete', eventId: 'ad-success', attemptId: 'ad', status: 'completed', now: day(2) });
-  assert.equal(state.wallet.hint, 1);
+  assert.equal(state.wallet.hint, STARTER_BOOSTERS.hint + 1);
 });
 
 test('earned wallet has no cap, spends only successful events and ignores test-stock migration', () => {
   const target = storage();
   target.values.set('porcelain:session', JSON.stringify({ boosters: { shuffle: 20, hint: 20, freeze: 20, eagle: 20 } }));
   let state = loadProgression({ storage: target, now: NOW });
-  assert.deepEqual(state.wallet, emptyWallet());
+  assert.deepEqual(state.wallet, STARTER_BOOSTERS, 'the old session stock is ignored; only the sampler is granted');
   state.wallet.hint = 500;
   const event = { type: 'booster', eventId: 'spend-1', gameId: 'duel-1', boosterId: 'hint', now: NOW };
   state = reduceProgression(state, event); assert.equal(state.wallet.hint, 499);
   assert.strictEqual(reduceProgression(state, event), state);
   assert.strictEqual(reduceProgression(state, { ...event, eventId: 'spend-ai', actor: 'ai' }), state);
+  state.wallet.freeze = 0;
   assert.strictEqual(reduceProgression(state, { ...event, eventId: 'empty', boosterId: 'freeze' }), state);
   saveProgression(state, target); assert.equal(loadProgression({ storage: target, now: NOW }).wallet.hint, 499);
   assert.equal(target.values.get('porcelain:profile'), '{"name":"Keep me"}');
@@ -392,7 +406,7 @@ test('damaged progression JSON still recovers the independently saved legacy bin
   assert.deepEqual(state.collection.receipts, collection.receipts);
   assert.equal(state.counters.personalPairs, 0);
   assert.equal(state.counters.completedWins, 0);
-  assert.deepEqual(state.wallet, emptyWallet());
+  assert.deepEqual(state.wallet, STARTER_BOOSTERS);
 });
 
 test('malformed progression is safe, validates known sets/IDs/counters and recomputes points', () => {
@@ -414,7 +428,7 @@ test('malformed progression is safe, validates known sets/IDs/counters and recom
   for (const raw of ['bad json','null','[]',JSON.stringify({ ...dirty, version: 999 })]) {
     target.values.set(PROGRESSION_STORAGE_KEY, raw);
     const loaded = loadProgression({ storage: target, now: NOW });
-    assert.equal(loaded.points, 0); assert.deepEqual(loaded.wallet, emptyWallet());
+    assert.equal(loaded.points, 0); assert.deepEqual(loaded.wallet, STARTER_BOOSTERS);
   }
   assert.doesNotThrow(() => loadProgression({ storage: { getItem() { throw Error('blocked'); } } }));
 });
@@ -444,7 +458,7 @@ test('inherited object-member IDs cannot enter achievement, receipt or daily ent
   assert.deepEqual(state.unlocked, { A001: NOW });
   assert.equal(state.points, 5);
   assert.deepEqual(state.newAchievementIds, ['A001']);
-  assert.deepEqual(state.eventReceipts, {});
+  assert.deepEqual(state.eventReceipts, { [starterReceiptId]: NOW });
   assert.deepEqual(state.attemptCursors, {});
   assert.deepEqual(state.completedGameIds, []);
   assert.deepEqual(state.daily.claimReceipts, {});
@@ -461,7 +475,7 @@ test('inherited object-member IDs cannot enter achievement, receipt or daily ent
     assert.strictEqual(reduceProgression(state, attempt({ gameId: id })), state);
   }
   const claimed = claim(state, 'valid-claim', NOW);
-  assert.equal(claimed.wallet.hint, 1);
+  assert.equal(claimed.wallet.hint, dirty.wallet.hint + STARTER_BOOSTERS.hint + 1);
   assert.equal(getDailyView(claimed, NOW).hasClaim, false);
   assert.equal(Object.getPrototypeOf(claimed.daily.claims), Object.prototype);
 });

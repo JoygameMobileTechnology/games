@@ -7,8 +7,9 @@ import { rarityForTile, RARITIES } from './rarity.js';
 import { BOOSTER_IDS } from './boosters.js';
 import { createDailyState, normalizeDaily, normalizeWallet, emptyWallet, applyDailyEvent, dayIdFor, validDayId, validEventId, validTimestamp, timestampOf } from './daily-rewards.js';
 import { createRanking, normalizeRanking, advanceRanking, LEAGUES } from './leaderboards.js';
-import { DUEL_COIN_REWARDS, SHOP_CURRENCY_PACKS, emptyCurrencies, normalizeCurrencies, addCurrencies, buyBoosterPack } from './economy.js';
+import { DUEL_COIN_REWARDS, STARTER_BOOSTERS, STARTER_BOOSTER_VERSION, SHOP_CURRENCY_PACKS, emptyCurrencies, normalizeCurrencies, addCurrencies, buyBoosterPack } from './economy.js';
 import { createDailyQuestState, normalizeDailyQuests, ensureDailyQuests, applyDailyQuestEvent, recordDailyQuestGameplay } from './daily-quests.js';
+import { PAIRS_PER_DUEL } from './game-balance.js';
 
 export const PROGRESSION_VERSION = 1;
 export const PROGRESSION_STORAGE_KEY = 'porcelain:progression';
@@ -28,13 +29,23 @@ const bump = (value, amount = 1) => Math.min(Number.MAX_SAFE_INTEGER, value + am
 function freshSeed() {
   try { return globalThis.crypto.getRandomValues(new Uint32Array(1))[0]; } catch { return Math.floor(Math.random() * 0x100000000); }
 }
+const starterReceipt = `starter-boosters:v${STARTER_BOOSTER_VERSION}`;
+const starterSeenReceipt = `${starterReceipt}:seen`;
+export function hasStarterNotice(state) {
+  return Object.hasOwn(state.eventReceipts, starterReceipt) && !Object.hasOwn(state.eventReceipts, starterSeenReceipt);
+}
+function grantStarterBoosters(state, now) {
+  if (Object.hasOwn(state.eventReceipts, starterReceipt)) return state;
+  return { ...state, wallet: Object.fromEntries(BOOSTER_IDS.map(id => [id, bump(state.wallet[id], STARTER_BOOSTERS[id])])),
+    eventReceipts: { ...state.eventReceipts, [starterReceipt]: timestampOf(now) } };
+}
 export function createProgression({ collection = createCollection(), seed = freshSeed() } = {}) {
   const state = { version: PROGRESSION_VERSION, counters: Object.fromEntries(NUMERIC_COUNTER_KEYS.map(key => [key, 0])),
     sets: Object.fromEntries(SET_COUNTER_KEYS.map(key => [key, []])), unlocked: {}, awardedPoints: {}, achievementRewardsVersion: ACHIEVEMENT_REWARDS_VERSION,
     points: 0, wallet: emptyWallet(), currencies: emptyCurrencies(), purchaseReceipts: {}, quests: createDailyQuestState(),
     collection: normalizeCollection(collection), daily: createDailyState(), ranking: createRanking(seed),
     eventReceipts: {}, attemptCursors: {}, completedGameIds: [], pendingRankingPresentation: null, newAchievementIds: [] };
-  return deriveCollectionCounters(state);
+  return grantStarterBoosters(deriveCollectionCounters(state), Date.now());
 }
 function validSetValue(key, value) {
   if (key === 'distinctCollectedMatchKeys') return launchFaces.has(value);
@@ -83,11 +94,16 @@ export function normalizeProgression(value, { collection, now = Date.now(), cold
     state.awardedPoints = record(value.awardedPoints) ? value.awardedPoints : {};
     state.wallet = normalizeWallet(value.wallet);
     state.currencies = normalizeCurrencies(value.currencies);
-    state.quests = normalizeDailyQuests(value.quests);
+    state.quests = normalizeDailyQuests(value.quests, { cold });
     state.purchaseReceipts = Object.fromEntries(Object.entries(record(value.purchaseReceipts) ? value.purchaseReceipts : {}).filter(([id, item]) =>
       validEventId(id) && validEventId(item?.eventId) && validTimestamp(item?.at) && SHOP_CURRENCY_PACKS.some(pack => pack.id === item?.productId))
       .map(([id, item]) => [id, { productId: item.productId, eventId: item.eventId, at: item.at }]));
     state.daily = normalizeDaily(value.daily);
+    if (cold) {
+      state.daily.adAttempts = Object.fromEntries(Object.entries(state.daily.adAttempts).map(([id, attempt]) =>
+        [id, attempt.status === 'pending' ? { ...attempt, status: 'failed' } : attempt]));
+      state.daily.activeAdAttemptId = null;
+    }
     state.sets.distinctLoginDayIds = [...state.daily.loginDayIds];
     state.eventReceipts = Object.fromEntries(Object.entries(record(value.eventReceipts) ? value.eventReceipts : {}).filter(([id, timestamp]) => validEventId(id) && validTimestamp(timestamp)));
     state.attemptCursors = Object.fromEntries(Object.entries(record(value.attemptCursors) ? value.attemptCursors : {}).filter(([id, sequence]) => validEventId(id) && Number.isSafeInteger(sequence) && sequence > 0));
@@ -96,7 +112,7 @@ export function normalizeProgression(value, { collection, now = Date.now(), cold
     state.ranking = normalizeRanking(value.ranking, state.counters.completedWins, state.ranking.seed);
     state.pendingRankingPresentation = cold ? null : normalizePresentation(value.pendingRankingPresentation, state.completedGameIds);
   }
-  state = deriveCollectionCounters(state);
+  state = grantStarterBoosters(deriveCollectionCounters(state), now);
   state.quests = ensureDailyQuests(state.quests, now, state.ranking.seed);
   return awardAchievements(state, timestampOf(now), compatible ? undefined : backfillIds);
 }
@@ -122,7 +138,7 @@ export function saveProgression(state, storage) {
   } catch { return false; }
 }
 function validContext(event) { return validEventId(event.gameId) && launchThemeIds.includes(event.themeId) && rulesets.has(event.rulesetId) && formations.has(event.formationId); }
-function validPairs(value) { return record(value) && ['you', 'ai'].every(actor => safeCount(value[actor]) && value[actor] <= 40) && value.you + value.ai <= 40; }
+function validPairs(value) { return record(value) && ['you', 'ai'].every(actor => safeCount(value[actor]) && value[actor] <= PAIRS_PER_DUEL) && value.you + value.ai <= PAIRS_PER_DUEL; }
 function countersValid(values, allowed) { return values == null || record(values) && Object.entries(values).every(([key, value]) => allowed.has(key) && safeCount(value)); }
 function receipt(state, event, now) { return { ...state, eventReceipts: { ...state.eventReceipts, [event.eventId]: now } }; }
 function unique(values, item) { return values.includes(item) ? values : [...values, item]; }
@@ -131,13 +147,16 @@ function unique(values, item) { return values.includes(item) ? values : [...valu
 export function reduceProgression(state, event) {
   if (state?.version !== PROGRESSION_VERSION || !record(event)) return state;
   const now = timestampOf(event.now);
+  if (['daily-ad-start', 'quest-ad-start'].includes(event.type) &&
+      [state.daily.adAttempts, state.quests.adAttempts].some(attempts => Object.values(attempts ?? {}).some(attempt => attempt.status === 'pending'))) return state;
   if (event.type === 'achievements-seen') {
     const seen = new Set((Array.isArray(event.ids) ? event.ids : []).filter(isAchievementId));
     const remaining = state.newAchievementIds.filter(id => !seen.has(id));
     return remaining.length === state.newAchievementIds.length ? state : { ...state, newAchievementIds: remaining };
   }
+  if (event.type === 'starter-seen') return hasStarterNotice(state) ? { ...state, eventReceipts: { ...state.eventReceipts, [starterSeenReceipt]: now } } : state;
   if (event.type === 'ranking-presented') return consumeRankingPresentation(state);
-  if (['quests-presented', 'quest-claim', 'quest-reroll'].includes(event.type)) {
+  if (['quests-presented', 'quest-claim', 'quest-reroll', 'quest-ad-start', 'quest-ad-complete'].includes(event.type)) {
     if (event.type !== 'quests-presented' && (!validEventId(event.eventId) || Object.hasOwn(state.eventReceipts, event.eventId))) return state;
     const result = applyDailyQuestEvent(state.quests, event, state.ranking.seed);
     if (!result.accepted) return state;
@@ -148,7 +167,7 @@ export function reduceProgression(state, event) {
   if (['shop-buy', 'shop-purchase-simulated'].includes(event.type)) {
     if (!validEventId(event.eventId) || Object.hasOwn(state.eventReceipts, event.eventId)) return state;
     if (event.type === 'shop-buy') {
-      const exchange = buyBoosterPack(state.currencies, state.wallet, event.productId);
+      const exchange = buyBoosterPack(state.currencies, state.wallet, event.productId, event.payment);
       return exchange ? receipt({ ...state, ...exchange }, event, now) : state;
     }
     // Testing adapter only. The UI explicitly confirms that no payment is taken.
@@ -165,7 +184,7 @@ export function reduceProgression(state, event) {
     const quests = event.type === 'login' ? ensureDailyQuests(state.quests, now, state.ranking.seed) : state.quests;
     if (result.daily === state.daily && quests === state.quests) return state;
     const wallet = Object.fromEntries(BOOSTER_IDS.map(id => [id, bump(state.wallet[id], result.grants[id])]));
-    let next = { ...state, daily: result.daily, wallet, quests, sets: { ...state.sets, distinctLoginDayIds: [...result.daily.loginDayIds] } };
+    let next = { ...state, daily: result.daily, wallet, currencies: addCurrencies(state.currencies, { coins: result.grants.coins }), quests, sets: { ...state.sets, distinctLoginDayIds: [...result.daily.loginDayIds] } };
     if (validEventId(event.eventId)) next = receipt(next, event, now);
     return awardAchievements(next, now);
   }
@@ -196,7 +215,7 @@ export function reduceProgression(state, event) {
   }
   if (event.type === 'complete') {
     const finalPairs = event.finalPairs ?? event.afterPairs;
-    if (!validContext(event) || !validPairs(finalPairs) || finalPairs.you + finalPairs.ai !== 40 || state.completedGameIds.includes(event.gameId)) return state;
+    if (!validContext(event) || !validPairs(finalPairs) || finalPairs.you + finalPairs.ai !== PAIRS_PER_DUEL || state.completedGameIds.includes(event.gameId)) return state;
     const outcome = finalPairs.you > finalPairs.ai ? 'win' : finalPairs.you < finalPairs.ai ? 'lose' : 'tie';
     if (event.outcome !== outcome) return state;
     const counters = { ...state.counters, completedDuels: bump(state.counters.completedDuels), completedWins: bump(state.counters.completedWins, Number(outcome === 'win')) };

@@ -1,4 +1,5 @@
 import { ACHIEVEMENTS, achievementProgress, awardedAchievementPoints, getCounter, isAchievementId } from './achievements.js';
+import { PAIRS_PER_DUEL } from './game-balance.js';
 
 export const ACHIEVEMENT_SHELVES = Object.freeze([
   { id: 'duels', name: 'Duels', description: 'Time at the table, well played.', artKey: 'duelist' },
@@ -12,7 +13,7 @@ export const ACHIEVEMENT_SHELVES = Object.freeze([
 // A family always shares one qualifying counter. Similar-looking conditions
 // remain separate, so existing saves and the exact rules behind each unlock hold.
 const familyDetails = [
-  ['completedDuels', 'completed-duels', 'Duelist', 'duels', 'duelist', 'Complete duels by clearing all 40 pairs. Wins, losses and draws all count.'],
+  ['completedDuels', 'completed-duels', 'Duelist', 'duels', 'duelist', `Complete duels by clearing all ${PAIRS_PER_DUEL} pairs. Wins, losses and draws all count.`],
   ['completedWins', 'duel-wins', 'Winning Form', 'duels', 'banner', 'Win completed duels and build your record at the table.'],
   ['personalPairs', 'matched-pairs', 'Pair Collector', 'duels', 'bamboo', 'Match pairs across your duels. Every pair you find adds to your progress.'],
   ['bestPairChain', 'pair-chain', 'Find Your Flow', 'memory', 'ribbon', 'Build your longest run of pairs without a mismatch in one duel.'],

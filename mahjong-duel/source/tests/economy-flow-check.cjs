@@ -70,29 +70,31 @@ const output = path.resolve('tmp/economy-qa');
     assert.ok(!view.quests.some(q => q.id === replaced.id));
     await advance(3000); assert.equal(await heading('Daily Quests').count(), 1, 'Quests stay open');
     await page.screenshot({ path: path.join(output, `${browserName}-quests.jpg`), animations: 'disabled' });
-    await tap('Back to main menu'); await page.reload(); await advance();
+    await tap('Back to main menu'); await advance();
+    await heading('Your starter boosters').waitFor(); await tap('Got it');
+    await page.reload(); await advance();
     await button('Play Duel').waitFor();
     assert.equal(await heading('Daily Quests').count(), 0, 'Daily auto presentation occurs once');
     assert.equal(getDailyQuestView(await stored(), time.getTime()).rerollsLeft, 0);
     await tap('Shop'); await heading('Shop').waitFor();
-    assert.equal(await page.locator('[data-shop-product="hint-single"]').isDisabled(), true);
-    await tap(page.locator('[data-shop-product="travelers-purse"]')); await tap('Cancel');
+    assert.equal(await page.locator('[data-shop-product="hint-single"][data-shop-payment="primary"]').isDisabled(), true);
+    await tap(page.locator('[data-shop-product="jade-chest"]')); await tap('Cancel');
     assert.deepEqual((await stored()).currencies, { coins: 0, gems: 0 });
-    await tap(page.locator('[data-shop-product="travelers-purse"]')); await tap('Test purchase');
+    await tap(page.locator('[data-shop-product="jade-chest"]')); await tap('Test purchase');
     await heading('Shop').waitFor(); state = await stored();
-    assert.deepEqual(state.currencies, { coins: 500, gems: 50 });
+    assert.deepEqual(state.currencies, { coins: 2000, gems: 90 });
     assert.equal(Object.keys(state.purchaseReceipts).length, 1);
     const beforeBoosters = state.wallet;
-    await tap(page.locator('[data-shop-product="duel-kit"]')); await tap('Confirm purchase');
-    state = await stored(); assert.deepEqual(state.currencies, { coins: 350, gems: 38 });
-    for (const kind of ['hint','shuffle','freeze','eagle']) assert.equal(state.wallet[kind], beforeBoosters[kind] + 1);
+    await tap(page.locator('[data-shop-product="duel-kit"][data-shop-payment="primary"]')); await tap('Confirm purchase');
+    state = await stored(); assert.deepEqual(state.currencies, { coins: 800, gems: 50 });
+    for (const kind of ['hint','shuffle','freeze','eagle']) assert.equal(state.wallet[kind], beforeBoosters[kind] + 3);
     await page.screenshot({ path: path.join(output, `${browserName}-shop.jpg`), animations: 'disabled' });
     await tap('Back to main menu'); await page.reload(); await advance();
-    assert.deepEqual((await stored()).currencies, { coins: 350, gems: 38 });
+    assert.deepEqual((await stored()).currencies, { coins: 800, gems: 50 });
     await tap('Play Duel'); await heading('Choose a theme').waitFor(); await tap('Play Duel');
     await advance(4000); await advance(1500);
     await page.locator('.game-board').waitFor(); await advance(1500);
-    for (let matched = 0; matched < 40; matched++) {
+    for (let matched = 0; matched < 30; matched++) {
       let pair;
       for (let retry = 0; retry < 20 && !pair; retry++) {
         pair = await page.locator('.game-tile[data-free="true"][aria-disabled="false"]').evaluateAll(nodes => {
@@ -105,14 +107,15 @@ const output = path.resolve('tmp/economy-qa');
       }
       assert.ok(pair, `Match ${matched + 1} available`);
       await tapTile(pair[0]); await tapTile(pair[1]);
-      for (let retry = 0; retry < 20 && await page.locator('.game-tile').count() > 80 - 2 * (matched + 1); retry++) await advance(200);
-      assert.equal(await page.locator('.game-tile').count(), 80 - 2 * (matched + 1));
-      if (matched === 20) assert.equal((await stored()).currencies.coins, 350, 'No reward before full board cleared');
+      for (let retry = 0; retry < 20 && await page.locator('.game-tile').count() > 60 - 2 * (matched + 1); retry++) await advance(200);
+      assert.equal(await page.locator('.game-tile').count(), 60 - 2 * (matched + 1));
+      if (matched === 15) assert.equal((await stored()).currencies.coins, 800, 'No reward before full board cleared');
     }
     for (let retry = 0; retry < 30 && !await heading('Victory!').count(); retry++) await advance(1000);
     await heading('Victory!').waitFor();
     assert.match(await page.locator('.result-currency-reward').textContent(), /\+100 Coins/);
-    state = await stored(); assert.deepEqual(state.currencies, { coins: 450, gems: 38 });
+    assert.ok(await page.locator('.collection-progress-summary').isVisible());
+    state = await stored(); assert.deepEqual(state.currencies, { coins: 900, gems: 50 });
     assert.equal(state.counters.completedDuels, 1);
     await tap('Continue'); await heading('Leaderboards').waitFor(); await advance(4000);
     await tap('Back to main menu'); await tap(page.locator('.quests-menu-control'));
@@ -120,8 +123,8 @@ const output = path.resolve('tmp/economy-qa');
     state = await stored(); view = getDailyQuestView(state, time.getTime());
     const completed = view.quests.filter(q => q.completed && !q.claimed);
     assert.ok(completed.length >= 1, 'Full win completes at least one quest');
-    const expected = completed.reduce((sum,q) => ({ coins: sum.coins + q.reward.coins, gems: sum.gems + q.reward.gems }), { coins: 450, gems: 38 });
-    for (const q of completed) await tap(page.getByRole('article', { name: `${q.title}, ${q.difficulty[0].toUpperCase() + q.difficulty.slice(1)} quest`, exact: true }).getByRole('button', { name: 'Claim', exact: true }));
+    const expected = completed.reduce((sum,q) => ({ coins: sum.coins + q.reward.coins * (q === completed[0] ? 2 : 1), gems: sum.gems + q.reward.gems * (q === completed[0] ? 2 : 1) }), { coins: 900, gems: 50 });
+    for (const q of completed) await tap(page.getByRole('article', { name: `${q.title}, ${q.difficulty[0].toUpperCase() + q.difficulty.slice(1)} quest`, exact: true }).getByRole('button', { name: q === completed[0] ? /Claim 2×/ : 'Claim', exact: q !== completed[0] }));
     assert.deepEqual((await stored()).currencies, expected);
     assert.equal(await heading('Daily Quests').count(), 1, 'Claims do not close quests');
     assert.equal(await button('Claim').count(), 0);
@@ -135,7 +138,7 @@ const output = path.resolve('tmp/economy-qa');
     assert.deepEqual((await stored()).currencies, expected, 'Balances survive daily reset');
     assert.deepEqual(errors, []);
     fs.writeFileSync(path.join(output, `${browserName}-flow-report.json`), JSON.stringify({ browserName, quests: completed.map(q => q.id), currencies: expected, errors }, null, 2));
-    console.log(`PASS ${browserName}: daily flow, reroll, simulated purchase, booster spending, 40-pair victory, quest claims, persistence and midnight reset`);
+    console.log(`PASS ${browserName}: daily flow, reroll, simulated purchase, booster spending, 30-pair victory, quest claims, persistence and midnight reset`);
   } catch (error) {
     await page.screenshot({ path: path.join(output, `${browserName}-failure.jpg`), animations: 'disabled' }).catch(() => {}); throw error;
   } finally { await browser.close(); }

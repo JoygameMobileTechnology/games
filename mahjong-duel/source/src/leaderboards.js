@@ -1,6 +1,6 @@
 import { AVATAR_IDS, DEFAULT_PROFILE } from './profile-store.js';
 
-export const RANKING_CONFIG = Object.freeze({ initialPosition: 10000, winRate: .02, aroundRows: 7, topRows: 10 });
+export const RANKING_CONFIG = Object.freeze({ initialPosition: 10000, initialWinGain: 1500, gainExponent: 1.5, aroundRows: 7, topRows: 10 });
 export const LEAGUES = Object.freeze([
   { id: 'bronze', name: 'Bronze', minWins: 0, color: '#b77943' },
   { id: 'silver', name: 'Silver', minWins: 10, color: '#96a6b2' },
@@ -26,10 +26,16 @@ export function normalizeRanking(value, completedWins = 0, seed = 1) {
   ranking.leagueId = leagueForWins(ranking.wins).id;
   return ranking;
 }
+/** Large opening gains taper smoothly with position; first place is the floor. */
+export function rankGainForWin(position) {
+  if (!Number.isSafeInteger(position) || position < 1 || position > RANKING_CONFIG.initialPosition) return 0;
+  const gain = Math.round(RANKING_CONFIG.initialWinGain * (position / RANKING_CONFIG.initialPosition) ** RANKING_CONFIG.gainExponent);
+  return Math.min(position - 1, Math.max(1, gain));
+}
 export function advanceRanking(ranking, { outcome, wins, eventId, gameId, newAchievementIds = [] }) {
   const previousPosition = ranking.position;
   const previousLeagueId = ranking.leagueId;
-  const gain = outcome === 'win' ? Math.max(1, Math.round(previousPosition * RANKING_CONFIG.winRate)) : 0;
+  const gain = outcome === 'win' ? rankGainForWin(previousPosition) : 0;
   const position = Math.max(1, previousPosition - gain);
   const leagueId = leagueForWins(wins).id;
   return {
@@ -58,7 +64,7 @@ export function rankingRows(state, profile = DEFAULT_PROFILE, { view = 'around' 
     if (position === ranking.position) return { id: 'local-player', position, name: profile.name || DEFAULT_PROFILE.name,
       avatarId: AVATAR_IDS.includes(profile.avatarId) ? profile.avatarId : DEFAULT_PROFILE.avatarId, wins: ranking.wins, isPlayer: true };
     const identity = hash(ranking.seed, position);
-    const distance = Math.ceil((ranking.position - position) / Math.max(1, Math.round(ranking.position * RANKING_CONFIG.winRate)));
+    const distance = Math.ceil((ranking.position - position) / Math.max(1, rankGainForWin(ranking.position)));
     return { id: `competitor-${position}`, position,
       name: `${firstNames[identity % firstNames.length]} ${lastNames[(identity >>> 8) % lastNames.length]}`,
       avatarId: AVATAR_IDS[(identity >>> 16) % AVATAR_IDS.length], wins: Math.max(0, ranking.wins + distance), isPlayer: false };

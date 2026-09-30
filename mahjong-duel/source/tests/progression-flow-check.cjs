@@ -68,7 +68,7 @@ const origin = process.env.GAME_URL || 'http://localhost:5173';
     await button('Hint, 2 uses left').click();
     assert.equal((await state()).wallet.hint,1);
     // Use actual pointer actions. Test automation may inspect image identities; the game remains face-down.
-    for (let matched=0; matched<40; matched++) {
+    for (let matched=0; matched<30; matched++) {
       await page.waitForFunction(() => {
         const free=[...document.querySelectorAll('.game-tile[data-free="true"][aria-disabled="false"]')];
         return free.some((a,i)=>free.slice(i+1).some(b=>a.querySelector('.tile-front img').src===b.querySelector('.tile-front img').src));
@@ -79,27 +79,27 @@ const origin = process.env.GAME_URL || 'http://localhost:5173';
         }
       });
       await tap(pair[0]); await tap(pair[1]);
-      await page.waitForFunction(expected => document.querySelectorAll('.game-tile').length === expected, 80-(matched+1)*2);
+      await page.waitForFunction(expected => document.querySelectorAll('.game-tile').length === expected, 60-(matched+1)*2);
       if(matched===14) await capture('phenomenal');
-      if(matched===20) {
-        assert.equal((await state()).counters.completedWins,0,'21st pair alone is not a completed win');
+      if(matched===15) {
+        assert.equal((await state()).counters.completedWins,0,'16th pair alone is not a completed win');
         await capture('victory-secured');
       }
     }
     await page.getByRole('dialog',{name:'Game results'}).waitFor();
     const won = await state();
-    assert.equal(won.counters.personalPairs,40); assert.equal(won.counters.completedDuels,1); assert.equal(won.counters.completedWins,1);
-    assert.equal(won.counters.bestPairChain,40); assert.equal(won.ranking.position,9800);
+    assert.equal(won.counters.personalPairs,30); assert.equal(won.counters.completedDuels,1); assert.equal(won.counters.completedWins,1);
+    assert.equal(won.counters.bestPairChain,30); assert.equal(won.ranking.position,8500);
     assert.ok(won.pendingRankingPresentation); assert.equal(await page.locator('.leaderboards-page').count(),0);
     await capture('result-before-rank');
     await page.waitForTimeout(1000); assert.equal((await state()).counters.completedWins,1);
     await button('Continue').click(); await page.getByRole('heading',{name:'Leaderboards',exact:true}).waitFor();
     assert.equal((await state()).pendingRankingPresentation,null); await capture('rank-win');
     await button('Back to main menu').click(); await button('Leaderboards').click();
-    assert.equal(await page.locator('.is-climbing').count(),0); assert.equal((await state()).ranking.position,9800);
+    assert.equal(await page.locator('.is-climbing').count(),0); assert.equal((await state()).ranking.position,8500);
     await button('Back to main menu').click(); await page.reload(); await button('Play Duel').waitFor();
     assert.equal((await state()).counters.completedWins,1); assert.equal((await state()).pendingRankingPresentation,null);
-    pass('40 real pointer matches award once; result precedes one-use leaderboards; reload keeps progress and discards presentation');
+    pass('30 real pointer matches award once; result precedes one-use leaderboards; reload keeps progress and discards presentation');
     await button('Achievements').click();
     assert.equal(await page.getByLabel('Search achievements').isVisible(),false);
     assert.equal(await button('Filter achievements').count(),0);

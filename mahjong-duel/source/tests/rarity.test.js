@@ -21,7 +21,7 @@ test('all 720 faces have a curated rarity with progressively smaller tiers', () 
   assert.equal(total, 720);
 });
 
-test('rarity metadata matches the four cosmetic tiers', () => {
+test('rarity metadata matches the four artwork tiers', () => {
   assert.deepEqual(RARITIES.map(({ id, label, code, order }) => ({ id, label, code, order })), [
     { id: 'marble', label: 'Marble', code: 'M', order: 0 },
     { id: 'sapphire', label: 'Sapphire', code: 'S', order: 1 },
@@ -31,7 +31,7 @@ test('rarity metadata matches the four cosmetic tiers', () => {
   assert.ok(Object.isFrozen(RARITIES));
   for (const rarity of RARITIES) {
     assert.ok(!Object.hasOwn(rarity, 'points'), 'rarity must not change scoring');
-    assert.ok(!Object.hasOwn(rarity, 'weight'), 'rarity must not change draw odds');
+    assert.ok(!Object.hasOwn(rarity, 'weight'), 'deal quotas are configured separately from artwork metadata');
   }
 });
 

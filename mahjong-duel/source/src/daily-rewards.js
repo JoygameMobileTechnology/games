@@ -2,11 +2,20 @@ import { BOOSTER_IDS } from './boosters.js';
 
 export const DAY_POLICY = { id: 'utc', dayId: timestamp => new Date(timestamp).toISOString().slice(0, 10) };
 export const DAILY_REWARD_CONFIG = Object.freeze({
+  weekly: Object.freeze([{ hint: 1 }, { coins: 25, shuffle: 1 }, { coins: 30, eagle: 1 }, { coins: 40 },
+    { coins: 50, hint: 1 }, { coins: 60 }, { freeze: 1 }].map(Object.freeze)),
+  longEvery: 30, longReward: Object.freeze({ shuffle: 1, hint: 1, freeze: 1, eagle: 1 }),
+});
+// Older states may omit the entitlement's reward snapshot. Honor the schedule
+// under which those login days were earned instead of retroactively repricing them.
+const LEGACY_DAILY_REWARD_CONFIG = Object.freeze({
   weekly: Object.freeze([{ hint: 1 }, { shuffle: 1 }, { freeze: 1 }, { eagle: 1 }, { hint: 2 }, { shuffle: 2 },
     { shuffle: 2, hint: 2, freeze: 2, eagle: 2 }].map(Object.freeze)),
   longEvery: 30, longReward: Object.freeze({ shuffle: 5, hint: 5, freeze: 5, eagle: 5 }),
 });
 export const emptyWallet = () => Object.fromEntries(BOOSTER_IDS.map(id => [id, 0]));
+const REWARD_IDS = [...BOOSTER_IDS, 'coins'];
+export const emptyRewards = () => Object.fromEntries(REWARD_IDS.map(id => [id, 0]));
 export const validTimestamp = value => Number.isSafeInteger(value) && value >= 0 && value <= 8640000000000000;
 export const timestampOf = value => validTimestamp(value instanceof Date ? value.getTime() : value) ? Number(value) : Date.now();
 export const validEventId = value => typeof value === 'string' && value.length > 0 && value.length <= 200 &&
@@ -21,11 +30,14 @@ export function dayIdFor(now = Date.now(), policy = DAY_POLICY) { return policy.
 export function normalizeWallet(value) {
   return Object.fromEntries(BOOSTER_IDS.map(id => [id, Number.isSafeInteger(value?.[id]) && value[id] >= 0 ? value[id] : 0]));
 }
-const add = (first, second, multiplier = 1) => Object.fromEntries(BOOSTER_IDS.map(id => [id,
-  Math.min(Number.MAX_SAFE_INTEGER, first[id] + (second[id] ?? 0) * multiplier)]));
+export function normalizeRewards(value) {
+  return Object.fromEntries(REWARD_IDS.map(id => [id, Number.isSafeInteger(value?.[id]) && value[id] >= 0 ? value[id] : 0]));
+}
+const add = (first, second, multiplier = 1) => Object.fromEntries(REWARD_IDS.map(id => [id,
+  Math.min(Number.MAX_SAFE_INTEGER, (first[id] ?? 0) + (second[id] ?? 0) * multiplier)]));
 export function rewardsForLogin(loginNumber, config = DAILY_REWARD_CONFIG) {
-  if (!Number.isSafeInteger(loginNumber) || loginNumber < 1) return emptyWallet();
-  const weekly = normalizeWallet(config.weekly[(loginNumber - 1) % config.weekly.length]);
+  if (!Number.isSafeInteger(loginNumber) || loginNumber < 1) return emptyRewards();
+  const weekly = normalizeRewards(config.weekly[(loginNumber - 1) % config.weekly.length]);
   return loginNumber % config.longEvery === 0 ? add(weekly, config.longReward) : weekly;
 }
 export function createDailyState() {
@@ -38,7 +50,7 @@ export function normalizeDaily(value) {
   daily.loginDayIds.forEach((dayId, index) => {
     const id = `login:${dayId}`, stored = ownValue(value?.entitlements, id);
     daily.entitlements[id] = { id, dayId, loginNumber: index + 1,
-      rewards: stored?.rewards && typeof stored.rewards === 'object' ? normalizeWallet(stored.rewards) : rewardsForLogin(index + 1) };
+      rewards: stored?.rewards && typeof stored.rewards === 'object' ? normalizeRewards(stored.rewards) : rewardsForLogin(index + 1, LEGACY_DAILY_REWARD_CONFIG) };
   });
   for (const [id, receipt] of Object.entries(value?.claimReceipts && typeof value.claimReceipts === 'object' ? value.claimReceipts : {})) {
     if (!validEventId(id) || ![1, 2].includes(receipt?.multiplier) || !validTimestamp(receipt?.at) || !Array.isArray(receipt?.entitlementIds)) continue;
@@ -57,10 +69,10 @@ export function normalizeDaily(value) {
 }
 function pendingEntitlements(daily) { return Object.values(daily.entitlements).filter(item => !ownValue(daily.claims, item.id)); }
 function claim(daily, ids, eventId, multiplier, now) {
-  if (!validEventId(eventId) || ownValue(daily.claimReceipts, eventId)) return { daily, grants: emptyWallet() };
+  if (!validEventId(eventId) || ownValue(daily.claimReceipts, eventId)) return { daily, grants: emptyRewards() };
   const eligible = [...new Set(ids)].filter(id => ownValue(daily.entitlements, id) && !ownValue(daily.claims, id));
-  if (!eligible.length) return { daily, grants: emptyWallet() };
-  let grants = emptyWallet();
+  if (!eligible.length) return { daily, grants: emptyRewards() };
+  let grants = emptyRewards();
   const claims = { ...daily.claims };
   eligible.forEach(id => {
     grants = add(grants, daily.entitlements[id].rewards, multiplier);
@@ -71,7 +83,7 @@ function claim(daily, ids, eventId, multiplier, now) {
 
 /** Pure daily transition: ad starts snapshot IDs; only confirmed completion pays that snapshot. */
 export function applyDailyEvent(daily, event) {
-  const now = timestampOf(event.now), empty = { daily, grants: emptyWallet() };
+  const now = timestampOf(event.now), empty = { daily, grants: emptyRewards() };
   if (event.type === 'login') {
     const dayId = dayIdFor(now);
     if (!validDayId(dayId) || daily.loginDayIds.includes(dayId)) return empty;
@@ -103,7 +115,7 @@ export function applyDailyEvent(daily, event) {
 export function getDailyView(state, now = Date.now()) {
   const daily = state?.daily ?? createDailyState(), loginDays = daily.loginDayIds.length, dayId = dayIdFor(now);
   const entitlements = pendingEntitlements(daily);
-  const rewards = entitlements.reduce((total, item) => add(total, item.rewards), emptyWallet());
+  const rewards = entitlements.reduce((total, item) => add(total, item.rewards), emptyRewards());
   return { loginDays, weeklyDay: loginDays ? (loginDays - 1) % DAILY_REWARD_CONFIG.weekly.length + 1 : 0,
     longDay: loginDays ? (loginDays - 1) % DAILY_REWARD_CONFIG.longEvery + 1 : 0, entitlements, rewards,
     hasClaim: entitlements.length > 0, claimedToday: Boolean(ownValue(daily.claims, `login:${dayId}`)),

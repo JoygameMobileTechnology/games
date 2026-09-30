@@ -35,6 +35,7 @@
 .theme-choice-lock > span { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .theme-choice-lock strong { font-size: 12px; line-height: 1.35; font-weight: 700; }
 .theme-choice-lock small { font-size: 11px; line-height: 1.4; color: #fff1d6; }
+.theme-choice-lock progress { width: 100%; height: 5px; margin-top: 2px; }
 .theme-choice-footer { flex-shrink: 0; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 13px 23px max(10px,env(safe-area-inset-bottom)); background: linear-gradient(#f8e8c5ee,#f8e5bd); border-top: 1px solid #d5b887; box-shadow: 0 -6px 14px #76562b14; z-index: 1; }
 .theme-choice-play.progression-primary { max-width: 570px; min-height: 54px; border: 2px solid #d4ae63; border-radius: 13px; background: repeating-linear-gradient(8deg,#ffffff05 0 1px,transparent 1px 5px),linear-gradient(130deg,#1c6f52,#12553e); box-shadow: inset 0 0 0 2px #739566,inset 0 0 0 3px #1e6645,0 3px #795729,0 5px 6px #76532033; font: 700 30px/1 'Cormorant Garamond',Georgia,serif; }
 .theme-choice-play > svg { flex-shrink: 0; }
@@ -47,6 +48,8 @@
 .theme-unlock-edition { color: #947347; font-size: 11px; font-weight: 700; }
 .theme-unlock-total { width: 100%; display: flex; flex-direction: column; gap: 8px; padding: 6px 0; max-width: 470px; }
 .theme-unlock-total strong { font-size: 14px; color: #603b20; }
+.theme-unlock-total strong > span { margin-left: 8px; color: #397343; font-variant-numeric: tabular-nums; }
+.theme-unlock-total > small { font-size: 11px; color: #86653e; }
 .theme-unlock-total progress { height: 12px; }
 .theme-unlock-intro p.theme-unlock-help { font-size: 11px; line-height: 1.5; color: #98754c; }
 .theme-unlock-intro p.theme-unlock-prerequisite { display: flex; align-items: center; justify-content: center; gap: 9px; width: 100%; padding: 11px 13px; border-block: 1px solid #caac77; color: #765024; background: #efdfb980; font-size: 12px; text-align: left; }
@@ -64,6 +67,7 @@
 .theme-goal-fraction { display: flex; flex-direction: column; align-items: flex-end; gap: 7px; flex-shrink: 0; }
 .theme-goal-fraction > strong { font-size: 18px; font-variant-numeric: tabular-nums; color: #6d4220; }
 .theme-goal-fraction > span { display: flex; align-items: center; gap: 4px; font-size: 10px; color: #876540; }
+.theme-goal-fraction > small { margin-top: -4px; color: #876540; font-size: 9px; }
 .theme-unlock-goal.is-complete .theme-goal-fraction { color: #337448; }
 .theme-goal-progress { padding: 0 12px 11px; }
 .theme-goal-progress progress { display: block; height: 5px; }

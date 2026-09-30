@@ -6,7 +6,7 @@ import { createProgression, normalizeProgression, reduceProgression, saveProgres
 const NOW = Date.UTC(2026, 8, 30, 10);
 const fresh = () => createProgression({ seed: 42 });
 const finish = (outcome, gameId = outcome) => ({ type: 'complete', gameId, eventId: `${gameId}:complete`, themeId: 'ming-porcelain', rulesetId: 'eastern', formationId: 'crown', outcome,
-  finalPairs: outcome === 'win' ? { you: 21, ai: 19 } : outcome === 'lose' ? { you: 19, ai: 21 } : { you: 20, ai: 20 }, now: NOW });
+  finalPairs: outcome === 'win' ? { you: 16, ai: 14 } : outcome === 'lose' ? { you: 14, ai: 16 } : { you: 15, ai: 15 }, now: NOW });
 const purchase = (productId = 'gems-pouch', id = 'one') => ({ type: 'shop-purchase-simulated', productId, transactionId: `transaction:${id}`, eventId: `purchase:${id}`, now: NOW });
 const memoryStorage = () => {
   const values = new Map();
@@ -20,7 +20,9 @@ test('currency migration starts at zero and preserves old boosters, wins, collec
   legacy.completedGameIds = ['old-win']; legacy.eventReceipts = { old: NOW - 1000 };
   const migrated = normalizeProgression(legacy, { now: NOW });
   assert.deepEqual(migrated.currencies, { coins: 0, gems: 0 });
-  for (const key of ['wallet', 'collection', 'counters', 'eventReceipts', 'completedGameIds']) assert.deepEqual(migrated[key], legacy[key]);
+  assert.deepEqual(migrated.wallet, Object.fromEntries(Object.entries(legacy.wallet).map(([key, value]) => [key, value + 2])));
+  assert.deepEqual(migrated.eventReceipts, { ...legacy.eventReceipts, 'starter-boosters:v1': NOW });
+  for (const key of ['collection', 'counters', 'completedGameIds']) assert.deepEqual(migrated[key], legacy[key]);
   assert.strictEqual(reduceProgression(migrated, finish('win', 'old-win')), migrated);
 });
 
@@ -28,7 +30,8 @@ test('only completed valid boards pay win100, lose20 or tie50, exactly once', ()
   assert.deepEqual(DUEL_COIN_REWARDS, { win: 100, lose: 20, tie: 50 });
   let state = fresh();
   const invalid = [finish('win'), finish('lose'), finish('tie')].flatMap(event => [
-    { ...event, finalPairs: { you: 21, ai: 0 } }, { ...event, outcome: 'incorrect' }, { ...event, themeId: 'missing' },
+    { ...event, finalPairs: { you: 16, ai: 0 } }, { ...event, outcome: 'incorrect' }, { ...event, themeId: 'missing' },
+    { ...event, finalPairs: { you: 21, ai: 19 } },
   ]);
   for (const event of invalid) assert.strictEqual(reduceProgression(state, event), state);
   for (const outcome of ['win', 'lose', 'tie']) {
@@ -48,7 +51,7 @@ test('currency packs require the explicitly simulated event and deduplicate tran
     assert.strictEqual(reduceProgression(state, invalid), state);
   }
   const bought = reduceProgression(state, event);
-  assert.deepEqual(bought.currencies, { coins: 0, gems: 15 });
+  assert.deepEqual(bought.currencies, { coins: 0, gems: 20 });
   assert.deepEqual(bought.wallet, state.wallet);
   assert.strictEqual(reduceProgression(bought, event), bought);
   assert.strictEqual(reduceProgression(bought, { ...event, eventId: 'different-event' }), bought);
@@ -59,11 +62,11 @@ test('currency packs require the explicitly simulated event and deduplicate tran
   assert.deepEqual(restored.purchaseReceipts, bought.purchaseReceipts);
   assert.strictEqual(reduceProgression(restored, { ...event, eventId: 'different-after-reload' }), restored);
   const again = reduceProgression(restored, purchase('gems-pouch', 'two'));
-  assert.deepEqual(again.currencies, { coins: 0, gems: 30 });
+  assert.deepEqual(again.currencies, { coins: 0, gems: 40 });
 });
 
 test('single and mixed-cost booster packs exchange balances and inventory atomically', () => {
-  let state = reduceProgression(fresh(), purchase('jade-chest'));
+  let state = { ...fresh(), currencies: { coins: 100000, gems: 10000 } };
   for (const pack of SHOP_BOOSTER_PACKS) {
     const before = structuredClone(state), event = { type: 'shop-buy', productId: pack.id, eventId: `buy:${pack.id}`, now: NOW };
     state = reduceProgression(state, event);

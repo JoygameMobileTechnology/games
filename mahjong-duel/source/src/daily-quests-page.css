@@ -115,3 +115,10 @@
   .daily-quest-wood-button,.daily-quest-claim > span,.daily-quest-claimed > span { width: 60px; height: 60px; }
   .daily-quest-reward { gap: 20px; }.daily-quest-reward > strong { font-size: 15px; }.daily-quest-reward .economy-amounts { gap: 12px; }.daily-quest-reward .currency-icon { --currency-icon-size: 38px; }.daily-quest-reward .economy-amounts strong { font-size: 18px; }
 }
+
+.daily-quest-claim-options { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1.5fr); gap: 9px; margin-top: 12px; }
+.daily-quest-claim-options > button { min-height: 52px; padding: 8px; font-size: 14px; }
+.daily-quest-double { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; background: linear-gradient(#ffebac,#f2cf86); }
+.daily-quest-double > span { display: flex; align-items: center; justify-content: center; gap: 5px; font-weight: 800; }
+.daily-quest-double > small { font-size: 10px; line-height: 1.4; }
+@media (min-width: 600px) { .daily-quest-claim-options > button { font-size: 16px; }.daily-quest-double > small { font-size: 11px; } }

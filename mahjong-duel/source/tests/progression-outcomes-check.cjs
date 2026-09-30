@@ -91,7 +91,7 @@ fs.mkdirSync(output, { recursive: true });
           if (view.result) { final = view; break; }
           if (view.you + view.ai >= lastReport + 10) { lastReport = view.you + view.ai; console.log(`${browserName} ${outcome}: ${view.you}-${view.ai}, ${localAttempts} local attempts`); }
           if (view.turn === 'you' && view.free.length >= 2) {
-            const shouldMatch = outcome === 'tie' ? view.you < 20 : view.ai >= 21;
+            const shouldMatch = outcome === 'tie' ? view.you < 15 : view.ai >= 16;
             const choices = [];
             for (let i = 0; i < view.free.length; i++) for (let j = i + 1; j < view.free.length; j++) {
               const first = view.free[i], second = view.free[j];
@@ -117,8 +117,8 @@ fs.mkdirSync(output, { recursive: true });
         assert.equal(progress.ranking.leagueId, 'bronze');
         assert.equal(progress.pendingRankingPresentation.outcome, outcome);
         assert.equal(progress.pendingRankingPresentation.improved, false);
-        assert.equal(final.you + final.ai, 40);
-        if (outcome === 'tie') assert.equal(final.you, 20); else assert.ok(final.ai > final.you);
+        assert.equal(final.you + final.ai, 30);
+        if (outcome === 'tie') assert.equal(final.you, 15); else assert.ok(final.ai > final.you);
         const cues = await page.evaluate(() => window.__observedOutcomeCues);
         assert.ok(cues.every(cue => cue.owner === 'you'));
         assert.ok(!cues.some(cue => cue.id === 'turning_win_secured'), 'AI victory never creates local Accomplished');

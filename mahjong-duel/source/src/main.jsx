@@ -20,10 +20,13 @@ import { GHOST_MEMORY_VERSION } from './ghost.js';
 import { chooseOpponent, matchmakingDelay, MATCH_FOUND_DELAY_MS, OPPONENT_ROSTER } from './matchmaking.js';
 import { MatchmakingPage } from './matchmaking-page.jsx';
 import { AI_MODES, normalizeAiMode, playOpponentTurn, rememberOpponentFaces, advanceOpponentMemory } from './opponent-ai.js';
+import { createRealisticState, planRealisticTurn, chooseRealisticSecond, advanceRealisticState } from './realistic-ai.js';
+import { normalizeRealisticSkill, createRealisticSample, recordRealisticAttempt, evolveRealisticSkill } from './realistic-skill.js';
 import { ProfileEditor, PlayerAvatar, loadProfile, saveProfile } from './player-profile.jsx';
 import { isFrameUnlocked } from './avatar-frames.js';
 import { prepareAchievementArtwork } from './achievement-artwork.js';
 import { VictoryBloom } from './remake-ui.jsx';
+import { CollectionProgressSummary } from './collection-progress-summary.jsx';
 import { ThemeSelectPage } from './theme-select-page.jsx';
 import { choosePlayableTheme } from './theme-unlocks.js';
 import { loadThemePopulation, updateThemePopulation, saveThemePopulation, UPDATE_INTERVAL_MS } from './theme-population.js';
@@ -38,11 +41,11 @@ import { chooseFormationId } from './formations.js';
 import { rarityForTile } from './rarity.js';
 import { TileRarity } from './tile-rarity.jsx';
 import { loadCollection } from './collection.js';
-import { loadProgression, saveProgression, reduceProgression, consumeRankingPresentation } from './progression.js';
+import { loadProgression, saveProgression, reduceProgression, consumeRankingPresentation, hasStarterNotice } from './progression.js';
 import { getDailyView } from './daily-rewards.js';
 import { DailyWelcomePage } from './daily-welcome-page.jsx';
 import { getDailyQuestView } from './daily-quests.js';
-import { DUEL_COIN_REWARDS, SHOP_CURRENCY_PACKS, SHOP_BOOSTER_PACKS } from './economy.js';
+import { DUEL_COIN_REWARDS, STARTER_BOOSTERS, SHOP_CURRENCY_PACKS, SHOP_BOOSTER_PACKS } from './economy.js';
 import { DailyQuestsPage, ShopPage } from './economy-pages.jsx';
 import { CurrencyIcon } from './currency-ui.jsx';
 import { requestRewardedAd } from './rewarded-ad.js';
@@ -51,6 +54,7 @@ import { createGameId } from './game-id.js';
 import { useViewportCompatibility } from './viewport-compat.js';
 import { TileBinder } from './tile-binder.jsx';
 import { createGame, isFree, getAvailablePairs, shuffleBoard, remainingCount } from './engine.js';
+import { PAIRS_PER_DUEL, TILES_PER_DUEL, PAIRS_TO_WIN, POINTS_PER_PAIR, DUEL_TOTAL_SCORE } from './game-balance.js';
 import { chime, tileSmack, unlockAudio } from './sound.js';
 import './style.css';
 import './board-art.css';
@@ -62,7 +66,7 @@ import './viewport-compat.css';
 import './phone-ui.css';
 import './phone-dialogs.css';
 import { ProgressionMenuHeader } from './progression-menu.jsx';
-import { DailyRewardsPage, AchievementsPage, LeaderboardsPage } from './progression-pages.jsx';
+import { RewardItems, DailyRewardsPage, AchievementsPage, LeaderboardsPage } from './progression-pages.jsx';
 import { StreakFeedback, StreakPortrait } from './streak-feedback.jsx';
 import { AchievementNotifications } from './achievement-toast.jsx';
 
@@ -203,12 +207,12 @@ function Sheet({ title, subtitle, onClose, children }) {
 
 function Rules({ ruleset, aiMode }) {
   return <div className="rules-content">
-    <div className="rule-step"><span>01</span><div><h3>Flip. Remember. Match.</h3><p>Every stone starts face down. Flip two uncovered stones. Matches leave the board; different faces turn back over after a short pause. Clear all 40 pairs to finish the board.</p></div></div>
+    <div className="rule-step"><span>01</span><div><h3>Flip. Remember. Match.</h3><p>Every stone starts face down. Flip two uncovered stones. Matches leave the board; different faces turn back over after a short pause. Clear all {PAIRS_PER_DUEL} pairs to finish the board.</p></div></div>
     <div className="rule-step"><span>02</span><div><h3>Work from the top.</h3><p>Only a stone with another stone on top is blocked. Neighbors on either side never stop you from flipping. Remember the faces as you uncover new layers.</p></div></div>
     <div className="rule-step"><span>03</span><div><h3>{ruleset === 'eastern' ? 'Know your families.' : 'Trust the picture.'}</h3><p>{ruleset === 'eastern' ? 'Match two identical faces. Counts and tiers form ordered groups; symbols, kin, and anchors are unranked pictures. Sharing a family does not make two different faces a match.' : 'Every pair must show the exact same picture. Each picture has four identical copies.'}</p></div></div>
     <div className="rule-note"><Sword size={24} /><p><strong>Your opponent</strong> is selected from a roster of simulated players with imperfect memory. Match for 100 points and play again. Miss, and the turn passes. The highest score when the board is clear wins.</p></div>
-    <p className="rules-footnote">First to 21 pairs secures the win; keep playing until all 40 pairs are cleared. Your matches collect artwork in your Collection.</p>
-    <p className="rules-footnote"><strong>{aiMode === 'original' ? 'Original AI' : 'Modern AI'}</strong>{' '}{aiMode === 'original' ? 'observes every tile either player reveals. It has a 40% chance of recalling an uncovered known pair, and a 35% chance of recalling a known partner after its first flip. After each pair attempt by either player, each memory has a 25% chance of being forgotten. Otherwise, it guesses among uncovered tiles.' : 'remembers both players’ reveals from the last two completed pair attempts, plus the current attempt. It uses remembered uncovered pairs and partners; otherwise, it guesses among uncovered tiles.'}</p>
+    <p className="rules-footnote">First to {PAIRS_TO_WIN} pairs secures the win; keep playing until all {PAIRS_PER_DUEL} pairs are cleared. Your matches collect artwork in your Collection.</p>
+    <p className="rules-footnote"><strong>{AI_MODES.find(value => value.id === normalizeAiMode(aiMode)).label}</strong>{' '}{normalizeAiMode(aiMode) === 'realistic' ? 'only learns faces that either player reveals. Its memory and recall gradually adapt to your skill between completed duels. It thinks at an uneven pace and can have good matches, bad matches and streaks. It guesses blindly when it cannot remember a match.' : aiMode === 'original' ? 'observes every tile either player reveals. It has a 40% chance of recalling an uncovered known pair, and a 35% chance of recalling a known partner after its first flip. After each pair attempt by either player, each memory has a 25% chance of being forgotten. Otherwise, it guesses among uncovered tiles.' : 'remembers both players’ reveals from the last two completed pair attempts, plus the current attempt. It uses remembered uncovered pairs and partners; otherwise, it guesses among uncovered tiles.'}</p>
     <div className="booster-rules"><h3>Your booster collection</h3><p>Claim Daily Rewards or visit the Shop to get boosters. Unused boosters carry over to your next duel.</p><p><strong>Shuffle</strong> rearranges the stones and clears the opponent’s memory. Automatic board recovery is free.</p><p><strong>Hint</strong> highlights an uncovered matching pair for 1.5 seconds, keeping it face down.</p><p><strong>Freeze</strong> skips the opponent’s next turn after your next miss.</p><p><strong>Eagle Eye</strong> reveals hidden tile rarity glows for 10 seconds.</p></div>
   </div>;
 }
@@ -300,7 +304,9 @@ function App() {
   const [boardThemeId, setBoardThemeId] = useState(() => themeById[store.get('boardTheme', store.get('theme', defaultTheme.id))] ? store.get('boardTheme', store.get('theme', defaultTheme.id)) : defaultTheme.id);
   const [themeId, setThemeId] = useState(() => themeById[store.get('theme', defaultTheme.id)] ? store.get('theme', defaultTheme.id) : defaultTheme.id);
   const [ruleset, setRuleset] = useState(() => store.get('ruleset', 'eastern') === 'western' ? 'western' : 'eastern');
-  const [aiMode, setAiMode] = useState(() => normalizeAiMode(store.get('aiMode', 'modern')));
+  // Select the new default once, then respect every subsequent Settings choice.
+  const [aiMode, setAiMode] = useState(() => store.get('aiModeVersion', 0) === 1 ? normalizeAiMode(store.get('aiMode', 'realistic')) : 'realistic');
+  const realisticSkill = useRef(normalizeRealisticSkill(store.get('realisticSkill', null)));
   const mode = 'duel';
   const [sound, setSound] = useState(() => store.get('sound', true));
   const [pips, setPips] = useState(() => store.get('pips', true));
@@ -337,6 +343,10 @@ function App() {
   }, [matchmaking?.id, matchmaking?.status, pageHidden]);
   const [sheet, setSheet] = useState(null);
   const [game, setGame] = useState(null);
+  const beforeDuelCollection = useRef(progression.collection);
+  useEffect(() => {
+    if (screen === 'menu' && !page && !sheet && hasStarterNotice(progression)) setSheet('starter');
+  }, [screen, page, sheet, progression]);
   const table = useMemo(() => boardMetrics(game?.tiles), [game?.tiles]);
   const [selected, setSelected] = useState(null);
   const [flippedIds, setFlippedIds] = useState([]);
@@ -371,7 +381,7 @@ function App() {
   const playSound = kind => chime(kind, sound);
   const announce = message => setToast({ message, id: Date.now() });
   useEffect(() => { store.set('ruleset', ruleset); }, [ruleset]);
-  useEffect(() => { store.set('aiMode', aiMode); }, [aiMode]);
+  useEffect(() => { store.set('aiMode', aiMode); store.set('aiModeVersion', 1); }, [aiMode]);
   useEffect(() => { store.set('theme', themeId); }, [themeId]);
   useEffect(() => { store.set('boardTheme', boardThemeId); }, [boardThemeId]);
   useEffect(() => { store.set('sound', sound); }, [sound]);
@@ -415,6 +425,13 @@ function App() {
     if (screen !== 'game' || !game || remainingCount(game.tiles)) return;
     const outcome = getDuelOutcome(game);
     progressEvent(completedDuelEvent(tracker.current, game, outcome, Date.now()));
+    if (game.aiMode === 'realistic' && realisticSkill.current.lastGameId !== game.gameId) {
+      const nextSkill = evolveRealisticSkill(realisticSkill.current, game);
+      if (nextSkill !== realisticSkill.current) {
+        realisticSkill.current = nextSkill;
+        store.set('realisticSkill', nextSkill);
+      }
+    }
     if (result || flight || streakCues.length || pending || sheet || pageHidden) return;
     setResult(outcome); setSelected(null);
     playEffect(outcome === 'win' ? 'win' : 'turn', sound);
@@ -432,7 +449,12 @@ function App() {
   }, [game?.tiles, game?.mode, screen, sheet, result, pending, flippedIds.length]);
 
   useEffect(() => {
-    if (!boardReady || screen !== 'game' || sheet || result || entering || pending || flippedIds.length || game?.mode !== 'duel' || game.turn !== 'ai' || !remainingCount(game.tiles) || !getAvailablePairs(game.tiles).length) return;
+    if (!boardReady || screen !== 'game' || sheet || pageHidden || result || entering || pending || flippedIds.length || game?.mode !== 'duel' || game.turn !== 'ai' || !remainingCount(game.tiles) || !getAvailablePairs(game.tiles).length) return;
+    if (game.aiMode === 'realistic') {
+      const plan = planRealisticTurn(gameRef.current);
+      if (plan.firstId) beginResolution({ kind: 'ai-think', actor: 'ai', plan }, plan.thinkMs);
+      return;
+    }
     const timeout = setTimeout(() => {
       const current = gameRef.current;
       const choice = playOpponentTurn(current);
@@ -443,10 +465,10 @@ function App() {
       beginResolution({ kind: 'ai-reveal', ids: choice.flippedIds, actor: 'ai' }, GHOST_FLIP_MS);
     }, GHOST_THINK_MS);
     return () => clearTimeout(timeout);
-  }, [game?.turn, game?.tiles, screen, sheet, result, pending, flippedIds.length, boardReady, entering]);
+  }, [game?.turn, game?.tiles, screen, sheet, pageHidden, result, pending, flippedIds.length, boardReady, entering]);
 
   useEffect(() => {
-    if (!pending || !boardReady || sheet || result || entering || screen !== 'game') return;
+    if (!pending || !boardReady || sheet || pageHidden || result || entering || screen !== 'game') return;
     const key = pending.key;
     const duration = pendingTime.current.ms;
     const started = performance.now();
@@ -454,6 +476,18 @@ function App() {
     const timeout = setTimeout(() => {
       if (pendingTime.current.key !== key) return;
       const current = gameRef.current;
+      if (pending.kind === 'ai-think') {
+        const first = pending.plan.firstId;
+        if (current.turn !== 'ai' || !isFree(current.tiles.find(tile => tile.id === first), current.tiles)) { resetTurn(); return; }
+        commitGame({ ...current, realisticState: pending.plan.state });
+        setFlippedIds([first]); setSelected(first);
+        rememberFaces([first]); playSound('tap');
+        // The first face is now visible and logged; only then choose its partner.
+        const choice = chooseRealisticSecond(gameRef.current, pending.plan);
+        if (!choice.secondId) { resetTurn(); return; }
+        beginResolution({ kind: 'ai-reveal', ids: [first, choice.secondId], actor: 'ai' }, choice.delayMs);
+        return;
+      }
       if (pending.kind === 'ai-reveal') {
         const turn = flipMemoryTile(current.tiles, [pending.ids[0]], pending.ids[1], current.difficulty);
         setFlippedIds(turn.revealed); rememberFaces([pending.ids[1]]); playSound('tap');
@@ -475,7 +509,11 @@ function App() {
           tracker.current = transition.tracker;
           progressEvent(transition.event);
           if (transition.cues.length) setStreakCues(transition.cues);
-          commitGame({ ...resolved, aiMemory: advanceOpponentMemory(resolved) });
+          const observed = current.aiMode === 'realistic' ? { ...resolved,
+            realisticState: advanceRealisticState(resolved, current),
+            realisticSample: recordRealisticAttempt(current, resolved),
+          } : resolved;
+          commitGame({ ...observed, aiMemory: advanceOpponentMemory(observed) });
           if (pending.kind === 'collision') {
             setBurst({ id: Date.now(), points: 100, x: flight?.burstX, y: flight?.burstY });
             tileSmack(sound, { strength: 1 });
@@ -496,7 +534,7 @@ function App() {
         pendingTime.current.started = null;
       }
     };
-  }, [pending, screen, sheet, result, sound, boardReady, entering]);
+  }, [pending, screen, sheet, pageHidden, result, sound, boardReady, entering]);
 
   function rememberFaces(ids) {
     for (const id of ids) tracker.current = observeFlip(tracker.current, id);
@@ -546,13 +584,16 @@ function App() {
   function start(requestedTheme, opponent, matchRuleset = ruleset, matchAiMode = aiMode) {
     const chosenTheme = choosePlayableTheme(progressionRef.current.collection, matchRuleset, requestedTheme);
     if (!chosenTheme) return;
+    beforeDuelCollection.current = progressionRef.current.collection;
     const seed = crypto.getRandomValues(new Uint32Array(1))[0];
     const formationId = chooseFormationId(seed, { excludeIds: [store.get('lastFormation', null)] });
     const deal = createGame(matchRuleset, seed, difficulty, chosenTheme, { formationId });
     setThemeId(chosenTheme); setBoardThemeId(chosenTheme);
     store.set('lastFormation', deal.formationId);
     const next = restoreBoosters({ ...deal, gameId: createGameId(), ruleset: matchRuleset, aiMode: matchAiMode, opponent: { ...opponent }, boardTheme: chosenTheme, mode: 'duel',
-      boosters: { ...progressionRef.current.wallet }, aiMemory: {}, ghostMemoryVersion: GHOST_MEMORY_VERSION, elapsed: 0, score: 0, hints: 0, shuffles: 0, flips: 0, attempts: 0, ...createDuelState() });
+      boosters: { ...progressionRef.current.wallet }, aiMemory: {}, ghostMemoryVersion: GHOST_MEMORY_VERSION,
+      ...(matchAiMode === 'realistic' ? { realisticState: createRealisticState(seed, realisticSkill.current.level), realisticSample: createRealisticSample() } : {}),
+      elapsed: 0, score: 0, hints: 0, shuffles: 0, flips: 0, attempts: 0, ...createDuelState() });
     tracker.current = createDuelTracker(next);
     previousOpponent.current = opponent.id;
     commitGame(next); setScreen('game'); setResult(null); resetTurn(); setStreakCues([]); setBurst(null); setSheet(null); setPage(null); setToast(null);
@@ -579,8 +620,9 @@ function App() {
   function activateBooster(id) {
     if (pending || sheet || result || entering || lock.current || (flippedIds.length && ['shuffle', 'hint'].includes(id))) return;
     const current = gameRef.current;
-    const next = useBooster(current, id);
+    let next = useBooster(current, id);
     if (next === current) return;
+    if (id === 'hint' && current.aiMode === 'realistic') next = { ...next, realisticSample: { ...current.realisticSample, hinted: true } };
     const activation = trackBooster(tracker.current, current, next, id);
     tracker.current = activation.tracker;
     progressEvent(activation.event);
@@ -594,7 +636,7 @@ function App() {
   const uncoveredCount = useMemo(() => game ? game.tiles.filter(tile => isFree(tile, game.tiles)).length : 0, [game?.tiles]);
   const activeTheme = themeById[screen === 'game' ? game.theme : themeId] || defaultTheme;
   const faces = facesByTheme[activeTheme.id];
-  const freeCount = game ? remainingCount(game.tiles) : 80;
+  const freeCount = game ? remainingCount(game.tiles) : TILES_PER_DUEL;
   const dragon = faces.western.W01;
   const selectedTile = game?.tiles.find(t => t.id === selected);
   const opponentTurn = game?.mode === 'duel' && game.turn === 'ai';
@@ -613,6 +655,7 @@ function App() {
     setProfile(next); playEffect('confirm', sound);
   }
   function closeSheet() {
+    if (sheet === 'starter') progressEvent({ type: 'starter-seen', now: Date.now() });
     setSheet(current => {
       if (current === 'rules') return 'settings';
       if (current === 'settings' && screen === 'game') return 'pause';
@@ -669,12 +712,28 @@ function App() {
     }
   }
   function claimQuest(questId, dayId) {
+    if (adBusy.current) return { ok: false, message: 'Please wait for the current reward claim.' };
     const now = Date.now(), before = progressionRef.current;
     const next = progressEvent({ type: 'quest-claim', questId, dayId, eventId: `quest-claim:${createGameId()}`, now });
     setEconomyNow(now);
     const claimed = next.currencies.coins > before.currencies.coins || next.currencies.gems > before.currencies.gems;
     if (claimed) playEffect('confirm', sound);
     return { ok: claimed, message: claimed ? 'Quest reward collected.' : 'This reward is not available. Check today’s quests.' };
+  }
+  async function doubleQuest(questId, dayId) {
+    if (adBusy.current) return { ok: false, message: 'Please wait for the current reward claim.' };
+    adBusy.current = true;
+    const attemptId = `quest-ad:${createGameId()}`;
+    try {
+      const started = progressEvent({ type: 'quest-ad-start', questId, dayId, attemptId, eventId: `${attemptId}:start`, now: Date.now() });
+      if (started.quests.adAttempts?.[attemptId]?.status !== 'pending') return { ok: false, message: 'This reward is not available. Check today’s quests.' };
+      const result = await requestRewardedAd({ placement: 'daily-quests', attemptId });
+      const next = progressEvent({ type: 'quest-ad-complete', questId, dayId, attemptId, status: result.status, eventId: `${attemptId}:complete`, now: Date.now() });
+      setEconomyNow(Date.now());
+      const claimed = next.quests.adAttempts?.[attemptId]?.status === 'completed';
+      if (claimed) playEffect('confirm', sound);
+      return { ok: claimed, message: claimed ? 'Double quest reward collected.' : 'The ad did not complete. You can still claim your reward.' };
+    } finally { adBusy.current = false; }
   }
   function rerollQuest(questId, dayId) {
     const now = Date.now(), before = progressionRef.current;
@@ -684,11 +743,11 @@ function App() {
     if (replaced) playEffect('confirm', sound);
     return { ok: replaced, message: replaced ? 'New quest ready. Your daily reroll is used.' : 'This quest cannot be rerolled. Check today’s quests.' };
   }
-  function buyBoosters(productId) {
+  function buyBoosters(productId, payment = 'primary') {
     const product = SHOP_BOOSTER_PACKS.find(item => item.id === productId);
     if (!product) return { ok: false, message: 'This pack is unavailable.' };
     const before = progressionRef.current;
-    const next = progressEvent({ type: 'shop-buy', productId, eventId: `shop:${createGameId()}`, now: Date.now() });
+    const next = progressEvent({ type: 'shop-buy', productId, payment, eventId: `shop:${createGameId()}`, now: Date.now() });
     const bought = next !== before && next.wallet !== before.wallet;
     if (bought) playEffect('confirm', sound);
     return { ok: bought, message: bought ? `${product.name} added to your boosters.` : 'Not enough Coins or Gems for this pack.' };
@@ -726,7 +785,7 @@ function App() {
         {page === 'collection' && <TileBinder collection={collection} initialTheme={themeId} initialRuleset={ruleset} onClose={closePage} />}
         {page === 'daily-welcome' && <DailyWelcomePage progression={progression} now={economyNow} onClose={closePage} onClaim={claimDaily} onDoubleClaim={doubleDaily} adState={adState} gentle={gentle} paused={pageHidden} />}
         {page === 'daily' && <DailyRewardsPage progression={progression} onClose={closePage} onClaim={claimDaily} onDoubleClaim={doubleDaily} adState={adState} gentle={gentle} />}
-        {(page === 'quests' || page === 'login-quests') && <DailyQuestsPage progression={progression} now={economyNow} onClose={closePage} onClaim={claimQuest} onReroll={rerollQuest} showLoginAction={page === 'login-quests'} />}
+        {(page === 'quests' || page === 'login-quests') && <DailyQuestsPage progression={progression} now={economyNow} onClose={closePage} onClaim={claimQuest} onDoubleClaim={doubleQuest} onReroll={rerollQuest} showLoginAction={page === 'login-quests'} />}
         {page === 'shop' && <ShopPage progression={progression} onClose={closePage} onBuy={buyBoosters} onPurchase={purchaseCurrency} />}
         {page === 'achievements' && <AchievementsPage progression={progression} profile={profile} onEquipFrame={equipAchievementFrame} onClose={closePage} gentle={gentle} />}
         {page === 'leaderboards' && <LeaderboardsPage progression={progression} profile={profile} onClose={closePage} presentation={rankingPresentation} sound={sound} gentle={gentle} />}
@@ -750,7 +809,7 @@ function App() {
             <div className={`player-score local-player ${!opponentTurn ? 'active-turn' : ''}`}><div className="local-avatar-wrap"><PlayerAvatar profile={profile} /><StreakPortrait cues={streakCues} paused={Boolean(sheet || result || entering)} gentle={gentle} /></div><div><span>{profile.name}</span><strong>{game.score.toLocaleString()}</strong></div><StreakFeedback cues={streakCues} profile={profile} paused={Boolean(sheet || result || entering)} sound={sound} gentle={gentle} onComplete={completedCues => setStreakCues(current => current === completedCues ? [] : current)} /></div>
             <div className="score-versus" aria-hidden="true">VS</div>
             <div className={`player-score opponent ${opponentTurn ? 'active-turn' : ''}`}><div><span className="opponent-name" title={opponentName}>{opponentName}</span><strong>{game.aiScore.toLocaleString()}</strong></div><PlayerAvatar profile={opponentProfile} /></div>
-            <div className="duel-progress"><div className="duel-progress-labels"><span>{game.score / 100} pairs</span><strong>{game.score >= 2100 ? 'You secured the win' : game.aiScore >= 2100 ? 'Opponent secured the win' : 'First to 21'}</strong><span>{game.aiScore / 100} pairs</span></div><div className="duel-progress-track" role="progressbar" aria-label="Duel pair progress" aria-valuemin={0} aria-valuemax={40} aria-valuenow={(game.score + game.aiScore) / 100} aria-valuetext={`You ${game.score / 100} pairs, ${opponentName} ${game.aiScore / 100} pairs; ${freeCount / 2} pairs remain`}><span className="your-progress" style={{ width: `${game.score / 4000 * 100}%` }} /><span className="ghost-progress" style={{ width: `${game.aiScore / 4000 * 100}%` }} /><i /></div></div>
+            <div className="duel-progress"><div className="duel-progress-labels"><span>{game.score / POINTS_PER_PAIR} pairs</span><strong>{game.score >= PAIRS_TO_WIN * POINTS_PER_PAIR ? 'You secured the win' : game.aiScore >= PAIRS_TO_WIN * POINTS_PER_PAIR ? 'Opponent secured the win' : `First to ${PAIRS_TO_WIN}`}</strong><span>{game.aiScore / POINTS_PER_PAIR} pairs</span></div><div className="duel-progress-track" role="progressbar" aria-label="Duel pair progress" aria-valuemin={0} aria-valuemax={PAIRS_PER_DUEL} aria-valuenow={(game.score + game.aiScore) / POINTS_PER_PAIR} aria-valuetext={`You ${game.score / POINTS_PER_PAIR} pairs, ${opponentName} ${game.aiScore / POINTS_PER_PAIR} pairs; ${freeCount / 2} pairs remain`}><span className="your-progress" style={{ width: `${game.score / DUEL_TOTAL_SCORE * 100}%` }} /><span className="ghost-progress" style={{ width: `${game.aiScore / DUEL_TOTAL_SCORE * 100}%` }} /><i /></div></div>
           </div>
           <div className={`turn-ribbon ${opponentTurn ? 'ghost-turn' : ''}`} aria-live="polite"><span>{opponentTurn ? `${opponentName}’s turn` : 'Your turn'}</span><small>{freeCount / 2} pairs left{game.freezeReady ? ' · Opponent frozen' : ''}{game.eagleMs > 0 ? ` · Eagle Eye ${Math.ceil(game.eagleMs / 1000)}s` : ''}</small></div>
           <div className="board-space" style={{ '--board-ratio': table.width / table.height }}><div className="board-frame">
@@ -775,14 +834,15 @@ function App() {
         </motion.div>}
       </AnimatePresence>
       <AnimatePresence>{toast && <motion.div className="toast" role="status" key={toast.id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5 }}>{toast.message}</motion.div>}</AnimatePresence>
-      <AnimatePresence>{sheet && <Sheet key={sheet} title={{ rules: 'How to play', settings: 'Settings', profile: 'Profile', pause: 'Paused', restart: 'New duel', leave: 'Leave duel?' }[sheet]} onClose={closeSheet}>
+      <AnimatePresence>{sheet && <Sheet key={sheet} title={{ starter: 'Your starter boosters', rules: 'How to play', settings: 'Settings', profile: 'Profile', pause: 'Paused', restart: 'New duel', leave: 'Leave duel?' }[sheet]} onClose={closeSheet}>
+        {sheet === 'starter' && <div className="starter-boosters-intro"><p>Eight boosters to try on your next duels. Two of each have been added to your balance.</p><RewardItems rewards={STARTER_BOOSTERS} /><button className="primary-button" onClick={closeSheet}>Got it <Check size={22} weight="bold" /></button></div>}
         {sheet === 'profile' && <ProfileEditor profile={profile} achievementPoints={progression.points} onSave={updateProfile} />}
         {sheet === 'rules' && <><Rules ruleset={screen === 'game' ? game.ruleset : ruleset} aiMode={screen === 'game' ? game.aiMode : aiMode} /><button className="primary-button" onClick={closeSheet}>Got it <Check size={22} weight="bold" /></button></>}
         {sheet === 'settings' && <div className="settings-content">
           <section className="settings-ruleset" aria-labelledby="settings-ai-heading">
             <h3 id="settings-ai-heading" className="settings-ruleset-heading">Opponent AI</h3>
             {screen === 'game' && <p className="settings-ruleset-note">Applies to your next duel. Playing now: {AI_MODES.find(value => value.id === normalizeAiMode(game.aiMode)).label}.</p>}
-            <div className="settings-ruleset-switch" role="group" aria-label="Opponent AI" aria-describedby="settings-ai-description">{AI_MODES.map(value => <button key={value.id} className={aiMode === value.id ? 'active' : ''} aria-pressed={aiMode === value.id} onClick={() => { setAiMode(value.id); playSound('tap'); }}>{value.label}</button>)}</div>
+            <div className="settings-ruleset-switch settings-ai-switch" role="group" aria-label="Opponent AI" aria-describedby="settings-ai-description">{AI_MODES.map(value => <button key={value.id} className={aiMode === value.id ? 'active' : ''} aria-pressed={aiMode === value.id} onClick={() => { setAiMode(value.id); playSound('tap'); }}>{value.label}</button>)}</div>
             <p id="settings-ai-description" className="settings-ruleset-note">{AI_MODES.find(value => value.id === aiMode).description}</p>
           </section>
           <section className="settings-ruleset" aria-labelledby="settings-ruleset-heading">
@@ -794,7 +854,7 @@ function App() {
         {sheet === 'restart' && <div className="pause-content"><p className="restart-copy">End this duel and choose a theme for your next board?</p><button className="primary-button" onClick={() => { leaveDuel(); openPage('theme-select'); }}>Choose a theme <ArrowsClockwise size={22} /></button><button className="plain-button" onClick={() => setSheet('pause')}>Keep this duel</button></div>}
         {sheet === 'leave' && <div className="pause-content"><p className="restart-copy">Leaving ends this duel. Tiles you collected stay in your binder.</p><button className="primary-button" onClick={leaveDuel}>Leave duel <ArrowRight size={22} /></button><button className="plain-button" onClick={() => setSheet('pause')}>Keep playing</button></div>}
       </Sheet>}</AnimatePresence>
-      <AnimatePresence>{result && <motion.div className="result-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }}><motion.section className="result-card" role="dialog" aria-modal="true" aria-label="Game results" initial={{ y: 25, scale: .9 }} animate={{ y: 0, scale: 1 }} transition={{ type: 'spring', damping: 20 }}><VictoryBloom /><h2>{result === 'win' ? 'Victory!' : result === 'tie' ? 'A perfect tie!' : 'Well played!'}</h2><p>{result === 'win' ? `You outmatched ${opponentName}.` : result === 'tie' ? 'A memory match, perfectly balanced.' : `${opponentName} takes this round.`}</p><div className="result-stats"><div><span>You</span><strong>{game.score.toLocaleString()}</strong></div><div><span>{opponentName}</span><strong>{game.aiScore.toLocaleString()}</strong></div><div><span>Your pairs</span><strong>{game.score / 100}</strong></div></div><div className="result-currency-reward"><CurrencyIcon kind="coins" /><strong>+{DUEL_COIN_REWARDS[result]} Coins</strong><span>Added to your balance</span></div><div className="result-memory"><PlayerAvatar profile={profile} /><span>{(80 - freeCount) / 2} pairs cleared<small>Every duel starts with a fresh board.</small></span></div>{progression.newAchievementIds.length > 0 && <p className="result-achievement-summary">{progression.newAchievementIds.length} achievement{progression.newAchievementIds.length === 1 ? '' : 's'} unlocked</p>}<button className="primary-button" onClick={continueResult}>Continue <ArrowRight size={25} weight="bold" /></button></motion.section></motion.div>}</AnimatePresence>
+      <AnimatePresence>{result && <motion.div className="result-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }}><motion.section className="result-card" role="dialog" aria-modal="true" aria-label="Game results" initial={{ y: 25, scale: .9 }} animate={{ y: 0, scale: 1 }} transition={{ type: 'spring', damping: 20 }}><VictoryBloom /><h2>{result === 'win' ? 'Victory!' : result === 'tie' ? 'A perfect tie!' : 'Well played!'}</h2><p>{result === 'win' ? `You outmatched ${opponentName}.` : result === 'tie' ? 'A memory match, perfectly balanced.' : `${opponentName} takes this round.`}</p><div className="result-stats"><div><span>You</span><strong>{game.score.toLocaleString()}</strong></div><div><span>{opponentName}</span><strong>{game.aiScore.toLocaleString()}</strong></div><div><span>Your pairs</span><strong>{game.score / POINTS_PER_PAIR}</strong></div></div><div className="result-currency-reward"><CurrencyIcon kind="coins" /><strong>+{DUEL_COIN_REWARDS[result]} Coins</strong><span>Added to your balance</span></div><CollectionProgressSummary beforeCollection={beforeDuelCollection.current} collection={progression.collection} ruleset={game.ruleset} /><div className="result-memory"><PlayerAvatar profile={profile} /><span>{(game.tiles.length - freeCount) / 2} pairs cleared<small>Every duel starts with a fresh board.</small></span></div>{progression.newAchievementIds.length > 0 && <p className="result-achievement-summary">{progression.newAchievementIds.length} achievement{progression.newAchievementIds.length === 1 ? '' : 's'} unlocked</p>}<button className="primary-button" onClick={continueResult}>Continue <ArrowRight size={25} weight="bold" /></button></motion.section></motion.div>}</AnimatePresence>
       </>}
     </main>
     <AchievementNotifications batches={achievementBatches} onComplete={id => setAchievementBatches(current => current.filter(batch => batch.id !== id))} paused={Boolean(sheet || entering || matchmaking || pageHidden)} sound={sound} gentle={gentle} />

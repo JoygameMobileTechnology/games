@@ -43,19 +43,24 @@ function SceneOpening({ background, paused, onComplete }) {
       <svg className="menu-scene-effects" viewBox="0 0 851 1848" aria-hidden="true" focusable="false">
         <defs>
           <radialGradient id={`${id}-halo`}><stop stopColor={night ? '#e3efff' : '#fffce0'} stopOpacity=".95" /><stop offset=".2" stopColor={night ? '#c9e1ff' : '#ffe59a'} stopOpacity=".65" /><stop offset=".55" stopColor={night ? '#b4d1ff' : '#ffc566'} stopOpacity=".2" /><stop offset="1" stopColor={night ? '#b4d1ff' : '#ffc566'} stopOpacity="0" /></radialGradient>
-          <radialGradient id={`${id}-moon`} cx="62%" cy="68%"><stop stopColor="#fffef0" /><stop offset=".72" stopColor="#fff6d6" /><stop offset="1" stopColor="#efdcb1" /></radialGradient>
+          <radialGradient id={`${id}-moon`} cx="62%" cy="68%"><stop stopColor="#ffffff" /><stop offset=".72" stopColor="#fffef2" /><stop offset="1" stopColor="#fff4d2" /></radialGradient>
           <mask id={`${id}-phase`} maskUnits="userSpaceOnUse" x={x - 46} y={y - 46} width="92" height="92">
             <circle cx={x} cy={y} r="44" fill="white" />
             <circle className="menu-moon-shadow" cx={x} cy={y} r="47" fill="black" transform="translate(-13 -12)" />
           </mask>
-          <filter id={`${id}-moon-glow`} filterUnits="userSpaceOnUse" x={x - 160} y={y - 160} width="320" height="320" colorInterpolationFilters="sRGB">
+          <filter id={`${id}-moon-glow`} filterUnits="userSpaceOnUse" x={x - 208} y={y - 208} width="416" height="416" colorInterpolationFilters="sRGB">
             <feGaussianBlur in="SourceGraphic" stdDeviation="8" result="edge" />
             <feGaussianBlur in="SourceGraphic" stdDeviation="24" result="bloom" />
-            <feMerge><feMergeNode in="bloom" /><feMergeNode in="edge" /><feMergeNode in="edge" /></feMerge>
+            <feGaussianBlur in="SourceGraphic" stdDeviation="48" result="aura" />
+            <feMerge>
+              <feMergeNode in="aura" /><feMergeNode in="aura" /><feMergeNode in="aura" />
+              <feMergeNode in="bloom" /><feMergeNode in="bloom" /><feMergeNode in="bloom" />
+              <feMergeNode in="edge" /><feMergeNode in="edge" /><feMergeNode in="edge" />
+            </feMerge>
           </filter>
           <filter id={`${id}-moon-radiance`} filterUnits="userSpaceOnUse" x={x - 80} y={y - 80} width="160" height="160" colorInterpolationFilters="sRGB">
-            <feGaussianBlur in="SourceGraphic" stdDeviation="3" result="rim" />
-            <feMerge><feMergeNode in="rim" /><feMergeNode in="SourceGraphic" /></feMerge>
+            <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="rim" />
+            <feMerge><feMergeNode in="rim" /><feMergeNode in="rim" /><feMergeNode in="SourceGraphic" /></feMerge>
           </filter>
         </defs>
         {night ? <>

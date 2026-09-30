@@ -1,3 +1,5 @@
+import { PAIRS_PER_DUEL, PAIRS_TO_WIN } from './game-balance.js';
+
 // Keep the original IDs, conditions and rewards as the migration source.
 const LEGACY_ACHIEVEMENTS = Object.freeze([
   {
@@ -915,7 +917,13 @@ for (const key of new Set(LEGACY_ACHIEVEMENTS.map(item => item.counterKey))) {
     previous = points;
   });
 }
-export const ACHIEVEMENTS = Object.freeze(LEGACY_ACHIEVEMENTS.map(item => Object.freeze({ ...item, points: nextRewards.get(item.id) })));
+const winningPairOrdinal = `${PAIRS_TO_WIN}${PAIRS_TO_WIN % 100 >= 11 && PAIRS_TO_WIN % 100 <= 13 ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' }[PAIRS_TO_WIN % 10] ?? 'th')}`;
+// Current copy follows the trial board size; saved IDs and earned point receipts remain unchanged.
+export const ACHIEVEMENTS = Object.freeze(LEGACY_ACHIEVEMENTS.map(item => Object.freeze({ ...item,
+  description: item.description.replaceAll('all 40 pairs', `all ${PAIRS_PER_DUEL} pairs`)
+    .replaceAll('21st pair', `${winningPairOrdinal} pair`).replaceAll('exactly 19', `exactly ${PAIRS_PER_DUEL - PAIRS_TO_WIN}`),
+  points: nextRewards.get(item.id),
+})));
 export const ACHIEVEMENT_POINTS_MAX = ACHIEVEMENTS.reduce((sum, item) => sum + item.points, 0);
 export const achievementById = Object.freeze(Object.assign(Object.create(null), Object.fromEntries(ACHIEVEMENTS.map(item => [item.id, item]))));
 export const isAchievementId = id => typeof id === 'string' && Object.hasOwn(achievementById, id);

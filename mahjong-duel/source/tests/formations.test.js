@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { FORMATIONS, FORMATION_IDS, getFormation, chooseFormationId } from '../src/formations.js';
+import { TILES_PER_DUEL } from '../src/game-balance.js';
 import { createGame, isFree, canMatch, removePair, remainingCount, getAvailablePairs, shuffleBoard, isCurrentCatalogueDeal } from '../src/engine.js';
 
 const positions = tiles => tiles.map(({ x, y, z }) => `${x},${y},${z}`).sort();
@@ -30,9 +31,9 @@ test('twelve distinct compact formations have supported tiers and no duplicate o
   for (const formation of FORMATIONS) {
     const { id, slots, bounds } = formation;
     assert.match(id, /^[a-z]+(?:-[a-z]+)*$/);
-    assert.equal(slots.length, 80, id);
-    assert.equal(new Set(slots.map(slot => slot.id)).size, 80, id);
-    assert.equal(new Set(positions(slots)).size, 80, id);
+    assert.equal(slots.length, TILES_PER_DUEL, id);
+    assert.equal(new Set(slots.map(slot => slot.id)).size, TILES_PER_DUEL, id);
+    assert.equal(new Set(positions(slots)).size, TILES_PER_DUEL, id);
     assert.ok(bounds.width >= 5.5 && bounds.width <= 6, id);
     assert.ok(bounds.height >= 6.5 && bounds.height <= 7.5, id);
     assert.ok(bounds.layers >= 2 && bounds.layers <= 5, id);
@@ -145,14 +146,15 @@ test('seeded formation selection supports only excluding the preceding layout wi
   assert.throws(() => shuffleBoard([], 1, { formationId: 'unknown' }), /Unknown formation/);
 });
 
-test('old six-by-eight saves still validate and shuffle in their existing geometry without a formation ID', () => {
-  const oldSlots = [
-    ...Array.from({ length: 48 }, (_, index) => ({ x: index % 6, y: Math.floor(index / 6), z: 0 })),
-    ...Array.from({ length: 24 }, (_, index) => ({ x: 1 + index % 4, y: 1 + Math.floor(index / 4), z: 1 })),
-    ...Array.from({ length: 8 }, (_, index) => ({ x: 2 + index % 2, y: 2 + Math.floor(index / 2), z: 2 })),
+test('custom sixty-tile geometry validates and shuffles in place without a formation ID', () => {
+  const customSlots = [
+    ...Array.from({ length: 36 }, (_, index) => ({ x: index % 6, y: Math.floor(index / 6), z: 0 })),
+    ...Array.from({ length: 20 }, (_, index) => ({ x: 1 + index % 4, y: .5 + Math.floor(index / 4), z: 1 })),
+    ...Array.from({ length: 4 }, (_, index) => ({ x: 2 + index % 2, y: 2 + Math.floor(index / 2), z: 2 })),
   ];
   const { formationId: unused, ...saved } = createGame('eastern', 14);
-  saved.tiles = saved.tiles.map((tile, index) => ({ ...tile, ...oldSlots[index] }));
+  assert.equal(customSlots.length, TILES_PER_DUEL);
+  saved.tiles = saved.tiles.map((tile, index) => ({ ...tile, ...customSlots[index] }));
   assert.equal(isCurrentCatalogueDeal(saved), true);
   const result = shuffleBoard(saved.tiles, 56);
   assert.equal(result.reflowed, false);

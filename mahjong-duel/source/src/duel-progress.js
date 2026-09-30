@@ -1,5 +1,6 @@
 import { canMatch, isFree, remainingCount } from './engine.js';
 import { getDuelOutcome } from './duel.js';
+import { PAIRS_PER_DUEL, TILES_PER_DUEL, PAIRS_TO_WIN, POINTS_PER_PAIR, DUEL_TOTAL_SCORE } from './game-balance.js';
 
 export const PAIR_CHAIN_NAMES = Object.freeze(['Double', 'Triple', 'Quadra', 'Sharp', 'Focused', 'Perceptive', 'Intelligent', 'Insightful', 'Astute', 'Brilliant', 'Ingenious', 'Exceptional', 'Masterful', 'Phenomenal']);
 export const TURNING_POINTS = Object.freeze({
@@ -14,7 +15,8 @@ export const TURNING_POINTS = Object.freeze({
 });
 const BOOSTER_IDS = ['shuffle', 'hint', 'freeze', 'eagle'];
 const safeCount = value => Number.isSafeInteger(value) && value >= 0 ? value : 0;
-const pairs = game => ({ you: safeCount(game.score) / 100, ai: safeCount(game.aiScore) / 100 });
+const pairs = game => ({ you: safeCount(game.score) / POINTS_PER_PAIR, ai: safeCount(game.aiScore) / POINTS_PER_PAIR });
+const DRAW_PAIRS = PAIRS_PER_DUEL / 2;
 const leader = totals => totals.you === totals.ai ? null : totals.you > totals.ai ? 'you' : 'ai';
 const timestamp = now => Number.isFinite(now) ? now : Date.now();
 const pairIdentity = ids => JSON.stringify([...ids].sort());
@@ -86,7 +88,7 @@ function winningFacts(tracker, afterPairs) {
     noMismatch: tracker.localMismatches === 0,
     recoverFive: tracker.maxDeficit >= 5,
     recoverTen: tracker.maxDeficit >= 10,
-    closeFinish: afterPairs.ai === 19,
+    closeFinish: afterPairs.ai === PAIRS_PER_DUEL - PAIRS_TO_WIN,
     chainFinishFive: tracker.chain >= 5,
     frontRunner: tracker.firstScorer === 'you' && !tracker.everTrailed,
     opponentFirst: tracker.firstScorer === 'ai',
@@ -167,7 +169,7 @@ export function resolveTrackedAttempt(tracker, before, after, ids, { rarity, now
     const changedLeader = Boolean(previousLeader && afterLeader && previousLeader !== afterLeader);
     if (!afterLeader || changedLeader) { next.turningLatches.turning_lead_five = false; next.turningLatches.turning_recover_four = false; }
     if (afterLeader) next.lastNonTiedLeader = afterLeader;
-    const alreadySecured = tracker.securedWinner || beforePairs.you >= 21 || beforePairs.ai >= 21;
+    const alreadySecured = tracker.securedWinner || beforePairs.you >= PAIRS_TO_WIN || beforePairs.ai >= PAIRS_TO_WIN;
     if (!alreadySecured) {
       if (!tracker.firstScorer && beforePairs.you + beforePairs.ai === 0) next.firstScorer = actor;
       next.leadChanges += Number(changedLeader);
@@ -178,22 +180,22 @@ export function resolveTrackedAttempt(tracker, before, after, ids, { rarity, now
         cues.push(turningCue(id, eventId)); next.turningLatches[id] = true;
       };
       // Equality and comeback cues can recur in later lead episodes.
-      if (actor === 'you' && beforePairs.you < beforePairs.ai && afterPairs.you === afterPairs.ai && afterPairs.you !== 20) cues.push(turningCue('turning_equalize', eventId));
+      if (actor === 'you' && beforePairs.you < beforePairs.ai && afterPairs.you === afterPairs.ai && afterPairs.you !== DRAW_PAIRS) cues.push(turningCue('turning_equalize', eventId));
       if (actor === 'you' && beforePairs.you === beforePairs.ai && afterPairs.you > afterPairs.ai && previousLeader === 'ai') cues.push(turningCue('turning_comeback_lead', eventId));
-      if (afterPairs.you >= 21) {
+      if (afterPairs.you >= PAIRS_TO_WIN) {
         next.securedWinner = 'you'; next.winningSnapshot = winningFacts(next, afterPairs);
         // Terminal feedback takes over comparative cues at this boundary.
         cues.splice(0, cues.length, ...cues.filter(cue => cue.family === 'chain'));
         trigger('turning_win_secured');
-      } else if (afterPairs.ai >= 21) {
+      } else if (afterPairs.ai >= PAIRS_TO_WIN) {
         next.securedWinner = 'ai';
-      } else if (afterPairs.you === 20 && afterPairs.ai === 20 && remainingCount(after.tiles) === 0) {
+      } else if (afterPairs.you === DRAW_PAIRS && afterPairs.ai === DRAW_PAIRS && remainingCount(after.tiles) === 0) {
         trigger('turning_draw_final');
       } else {
         if (actor === 'you' && beforePairs.you - beforePairs.ai === 4 && afterPairs.you - afterPairs.ai === 5) trigger('turning_lead_five');
         if (actor === 'you' && beforePairs.ai - beforePairs.you === 5 && afterPairs.ai - afterPairs.you === 4) trigger('turning_recover_four');
-        if (actor === 'you' && beforePairs.you < 17 && afterPairs.you === 17 && afterPairs.ai <= 19) trigger('turning_four_to_win');
-        if (beforePairs.ai < 20 && afterPairs.ai === 20 && afterPairs.you < 20) trigger('turning_draw_only');
+        if (actor === 'you' && beforePairs.you < PAIRS_TO_WIN - 4 && afterPairs.you === PAIRS_TO_WIN - 4 && afterPairs.ai < DRAW_PAIRS) trigger('turning_four_to_win');
+        if (beforePairs.ai < DRAW_PAIRS && afterPairs.ai === DRAW_PAIRS && afterPairs.you < DRAW_PAIRS) trigger('turning_draw_only');
       }
     }
   }
@@ -211,8 +213,8 @@ export function resolveTrackedAttempt(tracker, before, after, ids, { rarity, now
 
 /** Repeated calls intentionally return the same receipt identity; the durable reducer commits once. */
 export function completedDuelEvent(tracker, game, outcome, now) {
-  if (!tracker || tracker.gameId !== game?.gameId || game.tiles?.length !== 80 || remainingCount(game.tiles) !== 0 ||
-      game.score + game.aiScore !== 4000 || getDuelOutcome(game) !== outcome || !['win', 'lose', 'tie'].includes(outcome)) return null;
+  if (!tracker || tracker.gameId !== game?.gameId || game.tiles?.length !== TILES_PER_DUEL || remainingCount(game.tiles) !== 0 ||
+      game.score + game.aiScore !== DUEL_TOTAL_SCORE || getDuelOutcome(game) !== outcome || !['win', 'lose', 'tie'].includes(outcome)) return null;
   return { type: 'complete', ...metadata(tracker), eventId: `${tracker.gameId}:complete`, outcome, now: timestamp(now),
     afterPairs: pairs(game), winningSnapshot: tracker.winningSnapshot,
     conditionalWins: outcome === 'win' ? { ...tracker.winningSnapshot?.conditionalWins } : {}, counterDeltas: {}, counterMaxima: {} };

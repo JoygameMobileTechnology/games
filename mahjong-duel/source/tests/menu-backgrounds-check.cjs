@@ -125,7 +125,7 @@ const viewports = [{ width: 320, height: 568 }, { width: 390, height: 844 }, { w
     await transition.waitFor({ state: 'detached' });
     await page.locator('.game-board').waitFor();
     assert.equal(await scene(page).count(), 0, 'menu art does not overlay the game');
-    assert.equal(await page.locator('.game-tile').count(), 80, 'a complete new duel starts');
+    assert.equal(await page.locator('.game-tile').count(), 60, 'a complete new duel starts');
     if (storageAvailable) assert.equal(await savedId(page), expected, 'starting a duel retains the selected scene');
     await button(page, 'Pause game').click();
     await page.getByRole('dialog', { name: 'Paused', exact: true }).waitFor();

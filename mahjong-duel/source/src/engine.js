@@ -1,17 +1,16 @@
 import { themeTileSets } from './tile-data.js';
 import { FORMATION_WIDTH, FORMATION_HEIGHT, FORMATION_IDS, getFormation, chooseFormationId } from './formations.js';
+import { TILES_PER_DUEL, RARITY_PAIRS_PER_DUEL } from './game-balance.js';
+import { rarityForTile } from './rarity.js';
 
 export const BOARD_WIDTH = FORMATION_WIDTH;
 export const BOARD_HEIGHT = FORMATION_HEIGHT;
-export const TILE_COUNT = 80;
-
-// Adapt the supplied tile-system difficulty axes to an 80-tile round. Eastern
-// rounds use 20 exact-picture faces, with four copies of each.
-const DIFFICULTY_DRAWS = {
-  calm: { anchors: 10, counts: [1, 3, 5], tiers: [1, 3, 5], kin: 3, glyphs: 1 },
-  balanced: { anchors: 6, counts: [1, 2, 3, 4, 5, 6], tiers: [1, 2, 3, 4, 5], kin: 3, glyphs: 0 },
-  intricate: { anchors: 4, counts: [1, 2, 3, 4, 5, 6], tiers: [1, 2, 3, 4, 5], kin: 1, glyphs: 4 },
-};
+export const TILE_COUNT = TILES_PER_DUEL;
+const COPIES_PER_FACE = 4;
+const FACES_PER_DUEL = TILE_COUNT / COPIES_PER_FACE;
+// Preserve accepted difficulty identifiers; this experiment gives each the
+// same approved rarity mix in both editions, replacing the old family quotas.
+const DIFFICULTIES = ['calm', 'balanced', 'intricate'];
 
 const EPSILON = 0.00001;
 const randomSeed = () => Math.floor(Math.random() * 0x100000000);
@@ -107,7 +106,7 @@ export function isCurrentCatalogueDeal(game) {
     ids.add(tile.id);
     copies.set(face.id, (copies.get(face.id) || 0) + 1);
   }
-  return copies.size === 20 && [...copies.values()].every(count => count === 4);
+  return copies.size === FACES_PER_DUEL && [...copies.values()].every(count => count === COPIES_PER_FACE);
 }
 
 function validateTiles(tiles) {
@@ -174,24 +173,13 @@ function chooseFaces(ruleset, difficulty, theme, random) {
   const sets = themeTileSets[theme];
   if (!Object.hasOwn(sets, ruleset)) throw new RangeError(`Unknown ruleset: ${ruleset}`);
   const definitions = sets[ruleset];
-  if (!Object.hasOwn(DIFFICULTY_DRAWS, difficulty)) throw new RangeError(`Unknown difficulty: ${difficulty}`);
-  if (ruleset === 'western') return shuffled(definitions, random).slice(0, 20);
-
-  const draw = DIFFICULTY_DRAWS[difficulty];
-  const pick = (family, count) => shuffled(definitions.filter((face) => face.family === family), random).slice(0, count);
-  const rankOffset = difficulty === 'calm' ? Math.floor(random() * 2) : 0;
-  const ranks = (family, values) => {
-    // Alternate spaced ranks so all six types remain collectible in Calm duels.
-    const selected = values.map(rank => rank + rankOffset);
-    return definitions.filter((face) => face.family === family && selected.includes(face.rank));
-  };
-  return [
-    ...pick('anchor', draw.anchors),
-    ...ranks('count', draw.counts),
-    ...ranks('tier', draw.tiers),
-    ...pick('kin', draw.kin),
-    ...pick('glyph', draw.glyphs),
-  ];
+  if (!DIFFICULTIES.includes(difficulty)) throw new RangeError(`Unknown difficulty: ${difficulty}`);
+  return Object.entries(RARITY_PAIRS_PER_DUEL).flatMap(([rarity, pairs]) => {
+    const count = pairs * 2 / COPIES_PER_FACE;
+    const candidates = definitions.filter(face => rarityForTile(theme, ruleset, face.id)?.id === rarity);
+    if (!Number.isInteger(count) || candidates.length < count) throw new Error(`Not enough ${rarity} artwork for the selected deal.`);
+    return shuffled(candidates, random).slice(0, count);
+  });
 }
 
 export function createGame(ruleset = 'eastern', seed = randomSeed(), difficulty = 'balanced', theme = 'ming-porcelain', options = {}) {
@@ -207,12 +195,12 @@ export function createGame(ruleset = 'eastern', seed = randomSeed(), difficulty 
       tiles.push({ ...face, id: `tile-${tiles.length + 1}`, faceId: face.id, removed: false });
     }
   }
-  if (tiles.length !== TILE_COUNT) throw new Error('The selected tile set must contain exactly 80 tiles.');
-  if (new Set(tiles.map((tile) => tile.matchKey)).size !== 20) {
-    throw new Error('The selected tile set must contain exactly 20 matching groups.');
+  if (tiles.length !== TILE_COUNT) throw new Error(`The selected tile set must contain exactly ${TILE_COUNT} tiles.`);
+  if (new Set(tiles.map((tile) => tile.matchKey)).size !== FACES_PER_DUEL) {
+    throw new Error(`The selected tile set must contain exactly ${FACES_PER_DUEL} matching groups.`);
   }
   const order = geometrySolution(formation.slots, random);
-  if (!order || order.length !== TILE_COUNT / 2) throw new Error(`Formation ${formationId} must have a complete 80-tile removal order.`);
+  if (!order || order.length !== TILE_COUNT / 2) throw new Error(`Formation ${formationId} must have a complete ${TILE_COUNT}-tile removal order.`);
   const deal = placePairs(tiles, pairByKey(tiles, random), order);
   return { ...deal, seed: normalizedSeed, ruleset, difficulty, theme, formationId };
 }

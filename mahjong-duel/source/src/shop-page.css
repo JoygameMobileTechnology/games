@@ -113,3 +113,17 @@
 @media (max-height: 450px) and (orientation: landscape) {
   .shop-wallet { padding-block: 7px; }.shop-wallet .currency-balance { min-height: 49px; }.shop-wallet .currency-balance .currency-icon { --currency-icon-size: 33px; }.shop-wallet .currency-balance .currency-amount { min-height: 37px; }.shop-wallet .currency-balance .currency-amount strong { font-size: 20px; }.shop-page .progression-page-scroll { scroll-padding-top: 70px; }
 }
+
+/* Both payment routes remain visible; a purchase always confirms one exact price. */
+.shop-payment-options { display: grid; gap: 5px; width: 100%; min-width: 0; }
+.shop-payment-options > div { min-width: 0; }
+.shop-payment-options .economy-price-button { width: 100%; min-height: 44px; }
+.shop-payment-options .shop-insufficient { display: block; margin-top: 4px; text-align: center; line-height: 1.35; }
+.shop-payment-or { text-align: center; color: #84613d; font-size: 11px; line-height: 1; text-transform: uppercase; }
+.shop-combo-product > .shop-payment-options { grid-column: 2; width: 175px; }
+@media (max-width: 359px) { .shop-combo-product > .shop-payment-options { grid-column: 1; width: 100%; } }
+@media (min-width: 650px) { .shop-combo-product > .shop-payment-options { width: 245px; } }
+@media (min-width: 1100px) and (orientation: landscape) { .shop-combo-product > .shop-payment-options { grid-column: 1; width: 100%; } }
+.starter-boosters-intro { text-align: center; }
+.starter-boosters-intro > p { line-height: 1.6; margin: 0 0 20px; }
+.starter-boosters-intro .reward-items { margin-block: 18px 25px; }

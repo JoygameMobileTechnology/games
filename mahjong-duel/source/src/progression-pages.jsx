@@ -4,9 +4,10 @@ import { PlayerAvatar } from './player-profile.jsx';
 import { playProgressSound } from './sound.js';
 import { ProgressionGlyph } from './progression-menu.jsx';
 import { ProgressionPage } from './progression-page.jsx';
+import { CurrencyIcon } from './currency-ui.jsx';
 export { ProgressionPage } from './progression-page.jsx';
 export { AchievementsPage } from './achievements-page.jsx';
-import { getDailyView, DAILY_REWARD_CONFIG } from './daily-rewards.js';
+import { getDailyView, DAILY_REWARD_CONFIG, emptyRewards } from './daily-rewards.js';
 import { rankingRows, leagueForWins, LEAGUES } from './leaderboards.js';
 import { themeTileSets } from './tile-data.js';
 import './progression-pages.css';
@@ -16,7 +17,8 @@ const BOOSTERS = { hint: { name: 'Hint', Icon: Lightbulb }, shuffle: { name: 'Sh
 const format = value => Number(value || 0).toLocaleString();
 
 export function RewardItems({ rewards, compact = false, named = false }) {
-  return <div className={`reward-items ${compact ? 'is-compact' : ''}`}>{Object.entries(BOOSTERS).filter(([key]) => rewards?.[key] > 0).map(([key, { Icon, name }]) => <div className="reward-item" key={key} role="img" aria-label={`${name}, ${rewards[key]}`} title={`${name} ×${rewards[key]}`}><span className="reward-coin"><Icon size={compact ? 22 : 30} weight="duotone" /></span><strong>{named && `${name} `}×{format(rewards[key])}</strong>{!compact && !named && <span>{name}</span>}</div>)}</div>;
+  const items = Object.entries({ coins: { name: 'Coins' }, ...BOOSTERS }).filter(([key]) => rewards?.[key] > 0);
+  return <div className={`reward-items ${compact ? 'is-compact' : ''} ${items.length > 4 ? 'has-many-rewards' : ''}`}>{items.map(([key, { Icon, name }]) => <div className="reward-item" key={key} role="img" aria-label={`${name}, ${rewards[key]}`} title={`${format(rewards[key])} ${name}`}><span className={`reward-coin ${key === 'coins' ? 'reward-currency' : ''}`}>{key === 'coins' ? <CurrencyIcon kind="coins" /> : <Icon size={compact ? 22 : 30} weight="duotone" />}</span><strong>{key === 'coins' ? <>{format(rewards[key])}{named && ' Coins'}</> : <>{named && `${name} `}×{format(rewards[key])}</>}</strong>{!compact && !named && <span>{name}</span>}</div>)}</div>;
 }
 export function DailyRewardsPage({ progression, onClose, onClaim, onDoubleClaim, adState = 'idle', gentle = false }) {
   const daily = getDailyView(progression), busy = adState === 'loading';
@@ -25,9 +27,9 @@ export function DailyRewardsPage({ progression, onClose, onClaim, onDoubleClaim,
   const receipt = progression.daily.claimReceipts[todayClaim?.receiptId];
   const claimedReward = receipt?.entitlementIds.reduce((total, id) => {
     const reward = progression.daily.entitlements[id]?.rewards;
-    for (const key of Object.keys(BOOSTERS)) total[key] += (reward?.[key] || 0) * receipt.multiplier;
+    for (const key of Object.keys(total)) total[key] += (reward?.[key] || 0) * receipt.multiplier;
     return total;
-  }, Object.fromEntries(Object.keys(BOOSTERS).map(key => [key, 0])));
+  }, emptyRewards());
   const displayedReward = daily.hasClaim ? daily.rewards : claimedReward || weeklyReward;
   const exceptional = ['unavailable', 'failed', 'cancelled'].includes(adState);
   return <ProgressionPage title="Daily Rewards" className={`daily-rewards-page ${gentle ? 'is-gentle' : ''}`} onClose={onClose}>
@@ -38,7 +40,7 @@ export function DailyRewardsPage({ progression, onClose, onClaim, onDoubleClaim,
     <section className={`daily-claim-panel ${exceptional ? 'has-claim-notice' : ''}`} aria-labelledby="daily-claim-title">
       <h3 id="daily-claim-title" className="ornament-heading">{!daily.hasClaim ? 'Claimed rewards' : daily.entitlements.length > 1 ? 'Your rewards' : `Day ${daily.loginDays} reward`}</h3><RewardItems rewards={displayedReward} />
     </section>
-    <section className="daily-grand-section" aria-label="Grand reward progress"><div className="daily-grand-reward"><div className="grand-reward-copy"><strong>Grand reward</strong><progress value={daily.longDay} max={DAILY_REWARD_CONFIG.longEvery} aria-label={`${DAILY_REWARD_CONFIG.longEvery}-day login progress`} /><span>{Object.values(DAILY_REWARD_CONFIG.longReward)[0]} of every booster</span></div><span className="grand-reward-chest" aria-label={`Grand reward on day ${DAILY_REWARD_CONFIG.longEvery}`}><span><ProgressionGlyph name="daily" /></span><strong>Day {DAILY_REWARD_CONFIG.longEvery}</strong></span></div><p>Missed days keep your progress.</p></section>
+    <section className="daily-grand-section" aria-label="Grand reward progress"><div className="daily-grand-reward"><div className="grand-reward-copy"><strong>{Object.values(DAILY_REWARD_CONFIG.longReward)[0]} of each booster</strong><progress value={daily.longDay} max={DAILY_REWARD_CONFIG.longEvery} aria-label={`${DAILY_REWARD_CONFIG.longEvery}-day login progress`} /></div><span className="grand-reward-chest" aria-label={`Grand reward on day ${DAILY_REWARD_CONFIG.longEvery}`}><span><ProgressionGlyph name="daily" /></span><strong>Day {DAILY_REWARD_CONFIG.longEvery}</strong></span></div><p>Missed days keep your progress.</p></section>
     <div className={`daily-claim-footer ${exceptional ? 'has-claim-notice' : ''}`}><div className="daily-claim-state" role="status">{busy ? 'Preparing your double rewards…' : !daily.hasClaim ? <><Check size={16} weight="bold" />Claimed — see you another day!</> : adState === 'unavailable' ? '2x unavailable. Standard rewards are ready.' : (adState === 'failed' || adState === 'cancelled') ? '2x did not complete. You can still claim.' : daily.entitlements?.length > 1 ? 'Includes your unclaimed rewards.' : null}</div>
       <div className="daily-claim-actions"><button className="progression-primary" disabled={!daily.hasClaim || busy} onClick={onClaim}>{daily.hasClaim ? 'Claim rewards' : 'Claimed'}{!daily.hasClaim && <Check size={20} weight="bold" />}</button><button className="progression-secondary double-rewards-button" disabled={!daily.hasClaim || busy || adState === 'unavailable'} onClick={onDoubleClaim}><Play size={22} weight="fill" />{busy ? 'Please wait…' : 'Claim rewards 2x'}</button></div>
     </div>

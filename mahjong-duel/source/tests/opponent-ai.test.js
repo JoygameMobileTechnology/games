@@ -1,18 +1,20 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { AI_MODES, normalizeAiMode, playOpponentTurn, rememberOpponentFaces, advanceOpponentMemory } from '../src/opponent-ai.js';
+import { createRealisticState, advanceRealisticState } from '../src/realistic-ai.js';
 import { playGhostTurn, rememberGhostFaces } from '../src/ghost.js';
 import { createDuelState, resolveDuelAttempt } from '../src/duel.js';
 import { createGame, getAvailablePairs, isFree, remainingCount, shuffleBoard } from '../src/engine.js';
 
 const tile = (id, key, x) => ({ id, faceId: `${key}-face`, matchKey: key, x, y: 0, z: 0, removed: false });
 
-test('Modern AI is the default and preserves existing decisions and memory exactly', () => {
-  assert.deepEqual(AI_MODES.map(mode => mode.label), ['Modern AI', 'Original AI']);
-  for (const value of [undefined, null, '', 'obsolete', 1, {}, 'modern']) assert.equal(normalizeAiMode(value), 'modern');
+test('Realistic is the default while explicit Modern preserves decisions and memory exactly', () => {
+  assert.deepEqual(AI_MODES.map(mode => mode.label), ['Realistic', 'Modern AI', 'Original AI']);
+  for (const value of [undefined, null, '', 'obsolete', 1, {}, 'realistic']) assert.equal(normalizeAiMode(value), 'realistic');
   assert.equal(normalizeAiMode('original'), 'original');
+  assert.equal(normalizeAiMode('modern'), 'modern');
   const tiles = [tile('a', 'A', 0), tile('b', 'B', 1), tile('c', 'A', 2), tile('d', 'D', 3)];
-  for (const aiMode of [undefined, 'modern']) for (let seed = 0; seed < 100; seed++) {
+  for (const aiMode of ['modern']) for (let seed = 0; seed < 100; seed++) {
     const game = { tiles, seed, aiMode, attempts: 3, aiAttempts: 2,
       aiMemory: { a: { key: 'A', turn: 3 }, c: { key: 'A', turn: 4 }, d: { key: 'D', turn: 0 } } };
     assert.deepEqual(playOpponentTurn(game), playGhostTurn(tiles, game.aiMemory, seed + 2 * 97 + 3 * 13, 5));
@@ -49,9 +51,9 @@ test('Original records both players immediately, then decays after matches, miss
   }
 });
 
-test('both opponents finish shared-board duels with human reveals and shuffle resets', () => {
-  for (const aiMode of ['modern', 'original']) for (const ruleset of ['eastern', 'western']) {
-    let game = { ...createGame(ruleset, 48, 'calm'), ...createDuelState(), mode: 'duel', aiMode, aiMemory: {} };
+test('all three opponents finish shared-board duels with human reveals and shuffle resets', () => {
+  for (const aiMode of ['realistic', 'modern', 'original']) for (const ruleset of ['eastern', 'western']) {
+    let game = { ...createGame(ruleset, 48, 'calm'), ...createDuelState(), mode: 'duel', aiMode, aiMemory: {}, realisticState: createRealisticState(48) };
     let moves = 0, shuffles = 0;
     while (remainingCount(game.tiles) && moves < 1600) {
       if (!getAvailablePairs(game.tiles).length) {
@@ -72,11 +74,12 @@ test('both opponents finish shared-board duels with human reveals and shuffle re
       for (const id of ids) game = { ...game, aiMemory: rememberOpponentFaces(game, [id]) };
       const resolved = resolveDuelAttempt(game, ids);
       assert.notEqual(resolved, game, 'both actors submit legal attempts');
-      game = { ...resolved, aiMemory: advanceOpponentMemory(resolved) };
+      const advanced = aiMode === 'realistic' ? { ...resolved, realisticState: advanceRealisticState(resolved, game) } : resolved;
+      game = { ...advanced, aiMemory: advanceOpponentMemory(advanced) };
       moves++;
     }
     assert.equal(remainingCount(game.tiles), 0, `${aiMode} ${ruleset} finishes after ${moves} attempts`);
-    assert.equal(game.score + game.aiScore, 4000);
+    assert.equal(game.score + game.aiScore, 3000);
     assert.deepEqual(game.aiMemory, {});
     assert.ok(shuffles >= 1);
   }

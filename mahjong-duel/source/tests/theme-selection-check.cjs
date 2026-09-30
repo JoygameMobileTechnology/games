@@ -112,7 +112,7 @@ const time = new Date('2026-09-30T12:00:00Z');
         surface: document.querySelector('.table-surface').style.getPropertyValue('--surface-image'),
       }));
       assert.equal(result.theme, themeId); assert.equal(result.board, themeId);
-      assert.ok(result.label.startsWith(edition)); assert.equal(result.faces.length, 80);
+      assert.ok(result.label.startsWith(edition)); assert.equal(result.faces.length, 60);
       const faceUrls = new Set(themeTileSets[themeId][edition].map(tile => new URL(tile.src, `${origin}/`).href));
       assert.ok(result.faces.every(src => faceUrls.has(src)), `${label}: every dealt tile belongs to selected theme and edition`);
       assert.ok(result.backs.every(src => src === new URL(themes.find(theme => theme.id === themeId).back, `${origin}/`).href), `${label}: tile backs match selected theme`);

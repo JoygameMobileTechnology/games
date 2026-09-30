@@ -136,7 +136,7 @@ const sizes = [
       else assert.equal(await page.locator(opening).count(), 0, 'reduced motion skips only the opening effect');
       await advance(2000);
       await page.locator(opening).waitFor({ state: 'detached' });
-      assert.equal(await page.locator('.game-tile').count(), 80);
+      assert.equal(await page.locator('.game-tile').count(), 60);
       assert.equal(await page.locator('.game-tile[data-face-up="true"]').count(), 0);
       assert.equal(await page.locator('.world').getAttribute('data-theme'), expectedTheme);
       assert.equal(await page.locator('.world').getAttribute('data-board-theme'), expectedTheme);

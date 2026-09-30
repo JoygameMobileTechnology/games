@@ -6,6 +6,7 @@ import {
 } from '../src/engine.js';
 import { tileSets, themeTileSets } from '../src/tile-data.js';
 import { getFormation } from '../src/formations.js';
+import { rarityForTile } from '../src/rarity.js';
 
 const tile = (id, x, y, z = 0, matchKey = 'test:pair') =>
   ({ id, faceId: id, x, y, z, matchKey, name: id, removed: false });
@@ -79,12 +80,12 @@ test('each seeded deal preserves catalogue copy rules and fits portrait bounds',
   for (const ruleset of ['eastern', 'western']) {
     const game = createGame(ruleset, 1234);
     assert.equal(game.theme, 'ming-porcelain');
-    assert.equal(TILE_COUNT, 80);
-    assert.equal(game.tiles.length, 80);
-    assert.equal(game.solution.length, 40);
-    assert.equal(new Set(game.tiles.map((value) => value.id)).size, 80);
-    assert.equal(new Set(game.tiles.map((value) => value.matchKey)).size, 20);
-    assert.equal(new Set(game.tiles.map((value) => value.faceId)).size, 20);
+    assert.equal(TILE_COUNT, 60);
+    assert.equal(game.tiles.length, 60);
+    assert.equal(game.solution.length, 30);
+    assert.equal(new Set(game.tiles.map((value) => value.id)).size, 60);
+    assert.equal(new Set(game.tiles.map((value) => value.matchKey)).size, 15);
+    assert.equal(new Set(game.tiles.map((value) => value.faceId)).size, 15);
     const positions = values => values.map(({ x, y, z }) => `${x},${y},${z}`).sort();
     assert.deepEqual(positions(game.tiles), positions(getFormation(game.formationId).slots));
     const counts = new Map();
@@ -131,11 +132,11 @@ test('all nine themes keep draw composition, matching rules, layout and solvabil
       for (const [theme, sets] of Object.entries(themeTileSets)) {
         const game = createGame(ruleset, 721, difficulty, theme);
         assert.equal(game.theme, theme);
-        assert.equal(game.tiles.length, 80);
-        assert.equal(new Set(game.tiles.map(value => value.matchKey)).size, 20);
-        assert.deepEqual(game.tiles.map(({ id, faceId, x, y, z, family, rank }) => ({ id, faceId, x, y, z, family, rank })),
-          reference.tiles.map(({ id, faceId, x, y, z, family, rank }) => ({ id, faceId, x, y, z, family, rank })),
-          `${theme} cosmetics do not change the chosen kinds or their positions`);
+        assert.equal(game.tiles.length, 60);
+        assert.equal(new Set(game.tiles.map(value => value.matchKey)).size, 15);
+        assert.deepEqual(game.tiles.map(({ id, x, y, z }) => ({ id, x, y, z })),
+          reference.tiles.map(({ id, x, y, z }) => ({ id, x, y, z })),
+          `${theme} keeps the seeded geometry while drawing its own rarity-curated artwork`);
         for (const face of game.tiles) {
           const definition = sets[ruleset].find(value => value.id === face.faceId);
           assert.equal(face.src, definition.src);
@@ -147,36 +148,41 @@ test('all nine themes keep draw composition, matching rules, layout and solvabil
   }
 });
 
-test('difficulty changes the Eastern draw using the supplied similarity axes', () => {
-  const expected = {
-    calm: { anchor: 10, count: 3, tier: 3, kin: 3, glyph: 1 },
-    balanced: { anchor: 6, count: 6, tier: 5, kin: 3, glyph: 0 },
-    intricate: { anchor: 4, count: 6, tier: 5, kin: 1, glyph: 4 },
-  };
-  for (const difficulty of ['calm', 'balanced', 'intricate']) {
-    for (const seed of [0, 1, 14, 52, 999]) {
-      const game = createGame('eastern', seed, difficulty);
-      assert.equal(game.difficulty, difficulty);
-      assert.deepEqual(game, createGame('eastern', seed, difficulty));
-      assert.equal(new Set(game.tiles.map((value) => value.matchKey)).size, 20);
-      assert.equal(game.tiles.length, 80);
-      for (const [family, count] of Object.entries(expected[difficulty])) {
-        const faces = game.tiles.filter((value) => value.family === family);
-        assert.equal(new Set(faces.map((value) => value.faceId)).size, count, `${difficulty} ${family}`);
-      }
-      const ranks = (family) => [...new Set(game.tiles.filter((value) => value.family === family).map((value) => value.rank))].sort();
-      if (difficulty === 'calm') {
-        assert.ok([[1, 3, 5], [2, 4, 6]].some(values => values.join() === ranks('count').join()));
-        assert.deepEqual(ranks('tier'), ranks('count'));
-      } else {
-        assert.deepEqual(ranks('count'), [1, 2, 3, 4, 5, 6]);
-        assert.deepEqual(ranks('tier'), [1, 2, 3, 4, 5]);
+test('every theme and edition deals exactly 16 Marble, 8 Sapphire, 4 Amethyst and 2 Gold pairs', () => {
+  for (const theme of Object.keys(themeTileSets)) {
+    for (const ruleset of ['eastern', 'western']) {
+      for (const difficulty of ['calm', 'balanced', 'intricate']) {
+        for (const seed of [0, 1, 14, 52, 999]) {
+          const game = createGame(ruleset, seed, difficulty, theme);
+          assert.equal(game.difficulty, difficulty);
+          const counts = { marble: 0, sapphire: 0, amethyst: 0, gold: 0 };
+          const artwork = Object.fromEntries(Object.keys(counts).map(id => [id, new Set()]));
+          for (const tile of game.tiles) {
+            const rarity = rarityForTile(theme, ruleset, tile.faceId).id;
+            counts[rarity]++;
+            artwork[rarity].add(tile.faceId);
+          }
+          assert.deepEqual(counts, { marble: 32, sapphire: 16, amethyst: 8, gold: 4 }, `${theme} ${ruleset} seed ${seed}`);
+          assert.deepEqual(Object.fromEntries(Object.entries(artwork).map(([id, faces]) => [id, faces.size])),
+            { marble: 8, sapphire: 4, amethyst: 2, gold: 1 });
+        }
       }
     }
   }
   assert.deepEqual(createGame('eastern', 27), createGame('eastern', 27, 'balanced'));
-  assert.deepEqual(createGame('western', 27, 'calm').tiles, createGame('western', 27, 'intricate').tiles,
-    'Western picture selection has no Eastern difficulty axis');
+});
+
+test('rarity does not reserve tiles for a particular layer', () => {
+  for (const ruleset of ['eastern', 'western']) {
+    const layers = { marble: new Set(), sapphire: new Set(), amethyst: new Set(), gold: new Set() };
+    for (let seed = 0; seed < 80; seed++) {
+      const game = createGame(ruleset, seed, 'calm', 'ming-porcelain', { formationId: 'crown' });
+      for (const tile of game.tiles) layers[rarityForTile(game.theme, ruleset, tile.faceId).id].add(tile.z);
+    }
+    for (const [rarity, seen] of Object.entries(layers)) {
+      assert.deepEqual([...seen].sort(), [0, 1, 2, 3], `${ruleset} ${rarity} can appear on every Crown tier`);
+    }
+  }
 });
 
 test('every launch tile type is obtainable in the playable Calm deal for both editions', () => {
@@ -211,7 +217,7 @@ test('invalid removal attempts do not mutate or change the board', () => {
   const sameFace = game.tiles.find((value) => value.id !== blocked.id && value.matchKey === blocked.matchKey);
   assert.strictEqual(removePair(game.tiles, blocked.id, sameFace.id), game.tiles);
   const next = removePair(game.tiles, freePair[0].id, freePair[1].id);
-  assert.equal(remainingCount(next), 78);
+  assert.equal(remainingCount(next), 58);
   assert.strictEqual(removePair(next, freePair[0].id, freePair[1].id), next);
   assert.deepEqual(game.tiles, before);
 });

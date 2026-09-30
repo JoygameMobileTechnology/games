@@ -10,7 +10,7 @@ const NOW = Date.UTC(2026, 8, 30, 10), DAY = dayIdFor(NOW);
 const fresh = () => reduceProgression(createProgression({ seed: 42 }), { type: 'login', now: NOW });
 function withQuests(ids) {
   const state = fresh();
-  state.quests = { dayId: DAY, rerollsUsed: 0, presented: false, entries: ids.map(id => ({ id, progress: 0, claimed: false, startedAt: NOW, uniqueKeys: [], chains: {} })) };
+  state.quests = normalizeDailyQuests({ dayId: DAY, rerollsUsed: 0, presented: false, entries: ids.map(id => ({ id, progress: 0, claimed: false, startedAt: NOW, uniqueKeys: [], chains: {} })) });
   return state;
 }
 const entry = (state, id) => state.quests.entries.find(item => item.id === id);
@@ -25,14 +25,15 @@ function attempt(index = 1, extras = {}) {
 }
 const action = (type, questId, eventId = type, now = NOW + 100) => ({ type, questId, eventId, dayId: dayIdFor(now), now });
 const finish = (outcome = 'win', id = 'game') => ({ type: 'complete', gameId: id, eventId: `${id}:complete`, themeId: 'ming-porcelain', rulesetId: 'eastern', formationId: 'crown',
-  outcome, finalPairs: outcome === 'win' ? { you: 21, ai: 19 } : outcome === 'lose' ? { you: 19, ai: 21 } : { you: 20, ai: 20 }, now: NOW + 50 });
+  outcome, finalPairs: outcome === 'win' ? { you: 16, ai: 14 } : outcome === 'lose' ? { you: 14, ai: 16 } : { you: 15, ai: 15 }, now: NOW + 50 });
 
 test('a large prerequisite-free pool deals three varied quests, with Easy and Medium always present initially', () => {
   assert.ok(DAILY_QUEST_POOL.length >= 30);
   assert.equal(new Set(DAILY_QUEST_POOL.map(quest => quest.id)).size, DAILY_QUEST_POOL.length);
   for (const difficulty of ['easy', 'medium', 'hard']) assert.ok(DAILY_QUEST_POOL.filter(quest => quest.difficulty === difficulty).length >= 10);
   for (const quest of DAILY_QUEST_POOL) {
-    assert.ok(quest.reward.gems >= 2 && quest.reward.gems <= 10);
+    assert.ok(quest.reward.gems >= 0 && quest.reward.gems <= 6);
+    assert.ok(quest.reward.coins >= 20 && quest.reward.coins <= 100);
     assert.ok(quest.target > 0 && quest.title && quest.description);
     assert.ok(Number.isSafeInteger(quest.estimatedMinutes) && quest.estimatedMinutes >= 2);
     assert.doesNotMatch(`${quest.metric} ${quest.description}`, /booster|eagle|freeze|shuffle|hint|Dancheong|Stained|Dutch/i);
@@ -105,7 +106,7 @@ test('chain quests count only attempts after their assignment and reset after a 
 
 test('completed duels count all outcomes, wins count only wins, and incomplete boards never count', () => {
   let state = withQuests(['easy-duel-1', 'medium-win-1', 'hard-duel-4']);
-  assert.strictEqual(reduceProgression(state, { ...finish(), finalPairs: { you: 21, ai: 0 } }), state);
+  assert.strictEqual(reduceProgression(state, { ...finish(), finalPairs: { you: 16, ai: 0 } }), state);
   state = reduceProgression(state, finish('lose', 'one'));
   assert.deepEqual(state.quests.entries.map(item => item.progress), [1, 0, 1]);
   state = reduceProgression(state, finish('tie', 'two'));

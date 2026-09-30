@@ -109,7 +109,7 @@ const near = (actual, expected, message, tolerance = 1) => assert.ok(Math.abs(ac
 
   async function boardAndReturn(page, expected) {
     await page.locator(transitionSelector).waitFor({ state: 'detached' });
-    await page.waitForFunction(() => document.querySelectorAll('.game-tile').length === 80);
+    await page.waitForFunction(() => document.querySelectorAll('.game-tile').length === 60);
     assert.equal(await page.locator(homeSceneSelector).count(), 0, 'menu artwork leaves the game');
     assert.equal(await page.locator('.theme-select-page').count(), 0, 'theme selection closes after starting');
     assert.equal(await page.locator('.game-tile[data-face-up="true"]').count(), 0, 'a fresh full board remains face down');
@@ -321,7 +321,7 @@ const near = (actual, expected, message, tolerance = 1) => assert.ok(Math.abs(ac
             pause = await pauseAndResume(page);
             await boardAndReturn(page, seed.id);
           }
-          report({ label: `${seed.id} ${viewport.width}×${viewport.height}: aligned light → flash → full 80-tile duel → same menu`, geometry, timing, samples: { early, crescent, glow, flash, exit }, pause, ended });
+          report({ label: `${seed.id} ${viewport.width}×${viewport.height}: aligned light → flash → full 60-tile duel → same menu`, geometry, timing, samples: { early, crescent, glow, flash, exit }, pause, ended });
         } catch (error) { await captureFailure(page); throw error; }
         finally { await context.close(); }
       }

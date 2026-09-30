@@ -3,11 +3,12 @@
 export const REWARDED_AD_CONFIG = Object.freeze({ mode: 'test', testOutcome: 'completed' });
 const outcomes = new Set(['completed', 'cancelled', 'failed', 'unavailable']);
 
-export async function requestRewardedAd({ attemptId, provider, config = REWARDED_AD_CONFIG } = {}) {
+export async function requestRewardedAd({ attemptId, provider, placement = 'daily-rewards', config = REWARDED_AD_CONFIG } = {}) {
   if (!attemptId) return { status: 'failed' };
+  if (!['daily-rewards', 'daily-quests'].includes(placement)) return { status: 'failed', attemptId };
   try {
     const result = provider
-      ? await provider.show({ placement: 'daily-rewards', attemptId })
+      ? await provider.show({ placement, attemptId })
       : config.mode === 'test' ? { status: config.testOutcome } : { status: 'unavailable' };
     const status = typeof result === 'string' ? result : result?.status;
     return { status: outcomes.has(status) ? status : 'failed', attemptId };

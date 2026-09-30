@@ -83,8 +83,8 @@ const browserName = process.argv.includes('--webkit') ? 'webkit' : 'chromium';
   }));
   async function launch(ruleset) {
     await button('Play Duel').click(); await page.locator('.game-board').waitFor();
-    await page.waitForFunction(() => document.querySelectorAll('.game-tile').length === 80);
-    assert.match(await page.locator('.game-board').getAttribute('aria-label'), new RegExp(`^${ruleset} Mahjong board, 80 tiles left$`));
+    await page.waitForFunction(() => document.querySelectorAll('.game-tile').length === 60);
+    assert.match(await page.locator('.game-board').getAttribute('aria-label'), new RegExp(`^${ruleset} Mahjong board, 60 tiles left$`));
     assert.equal(await page.locator('.game-tile[data-face-up="true"]').count(), 0);
     const wallet = (await stored('progression')).wallet;
     for (const [id, name] of Object.entries({ shuffle: 'Shuffle', hint: 'Hint', freeze: 'Freeze', eagle: 'Eagle Eye' })) {
@@ -182,7 +182,7 @@ const browserName = process.argv.includes('--webkit') ? 'webkit' : 'chromium';
     await page.waitForFunction(() => document.querySelectorAll('.game-tile.hinted').length === 2);
     const pair = await page.locator('.game-tile.hinted').evaluateAll(nodes => nodes.map(node => node.dataset.tileId));
     await tap(pair[0]); await tap(pair[1]);
-    await page.waitForFunction(() => document.querySelectorAll('.game-tile').length === 78);
+    await page.waitForFunction(() => document.querySelectorAll('.game-tile').length === 58);
     assert.equal(await page.locator('.player-score').first().locator('strong').innerText(), '100');
     assert.equal(await button('Hint, 1 uses left').count(), 1);
     const earnedCollection = await stored('collection');
@@ -223,7 +223,7 @@ const browserName = process.argv.includes('--webkit') ? 'webkit' : 'chromium';
     assert.equal(await page.getByRole('group', { name: 'Collection ruleset' }).count(), 0, 'Collection follows the edition chosen in Settings');
     assert.match(await page.locator('.collection-summary').innerText(), /\b3 pairs matched\b/);
     await button('Back to main menu').click(); await page.locator('.collection-page').waitFor({ state: 'detached' });
-    report('confirmed Leave and reload discard the duel; earned binder progress survives and fresh 80-tile games with a persistent booster wallet never repeat the previous formation');
+    report('confirmed Leave and reload discard the duel; earned binder progress survives and fresh 60-tile games with a persistent booster wallet never repeat the previous formation');
 
     for (const [width, height] of [[320, 568], [375, 667], [390, 844], [440, 956], [768, 1024], [1024, 1366]]) {
       await page.setViewportSize({ width, height }); await page.waitForTimeout(180); await home();

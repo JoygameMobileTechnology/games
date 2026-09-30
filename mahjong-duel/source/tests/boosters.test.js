@@ -65,8 +65,8 @@ test('Freeze survives matches, skips precisely the next ghost handoff and never 
   assert.equal(canUseBooster(miss, 'freeze'), true);
 });
 
-test('21 pairs secures a lead without ending the remaining board', () => {
-  const first = { ...game(), score: 2100, aiScore: 1800 };
+test('16 pairs secures a lead without ending the remaining board', () => {
+  const first = { ...game(), score: 1600, aiScore: 1300 };
   assert.equal(getDuelOutcome(first), null);
   assert.equal(getDuelOutcome({ ...first, tiles: first.tiles.map(tile => ({ ...tile, removed: true })) }), 'win');
 });

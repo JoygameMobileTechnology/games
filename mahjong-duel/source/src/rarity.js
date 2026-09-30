@@ -1,6 +1,6 @@
 import { themeTileSets } from './tile-data.js';
 
-/** Cosmetic tiers only. These values never change draws, matching or points. */
+/** Artwork tiers. The balancing deal uses rarity quotas; matching and points stay equal. */
 export const RARITIES = Object.freeze([
   { id: 'marble', code: 'M', label: 'Marble', color: '#f3eddd', ink: '#635d53', tint: '#f7f3e9', order: 0 },
   { id: 'sapphire', code: 'S', label: 'Sapphire', color: '#4c8fdf', ink: '#225597', tint: '#e1edfc', order: 1 },

@@ -109,9 +109,10 @@ test('legacy unlocks retain their AP and timestamps, while the next earned tier 
   assert.equal(migrated.achievementRewardsVersion, ACHIEVEMENT_REWARDS_VERSION);
   assert.equal(migrated.points, 25);
   assert.deepEqual(migrated.awardedPoints, { A001: 5, A002: 5, A003: 5, A004: 10 });
-  for (const key of ['unlocked', 'counters', 'newAchievementIds', 'eventReceipts', 'completedGameIds']) assert.deepEqual(migrated[key], source[key], key);
+  assert.deepEqual(migrated.eventReceipts, { ...source.eventReceipts, 'starter-boosters:v1': NOW });
+  for (const key of ['unlocked', 'counters', 'newAchievementIds', 'completedGameIds']) assert.deepEqual(migrated[key], source[key], key);
   const event = { type: 'complete', eventId: 'next-duel:complete', gameId: 'next-duel', themeId: 'ming-porcelain', rulesetId: 'eastern',
-    formationId: 'crown', outcome: 'lose', afterPairs: { you: 19, ai: 21 }, now: NOW + 1 };
+    formationId: 'crown', outcome: 'lose', afterPairs: { you: 14, ai: 16 }, now: NOW + 1 };
   const next = reduceProgression(migrated, event);
   assert.equal(next.awardedPoints.A005, 40);
   assert.equal(next.points, 65);

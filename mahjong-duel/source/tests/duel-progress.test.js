@@ -3,11 +3,12 @@ import assert from 'node:assert/strict';
 import { createDuelState, resolveDuelAttempt } from '../src/duel.js';
 import { useBooster, advanceBoosterEffects } from '../src/boosters.js';
 import { createDuelTracker, observeFlip, resolveTrackedAttempt, trackBooster, trackAutomaticShuffle, completedDuelEvent, coalesceStreakCues, PAIR_CHAIN_NAMES } from '../src/duel-progress.js';
+import { createProgression, reduceProgression } from '../src/progression.js';
 
 function harness(extra = {}, trackerExtra = {}) {
   let game = { ...createDuelState(), mode: 'duel', gameId: 'fixture-duel', theme: 'ming-porcelain', ruleset: 'eastern', formationId: 'crown',
     boosters: { shuffle: 5, hint: 5, freeze: 5, eagle: 5 }, freezeReady: false, eagleMs: 0,
-    tiles: Array.from({ length: 80 }, (_, n) => ({ id: `t${n}`, matchKey: `face${Math.floor(n / 4)}`, x: n * 2, y: 0, z: 0, removed: false })), ...extra };
+    tiles: Array.from({ length: 60 }, (_, n) => ({ id: `t${n}`, matchKey: `face${Math.floor(n / 4)}`, x: n * 2, y: 0, z: 0, removed: false })), ...extra };
   let tracker = { ...createDuelTracker(game), ...trackerExtra };
   return {
     get game() { return game; }, get tracker() { return tracker; },
@@ -164,29 +165,36 @@ test('Turning Points use local-perspective crossings, genuine prior opponent lea
   const deficit = harness(); for (let i = 0; i < 5; i++) deficit.pair('ai');
   assert.equal(hasCue(deficit.pair('you'), 'turning_recover_four'), true);
   deficit.pair('ai'); assert.equal(hasCue(deficit.pair('you'), 'turning_recover_four'), false);
-  const composed = harness({ score: 1600, aiScore: 1900 }); assert.equal(hasCue(composed.pair('you'), 'turning_four_to_win'), true);
-  const cannotWin = harness({ score: 1600, aiScore: 2000 }); assert.equal(hasCue(cannotWin.pair('you'), 'turning_four_to_win'), false);
-  const resolute = harness({ score: 1700, aiScore: 1900 });
+  const composed = harness({ score: 1100, aiScore: 1400 }); assert.equal(hasCue(composed.pair('you'), 'turning_four_to_win'), true);
+  const cannotWin = harness({ score: 1100, aiScore: 1500 }); assert.equal(hasCue(cannotWin.pair('you'), 'turning_four_to_win'), false);
+  const resolute = harness({ score: 1200, aiScore: 1400 });
   const cue = resolute.pair('ai').cues.find(item => item.id === 'turning_draw_only');
   assert.equal(cue.owner, 'you'); assert.equal(cue.subtitle, 'Match the remaining pairs to draw');
 });
 
-test('victory freezes qualification at 21; cleanup still earns pairs/chains but cannot rewrite or create winning facts', () => {
-  const h = harness(); for (let i = 0; i < 20; i++) h.pair('you');
+test('victory freezes qualification at 16; cleanup still earns pairs/chains but cannot rewrite or create winning facts', () => {
+  const h = harness(); for (let i = 0; i < 15; i++) h.pair('you');
+  assert.equal(h.tracker.securedWinner, null, '15 pairs can still result in a tie');
+  assert.equal(h.tracker.winningSnapshot, null);
   const secured = h.pair('you'); assert.equal(hasCue(secured, 'turning_win_secured'), true);
-  assert.equal(completedDuelEvent(h.tracker, h.game, 'win'), null, '21 is not board completion');
+  assert.equal(completedDuelEvent(h.tracker, h.game, 'win'), null, '16 is not board completion');
   const snapshot = structuredClone(h.tracker.winningSnapshot);
   assert.equal(snapshot.conditionalWins.noMismatch, true); assert.equal(snapshot.conditionalWins.noBoosters, true);
   assert.equal(snapshot.conditionalWins.frontRunner, true); assert.equal(snapshot.conditionalWins.chainFinishFive, true);
-  h.booster('hint'); h.attempt(['t42', 't44'], 'you');
+  h.booster('hint'); h.attempt(['t32', 't36'], 'you');
   while (h.game.tiles.some(tile => !tile.removed)) {
     const result = h.pair('ai'); assert.equal(result.cues.length, 0, 'no comparative cues or opponent chain during cleanup');
   }
   assert.deepEqual(h.tracker.winningSnapshot, snapshot);
   const complete = completedDuelEvent(h.tracker, h.game, 'win', 99);
-  assert.equal(complete.eventId, 'fixture-duel:complete'); assert.deepEqual(complete.afterPairs, { you: 21, ai: 19 });
+  assert.equal(complete.eventId, 'fixture-duel:complete'); assert.deepEqual(complete.afterPairs, { you: 16, ai: 14 });
   assert.equal(complete.conditionalWins.closeFinish, false, 'cleanup cannot make a false close finish true');
   assert.equal(complete.conditionalWins.noBoosters, true); assert.equal(complete.conditionalWins.noMismatch, true);
+  const progress = reduceProgression(createProgression({ seed: 42 }), complete);
+  assert.equal(progress.counters.completedDuels, 1, 'the 30-pair tracker receipt reaches durable progression');
+  assert.equal(progress.counters.completedWins, 1);
+  assert.equal(progress.currencies.coins, 100, 'completion pays the existing win reward');
+  assert.strictEqual(reduceProgression(progress, complete), progress, 'completion cannot pay twice');
   assert.deepEqual(completedDuelEvent(h.tracker, h.game, 'win', 99), complete, 'completion replay has stable identity');
   assert.equal(completedDuelEvent(h.tracker, h.game, 'tie'), null);
 });
@@ -198,29 +206,29 @@ test('winning snapshot captures ten-pair recovery, actual leader changes through
   h.pair('ai'); h.pair('ai'); // second, tie itself does not change leader
   h.pair('you'); h.pair('you'); // third
   assert.equal(h.tracker.leadChanges, 3);
-  while (h.game.score < 2100) h.pair('you');
+  while (h.game.score < 1600) h.pair('you');
   const facts = h.tracker.winningSnapshot.conditionalWins;
   for (const key of ['recoverFive', 'recoverTen', 'opponentFirst', 'threeLeadChanges', 'allFourBoosters']) assert.equal(facts[key], true, key);
   assert.equal(facts.exactlyOneBooster, false); assert.equal(facts.frontRunner, false);
 });
 
-test('final draw is local-owned regardless of last actor; opponent securing 21 emits no streak', () => {
+test('final draw is local-owned regardless of last actor; opponent securing 16 emits no streak', () => {
   for (const lastActor of ['you', 'ai']) {
     const h = harness();
-    for (let i = 0; i < 20; i++) h.pair(lastActor === 'you' ? 'ai' : 'you');
-    for (let i = 0; i < 19; i++) h.pair(lastActor);
+    for (let i = 0; i < 15; i++) h.pair(lastActor === 'you' ? 'ai' : 'you');
+    for (let i = 0; i < 14; i++) h.pair(lastActor);
     const last = h.pair(lastActor);
     const cue = last.cues.find(item => item.id === 'turning_draw_final');
     assert.equal(cue.owner, 'you'); assert.equal(hasCue(last, 'turning_equalize'), false);
     assert.equal(completedDuelEvent(h.tracker, h.game, 'tie').outcome, 'tie');
   }
-  const loss = harness(); for (let i = 0; i < 20; i++) loss.pair('ai');
+  const loss = harness(); for (let i = 0; i < 15; i++) loss.pair('ai');
   assert.deepEqual(loss.pair('ai').cues, []);
-  for (let i = 0; i < 19; i++) assert.ok(loss.pair('you').cues.every(cue => cue.family === 'chain'));
+  for (let i = 0; i < 14; i++) assert.ok(loss.pair('you').cues.every(cue => cue.family === 'chain'));
 });
 
 test('presentation admits only local ownership, deduplicates, and coalesces to highest-priority primary plus one secondary', () => {
-  const h = harness({ score: 2000 }), result = h.pair('you');
+  const h = harness({ score: 1500 }), result = h.pair('you');
   const cues = [
     { family: 'chain', id: 'chain_15', name: 'Phenomenal', count: 15, eventId: 'chain', actor: 'you', owner: 'you' },
     { family: 'turning', id: 'turning_comeback_lead', eventId: 'comeback', actor: 'you', owner: 'you' },
@@ -234,11 +242,11 @@ test('presentation admits only local ownership, deduplicates, and coalesces to h
   assert.deepEqual(coalesceStreakCues(cues.map(cue => ({ ...cue, owner: 'ai' }))), []);
 });
 
-test('close-finish, exactly-one-booster and mismatch limits reflect the 21st pair precisely', () => {
+test('close-finish, exactly-one-booster and mismatch limits reflect the 16th pair precisely', () => {
   const h = harness(); h.booster('hint');
   for (let i = 0; i < 3; i++) h.attempt(['t0', 't4'], 'you');
-  for (let i = 0; i < 19; i++) h.pair('ai');
-  for (let i = 0; i < 21; i++) h.pair('you');
+  for (let i = 0; i < 14; i++) h.pair('ai');
+  for (let i = 0; i < 16; i++) h.pair('you');
   const facts = completedDuelEvent(h.tracker, h.game, 'win').winningSnapshot.conditionalWins;
   assert.equal(facts.closeFinish, true); assert.equal(facts.exactlyOneBooster, true);
   assert.equal(facts.noMismatch, false); assert.equal(facts.atMostTwoMisses, false);

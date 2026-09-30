@@ -1,11 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ArrowsClockwise, Check, Clock, Eye, Lightbulb, Snowflake } from '@phosphor-icons/react';
+import { ArrowsClockwise, Check, Clock, Eye, Lightbulb, Play, Snowflake } from '@phosphor-icons/react';
 import { ProgressionPage } from './progression-page.jsx';
 import { CurrencyBalance, CurrencyIcon } from './currency-ui.jsx';
 import { getDailyQuestView } from './daily-quests.js';
 import { getDailyQuestPresentation } from './daily-quest-presentation.js';
 import { DailyQuestIcon } from './daily-quest-icon.jsx';
-import { SHOP_CURRENCY_PACKS, SHOP_BOOSTER_PACKS, canAfford } from './economy.js';
+import { SHOP_CURRENCY_PACKS, SHOP_BOOSTER_PACKS, boosterCost, canAfford } from './economy.js';
 import './economy-pages.css';
 import './daily-quests-page.css';
 import './shop-page.css';
@@ -40,12 +40,16 @@ function boosterSummary(product) {
   return kinds.map(kind => `${product.boosters[kind]} ${BOOSTERS[kind].label}${product.boosters[kind] > 1 ? 's' : ''}`).join(' + ');
 }
 function ShopBoosterCard({ product, currencies, busy, onSelect, combo = false }) {
-  const canBuy = canAfford(currencies, product.cost);
   return <article className={`shop-product ${combo ? 'shop-combo-product' : 'shop-booster-product'}`} aria-label={product.name}>
     <div className="shop-booster-copy"><h4>{product.name}</h4>{combo && <p>{boosterSummary(product)}</p>}</div>
     {!combo && <BoosterContents boosters={product.boosters} />}
-    <button type="button" className="economy-price-button" data-shop-product={product.id} disabled={busy || !canBuy} onClick={() => onSelect(product)} aria-label={`Buy ${product.name} for ${currencyText(product.cost)}`}><CurrencyAmounts amounts={product.cost} /></button>
-    {!canBuy && <small className="shop-insufficient">Need {missingCurrency(currencies, product.cost)}</small>}
+    <div className="shop-payment-options" aria-label="Choose payment">{['primary', 'coins'].map((payment, index) => {
+      const cost = boosterCost(product, payment), canBuy = canAfford(currencies, cost);
+      return <React.Fragment key={payment}>{index > 0 && <span className="shop-payment-or">or</span>}<div>
+        <button type="button" className="economy-price-button" data-shop-product={product.id} data-shop-payment={payment} disabled={busy || !canBuy} onClick={() => onSelect(product, payment)} aria-label={`Buy ${product.name} for ${currencyText(cost)}`}><CurrencyAmounts amounts={cost} /></button>
+        {!canBuy && <small className="shop-insufficient">Need {missingCurrency(currencies, cost)}</small>}
+      </div></React.Fragment>;
+    })}</div>
   </article>;
 }
 function usePageAction() {
@@ -74,7 +78,7 @@ function resetLabel(resetAt, now) {
   return `New quests in ${hours ? `${hours}h ` : ''}${rest}m`;
 }
 
-export function DailyQuestsPage({ progression, onClose, onClaim, onReroll, now = Date.now(), showLoginAction = false }) {
+export function DailyQuestsPage({ progression, onClose, onClaim, onDoubleClaim, onReroll, now = Date.now(), showLoginAction = false }) {
   const view = getDailyQuestView(progression, now), action = usePageAction();
   const [rerollId, setRerollId] = useState(null);
   const currentDay = useRef(view.dayId), confirmRef = useRef(null), rerollOpener = useRef(null), questList = useRef(null), replacementFocus = useRef(null);
@@ -100,7 +104,7 @@ export function DailyQuestsPage({ progression, onClose, onClaim, onReroll, now =
     <div className="daily-quest-list" ref={questList}>{view.quests.map(quest => {
       const difficulty = DIFFICULTIES[quest.difficulty] || DIFFICULTIES.easy;
       const presentation = getDailyQuestPresentation(quest);
-      const rerolling = rerollId === quest.id, busy = Boolean(action.pending), finished = quest.completed || quest.claimed;
+      const rerolling = rerollId === quest.id, busy = Boolean(action.pending || view.adAttempt), finished = quest.completed || quest.claimed;
       return <article className={`daily-quest-card difficulty-${quest.difficulty} ${quest.claimed ? 'is-claimed' : quest.completed ? 'is-complete' : ''}`} key={`${view.dayId}:${quest.id}`} aria-label={`${quest.title}, ${difficulty} quest`}>
         <div className="daily-quest-main">
           <div className="daily-quest-art"><DailyQuestIcon metric={quest.metric} /></div>
@@ -110,9 +114,13 @@ export function DailyQuestsPage({ progression, onClose, onClaim, onReroll, now =
             {presentation.detail && <p className="daily-quest-description">{presentation.detail}</p>}
           </div>
           <div className="daily-quest-progress"><progress value={Math.min(quest.progress, quest.target)} max={quest.target} aria-label={`${quest.title} progress`} /><strong>{presentation.bestRun && <small>Best run: </small>}{format(Math.min(quest.progress, quest.target))} / {format(quest.target)}</strong></div>
-          <div className="daily-quest-actions">{quest.claimed ? <span className="daily-quest-claimed"><span><Check size={28} weight="bold" aria-hidden="true" /></span>Claimed</span> : quest.completed ? <button type="button" className="daily-quest-claim" disabled={busy} onClick={() => action.run(`claim:${quest.id}`, onClaim, quest.id, view.dayId)}><span><Check size={28} weight="bold" aria-hidden="true" /></span><strong>{action.pending === `claim:${quest.id}` ? 'Claiming…' : 'Claim'}</strong></button> : <button type="button" className="daily-quest-reroll" aria-label={`Replace ${quest.title}`} aria-expanded={rerolling} disabled={busy || view.rerollsLeft < 1} onClick={event => { action.clear(); rerollOpener.current = event.currentTarget; setRerollId(rerolling ? null : quest.id); }}><span className="daily-quest-wood-button"><ArrowsClockwise size={34} weight="bold" aria-hidden="true" /></span><strong>{view.rerollsLeft > 0 ? 'Re-roll' : 'Used today'}</strong></button>}</div>
+          <div className="daily-quest-actions">{quest.claimed ? <span className="daily-quest-claimed"><span><Check size={28} weight="bold" aria-hidden="true" /></span>Claimed</span> : quest.completed ? <span className="daily-quest-claimed"><span><Check size={28} weight="bold" aria-hidden="true" /></span>{quest.pending ? 'Claiming…' : 'Complete'}</span> : <button type="button" className="daily-quest-reroll" aria-label={`Replace ${quest.title}`} aria-expanded={rerolling} disabled={busy || view.rerollsLeft < 1} onClick={event => { action.clear(); rerollOpener.current = event.currentTarget; setRerollId(rerolling ? null : quest.id); }}><span className="daily-quest-wood-button"><ArrowsClockwise size={34} weight="bold" aria-hidden="true" /></span><strong>{view.rerollsLeft > 0 ? 'Re-roll' : 'Used today'}</strong></button>}</div>
         </div>
-        <div className="daily-quest-reward"><strong>Reward</strong><CurrencyAmounts amounts={quest.reward} /></div>
+        <div className="daily-quest-reward"><strong>{quest.claimed ? 'Collected' : 'Reward'}{quest.claimMultiplier === 2 ? ' ×2' : ''}</strong><CurrencyAmounts amounts={Object.fromEntries(Object.entries(quest.reward).map(([kind, value]) => [kind, value * (quest.claimMultiplier || 1)]))} /></div>
+        {quest.completed && !quest.claimed && <div className="daily-quest-claim-options">
+          <button type="button" className="economy-small-primary" disabled={busy} onClick={() => action.run(`claim:${quest.id}`, onClaim, quest.id, view.dayId)}>Claim</button>
+          <button type="button" className="economy-quiet-button daily-quest-double" disabled={busy} onClick={() => action.run(`double:${quest.id}`, onDoubleClaim, quest.id, view.dayId)}><span><Play size={15} weight="fill" aria-hidden="true" />{quest.pending ? 'Claiming…' : 'Claim 2×'}</span><small>Watch ad · {currencyText(Object.fromEntries(Object.entries(quest.reward).map(([kind, value]) => [kind, value * 2])))}</small></button>
+        </div>}
         {rerolling && !finished && <section className="daily-quest-reroll-confirm" aria-label="Confirm quest replacement"><h4 ref={confirmRef} tabIndex={-1}>Replace this quest?</h4><p>Uses your free daily replacement. This quest’s progress is lost, and the new quest will have a different difficulty.</p><div><button type="button" className="economy-quiet-button" disabled={busy} onClick={cancelReroll}>Keep quest</button><button type="button" className="economy-small-primary" disabled={busy || view.rerollsLeft < 1} onClick={() => reroll(quest)}>{busy ? 'Replacing…' : 'Replace for free'}</button></div></section>}
       </article>;
     })}</div>
@@ -130,15 +138,15 @@ export function ShopPage({ progression, onClose, onBuy, onPurchase, purchaseStat
   const externalBusy = purchaseState === 'loading', busy = Boolean(action.pending) || externalBusy;
   useEffect(() => {
     if (!confirm && restore.current) {
-      if (bodyRef.current) { bodyRef.current.scrollTop = scrollPosition.current; bodyRef.current.querySelector(`[data-shop-product="${openerId.current}"]`)?.focus({ preventScroll: true }); }
+      if (bodyRef.current) { bodyRef.current.scrollTop = scrollPosition.current; bodyRef.current.querySelector(`[data-shop-product="${openerId.current.id}"]${openerId.current.payment ? `[data-shop-payment="${openerId.current.payment}"]` : ''}`)?.focus({ preventScroll: true }); }
       restore.current = false;
     }
   }, [confirm]);
-  const openConfirmation = product => { scrollPosition.current = bodyRef.current?.scrollTop || 0; openerId.current = product.id; action.clear(); setConfirm(product); if (bodyRef.current) bodyRef.current.scrollTop = 0; };
+  const openConfirmation = (product, payment = 'primary') => { scrollPosition.current = bodyRef.current?.scrollTop || 0; openerId.current = { id: product.id, payment: product.kind === 'booster' ? payment : null }; action.clear(); setConfirm(product.kind === 'booster' ? { ...product, cost: boosterCost(product, payment), payment } : product); if (bodyRef.current) bodyRef.current.scrollTop = 0; };
   const closeConfirmation = () => { restore.current = true; setConfirm(null); };
   const completePurchase = async () => {
     if (!confirm || busy) return;
-    const result = await action.run(confirm.id, confirm.kind === 'currency' ? onPurchase : onBuy, confirm.id);
+    const result = await action.run(confirm.id, confirm.kind === 'currency' ? onPurchase : onBuy, confirm.id, confirm.payment);
     if (result?.ok) closeConfirmation();
   };
   const affordable = !confirm || confirm.kind === 'currency' || canAfford(progression.currencies, confirm.cost);
@@ -163,7 +171,7 @@ export function ShopPage({ progression, onClose, onBuy, onPurchase, purchaseStat
           <button type="button" className="economy-price-button shop-currency-price" data-shop-product={product.id} disabled={busy} onClick={() => openConfirmation(product)} aria-label={`${product.name}, ${product.priceLabel}, test purchase`}>{product.priceLabel}</button>
         </article>)}</div>
       </section>
-      <section className="shop-section" aria-labelledby="shop-boosters-heading"><h3 id="shop-boosters-heading" className="ornament-heading">Booster packs</h3><div className="shop-products shop-single-products">{singlePacks.map(product => <ShopBoosterCard key={product.id} product={product} currencies={progression.currencies} busy={busy} onSelect={openConfirmation} />)}</div></section>
+      <section className="shop-section" aria-labelledby="shop-boosters-heading"><h3 id="shop-boosters-heading" className="ornament-heading">Boosters</h3><div className="shop-products shop-single-products">{singlePacks.map(product => <ShopBoosterCard key={product.id} product={product} currencies={progression.currencies} busy={busy} onSelect={openConfirmation} />)}</div></section>
       <section className="shop-section" aria-labelledby="shop-combos-heading"><h3 id="shop-combos-heading" className="ornament-heading">Combo packs</h3><div className="shop-combo-products">{comboPacks.map(product => <ShopBoosterCard key={product.id} product={product} currencies={progression.currencies} busy={busy} onSelect={openConfirmation} combo />)}</div></section>
     </>}
   </ProgressionPage>;

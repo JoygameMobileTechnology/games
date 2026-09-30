@@ -6,21 +6,23 @@ const fs = require('node:fs');
 const path = require('node:path');
 const browserName = process.argv.includes('--webkit') ? 'webkit' : 'chromium';
 const origin = process.env.GAME_URL || 'http://localhost:5173';
-const output = path.resolve('tmp/original-ai');
+const output = path.resolve('tmp/opponent-settings');
 
 (async () => {
   fs.mkdirSync(output, { recursive: true });
   const browser = await require(process.env.PLAYWRIGHT_MODULE || 'playwright')[browserName].launch();
   const reports = [];
   try {
-    for (const viewport of [{ width: 320, height: 568 }, { width: 768, height: 1024 }]) {
+    for (const viewport of [{ width: 320, height: 568 }, { width: 390, height: 844 }, { width: 768, height: 1024 }]) {
       const label = `${browserName}-${viewport.width}x${viewport.height}`;
       const context = await browser.newContext({ viewport, isMobile: true, hasTouch: true, reducedMotion: 'reduce' });
-      await context.addInitScript(() => {
-        // Only presentation preferences are seeded; opponent choice and duel state use the UI.
+      const previousMode = viewport.width === 320 ? 'modern' : viewport.width === 768 ? 'original' : null;
+      await context.addInitScript(previousMode => {
+        // Legacy settings lack the migration stamp. Later choices use the UI.
+        if (previousMode && !localStorage.getItem('porcelain:aiModeVersion')) localStorage.setItem('porcelain:aiMode', JSON.stringify(previousMode));
         localStorage.setItem('porcelain:gentle', 'true');
         localStorage.setItem('porcelain:sound', 'false');
-      });
+      }, previousMode);
       const page = await context.newPage(), errors = [];
       page.setDefaultTimeout(10000);
       page.on('pageerror', error => errors.push(error.message));
@@ -30,18 +32,18 @@ const output = path.resolve('tmp/original-ai');
       await page.clock.pauseAt(time);
       const advance = async (ms = 200) => { await page.clock.runFor(ms); await page.evaluate(() => document.body.childElementCount); };
       const button = name => page.getByRole('button', { name, exact: true });
-      async function tap(name) {
+      async function tap(name, settle = 400) {
         const control = button(name);
         await control.waitFor();
         await control.scrollIntoViewIfNeeded();
         const rect = await control.boundingBox();
         assert.ok(rect, `${label}: ${name} is visible`);
         await page.mouse.click(rect.x + rect.width / 2, rect.y + rect.height / 2);
-        await advance(400);
+        await advance(settle);
       }
       async function checkSettings(selected, current) {
         await page.getByRole('heading', { name: 'Settings', exact: true }).waitFor();
-        for (const name of ['Modern AI', 'Original AI']) {
+        for (const name of ['Realistic', 'Modern AI', 'Original AI']) {
           assert.equal(await button(name).getAttribute('aria-pressed'), String(name === selected));
           const rect = await button(name).boundingBox();
           assert.ok(rect.width >= 44 && rect.height >= 44, `${label}: ${name} has a 44px touch target (${rect.width}×${rect.height})`);
@@ -90,47 +92,68 @@ const output = path.resolve('tmp/original-ai');
         assert.ok(settled, `${label}: ${mode} returns control after actual reveals`);
         return { mode, playerAttempts, ghostRevealed };
       }
+      async function enterDuel() {
+        await page.getByRole('heading', { name: 'Choose a theme', exact: true }).waitFor();
+        await tap('Play Duel');
+        await advance(4000); await advance(1500);
+        await page.locator('.game-board').waitFor(); await advance(1000);
+      }
+      async function checkRules(mode) {
+        await tap('Rules');
+        const rules = await page.locator('.rules-content').textContent();
+        assert.match(rules, new RegExp(mode));
+        for (const other of ['Realistic', 'Modern AI', 'Original AI'].filter(value => value !== mode)) assert.doesNotMatch(rules, new RegExp(other));
+        if (mode === 'Original AI') for (const rate of ['40%', '35%', '25%']) assert.ok(rules.includes(rate));
+        if (mode === 'Modern AI') assert.match(rules, /last two completed pair attempts/);
+        if (mode === 'Realistic') {
+          assert.match(rules, /reveal|visible|see/i);
+          assert.match(rules, /adapt|skill|level/i);
+          assert.match(rules, /streak|good|bad/i);
+        }
+        await tap('Got it');
+      }
       try {
         await page.goto(origin);
         await page.getByRole('heading', { name: 'Daily Rewards', exact: true }).waitFor();
         await advance(400); await tap('Claim rewards');
         await page.getByRole('heading', { name: 'Daily Quests', exact: true }).waitFor();
         await tap('Back to main menu');
-        await tap('Settings'); await checkSettings('Modern AI');
-        await tap('Original AI'); await checkSettings('Original AI');
+        await tap('Settings'); await checkSettings('Realistic');
+        assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('porcelain:aiModeVersion'))), 1, 'the one-time default migration is marked complete');
+        await checkRules('Realistic');
         await page.screenshot({ path: path.join(output, `${label}-settings.png`), animations: 'disabled' });
+        await tap('Done'); await page.reload(); await advance(400);
+        await tap('Settings'); await checkSettings('Realistic');
+        assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('porcelain:aiMode'))), 'realistic');
+        await tap('Done'); await tap('Play Duel'); await enterDuel();
+        const moves = [await playAttempts('Realistic')];
+        await tap('Pause game'); await tap('Settings');
+        await checkSettings('Realistic', 'Realistic');
+        await tap('Original AI'); await checkSettings('Original AI');
+        await checkSettings('Original AI', 'Realistic');
+        await checkRules('Realistic');
         await tap('Done');
         await page.reload(); await advance(400);
         await tap('Settings'); await checkSettings('Original AI');
         assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('porcelain:aiMode'))), 'original');
-        await tap('Done'); await tap('Play Duel');
-        await page.getByRole('heading', { name: 'Choose a theme', exact: true }).waitFor();
-        await tap('Play Duel');
-        await advance(4000); await advance(1500);
-        await page.locator('.game-board').waitFor(); await advance(1000);
-        const moves = [await playAttempts('Original AI')];
+        await tap('Done'); await tap('Play Duel'); await enterDuel();
+        moves.push(await playAttempts('Original AI'));
         await tap('Pause game'); await tap('Settings');
         await checkSettings('Original AI', 'Original AI');
         await tap('Modern AI'); await checkSettings('Modern AI', 'Original AI');
-        await tap('Rules');
-        const originalRules = await page.locator('.rules-content').textContent();
-        assert.match(originalRules, /Original AI/); assert.match(originalRules, /40%/); assert.match(originalRules, /35%/); assert.match(originalRules, /25%/);
-        assert.doesNotMatch(originalRules, /Modern AI/);
-        await tap('Got it'); await checkSettings('Modern AI', 'Original AI');
+        await checkRules('Original AI'); await checkSettings('Modern AI', 'Original AI');
         await tap('Done'); await tap('New duel'); await tap('Choose a theme');
-        await page.getByRole('heading', { name: 'Choose a theme', exact: true }).waitFor();
-        await tap('Play Duel');
-        await advance(4000); await advance(1500);
-        await page.locator('.game-board').waitFor(); await advance(1000);
+        await enterDuel();
         moves.push(await playAttempts('Modern AI'));
         await tap('Pause game'); await tap('Settings');
         await checkSettings('Modern AI', 'Modern AI');
-        await tap('Rules');
-        assert.match(await page.locator('.rules-content').textContent(), /Modern AI.*last two completed pair attempts/s);
-        assert.doesNotMatch(await page.locator('.rules-content').textContent(), /Original AI/);
+        await checkRules('Modern AI');
+        await tap('Done'); await page.reload(); await advance(400);
+        await tap('Settings'); await checkSettings('Modern AI');
+        assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('porcelain:aiMode'))), 'modern');
         assert.deepEqual(errors, []);
-        reports.push({ label, moves, errors });
-        console.log(`PASS ${label}: settings, persistence, next-duel isolation, Rules, both opponents play`);
+        reports.push({ label, previousMode, moves, errors });
+        console.log(`PASS ${label}: Realistic ${previousMode ? `migration from ${previousMode}` : 'new-player default'}, three settings, persistence, next-duel isolation, Rules, all opponents play`);
       } catch (error) {
         await page.screenshot({ path: path.join(output, `${label}-failure.png`), animations: 'disabled' }).catch(() => {});
         throw error;

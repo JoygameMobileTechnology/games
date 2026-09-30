@@ -110,7 +110,7 @@ test('the outcome waits for a shared empty board and compares scores regardless 
   }
 });
 
-test('a complete seeded board has exactly 4000 shared points with either actor clearing it', () => {
+test('a complete seeded board has exactly 3000 shared points with either actor clearing it', () => {
   for (const ruleset of ['eastern', 'western']) {
     for (const actor of ['you', 'ai']) {
       const deal = createGame(ruleset, 203);
@@ -122,8 +122,8 @@ test('a complete seeded board has exactly 4000 shared points with either actor c
         assert.equal(remainingCount(next.tiles), remainingCount(game.tiles) - 2);
         game = next;
       }
-      assert.equal(game.score + game.aiScore, 4000);
-      assert.equal(game.attempts + game.aiAttempts, 40);
+      assert.equal(game.score + game.aiScore, 3000);
+      assert.equal(game.attempts + game.aiAttempts, 30);
       assert.equal(getDuelOutcome(game), actor === 'you' ? 'win' : 'lose');
     }
   }
