@@ -7,6 +7,8 @@ import { rarityForTile, RARITIES } from './rarity.js';
 import { BOOSTER_IDS } from './boosters.js';
 import { createDailyState, normalizeDaily, normalizeWallet, emptyWallet, applyDailyEvent, dayIdFor, validDayId, validEventId, validTimestamp, timestampOf } from './daily-rewards.js';
 import { createRanking, normalizeRanking, advanceRanking, LEAGUES } from './leaderboards.js';
+import { DUEL_COIN_REWARDS, SHOP_CURRENCY_PACKS, emptyCurrencies, normalizeCurrencies, addCurrencies, buyBoosterPack } from './economy.js';
+import { createDailyQuestState, normalizeDailyQuests, ensureDailyQuests, applyDailyQuestEvent, recordDailyQuestGameplay } from './daily-quests.js';
 
 export const PROGRESSION_VERSION = 1;
 export const PROGRESSION_STORAGE_KEY = 'porcelain:progression';
@@ -29,7 +31,7 @@ function freshSeed() {
 export function createProgression({ collection = createCollection(), seed = freshSeed() } = {}) {
   const state = { version: PROGRESSION_VERSION, counters: Object.fromEntries(NUMERIC_COUNTER_KEYS.map(key => [key, 0])),
     sets: Object.fromEntries(SET_COUNTER_KEYS.map(key => [key, []])), unlocked: {}, awardedPoints: {}, achievementRewardsVersion: ACHIEVEMENT_REWARDS_VERSION,
-    points: 0, wallet: emptyWallet(),
+    points: 0, wallet: emptyWallet(), currencies: emptyCurrencies(), purchaseReceipts: {}, quests: createDailyQuestState(),
     collection: normalizeCollection(collection), daily: createDailyState(), ranking: createRanking(seed),
     eventReceipts: {}, attemptCursors: {}, completedGameIds: [], pendingRankingPresentation: null, newAchievementIds: [] };
   return deriveCollectionCounters(state);
@@ -80,6 +82,11 @@ export function normalizeProgression(value, { collection, now = Date.now(), cold
     state.unlocked = Object.fromEntries(Object.entries(record(value.unlocked) ? value.unlocked : {}).filter(([id, timestamp]) => isAchievementId(id) && validTimestamp(timestamp)));
     state.awardedPoints = record(value.awardedPoints) ? value.awardedPoints : {};
     state.wallet = normalizeWallet(value.wallet);
+    state.currencies = normalizeCurrencies(value.currencies);
+    state.quests = normalizeDailyQuests(value.quests);
+    state.purchaseReceipts = Object.fromEntries(Object.entries(record(value.purchaseReceipts) ? value.purchaseReceipts : {}).filter(([id, item]) =>
+      validEventId(id) && validEventId(item?.eventId) && validTimestamp(item?.at) && SHOP_CURRENCY_PACKS.some(pack => pack.id === item?.productId))
+      .map(([id, item]) => [id, { productId: item.productId, eventId: item.eventId, at: item.at }]));
     state.daily = normalizeDaily(value.daily);
     state.sets.distinctLoginDayIds = [...state.daily.loginDayIds];
     state.eventReceipts = Object.fromEntries(Object.entries(record(value.eventReceipts) ? value.eventReceipts : {}).filter(([id, timestamp]) => validEventId(id) && validTimestamp(timestamp)));
@@ -90,6 +97,7 @@ export function normalizeProgression(value, { collection, now = Date.now(), cold
     state.pendingRankingPresentation = cold ? null : normalizePresentation(value.pendingRankingPresentation, state.completedGameIds);
   }
   state = deriveCollectionCounters(state);
+  state.quests = ensureDailyQuests(state.quests, now, state.ranking.seed);
   return awardAchievements(state, timestampOf(now), compatible ? undefined : backfillIds);
 }
 export function loadProgression({ collection, storage, now = Date.now() } = {}) {
@@ -129,12 +137,35 @@ export function reduceProgression(state, event) {
     return remaining.length === state.newAchievementIds.length ? state : { ...state, newAchievementIds: remaining };
   }
   if (event.type === 'ranking-presented') return consumeRankingPresentation(state);
+  if (['quests-presented', 'quest-claim', 'quest-reroll'].includes(event.type)) {
+    if (event.type !== 'quests-presented' && (!validEventId(event.eventId) || Object.hasOwn(state.eventReceipts, event.eventId))) return state;
+    const result = applyDailyQuestEvent(state.quests, event, state.ranking.seed);
+    if (!result.accepted) return state;
+    let next = { ...state, quests: result.quests, currencies: addCurrencies(state.currencies, result.grants) };
+    if (validEventId(event.eventId)) next = receipt(next, event, now);
+    return next;
+  }
+  if (['shop-buy', 'shop-purchase-simulated'].includes(event.type)) {
+    if (!validEventId(event.eventId) || Object.hasOwn(state.eventReceipts, event.eventId)) return state;
+    if (event.type === 'shop-buy') {
+      const exchange = buyBoosterPack(state.currencies, state.wallet, event.productId);
+      return exchange ? receipt({ ...state, ...exchange }, event, now) : state;
+    }
+    // Testing adapter only. The UI explicitly confirms that no payment is taken.
+    const pack = SHOP_CURRENCY_PACKS.find(item => item.id === event.productId);
+    if (!pack || !validEventId(event.transactionId) || Object.hasOwn(state.purchaseReceipts ?? {}, event.transactionId)) return state;
+    const currencies = normalizeCurrencies(state.currencies);
+    if (['coins', 'gems'].some(id => !Number.isSafeInteger(currencies[id] + pack.grants[id]))) return state;
+    return receipt({ ...state, currencies: addCurrencies(currencies, pack.grants),
+      purchaseReceipts: { ...state.purchaseReceipts, [event.transactionId]: { productId: pack.id, eventId: event.eventId, at: now } } }, event, now);
+  }
   if (['login', 'daily-presented', 'daily-claim', 'daily-ad-start', 'daily-ad-complete'].includes(event.type)) {
     if (!['login', 'daily-presented'].includes(event.type) && (!validEventId(event.eventId) || Object.hasOwn(state.eventReceipts, event.eventId))) return state;
     const result = applyDailyEvent(state.daily, event);
-    if (result.daily === state.daily) return state;
+    const quests = event.type === 'login' ? ensureDailyQuests(state.quests, now, state.ranking.seed) : state.quests;
+    if (result.daily === state.daily && quests === state.quests) return state;
     const wallet = Object.fromEntries(BOOSTER_IDS.map(id => [id, bump(state.wallet[id], result.grants[id])]));
-    let next = { ...state, daily: result.daily, wallet, sets: { ...state.sets, distinctLoginDayIds: [...result.daily.loginDayIds] } };
+    let next = { ...state, daily: result.daily, wallet, quests, sets: { ...state.sets, distinctLoginDayIds: [...result.daily.loginDayIds] } };
     if (validEventId(event.eventId)) next = receipt(next, event, now);
     return awardAchievements(next, now);
   }
@@ -160,7 +191,8 @@ export function reduceProgression(state, event) {
       for (const [key, value] of Object.entries(event.counterMaxima ?? {})) counters[key] = Math.max(counters[key], value);
       next = deriveCollectionCounters({ ...next, collection, counters });
     }
-    return awardAchievements(next, now);
+    next.quests = recordDailyQuestGameplay(state.quests, event, state.ranking.seed);
+    return awardAchievements(receipt(next, event, now), now);
   }
   if (event.type === 'complete') {
     const finalPairs = event.finalPairs ?? event.afterPairs;
@@ -176,7 +208,9 @@ export function reduceProgression(state, event) {
       distinctCompletedRulesetIds: unique(state.sets.distinctCompletedRulesetIds, event.rulesetId),
       distinctCompletedThemeRulesetCombinations: unique(state.sets.distinctCompletedThemeRulesetCombinations, `${event.themeId}:${event.rulesetId}`),
       distinctDuelCompletionDayIds: unique(state.sets.distinctDuelCompletionDayIds, dayIdFor(now)) };
-    let next = awardAchievements(receipt({ ...state, counters, sets, completedGameIds: [...state.completedGameIds, event.gameId] }, event, now), now);
+    let next = awardAchievements(receipt({ ...state, counters, sets, completedGameIds: [...state.completedGameIds, event.gameId],
+      currencies: addCurrencies(state.currencies, { coins: DUEL_COIN_REWARDS[outcome], gems: 0 }),
+      quests: recordDailyQuestGameplay(state.quests, event, state.ranking.seed) }, event, now), now);
     const ranking = advanceRanking(state.ranking, { outcome, wins: counters.completedWins, eventId: event.eventId, gameId: event.gameId, newAchievementIds: next.newAchievementIds });
     return { ...next, ranking: ranking.ranking, pendingRankingPresentation: ranking.presentation };
   }

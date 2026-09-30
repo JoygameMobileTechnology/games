@@ -1,0 +1,116 @@
+/* A quest reads from objective to progress to reward, with one action at the right. */
+.daily-quests-page .progression-page-content {
+  max-width: 760px;
+  padding: 0 14px max(24px,env(safe-area-inset-bottom));
+}
+.daily-quests-dayline {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  min-height: 74px; padding-block: 16px; color: #623217; font-size: 13px; font-weight: 800;
+}
+.daily-quests-dayline > span { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.daily-quests-dayline svg { flex-shrink: 0; }
+.daily-quests-dayline > strong { flex-shrink: 0; padding-left: 13px; border-left: 1px solid #cea866; line-height: 1.6; }
+.daily-quest-list { display: grid; grid-template-columns: minmax(0,1fr); gap: 14px; }
+.daily-quest-card {
+  min-width: 0; padding: 14px 12px 10px; border: 1px solid #d5ac66; border-radius: 13px;
+  background: linear-gradient(125deg,#fffdf0ed,#fff4dbe6);
+  box-shadow: inset 0 1px 0 #fffef7,0 3px 5px #82532a17;
+}
+.daily-quest-main {
+  display: grid; grid-template-columns: 104px minmax(0,1fr) 54px;
+  grid-template-rows: 1fr auto; column-gap: 9px; row-gap: 9px;
+  align-items: center; min-height: 109px;
+}
+.daily-quest-art { grid-column: 1; grid-row: 1 / 3; width: 100%; align-self: center; }
+.daily-quest-art > svg { display: block; width: 100%; height: auto; overflow: visible; }
+.daily-quest-copy { grid-column: 2; grid-row: 1; align-self: center; min-width: 0; }
+.daily-quest-difficulty { display: inline-block; padding: 3px 13px; border-radius: 20px; color: #225a2a; background: #c4dfaa; font-size: 12px; font-weight: 800; line-height: 1.35; }
+.difficulty-medium .daily-quest-difficulty { background: #ffce7b; color: #6c3b14; }
+.difficulty-hard .daily-quest-difficulty { background: #f6af93; color: #6f2b1d; }
+.daily-quest-copy h3 { margin: 7px 0 0; color: #542815; font-size: 18px; font-weight: 800; line-height: 1.25; letter-spacing: -.3px; overflow-wrap: break-word; }
+.daily-quest-copy h3:focus { outline: none; }
+.daily-quest-copy h3:focus-visible { outline: 2px solid #285e77; outline-offset: 4px; border-radius: 3px; }
+.daily-quest-description { margin: 5px 0 0; color: #856039; font-size: 12px; font-weight: 600; line-height: 1.4; }
+.daily-quest-progress { grid-column: 2; grid-row: 2; display: flex; align-items: center; flex-wrap: wrap; gap: 5px 8px; min-width: 0; }
+.daily-quest-progress progress { flex: 1 1 58px; min-width: 45px; width: 0; height: 16px; border: 1px solid #c9a061; background: #e5d1a7; }
+.daily-quest-progress progress::-webkit-progress-bar { background: #e9d6af; box-shadow: inset 0 2px 4px #8a612b33; }
+.daily-quest-progress progress::-webkit-progress-value { background: linear-gradient(#88e66a,#25b545 50%,#008642); box-shadow: inset 0 1px 1px #f0ffc3; }
+.daily-quest-progress progress::-moz-progress-bar { background: linear-gradient(#88e66a,#25b545 50%,#008642); }
+.daily-quest-progress > strong { flex: 0 0 auto; margin-left: auto; color: #60301c; font-size: 13px; font-weight: 800; line-height: 1.3; font-variant-numeric: tabular-nums; }
+.daily-quest-progress small { font-size: 11px; }
+.daily-quest-actions { grid-column: 3; grid-row: 1 / 3; justify-self: center; min-width: 0; align-self: center; }
+.daily-quest-reroll,.daily-quest-claim,.daily-quest-claimed { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px; width: 58px; min-height: 78px; padding: 0; border: 0; border-radius: 8px; background: none; color: #65371f; text-align: center; font-size: 11px; font-weight: 800; line-height: 1.3; }
+.daily-quest-reroll strong,.daily-quest-claim strong { font-size: inherit; font-weight: inherit; }
+.daily-quest-wood-button { display: grid; place-items: center; width: 52px; height: 52px; border: 1px solid #7f4316; border-radius: 50%; color: #fff1bc; background: repeating-linear-gradient(2deg,#edb46a16 0 1px,transparent 1px 4px),radial-gradient(ellipse at 40% 12%,#b77528,#71340e 85%); box-shadow: inset 0 0 0 2px #e2af5a,inset 0 0 0 4px #965619,0 2px 0 #683711,0 3px 5px #5e321d35; }
+.daily-quest-wood-button svg { width: 30px; height: 30px; filter: drop-shadow(0 1px 0 #683314); }
+.daily-quest-reroll:not(:disabled):active .daily-quest-wood-button { transform: translateY(2px); box-shadow: inset 0 0 0 2px #e2af5a,inset 0 0 0 4px #965619; }
+.daily-quest-reroll:disabled { color: #8b7860; cursor: default; }
+.daily-quest-reroll:disabled .daily-quest-wood-button { filter: saturate(.18); opacity: .55; }
+.daily-quest-claim { color: #25643a; }
+.daily-quest-claim > span,.daily-quest-claimed > span { display: grid; place-items: center; width: 52px; height: 52px; border: 2px solid #b2cd76; border-radius: 50%; background: linear-gradient(#68bd58,#158545); color: #ffffe5; box-shadow: inset 0 1px #ddf3aa,0 2px 0 #28663a,0 3px 6px #30632c2b; }
+.daily-quest-claim:disabled { opacity: .65; cursor: default; }
+.daily-quest-claimed { color: #467245; }
+.daily-quest-claimed > span { border-color: #c5d2a0; background: #dce8c5; color: #42743e; box-shadow: inset 0 1px #f3f8d9; }
+.daily-quest-card.is-complete { border-color: #93af69; box-shadow: inset 0 0 0 1px #ccdab280,0 3px 5px #82532a17; }
+.daily-quest-card.is-claimed { background: linear-gradient(125deg,#f9f7e6,#f2ecd6); }
+.daily-quest-reward { display: flex; align-items: center; gap: 22px; min-height: 49px; margin-top: 14px; padding-top: 7px; border-top: 1px solid #e4c38d; }
+.daily-quest-reward > strong { color: #68361e; font-size: 14px; font-weight: 800; }
+.daily-quest-reward .economy-amounts { flex-wrap: wrap; gap: 15px; }
+.daily-quest-reward .economy-amounts > span { gap: 6px; color: #60341d; }
+.daily-quest-reward .currency-icon { --currency-icon-size: 38px; }
+.daily-quest-reward .economy-amounts strong { font-size: 17px; }
+.daily-quests-footnote { display: flex; align-items: center; justify-content: center; gap: 12px; margin: 27px 5px 0; color: #774722; font-size: 13px; font-weight: 700; line-height: 1.45; text-align: center; }
+.daily-quests-footnote::before,.daily-quests-footnote::after { content: ''; height: 1px; background: #c8a169; flex: 1; }
+.daily-quests-footnote > span { max-width: 75%; }
+.daily-quest-reroll-confirm { margin-top: 13px; padding-top: 13px; border-top: 1px solid #d5b985; }
+.daily-quest-reroll-confirm h4 { margin: 0 0 7px; color: #684523; font-size: 15px; }
+.daily-quest-reroll-confirm h4:focus { outline: none; }
+.daily-quest-reroll-confirm p { margin: 0 0 13px; color: #805b32; font-size: 12px; line-height: 1.5; }
+.daily-quest-reroll-confirm > div { display: flex; gap: 10px; }
+.daily-quest-reroll-confirm button { flex: 1; padding-inline: 8px; font-size: 12px; }
+@media (hover: hover) { .daily-quest-reroll:not(:disabled):hover .daily-quest-wood-button,.daily-quest-claim:not(:disabled):hover > span { filter: brightness(1.1); } }
+@media (max-width: 350px) {
+  .daily-quests-page .progression-page-content { padding-inline: 10px; }
+  .daily-quests-dayline { font-size: 11px; gap: 8px; min-height: 64px; }
+  .daily-quests-dayline > span { gap: 5px; }.daily-quests-dayline svg { width: 20px; height: 20px; }
+  .daily-quests-dayline > strong { padding-left: 8px; }
+  .daily-quest-card { padding-inline: 10px; }.daily-quest-main { grid-template-columns: 82px minmax(0,1fr) 48px; column-gap: 7px; }
+  .daily-quest-copy h3 { font-size: 16px; }.daily-quest-difficulty { font-size: 11px; padding-inline: 11px; }
+  .daily-quest-reroll,.daily-quest-claim,.daily-quest-claimed { width: 48px; font-size: 10px; }
+  .daily-quest-wood-button,.daily-quest-claim > span,.daily-quest-claimed > span { width: 46px; height: 46px; }
+  .daily-quest-wood-button svg { width: 27px; height: 27px; }
+  .daily-quest-reward { gap: 18px; }.daily-quest-reward .economy-amounts { gap: 12px; }
+  .daily-quest-reward .currency-icon { --currency-icon-size: 34px; }
+  .daily-quests-footnote { font-size: 12px; }
+}
+@media (min-width: 600px) {
+  .daily-quests-page .progression-page-content { padding-inline: 28px; }
+  .daily-quests-dayline { min-height: 91px; font-size: 17px; }.daily-quests-dayline svg { width: 31px; height: 31px; }
+  .daily-quests-dayline > strong { padding-left: 25px; }
+  .daily-quest-list { gap: 18px; }.daily-quest-card { padding: 19px 23px 14px; border-radius: 17px; }
+  .daily-quest-main { grid-template-columns: 152px minmax(0,1fr) 76px; column-gap: 18px; row-gap: 13px; min-height: 152px; }
+  .daily-quest-copy h3 { font-size: 24px; margin-top: 10px; }.daily-quest-difficulty { font-size: 14px; padding-inline: 18px; }
+  .daily-quest-description { font-size: 14px; }
+  .daily-quest-progress progress { height: 20px; }.daily-quest-progress > strong { font-size: 17px; }.daily-quest-progress small { font-size: 13px; }
+  .daily-quest-reroll,.daily-quest-claim,.daily-quest-claimed { width: 76px; font-size: 13px; gap: 9px; }
+  .daily-quest-wood-button,.daily-quest-claim > span,.daily-quest-claimed > span { width: 68px; height: 68px; }.daily-quest-wood-button svg { width: 39px; height: 39px; }
+  .daily-quest-reward { gap: 36px; margin-top: 17px; min-height: 61px; }.daily-quest-reward > strong { font-size: 18px; }
+  .daily-quest-reward .economy-amounts { gap: 25px; }.daily-quest-reward .currency-icon { --currency-icon-size: 49px; }.daily-quest-reward .economy-amounts strong { font-size: 22px; }
+  .daily-quests-footnote { font-size: 16px; margin-top: 32px; }
+  .daily-quest-reroll-confirm p { font-size: 14px; }.daily-quest-reroll-confirm button { flex: 0 1 200px; font-size: 14px; }.daily-quest-reroll-confirm > div { justify-content: flex-end; }
+}
+@media (min-width: 1000px) and (orientation: landscape) {
+  .daily-quests-page .progression-page-content { max-width: 1400px; padding-inline: 30px; }
+  .daily-quests-dayline { max-width: 670px; margin-inline: auto; min-height: 100px; }
+  .daily-quest-list { grid-template-columns: repeat(3,minmax(0,1fr)); gap: 20px; align-items: start; }
+  .daily-quest-card { padding: 22px 18px 14px; }
+  .daily-quest-main { grid-template-columns: minmax(0,1fr) 64px; grid-template-rows: 150px minmax(136px,auto) auto; column-gap: 10px; row-gap: 15px; }
+  .daily-quest-art { grid-column: 1; grid-row: 1; width: min(150px,100%); justify-self: center; }
+  .daily-quest-copy { grid-column: 1 / 3; grid-row: 2; align-self: start; }
+  .daily-quest-copy h3 { font-size: 24px; }.daily-quest-description { font-size: 14px; }
+  .daily-quest-progress { grid-column: 1 / 3; grid-row: 3; }
+  .daily-quest-actions { grid-column: 2; grid-row: 1; }
+  .daily-quest-reroll,.daily-quest-claim,.daily-quest-claimed { width: 64px; }
+  .daily-quest-wood-button,.daily-quest-claim > span,.daily-quest-claimed > span { width: 60px; height: 60px; }
+  .daily-quest-reward { gap: 20px; }.daily-quest-reward > strong { font-size: 15px; }.daily-quest-reward .economy-amounts { gap: 12px; }.daily-quest-reward .currency-icon { --currency-icon-size: 38px; }.daily-quest-reward .economy-amounts strong { font-size: 18px; }
+}

@@ -8,7 +8,7 @@ export const TILE_COUNT = 80;
 // Adapt the supplied tile-system difficulty axes to an 80-tile round. Eastern
 // rounds use 20 exact-picture faces, with four copies of each.
 const DIFFICULTY_DRAWS = {
-  calm: { anchors: 10, counts: [1, 3, 6], tiers: [1, 3, 5], kin: 4, glyphs: 0 },
+  calm: { anchors: 10, counts: [1, 3, 5], tiers: [1, 3, 5], kin: 3, glyphs: 1 },
   balanced: { anchors: 6, counts: [1, 2, 3, 4, 5, 6], tiers: [1, 2, 3, 4, 5], kin: 3, glyphs: 0 },
   intricate: { anchors: 4, counts: [1, 2, 3, 4, 5, 6], tiers: [1, 2, 3, 4, 5], kin: 1, glyphs: 4 },
 };
@@ -179,7 +179,12 @@ function chooseFaces(ruleset, difficulty, theme, random) {
 
   const draw = DIFFICULTY_DRAWS[difficulty];
   const pick = (family, count) => shuffled(definitions.filter((face) => face.family === family), random).slice(0, count);
-  const ranks = (family, values) => definitions.filter((face) => face.family === family && values.includes(face.rank));
+  const rankOffset = difficulty === 'calm' ? Math.floor(random() * 2) : 0;
+  const ranks = (family, values) => {
+    // Alternate spaced ranks so all six types remain collectible in Calm duels.
+    const selected = values.map(rank => rank + rankOffset);
+    return definitions.filter((face) => face.family === family && selected.includes(face.rank));
+  };
   return [
     ...pick('anchor', draw.anchors),
     ...ranks('count', draw.counts),

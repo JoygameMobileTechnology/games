@@ -1,0 +1,12 @@
+.daily-quest-icon {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+  overflow: visible;
+  flex: none;
+}
+
+.daily-quest-icon-object {
+  filter: drop-shadow(0 2px 1.6px rgb(98 55 17 / 22%));
+}

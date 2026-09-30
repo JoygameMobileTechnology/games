@@ -149,7 +149,7 @@ test('all nine themes keep draw composition, matching rules, layout and solvabil
 
 test('difficulty changes the Eastern draw using the supplied similarity axes', () => {
   const expected = {
-    calm: { anchor: 10, count: 3, tier: 3, kin: 4, glyph: 0 },
+    calm: { anchor: 10, count: 3, tier: 3, kin: 3, glyph: 1 },
     balanced: { anchor: 6, count: 6, tier: 5, kin: 3, glyph: 0 },
     intricate: { anchor: 4, count: 6, tier: 5, kin: 1, glyph: 4 },
   };
@@ -165,13 +165,31 @@ test('difficulty changes the Eastern draw using the supplied similarity axes', (
         assert.equal(new Set(faces.map((value) => value.faceId)).size, count, `${difficulty} ${family}`);
       }
       const ranks = (family) => [...new Set(game.tiles.filter((value) => value.family === family).map((value) => value.rank))].sort();
-      assert.deepEqual(ranks('count'), difficulty === 'calm' ? [1, 3, 6] : [1, 2, 3, 4, 5, 6]);
-      assert.deepEqual(ranks('tier'), difficulty === 'calm' ? [1, 3, 5] : [1, 2, 3, 4, 5]);
+      if (difficulty === 'calm') {
+        assert.ok([[1, 3, 5], [2, 4, 6]].some(values => values.join() === ranks('count').join()));
+        assert.deepEqual(ranks('tier'), ranks('count'));
+      } else {
+        assert.deepEqual(ranks('count'), [1, 2, 3, 4, 5, 6]);
+        assert.deepEqual(ranks('tier'), [1, 2, 3, 4, 5]);
+      }
     }
   }
   assert.deepEqual(createGame('eastern', 27), createGame('eastern', 27, 'balanced'));
   assert.deepEqual(createGame('western', 27, 'calm').tiles, createGame('western', 27, 'intricate').tiles,
     'Western picture selection has no Eastern difficulty axis');
+});
+
+test('every launch tile type is obtainable in the playable Calm deal for both editions', () => {
+  for (const theme of ['ming-porcelain', 'dancheong', 'stained-glass', 'dutch-golden-age']) {
+    for (const ruleset of ['eastern', 'western']) {
+      const seen = new Set();
+      for (let seed = 0; seed < 80; seed++) {
+        const game = createGame(ruleset, seed, 'calm', theme);
+        for (const tile of game.tiles) seen.add(tile.faceId);
+      }
+      assert.deepEqual([...seen].sort(), themeTileSets[theme][ruleset].map(tile => tile.id).sort(), `${theme} ${ruleset} can complete every unlock requirement`);
+    }
+  }
 });
 
 test('100 deals of every Eastern difficulty and Western rules have complete legal solutions', () => {
