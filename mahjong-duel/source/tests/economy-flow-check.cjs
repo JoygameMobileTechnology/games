@@ -90,6 +90,7 @@ const output = path.resolve('tmp/economy-qa');
     await tap('Back to main menu'); await page.reload(); await advance();
     assert.deepEqual((await stored()).currencies, { coins: 350, gems: 38 });
     await tap('Play Duel'); await heading('Choose a theme').waitFor(); await tap('Play Duel');
+    await advance(4000); await advance(1500);
     await page.locator('.game-board').waitFor(); await advance(1500);
     for (let matched = 0; matched < 40; matched++) {
       let pair;

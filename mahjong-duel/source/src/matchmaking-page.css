@@ -1,0 +1,140 @@
+.matchmaking-page {
+  --matchmaking-portrait: clamp(106px, 34vw, 206px);
+  --matchmaking-vs: clamp(39px, 11vw, 64px);
+  color: #603014;
+  background: radial-gradient(ellipse at 48% 35%, #fffbee 0, #fff5d9 55%, #f7e5bc 100%);
+}
+.matchmaking-page::before { opacity: .16; }
+.matchmaking-page .progression-page-header h2 { font-size: clamp(24px, 6.6vw, 36px); }
+.matchmaking-page .progression-page-content {
+  display: grid;
+  grid-template-rows: minmax(min-content, 1fr) auto auto;
+  gap: clamp(19px, 3.3dvh, 36px);
+  width: min(100%, 730px);
+  min-height: 100%;
+  padding: clamp(20px, 4dvh, 40px) max(15px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(15px, env(safe-area-inset-left));
+}
+.matchmaking-live-status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.matchmaking-search { display: flex; flex-direction: column; justify-content: space-evenly; gap: clamp(22px, 4dvh, 42px); min-width: 0; }
+.matchmaking-heading { margin: 0; text-align: center; color: #5a2913; font-size: clamp(22px, 6.2vw, 37px); font-weight: 800; letter-spacing: -.8px; line-height: 1.2; }
+.matchmaking-players { display: grid; grid-template-columns: minmax(0, 1fr) var(--matchmaking-vs) minmax(0, 1fr); align-items: start; width: 100%; max-width: calc(var(--matchmaking-portrait) * 2 + var(--matchmaking-vs)); margin-inline: auto; }
+.matchmaking-seat { display: flex; flex-direction: column; align-items: center; min-width: 0; }
+.matchmaking-portrait-wrap { width: var(--matchmaking-portrait); max-width: 100%; aspect-ratio: 1; position: relative; margin-bottom: clamp(15px, 2.5dvh, 24px); }
+.matchmaking-portrait-ring { position: absolute; inset: 3%; border: 3px solid #a16524; border-radius: 50%; padding: 4px; background: linear-gradient(135deg, #ffe39a 0, #c98b33 35%, #ffdc88 54%, #935219 100%); box-shadow: 0 0 0 1px #f9d98b, inset 0 0 0 1px #fff6c7, 0 4px 7px #68401838; }
+.matchmaking-portrait-ring::after { content: ''; position: absolute; inset: 4px; border: 1px solid #9b682b; border-radius: 50%; box-shadow: inset 0 2px 5px #7a4a3038; pointer-events: none; }
+.matchmaking-avatar.player-avatar { display: block; width: 100%; height: 100%; border-radius: 50%; }
+.matchmaking-avatar .player-avatar-portrait { border-radius: 50%; box-shadow: none; }
+.matchmaking-avatar .avatar-frame { display: none; }
+.matchmaking-anonymous { display: block; width: 100%; height: 100%; border-radius: 50%; overflow: hidden; background: radial-gradient(ellipse at 38% 24%, #f9edce, #e5c995 90%); }
+.matchmaking-anonymous svg { display: block; width: 100%; height: 100%; fill: #b59361; }
+.matchmaking-search-orbit { position: absolute; z-index: 2; inset: -4%; width: 108%; height: 108%; overflow: visible; pointer-events: none; }
+.matchmaking-orbit-track { fill: none; stroke: #c99d5b; stroke-width: .8; opacity: .28; }
+.matchmaking-orbit-arcs { transform-origin: 60px 60px; animation: matchmaking-orbit 3.2s linear infinite; filter: drop-shadow(0 0 2px #ffc257); }
+.matchmaking-orbit-arcs path { fill: none; stroke: #f3ad2f; stroke-width: 2.7; stroke-linecap: round; }
+.matchmaking-orbit-arcs circle { fill: #fffbee; stroke: #fff0b3; stroke-width: .5; }
+.matchmaking-ready-badge { display: grid; place-items: center; position: absolute; z-index: 3; right: 1%; bottom: 5%; width: 25%; aspect-ratio: 1; border: 2px solid #fff6c9; border-radius: 50%; color: #fffced; background: linear-gradient(145deg, #90d368, #3aa54d 60%, #277b38); box-shadow: 0 0 0 1px #b88836, 0 2px 4px #67432152, inset 0 1px 2px #e8ffb994; }
+.matchmaking-ready-badge svg { width: 72%; height: 72%; }
+.matchmaking-player-name { max-width: 100%; padding-inline: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: clamp(18px, 5.1vw, 28px); line-height: 1.2; font-weight: 800; }
+.matchmaking-player-state { display: inline-flex; justify-content: center; align-items: center; gap: 5px; margin-top: 6px; color: #7b542f; font-size: clamp(14px, 4.1vw, 22px); line-height: 1.3; }
+.matchmaking-player-state.is-ready svg { width: 17px; height: 17px; border-radius: 50%; padding: 2px; color: #fffcee; background: #51a651; box-shadow: inset 0 1px #bde79e; }
+.matchmaking-versus { display: grid; place-items: center; width: var(--matchmaking-vs); height: var(--matchmaking-vs); margin-top: calc((var(--matchmaking-portrait) - var(--matchmaking-vs)) / 2); position: relative; z-index: 3; border: 2px solid #be8033; border-radius: 50%; color: #fff4c5; background: repeating-linear-gradient(92deg, #ffe29e0b 0 1px, transparent 1px 5px), linear-gradient(120deg, #a26223, #753c0f 60%, #9c5c1b); box-shadow: inset 0 0 0 2px #efd28a, inset 0 0 0 3px #754416, 0 3px 5px #673a2430; font-size: clamp(20px, 5.8vw, 34px); font-weight: 800; text-shadow: 0 2px #4e270f; }
+.matchmaking-progress { display: flex; flex-direction: column; align-items: center; gap: clamp(12px, 2dvh, 19px); }
+.matchmaking-progress-dots { display: flex; justify-content: center; align-items: center; gap: 14px; height: 24px; }
+.matchmaking-progress-dots > span { width: 14px; height: 14px; border-radius: 50%; background: linear-gradient(#efbd66, #d79734); box-shadow: inset 0 1px #fff5be; transform: scale(.65); animation: matchmaking-dot 1.8s ease-in-out infinite; }
+.matchmaking-progress-dots > span:nth-child(2) { animation-delay: .25s; }
+.matchmaking-progress-dots > span:nth-child(3) { animation-delay: .5s; }
+.matchmaking-elapsed { margin: 0; color: #754525; font-size: clamp(14px, 4.1vw, 21px); font-weight: 600; line-height: 1.4; }
+.matchmaking-elapsed time { color: #542912; font-variant-numeric: tabular-nums; }
+.matchmaking-theme { position: relative; isolation: isolate; display: flex; align-items: center; min-width: 0; min-height: clamp(105px, 16dvh, 162px); padding: 14px 12px 14px 31%; border: 2px solid #bf8b37; border-radius: 12px; background: #f9edce; box-shadow: inset 0 0 0 2px #fff6d8, 0 0 0 1px #e7b352, 0 3px 7px #72502c30; }
+.matchmaking-theme .theme-choice-art { inset: 2px; background: #f7ecd0; }
+.matchmaking-theme .theme-choice-art::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, #fff6df00 18%, #fff5dcf2 31%, #fff5dcf2 72%, #fff5dc30); }
+.matchmaking-theme .theme-choice-surface { opacity: .85; }
+.matchmaking-theme .theme-choice-tile { z-index: 1; left: 4%; right: auto; width: 22%; max-width: 110px; top: 11%; bottom: 11%; transform: rotate(-2deg); box-shadow: 1px 3px #8b754d, 3px 4px 5px #462d1759; }
+.matchmaking-theme-copy { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 5px; min-width: 0; color: #633517; text-shadow: 0 1px #fff8e4; }
+.matchmaking-theme-copy > span { font-size: clamp(12px, 3.4vw, 16px); font-weight: 600; }
+.matchmaking-theme-copy > strong { font-size: clamp(19px, 5.1vw, 30px); font-weight: 800; line-height: 1.12; letter-spacing: -.4px; }
+.matchmaking-theme-copy > small { font-size: clamp(10px, 2.8vw, 13px); color: #7b5a35; line-height: 1.3; font-weight: 600; }
+.matchmaking-footer { padding: 0 3px 3px; }
+.matchmaking-cancel.progression-secondary { min-height: 49px; padding-block: 8px; font-size: clamp(22px, 6vw, 30px); border-radius: 40px; }
+.matchmaking-cancel.progression-secondary:disabled { color: #426336; border-color: #91a763; background: linear-gradient(#ecf1d4, #d7e1b7); box-shadow: inset 0 2px #fffbea, 0 2px #899559; opacity: 1; }
+.matchmaking-page.is-found .matchmaking-orbit-arcs { animation: none; filter: drop-shadow(0 0 3px #8ccc61); }
+.matchmaking-page.is-found .matchmaking-orbit-arcs path { stroke: #66ab4c; }
+.matchmaking-page.is-found .matchmaking-orbit-arcs circle { fill: #f4ffdf; stroke: #b9e799; }
+.matchmaking-page.is-found .matchmaking-progress-dots > span { animation: none; transform: scale(1); background: linear-gradient(#91d164, #419543); box-shadow: inset 0 1px #dfffbd, 0 0 8px #71bb5099; }
+.matchmaking-page.is-found .matchmaking-elapsed { color: #4b7136; }
+.matchmaking-page.is-paused .matchmaking-orbit-arcs, .matchmaking-page.is-paused .matchmaking-progress-dots > span { animation-play-state: paused; }
+@keyframes matchmaking-orbit { to { transform: rotate(-360deg); } }
+@keyframes matchmaking-dot { 0%, 13%, 100% { transform: scale(.65); } 29%, 72% { transform: scale(1); box-shadow: inset 0 1px #fff5be, 0 0 0 2px #e2b14c55; } 88% { transform: scale(.65); } }
+@media (min-width: 600px) {
+  .matchmaking-page .progression-page-content { padding-inline: 38px; padding-bottom: max(36px, env(safe-area-inset-bottom)); }
+  .matchmaking-theme { min-height: 170px; padding-left: 30%; }
+  .matchmaking-theme-copy { gap: 8px; }
+  .matchmaking-cancel.progression-secondary { min-height: 62px; }
+  .matchmaking-progress-dots > span { width: 17px; height: 17px; }
+  .matchmaking-progress-dots { gap: 19px; }
+}
+@media (max-width: 360px), (max-height: 650px) and (orientation: portrait) {
+  .matchmaking-page { --matchmaking-portrait: clamp(104px, 32vw, 124px); }
+  .matchmaking-page .progression-page-content { gap: 18px; padding-top: 18px; padding-bottom: max(18px, env(safe-area-inset-bottom)); }
+  .matchmaking-search { gap: 18px; }
+  .matchmaking-heading { font-size: 22px; letter-spacing: -.65px; }
+  .matchmaking-theme { min-height: 104px; }
+  .matchmaking-theme-copy > strong { font-size: 19px; }
+  .matchmaking-progress { gap: 9px; }
+  .matchmaking-progress-dots { height: 20px; }
+  .matchmaking-portrait-wrap { margin-bottom: 12px; }
+  .matchmaking-cancel.progression-secondary { min-height: 46px; padding-block: 6px; }
+}
+@media (min-width: 700px) and (orientation: landscape) {
+  .matchmaking-page { --matchmaking-portrait: clamp(126px, 18vw, 204px); --matchmaking-vs: clamp(45px, 5.5vw, 64px); }
+  .matchmaking-page .progression-page-content { width: min(100%, 1140px); grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); grid-template-rows: 1fr auto 1fr; gap: 25px 38px; padding: 32px 32px max(32px, env(safe-area-inset-bottom)); align-content: center; }
+  .matchmaking-search { grid-column: 1; grid-row: 1 / 4; justify-content: center; gap: clamp(25px, 5dvh, 44px); }
+  .matchmaking-heading { font-size: clamp(25px, 3.4vw, 35px); }
+  .matchmaking-theme { grid-column: 2; grid-row: 2; min-height: clamp(150px, 24dvh, 195px); padding-left: 31%; }
+  .matchmaking-theme-copy > strong { font-size: clamp(23px, 2.6vw, 30px); }
+  .matchmaking-theme-copy > span { font-size: 14px; }
+  .matchmaking-theme-copy > small { font-size: 12px; }
+  .matchmaking-footer { grid-column: 2; grid-row: 3; align-self: start; }
+  .matchmaking-cancel.progression-secondary { min-height: 54px; font-size: 27px; }
+  .matchmaking-player-name { font-size: clamp(20px, 2.7vw, 27px); }
+  .matchmaking-player-state { font-size: 18px; }
+}
+@media (max-height: 500px) and (orientation: landscape) {
+  .matchmaking-page { --matchmaking-portrait: clamp(88px, 27dvh, 125px); --matchmaking-vs: 40px; }
+  .matchmaking-page .progression-page-header { min-height: 56px; padding-block: max(5px, env(safe-area-inset-top)) 5px; }
+  .matchmaking-page .progression-page-header h2 { font-size: 25px; }
+  .matchmaking-page .progression-page-content { width: min(100%, 920px); grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); grid-template-rows: 1fr auto 1fr; gap: 18px 28px; padding: 16px max(23px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(23px, env(safe-area-inset-left)); }
+  .matchmaking-search { grid-column: 1; grid-row: 1 / 4; justify-content: center; gap: 17px; }
+  .matchmaking-heading { font-size: 23px; }
+  .matchmaking-versus { font-size: 22px; }
+  .matchmaking-portrait-wrap { margin-bottom: 11px; }
+  .matchmaking-player-name { font-size: 20px; }
+  .matchmaking-player-state { margin-top: 3px; font-size: 14px; }
+  .matchmaking-progress { gap: 4px; }
+  .matchmaking-progress-dots { height: 18px; gap: 13px; }
+  .matchmaking-progress-dots > span { width: 12px; height: 12px; }
+  .matchmaking-elapsed { font-size: 14px; }
+  .matchmaking-theme { grid-column: 2; grid-row: 2; min-height: 123px; padding-left: 30%; }
+  .matchmaking-theme-copy { gap: 5px; }
+  .matchmaking-theme-copy > span { font-size: 12px; }
+  .matchmaking-theme-copy > strong { font-size: 21px; }
+  .matchmaking-theme-copy > small { font-size: 11px; }
+  .matchmaking-footer { grid-column: 2; grid-row: 3; align-self: start; }
+  .matchmaking-cancel.progression-secondary { min-height: 44px; font-size: 23px; }
+}
+.matchmaking-page.is-gentle .matchmaking-orbit-arcs, .matchmaking-page.is-gentle .matchmaking-progress-dots > span { animation: none; }
+.matchmaking-page.is-gentle .matchmaking-progress-dots > span { transform: scale(1); }
+@media (max-height: 350px) and (orientation: landscape) {
+  .matchmaking-search { gap: 9px; }
+  .matchmaking-heading { font-size: 21px; }
+  .matchmaking-player-name { font-size: 17px; }
+  .matchmaking-player-state { font-size: 13px; }
+  .matchmaking-portrait-wrap { margin-bottom: 8px; }
+  .matchmaking-page .progression-page-content { height: 100%; column-gap: 20px; padding-block: 12px max(12px, env(safe-area-inset-bottom)); }
+  .matchmaking-theme { min-height: 112px; }
+  .matchmaking-cancel.progression-secondary { padding-block: 6px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .matchmaking-orbit-arcs, .matchmaking-progress-dots > span { animation: none; }
+  .matchmaking-progress-dots > span { transform: scale(1); }
+}

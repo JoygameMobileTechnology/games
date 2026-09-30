@@ -20,7 +20,7 @@ const goalTotals = requirements => requirements.reduce((sum, goal) => ({
   required: sum.required + goal.requiredTypes,
 }), { completed: 0, required: 0 });
 
-function ThemeArtwork({ theme, ruleset }) {
+export function ThemeArtwork({ theme, ruleset }) {
   const tile = themeTileSets[theme.id][ruleset].find(face => face.id === SIGNATURES[theme.id][ruleset]);
   return <span className="theme-choice-art" aria-hidden="true">
     <img className="theme-choice-surface" src={boardVariants[theme.id].portrait.src} alt="" draggable="false" />
@@ -61,12 +61,13 @@ function UnlockGoals({ state, ruleset, prerequisite }) {
 }
 
 /** Theme availability is derived from collected pairs; a locked card only opens its goals. */
-export function ThemeSelectPage({ collection, ruleset = 'eastern', initialTheme, populationCounts = {}, onClose, onPlay }) {
+export function ThemeSelectPage({ collection, ruleset = 'eastern', initialTheme, initialScrollTop = 0, populationCounts = {}, onClose, onPlay }) {
   const edition = ruleset === 'western' ? 'western' : 'eastern';
   const unlocks = useMemo(() => getThemeUnlocks(collection, edition), [collection, edition]);
-  const [selection, setSelection] = useState(() => unlocks.find(state => state.themeId === initialTheme && state.unlocked)?.themeId || unlocks.find(state => state.unlocked)?.themeId);
+  const [selection, setSelection] = useState(() => initialTheme === 'random' ? 'random' : unlocks.find(state => state.themeId === initialTheme && state.unlocked)?.themeId || unlocks.find(state => state.unlocked)?.themeId);
   const [inspectedId, setInspectedId] = useState(null);
   const scroller = useRef(null), scrollPosition = useRef(0), opener = useRef(null), restoreFocus = useRef(false);
+  useEffect(() => { if (scroller.current) scroller.current.scrollTop = initialScrollTop; }, []);
   const inspected = unlocks.find(state => state.themeId === inspectedId);
   const previousInspected = inspected ? unlocks[unlocks.indexOf(inspected) - 1] : null;
   const selected = unlocks.find(state => state.themeId === selection && state.unlocked);
@@ -104,7 +105,7 @@ export function ThemeSelectPage({ collection, ruleset = 'eastern', initialTheme,
           </button>;
         })}</div>
       </div>
-      <footer className="theme-choice-footer"><button type="button" className="progression-primary theme-choice-play" disabled={!chosen} onClick={() => onPlay(chosen)}>Play Duel<CaretRight size={26} weight="bold" /></button><span className="theme-choice-selection-note">{chosen === 'random' ? 'A surprise from your unlocked collections' : themeById[chosen]?.name}</span></footer>
+      <footer className="theme-choice-footer"><button type="button" className="progression-primary theme-choice-play" disabled={!chosen} onClick={() => onPlay(chosen, scroller.current?.scrollTop || 0)}>Play Duel<CaretRight size={26} weight="bold" /></button><span className="theme-choice-selection-note">{chosen === 'random' ? 'A surprise from your unlocked collections' : themeById[chosen]?.name}</span></footer>
     </>}
   </ProgressionPage>;
 }

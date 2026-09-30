@@ -101,6 +101,7 @@ const time = new Date('2026-09-30T12:00:00Z');
       return layout;
     };
     const checkBoard = async (themeId, edition = 'eastern') => {
+      await advance(4000); await advance(1500);
       await page.locator('.game-board').waitFor(); await advance(500);
       const result = await page.evaluate(() => ({
         theme: document.querySelector('.world').dataset.theme,

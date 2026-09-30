@@ -25,7 +25,7 @@ export const SHOP_CURRENCY_PACKS = Object.freeze([
 export const SHOP_BOOSTER_PACKS = Object.freeze([
   { id: 'hint-single', name: 'Hint', description: 'Highlight an available pair.', cost: { coins: 0, gems: 3 }, boosters: { hint: 1 } },
   { id: 'shuffle-single', name: 'Shuffle', description: 'Give the board a fresh arrangement.', cost: { coins: 0, gems: 4 }, boosters: { shuffle: 1 } },
-  { id: 'freeze-single', name: 'Freeze', description: 'Skip the ghost’s next turn.', cost: { coins: 0, gems: 5 }, boosters: { freeze: 1 } },
+  { id: 'freeze-single', name: 'Freeze', description: 'Skip your opponent’s next turn.', cost: { coins: 0, gems: 5 }, boosters: { freeze: 1 } },
   { id: 'eagle-single', name: 'Eagle Eye', description: 'Reveal rarity glows for ten seconds.', cost: { coins: 0, gems: 6 }, boosters: { eagle: 1 } },
   { id: 'focused-mind', name: 'Focused Mind', description: 'Three Hints and one Freeze.', cost: { coins: 100, gems: 10 }, boosters: { hint: 3, freeze: 1 } },
   { id: 'duel-kit', name: 'Duel Kit', description: 'One of every booster.', cost: { coins: 150, gems: 12 }, boosters: { shuffle: 1, hint: 1, freeze: 1, eagle: 1 } },

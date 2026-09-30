@@ -1,3 +1,64 @@
 .menu-scene { position: absolute; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
 .menu-scene-art { display: block; width: 100%; height: 100%; object-fit: cover; object-position: center; }
-.menu-scene.menu-scene-transition { z-index: 80; }
+.menu-scene.menu-scene-transition {
+  --scene-duration: 1650ms;
+  z-index: 80;
+  animation: menu-scene-exit var(--scene-duration) linear both;
+}
+.menu-scene-picture {
+  position: absolute;
+  width: var(--scene-art-width, 100%); height: var(--scene-art-height, 100%);
+  left: var(--scene-art-left, 0); top: var(--scene-art-top, 0);
+  animation: menu-scene-focus var(--scene-duration) cubic-bezier(.2,.7,.2,1) both;
+}
+.menu-scene-picture > .menu-scene-art { animation: menu-scene-art-out var(--scene-duration) linear both; }
+.menu-scene-effects { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.menu-sun-halo { animation: menu-sun-bloom var(--scene-duration) ease-in both; }
+.menu-sun-core { animation: menu-sun-kindle var(--scene-duration) ease-in both; }
+.menu-moon-disc { animation: menu-moon-kindle var(--scene-duration) ease-in both; }
+.menu-moon-glow { animation: menu-moon-bloom var(--scene-duration) ease-in both; }
+.menu-scene-flash {
+  position: absolute; inset: 0; z-index: 2;
+  background: radial-gradient(ellipse at var(--scene-light-x) var(--scene-light-y), #fffef7 0%, #fff7d9 48%, #fff4c4 100%);
+  animation: menu-scene-flash var(--scene-duration) cubic-bezier(.35,0,.25,1) both;
+}
+.menu-scene--moon .menu-scene-flash { background: radial-gradient(ellipse at var(--scene-light-x) var(--scene-light-y), #fffef7 0%, #f0f5ff 52%, #dbe8ff 100%); }
+
+@keyframes menu-scene-focus {
+  0% { transform: translate(0, 0); }
+  30%,100% { transform: translate(var(--scene-pan-x, 0px), var(--scene-pan-y, 0px)); }
+}
+@keyframes menu-sun-bloom {
+  0% { opacity: 0; transform: scale(.35); }
+  20% { opacity: .35; transform: scale(.7); }
+  52% { opacity: .9; transform: scale(1.7); }
+  76%,100% { opacity: 1; transform: scale(4); }
+}
+@keyframes menu-sun-kindle {
+  0% { opacity: 0; transform: scale(.7); }
+  25% { opacity: .8; transform: scale(1.2); }
+  65%,100% { opacity: 1; transform: scale(3); }
+}
+@keyframes menu-moon-kindle {
+  0% { opacity: 0; }
+  22% { opacity: .35; }
+  52%,100% { opacity: 1; }
+}
+@keyframes menu-moon-bloom {
+  0%,8% { opacity: 0; }
+  26% { opacity: .45; }
+  52% { opacity: .95; }
+  66%,100% { opacity: 1; }
+}
+@keyframes menu-scene-flash {
+  0%,54% { opacity: 0; }
+  65% { opacity: .3; }
+  72%,100% { opacity: 1; }
+}
+@keyframes menu-scene-art-out { 0%,72% { opacity: 1; } 78%,100% { opacity: 0; } }
+@keyframes menu-scene-exit { 0%,79% { opacity: 1; } 100% { opacity: 0; } }
+
+.menu-scene-transition.is-paused,
+.menu-scene-transition.is-paused * { animation-play-state: paused !important; }
+.gentle-motion .menu-scene-transition { display: none; }
+@media (prefers-reduced-motion: reduce) { .menu-scene-transition { display: none; } }
