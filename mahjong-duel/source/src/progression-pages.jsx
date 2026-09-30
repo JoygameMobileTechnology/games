@@ -15,8 +15,8 @@ const craneArt = themeTileSets['ming-porcelain'].eastern.find(tile => tile.id ==
 const BOOSTERS = { hint: { name: 'Hint', Icon: Lightbulb }, shuffle: { name: 'Shuffle', Icon: ArrowsClockwise }, freeze: { name: 'Freeze', Icon: Snowflake }, eagle: { name: 'Eagle Eye', Icon: Eye } };
 const format = value => Number(value || 0).toLocaleString();
 
-function RewardItems({ rewards, compact = false }) {
-  return <div className={`reward-items ${compact ? 'is-compact' : ''}`}>{Object.entries(BOOSTERS).filter(([key]) => rewards?.[key] > 0).map(([key, { Icon, name }]) => <div className="reward-item" key={key} role="img" aria-label={`${name}, ${rewards[key]}`} title={`${name} ×${rewards[key]}`}><span className="reward-coin"><Icon size={compact ? 22 : 30} weight="duotone" /></span><strong>×{format(rewards[key])}</strong>{!compact && <span>{name}</span>}</div>)}</div>;
+export function RewardItems({ rewards, compact = false, named = false }) {
+  return <div className={`reward-items ${compact ? 'is-compact' : ''}`}>{Object.entries(BOOSTERS).filter(([key]) => rewards?.[key] > 0).map(([key, { Icon, name }]) => <div className="reward-item" key={key} role="img" aria-label={`${name}, ${rewards[key]}`} title={`${name} ×${rewards[key]}`}><span className="reward-coin"><Icon size={compact ? 22 : 30} weight="duotone" /></span><strong>{named && `${name} `}×{format(rewards[key])}</strong>{!compact && !named && <span>{name}</span>}</div>)}</div>;
 }
 export function DailyRewardsPage({ progression, onClose, onClaim, onDoubleClaim, adState = 'idle', gentle = false }) {
   const daily = getDailyView(progression), busy = adState === 'loading';

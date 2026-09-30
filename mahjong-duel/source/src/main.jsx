@@ -38,6 +38,7 @@ import { TileRarity } from './tile-rarity.jsx';
 import { loadCollection } from './collection.js';
 import { loadProgression, saveProgression, reduceProgression, consumeRankingPresentation } from './progression.js';
 import { getDailyView } from './daily-rewards.js';
+import { DailyWelcomePage } from './daily-welcome-page.jsx';
 import { getDailyQuestView } from './daily-quests.js';
 import { DUEL_COIN_REWARDS, SHOP_CURRENCY_PACKS, SHOP_BOOSTER_PACKS } from './economy.js';
 import { DailyQuestsPage, ShopPage } from './economy-pages.jsx';
@@ -235,7 +236,7 @@ function App() {
   const [achievementBatches, setAchievementBatches] = useState(launchProgress.notifications);
   const progressionRef = useRef(progression);
   const collection = progression.collection;
-  const [page, setPage] = useState(() => getDailyView(progression).shouldAutoOpen ? 'daily' : getDailyQuestView(progression).shouldAutoOpen ? 'quests' : null);
+  const [page, setPage] = useState(() => getDailyView(progression).shouldAutoOpen ? 'daily-welcome' : getDailyQuestView(progression).shouldAutoOpen ? 'login-quests' : null);
   const [economyNow, setEconomyNow] = useState(() => Date.now());
   useEffect(() => {
     if (screen !== 'menu' || page || pageHidden) return;
@@ -274,8 +275,8 @@ function App() {
   const dailyDayId = getDailyView(progression, economyNow).dayId;
   const questDayId = getDailyQuestView(progression, economyNow).dayId;
   useEffect(() => {
-    if (page === 'daily') progressEvent({ type: 'daily-presented', dayId: dailyDayId, now: economyNow });
-    if (page === 'quests') progressEvent({ type: 'quests-presented', dayId: questDayId, now: economyNow });
+    if (page === 'daily' || page === 'daily-welcome') progressEvent({ type: 'daily-presented', dayId: dailyDayId, now: economyNow });
+    if (page === 'quests' || page === 'login-quests') progressEvent({ type: 'quests-presented', dayId: questDayId, now: economyNow });
   }, [page, dailyDayId, questDayId]);
   useEffect(() => {
     const refresh = () => {
@@ -591,11 +592,11 @@ function App() {
     const current = progressEvent({ type: 'login', now: Date.now() });
     if (getDailyQuestView(current).shouldAutoOpen) {
       pageOpener.current = '.quests-menu-control';
-      setPage('quests');
+      setPage(page === 'daily-welcome' ? 'login-quests' : 'quests');
     } else returnToMenu();
   }
   function closePage() {
-    if (page === 'daily') finishDailyPage();
+    if (page === 'daily' || page === 'daily-welcome') finishDailyPage();
     else returnToMenu();
     setRankingPresentation(null); playSound('tap');
   }
@@ -671,8 +672,9 @@ function App() {
       {page ? <>
         {page === 'theme-select' && <ThemeSelectPage collection={collection} ruleset={ruleset} initialTheme={themeId} populationCounts={themePopulation.counts} onClose={closePage} onPlay={start} />}
         {page === 'collection' && <TileBinder collection={collection} initialTheme={themeId} initialRuleset={ruleset} onClose={closePage} />}
+        {page === 'daily-welcome' && <DailyWelcomePage progression={progression} now={economyNow} onClose={closePage} onClaim={claimDaily} onDoubleClaim={doubleDaily} adState={adState} gentle={gentle} paused={pageHidden} />}
         {page === 'daily' && <DailyRewardsPage progression={progression} onClose={closePage} onClaim={claimDaily} onDoubleClaim={doubleDaily} adState={adState} gentle={gentle} />}
-        {page === 'quests' && <DailyQuestsPage progression={progression} now={economyNow} onClose={closePage} onClaim={claimQuest} onReroll={rerollQuest} />}
+        {(page === 'quests' || page === 'login-quests') && <DailyQuestsPage progression={progression} now={economyNow} onClose={closePage} onClaim={claimQuest} onReroll={rerollQuest} showLoginAction={page === 'login-quests'} />}
         {page === 'shop' && <ShopPage progression={progression} onClose={closePage} onBuy={buyBoosters} onPurchase={purchaseCurrency} />}
         {page === 'achievements' && <AchievementsPage progression={progression} profile={profile} onEquipFrame={equipAchievementFrame} onClose={closePage} gentle={gentle} />}
         {page === 'leaderboards' && <LeaderboardsPage progression={progression} profile={profile} onClose={closePage} presentation={rankingPresentation} sound={sound} gentle={gentle} />}

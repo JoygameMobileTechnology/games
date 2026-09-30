@@ -74,7 +74,7 @@ function resetLabel(resetAt, now) {
   return `New quests in ${hours ? `${hours}h ` : ''}${rest}m`;
 }
 
-export function DailyQuestsPage({ progression, onClose, onClaim, onReroll, now = Date.now() }) {
+export function DailyQuestsPage({ progression, onClose, onClaim, onReroll, now = Date.now(), showLoginAction = false }) {
   const view = getDailyQuestView(progression, now), action = usePageAction();
   const [rerollId, setRerollId] = useState(null);
   const currentDay = useRef(view.dayId), confirmRef = useRef(null), rerollOpener = useRef(null), questList = useRef(null), replacementFocus = useRef(null);
@@ -117,6 +117,7 @@ export function DailyQuestsPage({ progression, onClose, onClaim, onReroll, now =
       </article>;
     })}</div>
     <p className="daily-quests-footnote"><span>{view.rerollsLeft > 0 ? '1 free re-roll available today' : 'Free re-roll used · More tomorrow'}</span></p>
+    {showLoginAction && <button type="button" className="progression-primary daily-quests-login-ok" onClick={onClose}>OK</button>}
   </ProgressionPage>;
 }
 

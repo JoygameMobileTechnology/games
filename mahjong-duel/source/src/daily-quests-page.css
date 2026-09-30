@@ -62,6 +62,7 @@
 .daily-quests-footnote { display: flex; align-items: center; justify-content: center; gap: 12px; margin: 27px 5px 0; color: #774722; font-size: 13px; font-weight: 700; line-height: 1.45; text-align: center; }
 .daily-quests-footnote::before,.daily-quests-footnote::after { content: ''; height: 1px; background: #c8a169; flex: 1; }
 .daily-quests-footnote > span { max-width: 75%; }
+.daily-quests-login-ok { max-width: 470px; margin: 18px auto 4px; }
 .daily-quest-reroll-confirm { margin-top: 13px; padding-top: 13px; border-top: 1px solid #d5b985; }
 .daily-quest-reroll-confirm h4 { margin: 0 0 7px; color: #684523; font-size: 15px; }
 .daily-quest-reroll-confirm h4:focus { outline: none; }

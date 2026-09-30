@@ -127,7 +127,7 @@ const output = path.resolve('tmp/economy-qa');
     await tap('Back to main menu'); await page.reload(); await advance(); await button('Play Duel').waitFor();
     assert.deepEqual((await stored()).currencies, expected, 'Reload does not duplicate any reward');
     await page.clock.fastForward(24 * 60 * 60 * 1000); await page.reload(); await advance();
-    await heading('Daily Rewards').waitFor(); await tap('Back to main menu'); await heading('Daily Quests').waitFor();
+    await heading('Daily Rewards').waitFor(); await tap('Close daily welcome'); await heading('Daily Quests').waitFor();
     view = getDailyQuestView(await stored(), time.getTime() + 86400000);
     assert.equal(view.dayId, '2026-10-04'); assert.equal(view.rerollsLeft, 1);
     assert.ok(view.quests.every(q => q.progress === 0 && !q.claimed));

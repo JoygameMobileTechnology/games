@@ -92,8 +92,10 @@ function assertStable(before, after, label) {
     try {
       await page.goto(offline ? standaloneUrl : origin);
       if (offline && browserName !== 'webkit') await context.setOffline(true);
-      await page.getByRole('button', { name: /^(?:Achievements|Back to main menu)$/ }).first().waitFor();
+      await page.getByRole('button', { name: /^(?:Achievements|Back to main menu|Close daily welcome)$/ }).first().waitFor();
+      if (await page.locator('.daily-welcome-page').isVisible()) await button('Close daily welcome').click();
       if (await page.locator('.daily-rewards-page').isVisible()) await button('Back to main menu').click();
+      if (await page.locator('.daily-quests-page').isVisible()) await button('Back to main menu').click();
       await button('Achievements').waitFor();
       await page.evaluate(() => document.fonts.ready);
       // Observe app-initiated work before opening: the test itself never warms the atlas.
