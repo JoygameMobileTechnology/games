@@ -1567,9 +1567,9 @@
     { "x": 2, "y": 22, "z": 2, "color": 2 }
   ],
   "lanes": [
-    { "hives": [{ "color": 2, "capacity": 60 }, { "color": 7, "capacity": 30, "hidden": true }, { "color": 2, "capacity": 80, "hidden": true }, { "color": 4, "capacity": 50 }, { "color": 7, "capacity": 60 }, { "color": 0, "capacity": 40 }, { "color": 7, "capacity": 50 }, { "color": 0, "capacity": 60 }] },
-    { "hives": [{ "color": 8, "capacity": 30 }, { "color": 4, "capacity": 60 }, { "color": 2, "capacity": 50 }, { "color": 7, "capacity": 50, "hidden": true }, { "color": 2, "capacity": 60 }, { "color": 7, "capacity": 60, "hidden": true }, { "color": 12, "capacity": 10, "hidden": true }] },
-    { "hives": [{ "color": 4, "capacity": 60 }, { "color": 10, "capacity": 70, "link": 2 }, { "color": 0, "capacity": 80, "link": 1 }, { "color": 7, "capacity": 60 }, { "color": 4, "capacity": 50 }, { "color": 7, "capacity": 80 }] },
-    { "hives": [{ "color": 0, "capacity": 50 }, { "color": 7, "capacity": 60, "link": 2 }, { "color": 2, "capacity": 70, "link": 1 }, { "color": 0, "capacity": 50 }, { "color": 7, "capacity": 60 }, { "color": 2, "capacity": 60 }, { "color": 7, "capacity": 60, "hidden": true }] }
+    { "hives": [{ "color": 7, "capacity": 60 }, { "color": 8, "capacity": 30 }, { "color": 7, "capacity": 30 }, { "color": 4, "capacity": 50 }, { "color": 7, "capacity": 70 }, { "color": 2, "capacity": 60 }, { "color": 7, "capacity": 40 }] },
+    { "hives": [{ "color": 2, "capacity": 70 }, { "color": 10, "capacity": 70, "link": 1 }, { "color": 0, "capacity": 60, "hidden": true }, { "color": 7, "capacity": 70, "link": 2 }, { "color": 4, "capacity": 50 }, { "color": 2, "capacity": 60 }, { "color": 7, "capacity": 60, "hidden": true }] },
+    { "hives": [{ "color": 12, "capacity": 10 }, { "color": 2, "capacity": 70, "link": 1 }, { "color": 4, "capacity": 60 }, { "color": 0, "capacity": 50, "link": 2 }, { "color": 7, "capacity": 70 }, { "color": 0, "capacity": 50 }, { "color": 7, "capacity": 50 }] },
+    { "hives": [{ "color": 4, "capacity": 60 }, { "color": 0, "capacity": 70, "hidden": true }, { "color": 2, "capacity": 60 }, { "color": 7, "capacity": 60, "hidden": true }, { "color": 2, "capacity": 60, "hidden": true }, { "color": 7, "capacity": 60 }, { "color": 0, "capacity": 50, "hidden": true }] }
   ]
 }

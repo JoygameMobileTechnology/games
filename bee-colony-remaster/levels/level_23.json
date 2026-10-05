@@ -1337,9 +1337,9 @@
     { "x": 4, "y": 19, "z": -1, "color": 10 }
   ],
   "lanes": [
-    { "hives": [{ "color": 9, "capacity": 40 }, { "color": 10, "capacity": 80, "hidden": true }, { "color": 0, "capacity": 50, "hidden": true }, { "color": 10, "capacity": 70, "hidden": true }, { "color": 1, "capacity": 60 }, { "color": 10, "capacity": 70, "link": 1 }] },
-    { "hives": [{ "color": 10, "capacity": 70 }, { "color": 9, "capacity": 30, "link": 2 }, { "color": 10, "capacity": 80 }, { "color": 1, "capacity": 40 }, { "color": 10, "capacity": 70 }, { "color": 1, "capacity": 20, "link": 1 }] },
-    { "hives": [{ "color": 10, "capacity": 80 }, { "color": 6, "capacity": 10, "link": 2 }, { "color": 10, "capacity": 80 }, { "color": 1, "capacity": 40 }, { "color": 10, "capacity": 60 }] },
-    { "hives": [{ "color": 0, "capacity": 40 }, { "color": 10, "capacity": 80 }, { "color": 0, "capacity": 50 }, { "color": 10, "capacity": 80 }, { "color": 0, "capacity": 30, "hidden": true }, { "color": 10, "capacity": 70, "hidden": true }, { "color": 1, "capacity": 30 }] }
+    { "hives": [{ "color": 9, "capacity": 30 }, { "color": 10, "capacity": 80 }, { "color": 1, "capacity": 40, "hidden": true }, { "color": 10, "capacity": 70 }, { "color": 0, "capacity": 60 }, { "color": 10, "capacity": 70 }] },
+    { "hives": [{ "color": 1, "capacity": 20 }, { "color": 10, "capacity": 80, "hidden": true }, { "color": 6, "capacity": 10, "hidden": true }, { "color": 10, "capacity": 70, "hidden": true }, { "color": 0, "capacity": 40 }, { "color": 10, "capacity": 60 }] },
+    { "hives": [{ "color": 10, "capacity": 80 }, { "color": 9, "capacity": 40 }, { "color": 10, "capacity": 80, "link": 2 }, { "color": 1, "capacity": 40 }, { "color": 10, "capacity": 70 }, { "color": 1, "capacity": 40, "link": 1 }] },
+    { "hives": [{ "color": 1, "capacity": 50 }, { "color": 10, "capacity": 80 }, { "color": 0, "capacity": 40, "link": 2 }, { "color": 10, "capacity": 80 }, { "color": 0, "capacity": 30, "hidden": true }, { "color": 10, "capacity": 70, "link": 1 }] }
   ]
 }

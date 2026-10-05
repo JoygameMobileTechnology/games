@@ -3,6 +3,13 @@
 Canlı sürüm: https://joygamemobiletechnology.github.io/games/bee-colony-remaster/
 (GitHub Pages sayfayı ~10 dakika önbellekte tutar; bir değişiklik görünmüyorsa sert yenileyin.)
 
+## 5 Ekim 2026 — Bağlı kovan kuralı
+
+- **Bağlı kovanlar ancak hepsi öndeyken gider:** ikili ya da üçlü bağın üyeleri, ancak hepsi kendi şeridinin en önündeyken birlikte slota gider (yeterli boş slot da gerekir). Biri hâlâ başka bir kovanın arkasındaysa öndekine dokunmak bir şey yapmaz, "Bağlı kovanların hepsi şeridin önünde olmalı" uyarısı çıkar. Önceden ortak, şeridin ortasından da çekilip slota uçuyordu.
+- **Geri Al ve Karıştır:** geri alınan bağlı kovanlar farklı şeritlerin önüne döner (grup tekrar oynanabilir); Karıştır bir grubun üyelerini hiçbir zaman aynı şeride koymaz.
+- **Metinler:** "Bağlı Kovanlar" kartı ve "Üçlü bağ!" balonu yeni kuralı anlatıyor.
+- **Leveller:** yeni kurala göre 21 bölümün kuyruğu yeniden kuruldu (10, 11, 13, 14, 16, 17, 19, 20, 22, 23, 24, 25, 26, 27, 29, 30, 31, 32, 33, 34, 35); heykeller aynı. Eski kuyruklarla 16, 22, 29 ve 35 (ve 10, 11, 14, 30) yeni kuralda çözülemiyordu. Hepsi çözülebilir ve zorluk hedefinde: normaller %82–90, zorlar %17–30 (dikkatsiz oyuncunun gerçek kazanma oranı).
+
 ## 5 Ekim 2026 — Daha kısa 1. bölüm
 
 - **Kiraz İkilisi küçüldü:** 590 küpten 380 küpe (iki kiraz, sap ve yaprak aynı şekilde, biraz daha küçük). Kovan sayısı 10'dan 7'ye indi; FTUE akışı aynı (önde yeşil / bej / kırmızı, bej meyve eti kırmızının içinde uyur, kırmızı kazınca uyanır).

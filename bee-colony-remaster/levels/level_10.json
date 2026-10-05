@@ -1147,8 +1147,8 @@
     { "x": 5, "y": 13, "z": 1, "color": 2 }
   ],
   "lanes": [
-    { "hives": [{ "color": 5, "capacity": 60 }, { "color": 0, "capacity": 20, "hidden": true }, { "color": 4, "capacity": 20, "link": 2 }, { "color": 2, "capacity": 70, "hidden": true }, { "color": 5, "capacity": 60 }, { "color": 1, "capacity": 60 }, { "color": 3, "capacity": 20 }, { "color": 1, "capacity": 70 }] },
-    { "hives": [{ "color": 7, "capacity": 20 }, { "color": 2, "capacity": 80, "link": 1 }, { "color": 5, "capacity": 70, "link": 2 }, { "color": 3, "capacity": 20 }, { "color": 5, "capacity": 70, "hidden": true }, { "color": 1, "capacity": 60 }, { "color": 5, "capacity": 30 }, { "color": 1, "capacity": 60, "hidden": true }] },
-    { "hives": [{ "color": 7, "capacity": 20 }, { "color": 5, "capacity": 60, "link": 1 }, { "color": 2, "capacity": 50 }, { "color": 4, "capacity": 20 }, { "color": 5, "capacity": 80 }, { "color": 0, "capacity": 20, "hidden": true }, { "color": 5, "capacity": 60 }, { "color": 1, "capacity": 40 }] }
+    { "hives": [{ "color": 2, "capacity": 80 }, { "color": 5, "capacity": 80 }, { "color": 7, "capacity": 20, "hidden": true }, { "color": 5, "capacity": 70 }, { "color": 7, "capacity": 20, "hidden": true }, { "color": 1, "capacity": 50 }, { "color": 5, "capacity": 50, "hidden": true }, { "color": 1, "capacity": 60 }] },
+    { "hives": [{ "color": 3, "capacity": 20 }, { "color": 5, "capacity": 60, "link": 1 }, { "color": 1, "capacity": 60, "link": 2 }, { "color": 3, "capacity": 20 }, { "color": 5, "capacity": 50, "hidden": true }, { "color": 0, "capacity": 20 }, { "color": 1, "capacity": 60 }, { "color": 2, "capacity": 60, "hidden": true }] },
+    { "hives": [{ "color": 5, "capacity": 70 }, { "color": 4, "capacity": 20, "link": 1 }, { "color": 2, "capacity": 60, "link": 2 }, { "color": 5, "capacity": 60 }, { "color": 0, "capacity": 20 }, { "color": 5, "capacity": 50 }, { "color": 1, "capacity": 60 }, { "color": 4, "capacity": 20 }] }
   ]
 }

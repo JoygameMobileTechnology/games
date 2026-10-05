@@ -1297,9 +1297,9 @@
     { "x": 12, "y": 9, "z": 3, "color": 6 }
   ],
   "lanes": [
-    { "hives": [{ "color": 6, "capacity": 70 }, { "color": 8, "capacity": 30 }, { "color": 1, "capacity": 10 }, { "color": 8, "capacity": 40, "link": 1 }, { "color": 0, "capacity": 60, "hidden": true }, { "color": 8, "capacity": 30 }, { "color": 14, "capacity": 70 }] },
-    { "hives": [{ "color": 0, "capacity": 60 }, { "color": 8, "capacity": 20 }, { "color": 14, "capacity": 60 }, { "color": 0, "capacity": 50, "link": 1 }, { "color": 3, "capacity": 30, "hidden": true }, { "color": 8, "capacity": 30 }] },
-    { "hives": [{ "color": 8, "capacity": 20 }, { "color": 14, "capacity": 70, "hidden": true }, { "color": 0, "capacity": 60 }, { "color": 14, "capacity": 60 }, { "color": 0, "capacity": 60, "hidden": true }, { "color": 8, "capacity": 30 }, { "color": 14, "capacity": 40, "hidden": true }, { "color": 8, "capacity": 30 }] },
-    { "hives": [{ "color": 0, "capacity": 60 }, { "color": 8, "capacity": 20 }, { "color": 6, "capacity": 70, "hidden": true }, { "color": 14, "capacity": 50 }, { "color": 0, "capacity": 40 }, { "color": 8, "capacity": 50 }, { "color": 14, "capacity": 70 }] }
+    { "hives": [{ "color": 0, "capacity": 80 }, { "color": 8, "capacity": 20 }, { "color": 14, "capacity": 70 }, { "color": 8, "capacity": 20 }, { "color": 6, "capacity": 70, "hidden": true }, { "color": 8, "capacity": 20, "hidden": true }, { "color": 14, "capacity": 50 }, { "color": 8, "capacity": 20, "hidden": true }, { "color": 0, "capacity": 40 }] },
+    { "hives": [{ "color": 3, "capacity": 10 }, { "color": 8, "capacity": 20 }, { "color": 14, "capacity": 60 }, { "color": 8, "capacity": 20 }, { "color": 14, "capacity": 50 }, { "color": 8, "capacity": 20 }, { "color": 1, "capacity": 10 }, { "color": 8, "capacity": 20 }] },
+    { "hives": [{ "color": 0, "capacity": 60 }, { "color": 14, "capacity": 50, "link": 1 }, { "color": 8, "capacity": 20 }, { "color": 14, "capacity": 60 }, { "color": 8, "capacity": 20, "hidden": true }, { "color": 0, "capacity": 50 }, { "color": 3, "capacity": 20, "hidden": true }, { "color": 8, "capacity": 20 }] },
+    { "hives": [{ "color": 6, "capacity": 70 }, { "color": 8, "capacity": 20, "link": 1 }, { "color": 14, "capacity": 80 }, { "color": 0, "capacity": 60 }, { "color": 8, "capacity": 20 }, { "color": 0, "capacity": 50 }, { "color": 8, "capacity": 20 }, { "color": 0, "capacity": 50, "hidden": true }, { "color": 8, "capacity": 20, "hidden": true }] }
   ]
 }
