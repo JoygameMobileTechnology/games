@@ -3,6 +3,11 @@
 Canlı sürüm: https://joygamemobiletechnology.github.io/games/bee-colony-remaster/
 (GitHub Pages sayfayı ~10 dakika önbellekte tutar; bir değişiklik görünmüyorsa sert yenileyin.)
 
+## 5 Ekim 2026 — Daha kısa 1. bölüm
+
+- **Kiraz İkilisi küçüldü:** 590 küpten 380 küpe (iki kiraz, sap ve yaprak aynı şekilde, biraz daha küçük). Kovan sayısı 10'dan 7'ye indi; FTUE akışı aynı (önde yeşil / bej / kırmızı, bej meyve eti kırmızının içinde uyur, kırmızı kazınca uyanır).
+- **Süre:** bot ile 1x 18,0 sn'den 14,6 sn'ye (Cube Land 1. bölüm 15 sn); tutorial adımlarıyla birlikte de aynı oranda kısalır.
+
 ## 30 Eylül 2026 — Yolculuk zemini
 
 - **Sade zemin:** Yolculuk ekranındaki adalar, kesik çizgili deniz rotaları ve dalgalar kaldırıldı; zemin artık Mağaza ile aynı lacivert kapitone desen.
