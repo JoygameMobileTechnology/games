@@ -46,8 +46,7 @@
 .streak-seal-motif.seal-focus .seal-left,.streak-seal-motif.seal-focus .seal-right { animation-name: streak-seal-focus; }
 .streak-seal-motif.seal-balanced .seal-left,.streak-seal-motif.seal-draw .seal-left { animation: streak-align-left var(--streak-duration) ease-out both; }
 .streak-seal-motif.seal-balanced .seal-right,.streak-seal-motif.seal-draw .seal-right { animation: streak-align-right var(--streak-duration) ease-out both; }
-/* The old turn label retains its existing height beneath this temporary overlay. */
-.has-streak .turn-ribbon { visibility: hidden; }
+/* Turn ownership remains visible while celebrations appear over the board. */
 .remake .player-score > div.local-avatar-wrap { position: relative; flex: 0 0 auto; display: block; min-width: 0; }
 .streak-portrait-ring { position: absolute; inset: -5px; pointer-events: none; z-index: 2; }
 .streak-portrait-ring .streak-seal-motif { width: 100%; height: 100%; fill: none; stroke: #ffdda0; stroke-width: 1.1; overflow: visible; filter: drop-shadow(0 0 3px #eac47b90); }

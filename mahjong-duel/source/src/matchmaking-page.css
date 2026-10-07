@@ -1,6 +1,7 @@
 .matchmaking-page {
   --matchmaking-portrait: clamp(106px, 34vw, 206px);
   --matchmaking-vs: clamp(39px, 11vw, 64px);
+  --faceoff-offset: clamp(3px, 1vw, 7px);
   color: #603014;
   background: radial-gradient(ellipse at 48% 35%, #fffbee 0, #fff5d9 55%, #f7e5bc 100%);
 }
@@ -14,17 +15,21 @@
   min-height: 100%;
   padding: clamp(20px, 4dvh, 40px) max(15px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(15px, env(safe-area-inset-left));
 }
+.matchmaking-page:not(.is-gentle) .progression-page-content { animation: none; }
 .matchmaking-live-status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .matchmaking-search { display: flex; flex-direction: column; justify-content: space-evenly; gap: clamp(22px, 4dvh, 42px); min-width: 0; }
 .matchmaking-heading { margin: 0; text-align: center; color: #5a2913; font-size: clamp(22px, 6.2vw, 37px); font-weight: 800; letter-spacing: -.8px; line-height: 1.2; }
 .matchmaking-players { display: grid; grid-template-columns: minmax(0, 1fr) var(--matchmaking-vs) minmax(0, 1fr); align-items: start; width: 100%; max-width: calc(var(--matchmaking-portrait) * 2 + var(--matchmaking-vs)); margin-inline: auto; }
-.matchmaking-seat { display: flex; flex-direction: column; align-items: center; min-width: 0; }
+.matchmaking-seat { position: relative; isolation: isolate; display: flex; flex-direction: column; align-items: center; min-width: 0; }
+.matchmaking-seat.is-player { --seat-dark: #124c98; --seat-color: #1578ca; --seat-light: #67c5ff; --seat-wash: #65b6ef3d; --seat-glow: #319ded66; --seat-nudge: var(--faceoff-offset); }
+.matchmaking-seat.is-opponent { --seat-dark: #8e231e; --seat-color: #be3b30; --seat-light: #ff9680; --seat-wash: #ef92743b; --seat-glow: #e55a4366; --seat-nudge: calc(var(--faceoff-offset) * -1); }
+.matchmaking-seat::before { content: ''; position: absolute; inset: -16% -15% 8%; z-index: -1; border-radius: 48% 58% 44% 50%; pointer-events: none; background: radial-gradient(ellipse, var(--seat-wash) 0, transparent 70%); }
 .matchmaking-portrait-wrap { width: var(--matchmaking-portrait); max-width: 100%; aspect-ratio: 1; position: relative; margin-bottom: clamp(15px, 2.5dvh, 24px); }
-.matchmaking-portrait-ring { position: absolute; inset: 3%; border: 3px solid #a16524; border-radius: 50%; padding: 4px; background: linear-gradient(135deg, #ffe39a 0, #c98b33 35%, #ffdc88 54%, #935219 100%); box-shadow: 0 0 0 1px #f9d98b, inset 0 0 0 1px #fff6c7, 0 4px 7px #68401838; }
-.matchmaking-portrait-ring::after { content: ''; position: absolute; inset: 4px; border: 1px solid #9b682b; border-radius: 50%; box-shadow: inset 0 2px 5px #7a4a3038; pointer-events: none; }
+.matchmaking-portrait-ring { position: absolute; inset: 3%; border: 3px solid #a16524; border-radius: 50%; padding: clamp(5px, 1.5vw, 9px); background: linear-gradient(135deg, var(--seat-light), var(--seat-color) 38%, var(--seat-dark) 72%, var(--seat-color)); box-shadow: 0 0 0 1px #f9d98b, inset 0 0 0 1px #fff6c7, inset 0 2px 4px #ffffff70, 0 4px 7px #68401838; }
+.matchmaking-portrait-ring::after { content: ''; position: absolute; inset: clamp(5px, 1.5vw, 9px); border: 2px solid #eed28c; border-radius: 50%; box-shadow: inset 0 2px 5px #7a4a3038; pointer-events: none; }
 .matchmaking-avatar.player-avatar { display: block; width: 100%; height: 100%; border-radius: 50%; }
 .matchmaking-avatar .player-avatar-portrait { border-radius: 50%; box-shadow: none; }
-.matchmaking-avatar .avatar-frame { display: none; }
+.matchmaking-avatar .avatar-frame { inset: 0; width: 100%; height: 100%; filter: none; }
 .matchmaking-anonymous { display: block; width: 100%; height: 100%; border-radius: 50%; overflow: hidden; background: radial-gradient(ellipse at 38% 24%, #f9edce, #e5c995 90%); }
 .matchmaking-anonymous svg { display: block; width: 100%; height: 100%; fill: #b59361; }
 .matchmaking-search-orbit { position: absolute; z-index: 2; inset: -4%; width: 108%; height: 108%; overflow: visible; pointer-events: none; }
@@ -32,13 +37,11 @@
 .matchmaking-orbit-arcs { transform-origin: 60px 60px; animation: matchmaking-orbit 3.2s linear infinite; filter: drop-shadow(0 0 2px #ffc257); }
 .matchmaking-orbit-arcs path { fill: none; stroke: #f3ad2f; stroke-width: 2.7; stroke-linecap: round; }
 .matchmaking-orbit-arcs circle { fill: #fffbee; stroke: #fff0b3; stroke-width: .5; }
-.matchmaking-ready-badge { display: grid; place-items: center; position: absolute; z-index: 3; right: 1%; bottom: 5%; width: 25%; aspect-ratio: 1; border: 2px solid #fff6c9; border-radius: 50%; color: #fffced; background: linear-gradient(145deg, #90d368, #3aa54d 60%, #277b38); box-shadow: 0 0 0 1px #b88836, 0 2px 4px #67432152, inset 0 1px 2px #e8ffb994; }
-.matchmaking-ready-badge svg { width: 72%; height: 72%; }
-.matchmaking-player-name { max-width: 100%; padding-inline: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: clamp(18px, 5.1vw, 28px); line-height: 1.2; font-weight: 800; }
+.matchmaking-player-name { display: block; width: 100%; max-width: 100%; padding: 6px 7px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border: 1px solid #c4944c; border-radius: 9px; background: linear-gradient(#fffae7, #f4dfae); box-shadow: inset 0 1px #fffdf0, 0 2px var(--seat-color), 0 3px 6px #6b3c1721; color: var(--seat-dark); text-align: center; font-size: clamp(17px, 4.7vw, 27px); line-height: 1.2; font-weight: 800; }
 .matchmaking-player-state { display: inline-flex; justify-content: center; align-items: center; gap: 5px; margin-top: 6px; color: #7b542f; font-size: clamp(14px, 4.1vw, 22px); line-height: 1.3; }
 .matchmaking-player-state.is-ready svg { width: 17px; height: 17px; border-radius: 50%; padding: 2px; color: #fffcee; background: #51a651; box-shadow: inset 0 1px #bde79e; }
 .matchmaking-versus { display: grid; place-items: center; width: var(--matchmaking-vs); height: var(--matchmaking-vs); margin-top: calc((var(--matchmaking-portrait) - var(--matchmaking-vs)) / 2); position: relative; z-index: 3; border: 2px solid #be8033; border-radius: 50%; color: #fff4c5; background: repeating-linear-gradient(92deg, #ffe29e0b 0 1px, transparent 1px 5px), linear-gradient(120deg, #a26223, #753c0f 60%, #9c5c1b); box-shadow: inset 0 0 0 2px #efd28a, inset 0 0 0 3px #754416, 0 3px 5px #673a2430; font-size: clamp(20px, 5.8vw, 34px); font-weight: 800; text-shadow: 0 2px #4e270f; }
-.matchmaking-progress { display: flex; flex-direction: column; align-items: center; gap: clamp(12px, 2dvh, 19px); }
+.matchmaking-progress { display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 74px; gap: clamp(12px, 2dvh, 19px); }
 .matchmaking-progress-dots { display: flex; justify-content: center; align-items: center; gap: 14px; height: 24px; }
 .matchmaking-progress-dots > span { width: 14px; height: 14px; border-radius: 50%; background: linear-gradient(#efbd66, #d79734); box-shadow: inset 0 1px #fff5be; transform: scale(.65); animation: matchmaking-dot 1.8s ease-in-out infinite; }
 .matchmaking-progress-dots > span:nth-child(2) { animation-delay: .25s; }
@@ -56,34 +59,42 @@
 .matchmaking-theme-copy > small { font-size: clamp(10px, 2.8vw, 13px); color: #7b5a35; line-height: 1.3; font-weight: 600; }
 .matchmaking-footer { padding: 0 3px 3px; }
 .matchmaking-cancel.progression-secondary { min-height: 49px; padding-block: 8px; font-size: clamp(22px, 6vw, 30px); border-radius: 40px; }
-.matchmaking-cancel.progression-secondary:disabled { color: #426336; border-color: #91a763; background: linear-gradient(#ecf1d4, #d7e1b7); box-shadow: inset 0 2px #fffbea, 0 2px #899559; opacity: 1; }
-.matchmaking-page.is-found .matchmaking-orbit-arcs { animation: none; filter: drop-shadow(0 0 3px #8ccc61); }
-.matchmaking-page.is-found .matchmaking-orbit-arcs path { stroke: #66ab4c; }
-.matchmaking-page.is-found .matchmaking-orbit-arcs circle { fill: #f4ffdf; stroke: #b9e799; }
-.matchmaking-page.is-found .matchmaking-progress-dots > span { animation: none; transform: scale(1); background: linear-gradient(#91d164, #419543); box-shadow: inset 0 1px #dfffbd, 0 0 8px #71bb5099; }
-.matchmaking-page.is-found .matchmaking-elapsed { color: #4b7136; }
-.matchmaking-page.is-paused .matchmaking-orbit-arcs, .matchmaking-page.is-paused .matchmaking-progress-dots > span { animation-play-state: paused; }
+.matchmaking-preparing { display: grid; place-items: center; min-height: 49px; margin: 0; color: #785131; font-size: clamp(17px, 4.8vw, 25px); font-weight: 700; text-align: center; }
+.matchmaking-versus > span { position: relative; z-index: 2; }
+.matchmaking-versus > i { position: absolute; inset: -15%; border: 2px solid #e6b957; border-radius: 50%; opacity: 0; pointer-events: none; }
+.matchmaking-page.is-found .is-opponent .matchmaking-portrait-ring { animation: matchmaking-reveal-portrait .6s cubic-bezier(.16, 1, .3, 1) both; }
+.matchmaking-page.is-found .is-opponent .matchmaking-player-name { animation: matchmaking-reveal-name .6s cubic-bezier(.16, 1, .3, 1) both; }
+.matchmaking-page.is-found .matchmaking-elapsed { color: #496534; }
+.matchmaking-page.is-faceoff .matchmaking-seat { animation: matchmaking-faceoff .6s cubic-bezier(.16, 1, .3, 1) both; }
+.matchmaking-page.is-faceoff .matchmaking-versus { animation: matchmaking-vs-accent .6s ease-out both; }
+.matchmaking-page.is-faceoff .matchmaking-versus > i { animation: matchmaking-gold-pulse .6s ease-out both; }
+.matchmaking-page.is-paused *, .matchmaking-page.is-paused *::before, .matchmaking-page.is-paused *::after { animation-play-state: paused !important; }
+@keyframes matchmaking-reveal-portrait { 0% { opacity: 0; transform: translateX(20px) scale(.94); } 70% { opacity: 1; transform: translateX(-2px) scale(1.015); } 100% { opacity: 1; transform: none; } }
+@keyframes matchmaking-reveal-name { 0%, 10% { opacity: 0; transform: translateX(12px); } 100% { opacity: 1; transform: none; } }
+@keyframes matchmaking-faceoff { from { transform: none; } 65%, 100% { transform: translateX(var(--seat-nudge)); } }
+@keyframes matchmaking-vs-accent { 0%, 100% { transform: scale(1); } 38% { transform: scale(1.14); box-shadow: inset 0 0 0 2px #fff4b2, inset 0 0 0 3px #754416, 0 0 19px #efbb4c99; } }
+@keyframes matchmaking-gold-pulse { 0% { opacity: 0; transform: scale(.82); } 28% { opacity: .9; } 100% { opacity: 0; transform: scale(1.65); } }
 @keyframes matchmaking-orbit { to { transform: rotate(-360deg); } }
 @keyframes matchmaking-dot { 0%, 13%, 100% { transform: scale(.65); } 29%, 72% { transform: scale(1); box-shadow: inset 0 1px #fff5be, 0 0 0 2px #e2b14c55; } 88% { transform: scale(.65); } }
 @media (min-width: 600px) {
   .matchmaking-page .progression-page-content { padding-inline: 38px; padding-bottom: max(36px, env(safe-area-inset-bottom)); }
   .matchmaking-theme { min-height: 170px; padding-left: 30%; }
   .matchmaking-theme-copy { gap: 8px; }
-  .matchmaking-cancel.progression-secondary { min-height: 62px; }
+  .matchmaking-cancel.progression-secondary, .matchmaking-preparing { min-height: 62px; }
   .matchmaking-progress-dots > span { width: 17px; height: 17px; }
   .matchmaking-progress-dots { gap: 19px; }
 }
 @media (max-width: 360px), (max-height: 650px) and (orientation: portrait) {
   .matchmaking-page { --matchmaking-portrait: clamp(104px, 32vw, 124px); }
-  .matchmaking-page .progression-page-content { gap: 18px; padding-top: 18px; padding-bottom: max(18px, env(safe-area-inset-bottom)); }
-  .matchmaking-search { gap: 18px; }
+  .matchmaking-page .progression-page-content { gap: 12px; padding-top: 14px; padding-bottom: max(14px, env(safe-area-inset-bottom)); }
+  .matchmaking-search { gap: 10px; }
   .matchmaking-heading { font-size: 22px; letter-spacing: -.65px; }
   .matchmaking-theme { min-height: 104px; }
   .matchmaking-theme-copy > strong { font-size: 19px; }
-  .matchmaking-progress { gap: 9px; }
+  .matchmaking-progress { min-height: 51px; gap: 9px; }
   .matchmaking-progress-dots { height: 20px; }
   .matchmaking-portrait-wrap { margin-bottom: 12px; }
-  .matchmaking-cancel.progression-secondary { min-height: 46px; padding-block: 6px; }
+  .matchmaking-cancel.progression-secondary, .matchmaking-preparing { min-height: 46px; padding-block: 6px; }
 }
 @media (min-width: 700px) and (orientation: landscape) {
   .matchmaking-page { --matchmaking-portrait: clamp(126px, 18vw, 204px); --matchmaking-vs: clamp(45px, 5.5vw, 64px); }
@@ -95,7 +106,7 @@
   .matchmaking-theme-copy > span { font-size: 14px; }
   .matchmaking-theme-copy > small { font-size: 12px; }
   .matchmaking-footer { grid-column: 2; grid-row: 3; align-self: start; }
-  .matchmaking-cancel.progression-secondary { min-height: 54px; font-size: 27px; }
+  .matchmaking-cancel.progression-secondary, .matchmaking-preparing { min-height: 54px; font-size: 27px; }
   .matchmaking-player-name { font-size: clamp(20px, 2.7vw, 27px); }
   .matchmaking-player-state { font-size: 18px; }
 }
@@ -110,7 +121,7 @@
   .matchmaking-portrait-wrap { margin-bottom: 11px; }
   .matchmaking-player-name { font-size: 20px; }
   .matchmaking-player-state { margin-top: 3px; font-size: 14px; }
-  .matchmaking-progress { gap: 4px; }
+  .matchmaking-progress { min-height: 42px; gap: 4px; }
   .matchmaking-progress-dots { height: 18px; gap: 13px; }
   .matchmaking-progress-dots > span { width: 12px; height: 12px; }
   .matchmaking-elapsed { font-size: 14px; }
@@ -120,14 +131,14 @@
   .matchmaking-theme-copy > strong { font-size: 21px; }
   .matchmaking-theme-copy > small { font-size: 11px; }
   .matchmaking-footer { grid-column: 2; grid-row: 3; align-self: start; }
-  .matchmaking-cancel.progression-secondary { min-height: 44px; font-size: 23px; }
+  .matchmaking-cancel.progression-secondary, .matchmaking-preparing { min-height: 44px; font-size: 23px; }
 }
-.matchmaking-page.is-gentle .matchmaking-orbit-arcs, .matchmaking-page.is-gentle .matchmaking-progress-dots > span { animation: none; }
+.matchmaking-page.is-gentle *, .matchmaking-page.is-gentle *::before, .matchmaking-page.is-gentle *::after { animation: none !important; }
 .matchmaking-page.is-gentle .matchmaking-progress-dots > span { transform: scale(1); }
 @media (max-height: 350px) and (orientation: landscape) {
   .matchmaking-search { gap: 9px; }
-  .matchmaking-heading { font-size: 21px; }
-  .matchmaking-player-name { font-size: 17px; }
+  .matchmaking-heading { font-size: 19px; }
+  .matchmaking-player-name { padding-block: 4px; font-size: 17px; }
   .matchmaking-player-state { font-size: 13px; }
   .matchmaking-portrait-wrap { margin-bottom: 8px; }
   .matchmaking-page .progression-page-content { height: 100%; column-gap: 20px; padding-block: 12px max(12px, env(safe-area-inset-bottom)); }
@@ -135,6 +146,6 @@
   .matchmaking-cancel.progression-secondary { padding-block: 6px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .matchmaking-orbit-arcs, .matchmaking-progress-dots > span { animation: none; }
+  .matchmaking-page *, .matchmaking-page *::before, .matchmaking-page *::after { animation: none !important; }
   .matchmaking-progress-dots > span { transform: scale(1); }
 }

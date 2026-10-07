@@ -56,7 +56,7 @@ test('search timing draws a fresh integer from two through four seconds', () => 
   assert.equal(matchmakingDelay(() => 0.5), 3000);
   assert.equal(matchmakingDelay(() => 1 - Number.EPSILON), 4000);
   assert.equal(matchmakingDelay(() => 1), 4000);
-  assert.equal(MATCH_FOUND_DELAY_MS, 1500);
+  assert.equal(MATCH_FOUND_DELAY_MS, 2500);
   for (const value of [-1, 0, 0.12345, 0.333, 0.9, 1, 2, NaN, Infinity]) {
     const delay = matchmakingDelay(() => value);
     assert.ok(Number.isInteger(delay));

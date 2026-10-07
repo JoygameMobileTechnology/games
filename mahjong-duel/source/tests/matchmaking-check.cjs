@@ -99,7 +99,7 @@ const sizes = [
       await noBoard();
       await advance(1); await status('found').waitFor();
       await noBoard();
-      assert.equal(await page.locator('.matchmaking-cancel').isDisabled(), true, 'Cancel locks when a match is found');
+      assert.equal(await page.locator('.matchmaking-cancel').count(), 0, 'Cancel leaves the face-off once an opponent is found');
       const found = await page.locator('.matchmaking-page').evaluate(node => ({
         text: node.innerText,
         name: node.querySelector('.is-opponent .matchmaking-player-name').textContent,
@@ -111,36 +111,50 @@ const sizes = [
       assert.notEqual(opponent.avatarId, profile.avatarId);
       assert.ok(found.avatars.some(avatar => avatar.id === opponent.avatarId && avatar.label?.includes(opponent.name)), 'the opponent uses its own preset portrait');
       assert.doesNotMatch(found.text, /ghost/i);
-      const green = await page.locator('.matchmaking-page').evaluate(root => {
-        const channels = value => [...value.matchAll(/rgba?\((\d+),\s*(\d+),\s*(\d+)/g)].map(match => match.slice(1).map(Number));
-        return {
-          ring: channels(getComputedStyle(root.querySelector('.matchmaking-orbit-arcs path')).stroke),
-          dots: [...root.querySelectorAll('.matchmaking-progress-dots > span')].map(node => ({
-            colors: channels(getComputedStyle(node).backgroundImage), animations: node.getAnimations().length,
-          })),
-        };
-      });
-      assert.ok(green.ring.length && green.ring.every(([r, g, b]) => g > r && g > b), 'the found ring becomes green');
-      assert.equal(green.dots.length, 3);
-      assert.ok(green.dots.every(dot => dot.animations === 0 && dot.colors.length && dot.colors.every(([r, g, b]) => g > r && g > b)), 'all three found dots stop and become green');
+      assert.equal(await page.locator('.matchmaking-search-orbit, .matchmaking-progress-dots').count(), 0, 'search motion gives way to the face-off');
+      assert.equal(await page.locator('[data-matchmaking-portrait="you"]').count(), 1);
+      assert.equal(await page.locator('[data-matchmaking-portrait="ai"]').count(), 1);
+      assert.equal(await page.locator('.matchmaking-preparing').innerText(), 'Preparing your table…');
       return opponent;
     }
-    async function enterBoard(opponent, expectedTheme, { hold = 1500 } = {}) {
-      await advance(hold - 1);
-      assert.equal(await status('found').count(), 1, 'the found state holds for the full 1.5 seconds');
+    async function enterBoard(opponent, expectedTheme, { elapsed = 0 } = {}) {
+      const revealRemaining = Math.max(0, model.MATCH_REVEAL_MS - elapsed);
+      if (revealRemaining) {
+        await advance(revealRemaining - 1);
+        assert.equal(await status('faceoff').count(), 0, 'opponent reveal lasts 600 ms');
+        await noBoard();
+        await advance(1);
+      }
+      await status('faceoff').waitFor();
+      const faceoffRemaining = model.MATCH_REVEAL_MS + model.MATCH_FACEOFF_MS - Math.max(elapsed, model.MATCH_REVEAL_MS);
+      await advance(faceoffRemaining - 1);
+      assert.equal(await status('faceoff').count(), 1, 'the face-off holds for 600 ms');
       await noBoard();
       await advance(1);
       await page.locator('.game-board').waitFor();
       assert.equal(await page.locator('.matchmaking-page').count(), 0);
-      if (preference === 'normal') assert.equal(await page.locator(opening).count(), 1, 'normal motion uses the existing opening after matchmaking');
-      else assert.equal(await page.locator(opening).count(), 0, 'reduced motion skips only the opening effect');
-      await advance(2000);
-      await page.locator(opening).waitFor({ state: 'detached' });
+      assert.equal(await page.locator(opening).count(), 0, 'the bright-light menu opening is removed');
+      assert.equal(await page.locator('.duel-stage').getAttribute('data-intro'), 'travel');
+      assert.equal(await page.locator('.duel-stage').evaluate(node => node.inert), true, 'input stays locked while portraits travel');
+      assert.equal(await page.locator('[data-travelling-portrait]').count(), 2, 'both portraits connect the face-off to the scoreboard');
+      await page.locator('.game-tile').first().evaluate(node => node.click());
+      assert.equal(await page.locator('.game-tile[data-face-up="true"]').count(), 0, 'a tile cannot flip during entry');
+      await advance(model.MATCH_TRANSFER_MS - 1);
+      assert.equal(await page.locator('.duel-stage').getAttribute('data-intro'), 'travel');
+      await advance(1);
+      assert.equal(await page.locator('.duel-stage').getAttribute('data-intro'), 'ready');
+      assert.equal(await page.locator('.duel-first-turn').innerText(), 'You play first');
+      assert.equal(await page.locator('.local-player').getAttribute('class').then(value => value.includes('active-turn')), true);
+      await advance(model.MATCH_READY_MS - 1);
+      assert.equal(await page.locator('.duel-stage').evaluate(node => node.inert), true, 'the opening cue lasts 500 ms');
+      await advance(1);
+      assert.equal(await page.locator('.duel-stage').evaluate(node => node.inert), false, 'input opens 2.5 seconds after finding an opponent');
+      assert.equal(await page.locator('.portrait-transfer').count(), 0);
       assert.equal(await page.locator('.game-tile').count(), 60);
       assert.equal(await page.locator('.game-tile[data-face-up="true"]').count(), 0);
       assert.equal(await page.locator('.world').getAttribute('data-theme'), expectedTheme);
       assert.equal(await page.locator('.world').getAttribute('data-board-theme'), expectedTheme);
-      assert.equal((await page.locator('.opponent-name').innerText()).trim(), opponent.name, 'the found username is the in-game opponent');
+      assert.equal((await page.locator('.opponent .duel-player-name').innerText()).trim(), opponent.name, 'the found username is the in-game opponent');
       assert.equal(await page.locator('.opponent .player-avatar').getAttribute('data-avatar-id'), opponent.avatarId, 'the found portrait is the in-game opponent');
       assert.doesNotMatch(await page.locator('body').innerText(), /ghost/i, 'visible duel text no longer calls the opponent Ghost');
       const allowedFaces = new Set(themeTileSets[expectedTheme].eastern.map(tile => new URL(tile.src, `${origin}/`).href));
@@ -150,7 +164,8 @@ const sizes = [
       assert.equal(timeline.filter(event => event.phase === 'found').length, 1);
       assert.equal(timeline.filter(event => event.phase === 'board').length, 1, 'one search launches one board');
       const found = timeline.find(event => event.phase === 'found'), board = timeline.find(event => event.phase === 'board');
-      assert.ok(board.at - found.at >= 1500, 'the board cannot start before the reveal hold');
+      assert.ok(board.at - found.at >= model.MATCH_REVEAL_MS + model.MATCH_FACEOFF_MS, 'the board appears after reveal and face-off');
+      assert.equal(timeline.filter(event => event.phase === 'opening').length, 0, 'no menu flash is ever mounted');
       return timeline;
     }
     async function capture(phase) {
@@ -170,7 +185,7 @@ const sizes = [
       assert.ok(layout.overflow <= 1, `${label}: no horizontal overflow`);
       assert.ok(layout.rect.top >= 0 && layout.rect.left >= 0 && layout.rect.right <= viewport.width + 1 && layout.rect.bottom <= viewport.height + 1, `${label}: matchmaking fits the viewport`);
       for (const control of layout.buttons) assert.ok(control.width >= 44 && control.height >= 44 && control.top >= 0 && control.bottom <= viewport.height && control.reachable, `${label}: ${control.text} is reachable and at least 44px: ${JSON.stringify(control)}`);
-      await page.screenshot({ path: path.join(output, `${browserName}-${label}-${phase}.png`) });
+      await page.screenshot({ path: path.join(output, `${browserName}-${label}-${phase}.jpg`), type: 'jpeg', quality: 65 });
       return layout;
     }
     async function checkMotion() {
@@ -216,7 +231,9 @@ const sizes = [
       await page.getByRole('heading', { name: 'Daily Rewards', exact: true }).waitFor();
       await advance(400); await tap('Claim rewards');
       await page.getByRole('heading', { name: 'Daily Quests', exact: true }).waitFor();
-      await tap('Back to main menu'); await tap('Play Duel');
+      await tap('Back to main menu');
+      if (await page.locator('.starter-boosters-intro').count()) await tap('Got it');
+      await tap('Play Duel');
       await page.getByRole('heading', { name: 'Choose a theme', exact: true }).waitFor();
       const result = await scenario({ page, advance, tap, button, status, noBoard, selection, choose, start, foundAfter, enterBoard, capture, checkMotion, visibility });
       assert.deepEqual(errors, [], `${label}: no browser or asset errors`);
@@ -270,8 +287,9 @@ const sizes = [
       assert.equal(await ui.page.locator('.matchmaking-theme').getAttribute('data-theme'), themes[0].id);
       await ui.page.evaluate(() => { Math.random = () => 1 - Number.EPSILON; });
       const opponent = await ui.foundAfter(delay);
-      // Native activation and Escape must both remain harmless after the lock.
-      await ui.page.locator('.matchmaking-cancel').evaluate(node => node.click()); await ui.page.keyboard.press('Escape');
+      // Escape must remain harmless after the cancellable search has ended.
+      assert.equal(await ui.page.locator('.matchmaking-cancel').count(), 0);
+      await ui.page.keyboard.press('Escape');
       assert.equal(await ui.status('found').count(), 1);
       const timeline = await ui.enterBoard(opponent, themes[0].id);
       await ui.advance(10000);
@@ -283,11 +301,65 @@ const sizes = [
       assert.equal(await ui.status('searching').count(), 1, 'backgrounding pauses the search deadline');
       await ui.noBoard(); await ui.visibility(false);
       const opponent = await ui.foundAfter(1000);
-      await ui.advance(700); await ui.visibility(true); await ui.advance(5000);
+      await ui.advance(model.MATCH_REVEAL_MS); await ui.advance(100); await ui.visibility(true); await ui.advance(5000);
       assert.equal(await ui.status('found').count(), 1, 'backgrounding pauses the found hold');
       await ui.noBoard(); await ui.visibility(false);
-      const timeline = await ui.enterBoard(opponent, themes[0].id, { hold: 800 });
+      const timeline = await ui.enterBoard(opponent, themes[0].id, { elapsed: 700 });
       return { opponent, timeline, hiddenSearchMs: 5000, hiddenFoundMs: 5000 };
+    });
+    await run('hidden-tab-pauses-entry', sizes[1], 'normal', async ui => {
+      const delay = await ui.start(0);
+      const opponent = await ui.foundAfter(delay);
+      await ui.advance(model.MATCH_REVEAL_MS);
+      await ui.advance(model.MATCH_FACEOFF_MS);
+      await ui.page.locator('.game-board').waitFor();
+      const stage = ui.page.locator('.duel-stage');
+      const noPauseSheet = async () => assert.equal(await ui.page.locator('.sheet-backdrop').count(), 0, 'backgrounding during entry never opens a Pause sheet');
+      const animationSnapshot = () => ui.page.evaluate(async () => {
+        const entries = [...document.querySelectorAll('[data-travelling-portrait], .game-tile .tile-rotator')].flatMap((node, index) => node.getAnimations().map(animation => ({ target: node.dataset.travellingPortrait || `tile-${index}`, animation })));
+        // WAAPI pause() commits at the next animation frame; wait for that commit
+        // before sampling so a pending pause cannot look like hidden progression.
+        await Promise.all(entries.map(({ animation }) => animation.ready));
+        return entries.map(({ target, animation }) => ({ target, currentTime: animation.currentTime, playState: animation.playState }));
+      });
+
+      await ui.advance(300);
+      await ui.visibility(true);
+      assert.equal(await stage.getAttribute('data-intro'), 'travel');
+      await noPauseSheet();
+      const pausedAnimations = await animationSnapshot();
+      assert.equal(pausedAnimations.filter(animation => ['you', 'ai'].includes(animation.target)).length, 2);
+      assert.ok(pausedAnimations.every(animation => ['paused', 'finished'].includes(animation.playState)), 'portrait and tile animations pause when the tab hides');
+      await ui.advance(5000);
+      assert.equal(await stage.getAttribute('data-intro'), 'travel', 'hidden time does not advance the transfer clock');
+      assert.equal(await stage.evaluate(node => node.inert), true);
+      assert.deepEqual(await animationSnapshot(), pausedAnimations, 'portrait and tile animation time stays frozen while hidden');
+      await noPauseSheet();
+      await ui.visibility(false);
+      await ui.advance(model.MATCH_TRANSFER_MS - 300 - 1);
+      assert.equal(await stage.getAttribute('data-intro'), 'travel', 'transfer resumes its exact remaining duration');
+      await ui.advance(1);
+      assert.equal(await stage.getAttribute('data-intro'), 'ready');
+      assert.equal(await ui.page.locator('.duel-entry-announcement').innerText(), 'You play first');
+      assert.equal(await ui.page.locator('.duel-entry-announcement').evaluate(node => Boolean(node.closest('[inert]'))), false, 'the starting announcement remains available to assistive technology');
+
+      await ui.advance(200);
+      await ui.visibility(true);
+      await ui.advance(5000);
+      assert.equal(await stage.getAttribute('data-intro'), 'ready', 'hidden time does not consume the first-turn cue');
+      assert.equal(await stage.evaluate(node => node.inert), true);
+      await noPauseSheet();
+      await ui.visibility(false);
+      await ui.advance(model.MATCH_READY_MS - 200 - 1);
+      assert.equal(await stage.getAttribute('data-intro'), 'ready');
+      assert.equal(await stage.evaluate(node => node.inert), true, 'input remains locked for the full remaining first-turn cue');
+      await ui.advance(1);
+      assert.equal(await stage.getAttribute('data-intro'), null);
+      assert.equal(await stage.evaluate(node => node.inert), false, 'input opens only after both paused stages complete');
+      assert.equal(await ui.page.locator('.portrait-transfer').count(), 0);
+      assert.equal(await ui.page.locator(opening).count(), 0);
+      await noPauseSheet();
+      return { opponent, hiddenTravelMs: 5000, hiddenReadyMs: 5000, pausedAnimations: pausedAnimations.length };
     });
     fs.writeFileSync(path.join(output, `${browserName}-report.json`), JSON.stringify(reports, null, 2));
     console.log(JSON.stringify({ browser: browserName, passed: reports.length, screenshots: output }, null, 2));

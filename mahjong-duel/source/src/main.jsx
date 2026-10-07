@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { AnimatePresence, motion, MotionConfig, useIsPresent } from 'motion/react';
-import { ArrowRight, ArrowLeft, ArrowsClockwise, Check, CaretRight, Diamond, FlowerLotus, GearSix, Info, Leaf, Lightbulb, Play, SpeakerHigh, SpeakerSlash, Sparkle, Sword, X, List, BookOpen, Snowflake, Eye, Storefront } from '@phosphor-icons/react';
+import { ArrowRight, ArrowLeft, ArrowsClockwise, Check, CaretRight, Diamond, FlowerLotus, GearSix, Info, Leaf, Lightbulb, Play, SpeakerHigh, SpeakerSlash, Sparkle, Sword, X, BookOpen, Snowflake, Eye, Storefront } from '@phosphor-icons/react';
 import '@fontsource/cormorant-garamond/latin-400.css';
 import '@fontsource/cormorant-garamond/latin-500.css';
 import '@fontsource/cormorant-garamond/latin-600.css';
@@ -17,12 +17,12 @@ import { boardVariants } from './board-variants.js';
 import { BoardSurface } from './board-surface.jsx';
 import { themeUiStyle } from './theme-ui.js';
 import { GHOST_MEMORY_VERSION } from './ghost.js';
-import { chooseOpponent, matchmakingDelay, MATCH_FOUND_DELAY_MS, OPPONENT_ROSTER } from './matchmaking.js';
+import { chooseOpponent, matchmakingDelay, MATCH_REVEAL_MS, MATCH_FACEOFF_MS, MATCH_TRANSFER_MS, MATCH_READY_MS, OPPONENT_ROSTER } from './matchmaking.js';
 import { MatchmakingPage } from './matchmaking-page.jsx';
 import { AI_MODES, normalizeAiMode, playOpponentTurn, rememberOpponentFaces, advanceOpponentMemory } from './opponent-ai.js';
 import { createRealisticState, planRealisticTurn, chooseRealisticSecond, advanceRealisticState } from './realistic-ai.js';
 import { normalizeRealisticSkill, createRealisticSample, recordRealisticAttempt, evolveRealisticSkill } from './realistic-skill.js';
-import { ProfileEditor, PlayerAvatar, loadProfile, saveProfile } from './player-profile.jsx';
+import { ProfileEditor, PlayerAvatar, AVATAR_SHEET, loadProfile, saveProfile } from './player-profile.jsx';
 import { isFrameUnlocked } from './avatar-frames.js';
 import { prepareAchievementArtwork } from './achievement-artwork.js';
 import { VictoryBloom } from './remake-ui.jsx';
@@ -32,6 +32,8 @@ import { choosePlayableTheme } from './theme-unlocks.js';
 import { loadThemePopulation, updateThemePopulation, saveThemePopulation, UPDATE_INTERVAL_MS } from './theme-population.js';
 import { chooseMenuBackground } from './menu-backgrounds.js';
 import { MenuScene } from './menu-scene.jsx';
+import { LoadingScreen } from './loading-screen.jsx';
+import { takeLoadingTheme } from './loading-state.js';
 import { playEffect } from './remake-sound.js';
 import { flipMemoryTile } from './memory-turn.js';
 import { createDuelState, resolveDuelAttempt, getDuelOutcome } from './duel.js';
@@ -54,7 +56,7 @@ import { createGameId } from './game-id.js';
 import { useViewportCompatibility } from './viewport-compat.js';
 import { TileBinder } from './tile-binder.jsx';
 import { createGame, isFree, getAvailablePairs, shuffleBoard, remainingCount } from './engine.js';
-import { PAIRS_PER_DUEL, TILES_PER_DUEL, PAIRS_TO_WIN, POINTS_PER_PAIR, DUEL_TOTAL_SCORE } from './game-balance.js';
+import { PAIRS_PER_DUEL, TILES_PER_DUEL, PAIRS_TO_WIN, POINTS_PER_PAIR } from './game-balance.js';
 import { chime, tileSmack, unlockAudio } from './sound.js';
 import './style.css';
 import './board-art.css';
@@ -67,7 +69,10 @@ import './phone-ui.css';
 import './phone-dialogs.css';
 import { ProgressionMenuHeader } from './progression-menu.jsx';
 import { RewardItems, DailyRewardsPage, AchievementsPage, LeaderboardsPage } from './progression-pages.jsx';
-import { StreakFeedback, StreakPortrait } from './streak-feedback.jsx';
+import { DuelHud } from './duel-hud.jsx';
+import { PortraitTransfer, ScoreFlight, TileEntrance, captureMatchmakingPortraits } from './duel-transition.jsx';
+import './duel-hud.css';
+import './duel-transition.css';
 import { AchievementNotifications } from './achievement-toast.jsx';
 
 const store = {
@@ -217,9 +222,8 @@ function Rules({ ruleset, aiMode }) {
   </div>;
 }
 
-function App() {
+function App({ menuBackground }) {
   const [screen, setScreen] = useState('menu');
-  const [menuBackground] = useState(() => chooseMenuBackground(store.get('menuBackground', null)));
   useEffect(() => { store.set('menuBackground', menuBackground.id); }, [menuBackground]);
   const [pageHidden, setPageHidden] = useState(() => document.hidden);
   const [themePopulation, setThemePopulation] = useState(() => loadThemePopulation());
@@ -301,6 +305,8 @@ function App() {
   }, []);
   useEffect(() => { saveProfile(profile, undefined, progressionRef.current.points); }, []);
   const [entering, setEntering] = useState(false);
+  const [matchIntro, setMatchIntro] = useState(null);
+  const introClock = useRef(null);
   const [boardThemeId, setBoardThemeId] = useState(() => themeById[store.get('boardTheme', store.get('theme', defaultTheme.id))] ? store.get('boardTheme', store.get('theme', defaultTheme.id)) : defaultTheme.id);
   const [themeId, setThemeId] = useState(() => themeById[store.get('theme', defaultTheme.id)] ? store.get('theme', defaultTheme.id) : defaultTheme.id);
   const [ruleset, setRuleset] = useState(() => store.get('ruleset', 'eastern') === 'western' ? 'western' : 'eastern');
@@ -329,11 +335,17 @@ function App() {
       if (!current()) return;
       updateClock();
       if (status === 'searching') {
-        request.status = 'found'; request.elapsedMs = request.searchMs; request.remainingMs = MATCH_FOUND_DELAY_MS;
-        setMatchmaking({ ...request }); playEffect('confirm', sound);
+        request.status = 'found'; request.elapsedMs = request.searchMs; request.remainingMs = MATCH_REVEAL_MS;
+        setMatchmaking({ ...request }); playEffect('opponent-reveal', sound);
+      } else if (status === 'found') {
+        request.status = 'faceoff'; request.remainingMs = MATCH_FACEOFF_MS;
+        setMatchmaking({ ...request }); playEffect('faceoff', sound);
+        if (!gentle && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+          try { navigator.vibrate?.(12); } catch { /* Haptics are optional on this platform. */ }
+        }
       } else {
         matchmakingRef.current = null; setMatchmaking(null);
-        start(request.themeId, request.opponent, request.ruleset, request.aiMode);
+        start(request.themeId, request.opponent, request.ruleset, request.aiMode, captureMatchmakingPortraits());
       }
     }, remaining);
     return () => {
@@ -356,9 +368,31 @@ function App() {
   const [boardReady, setBoardReady] = useState(false);
   useViewportCompatibility(boardRef, boardReady, table.width / table.height);
   const attachBoard = useCallback(node => { boardRef.current = node; setBoardReady(Boolean(node)); }, []);
+  // The entry clock begins only once the visible game board has mounted.
+  useEffect(() => {
+    const clock = introClock.current;
+    if (!clock || !boardReady || pageHidden || sheet) return;
+    const started = performance.now(), remaining = clock.remaining;
+    const timeout = setTimeout(() => {
+      if (introClock.current !== clock) return;
+      if (clock.phase === 'travel') {
+        introClock.current = { phase: 'ready', remaining: MATCH_READY_MS };
+        setMatchIntro(current => ({ ...current, phase: 'ready' }));
+        playEffect('duel-start', sound);
+      } else {
+        introClock.current = null; setMatchIntro(null); setEntering(false);
+        requestAnimationFrame(() => boardRef.current?.querySelector('[data-free="true"]')?.focus({ preventScroll: true }));
+      }
+    }, remaining);
+    return () => {
+      clearTimeout(timeout);
+      if (introClock.current === clock) clock.remaining = Math.max(0, remaining - (performance.now() - started));
+    };
+  }, [matchIntro?.phase, boardReady, pageHidden, sheet]);
   const pendingTime = useRef({ key: null, ms: 0 });
   const [toast, setToast] = useState(null);
-  const [burst, setBurst] = useState(null);
+  const [scoreFlights, setScoreFlights] = useState([]);
+  const burst = scoreFlights.at(-1) || null;
   const [result, setResult] = useState(null);
   useEffect(() => {
     if (!result) return;
@@ -395,16 +429,15 @@ function App() {
   useEffect(() => { store.set('pips', pips); }, [pips]);
   useEffect(() => { store.set('difficulty', difficulty); }, [difficulty]);
   useEffect(() => { if (toast) { const timeout = setTimeout(() => setToast(null), 2700); return () => clearTimeout(timeout); } }, [toast]);
-  useEffect(() => { if (burst) { const timeout = setTimeout(() => setBurst(null), 850); return () => clearTimeout(timeout); } }, [burst]);
 
   useEffect(() => {
     const pauseOnHide = () => {
       setPageHidden(document.hidden);
-      if (document.hidden && screen === 'game' && !result && remainingCount(gameRef.current?.tiles || [])) setSheet(current => current || 'pause');
+      if (document.hidden && screen === 'game' && !entering && !result && remainingCount(gameRef.current?.tiles || [])) setSheet(current => current || 'pause');
     };
     document.addEventListener('visibilitychange', pauseOnHide);
     return () => document.removeEventListener('visibilitychange', pauseOnHide);
-  }, [screen, result]);
+  }, [screen, result, entering]);
   useEffect(() => {
     if (screen !== 'game' || sheet || result || entering) return;
     const interval = setInterval(() => setGame(current => current ? { ...current, elapsed: current.elapsed + 1 } : current), 1000);
@@ -432,10 +465,10 @@ function App() {
         store.set('realisticSkill', nextSkill);
       }
     }
-    if (result || flight || streakCues.length || pending || sheet || pageHidden) return;
+    if (result || flight || scoreFlights.length || streakCues.length || pending || sheet || pageHidden) return;
     setResult(outcome); setSelected(null);
     playEffect(outcome === 'win' ? 'win' : 'turn', sound);
-  }, [game, screen, result, flight, streakCues, pending, sheet, pageHidden]);
+  }, [game, screen, result, flight, scoreFlights, streakCues, pending, sheet, pageHidden]);
 
   // Both players use this board. Rescue a blocked deal without consuming a turn.
   useEffect(() => {
@@ -515,12 +548,12 @@ function App() {
           } : resolved;
           commitGame({ ...observed, aiMemory: advanceOpponentMemory(observed) });
           if (pending.kind === 'collision') {
-            setBurst({ id: Date.now(), points: 100, x: flight?.burstX, y: flight?.burstY });
+            setScoreFlights(current => [...current, { id: performance.now(), actor: pending.actor, points: POINTS_PER_PAIR, source: flight?.scoreOrigin }]);
             tileSmack(sound, { strength: 1 });
-            if (!transition.cues.length) playEffect('match', sound);
+            if (!transition.cues.length) playEffect('score', sound);
           } else {
-            announce(pending.actor === 'ai' ? 'Your turn' : current.freezeReady ? 'Opponent frozen. Play again!' : 'Opponent’s turn');
-            if (pending.actor === 'ai' && !transition.cues.length) playEffect('turn', sound);
+            announce(resolved.turn === 'you' ? current.freezeReady ? 'Opponent frozen. Play again!' : 'Your turn' : `${current.opponent.name}’s turn`);
+            if (resolved.turn !== current.turn) playEffect('turn', sound);
           }
         }
       }
@@ -558,7 +591,7 @@ function App() {
     const centerX = stones.reduce((sum, tile) => sum + tile.x + tile.width / 2, 0) / 2;
     const centerY = stones.reduce((sum, tile) => sum + tile.y + tile.height / 2, 0) / 2;
     const meetingX = Math.max(stones[0].width, Math.min(board.clientWidth - stones[1].width, centerX));
-    setFlight({ key: performance.now(), ids, centerX: meetingX, centerY, burstX: meetingX + board.offsetLeft, burstY: centerY + board.offsetTop, reduced: gentle || matchMedia('(prefers-reduced-motion: reduce)').matches, stones: stones.map((tile, i) => ({ ...tile, dx: meetingX - (i === 0 ? tile.width : 0) - tile.x, dy: centerY - tile.height / 2 - tile.y, direction: i === 0 ? 1 : -1 })) });
+    setFlight({ key: performance.now(), ids, centerX: meetingX, centerY, scoreOrigin: { x: rect.left + meetingX * scale, y: rect.top + centerY * scale }, reduced: gentle || matchMedia('(prefers-reduced-motion: reduce)').matches, stones: stones.map((tile, i) => ({ ...tile, dx: meetingX - (i === 0 ? tile.width : 0) - tile.x, dy: centerY - tile.height / 2 - tile.y, direction: i === 0 ? 1 : -1 })) });
   }
   function beginResolution(details, duration) {
     const key = performance.now();
@@ -581,7 +614,7 @@ function App() {
     if (matchmakingRef.current?.status !== 'searching') return;
     matchmakingRef.current = null; setMatchmaking(null); setPage('theme-select'); playSound('tap');
   }
-  function start(requestedTheme, opponent, matchRuleset = ruleset, matchAiMode = aiMode) {
+  function start(requestedTheme, opponent, matchRuleset = ruleset, matchAiMode = aiMode, origins = null) {
     const chosenTheme = choosePlayableTheme(progressionRef.current.collection, matchRuleset, requestedTheme);
     if (!chosenTheme) return;
     beforeDuelCollection.current = progressionRef.current.collection;
@@ -596,12 +629,13 @@ function App() {
       elapsed: 0, score: 0, hints: 0, shuffles: 0, flips: 0, attempts: 0, ...createDuelState() });
     tracker.current = createDuelTracker(next);
     previousOpponent.current = opponent.id;
-    commitGame(next); setScreen('game'); setResult(null); resetTurn(); setStreakCues([]); setBurst(null); setSheet(null); setPage(null); setToast(null);
-    setEntering(!gentle && !matchMedia('(prefers-reduced-motion: reduce)').matches); playEffect('doors', sound);
+    commitGame(next); setScreen('game'); setResult(null); resetTurn(); setStreakCues([]); setScoreFlights([]); setSheet(null); setPage(null); setToast(null);
+    introClock.current = { phase: 'travel', remaining: MATCH_TRANSFER_MS };
+    setMatchIntro({ phase: 'travel', origins }); setEntering(true);
     try { const promise = window.screen.orientation?.lock?.('portrait'); promise?.catch(() => {}); } catch { /* Portrait canvas is retained when orientation locking is unsupported. */ }
   }
   function leaveDuel() {
-    resetTurn(); tracker.current = null; commitGame(null); setResult(null); setStreakCues([]); setBurst(null); setToast(null); setEntering(false); setSheet(null); setScreen('menu');
+    resetTurn(); tracker.current = null; commitGame(null); setResult(null); setStreakCues([]); setScoreFlights([]); setToast(null); setEntering(false); setMatchIntro(null); introClock.current = null; setSheet(null); setScreen('menu');
   }
   function tap(tile) {
     if (lock.current || pending || sheet || result || entering) return;
@@ -803,29 +837,21 @@ function App() {
             <div className="home-links"><button className="binder-launch" onClick={() => openPage('collection')}><BookOpen size={23} weight="duotone" />Collection</button></div>
             <button className="shop-launch" onClick={() => openPage('shop')}><Storefront size={23} weight="duotone" />Shop</button>
           </section>
-        </motion.div> : <motion.div key="game" className={`game-screen ${streakCues.length ? 'has-streak' : ''}`} inert={Boolean(sheet || result || entering)} {...fade}>
-          <header className="game-header"><IconButton label="Pause game" disabled={!freeCount} onClick={() => openSheet('pause')}><List size={26} weight="bold" /></IconButton></header>
-          <div className="scoreboard duel-scoreboard" data-turn={game.turn}>
-            <div className={`player-score local-player ${!opponentTurn ? 'active-turn' : ''}`}><div className="local-avatar-wrap"><PlayerAvatar profile={profile} /><StreakPortrait cues={streakCues} paused={Boolean(sheet || result || entering)} gentle={gentle} /></div><div><span>{profile.name}</span><strong>{game.score.toLocaleString()}</strong></div><StreakFeedback cues={streakCues} profile={profile} paused={Boolean(sheet || result || entering)} sound={sound} gentle={gentle} onComplete={completedCues => setStreakCues(current => current === completedCues ? [] : current)} /></div>
-            <div className="score-versus" aria-hidden="true">VS</div>
-            <div className={`player-score opponent ${opponentTurn ? 'active-turn' : ''}`}><div><span className="opponent-name" title={opponentName}>{opponentName}</span><strong>{game.aiScore.toLocaleString()}</strong></div><PlayerAvatar profile={opponentProfile} /></div>
-            <div className="duel-progress"><div className="duel-progress-labels"><span>{game.score / POINTS_PER_PAIR} pairs</span><strong>{game.score >= PAIRS_TO_WIN * POINTS_PER_PAIR ? 'You secured the win' : game.aiScore >= PAIRS_TO_WIN * POINTS_PER_PAIR ? 'Opponent secured the win' : `First to ${PAIRS_TO_WIN}`}</strong><span>{game.aiScore / POINTS_PER_PAIR} pairs</span></div><div className="duel-progress-track" role="progressbar" aria-label="Duel pair progress" aria-valuemin={0} aria-valuemax={PAIRS_PER_DUEL} aria-valuenow={(game.score + game.aiScore) / POINTS_PER_PAIR} aria-valuetext={`You ${game.score / POINTS_PER_PAIR} pairs, ${opponentName} ${game.aiScore / POINTS_PER_PAIR} pairs; ${freeCount / 2} pairs remain`}><span className="your-progress" style={{ width: `${game.score / DUEL_TOTAL_SCORE * 100}%` }} /><span className="ghost-progress" style={{ width: `${game.aiScore / DUEL_TOTAL_SCORE * 100}%` }} /><i /></div></div>
-          </div>
-          <div className={`turn-ribbon ${opponentTurn ? 'ghost-turn' : ''}`} aria-live="polite"><span>{opponentTurn ? `${opponentName}’s turn` : 'Your turn'}</span><small>{freeCount / 2} pairs left{game.freezeReady ? ' · Opponent frozen' : ''}{game.eagleMs > 0 ? ` · Eagle Eye ${Math.ceil(game.eagleMs / 1000)}s` : ''}</small></div>
+        </motion.div> : <motion.div key="game" data-intro={matchIntro?.phase} data-paused={Boolean(sheet || pageHidden)} className={`game-screen duel-stage ${streakCues.length ? 'has-streak' : ''}`} inert={Boolean(sheet || result || entering)} initial={false} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+          <DuelHud game={game} profile={profile} opponentProfile={opponentProfile} streakCues={streakCues} onStreakComplete={completedCues => setStreakCues(current => current === completedCues ? [] : current)} paused={Boolean(sheet || result || entering || pageHidden)} gentle={gentle} sound={sound} remainingPairs={freeCount / 2} introPhase={matchIntro?.phase} scoreFeedback={burst} onPause={() => openSheet('pause')} />
           <div className="board-space" style={{ '--board-ratio': table.width / table.height }}><div className="board-frame">
             <div className="game-board" ref={attachBoard} role="group" aria-label={`${game.ruleset} Mahjong board, ${freeCount} tiles left`}>
               <AnimatePresence>{game.tiles.filter(tile => !tile.removed).map((tile, index) => {
                 const free = isFree(tile, game.tiles), faceUp = flippedIds.includes(tile.id), active = selected === tile.id && faceUp, inFlight = flight?.ids.includes(tile.id);
                 const rarity = rarityForTile(game.theme, game.ruleset, tile.faceId);
                 const hinted = game.hintEffect?.ids.includes(tile.id), eagle = game.eagleMs > 0 && !faceUp;
-                return <motion.button layout="position" key={tile.id} data-tile-id={tile.id} data-free={free} data-face-up={faceUp} data-rarity={rarity.id} data-rarity-visible={faceUp || eagle} className={`game-tile ${free ? 'free' : 'blocked'} ${active ? 'tile-selected' : ''} ${inFlight ? 'tile-in-flight' : ''} ${hinted ? 'hinted' : ''} ${eagle ? 'eagle-lit' : ''}`} aria-label={faceUp ? `${tile.name}, ${rarity.label}, revealed` : `Hidden stone, row ${tile.y + 1}, column ${tile.x + 1}, layer ${tile.z + 1}, ${free ? 'uncovered' : 'covered'}${eagle ? `, ${rarity.label}` : ''}`} aria-pressed={faceUp} aria-disabled={!free || opponentTurn || (game.mode === 'duel' && Boolean(pending))} tabIndex={free && !opponentTurn && !(game.mode === 'duel' && pending) ? 0 : -1} style={{ ...tilePosition(tile, table), '--rarity-color': rarity.color, '--shine-delay': `${-(index % 11) * .7}s`, zIndex: tile.z * 100 + Math.floor(tile.y * 10) + (active ? 80 : 0) }} initial={{ opacity: 0, scale: 0.86, y: -20 }} animate={{ opacity: 1, scale: active ? 1.035 : 1, y: active ? -3 : 0 }} exit={{ opacity: 0, transition: { duration: 0 } }} transition={{ duration: 0.18, delay: screen === 'game' && game.elapsed < 1 ? index * 0.004 : 0 }} onClick={() => tap(tile)}><span className="tile-rotator">
+                return <motion.button layout="position" key={tile.id} data-tile-id={tile.id} data-free={free} data-face-up={faceUp} data-rarity={rarity.id} data-rarity-visible={faceUp || eagle} className={`game-tile ${free ? 'free' : 'blocked'} ${active ? 'tile-selected' : ''} ${faceUp ? opponentTurn ? 'opponent-reveal' : 'player-reveal' : ''} ${inFlight ? 'tile-in-flight' : ''} ${hinted ? 'hinted' : ''} ${eagle ? 'eagle-lit' : ''}`} aria-label={faceUp ? `${tile.name}, ${rarity.label}, revealed` : `Hidden stone, row ${tile.y + 1}, column ${tile.x + 1}, layer ${tile.z + 1}, ${free ? 'uncovered' : 'covered'}${eagle ? `, ${rarity.label}` : ''}`} aria-pressed={faceUp} aria-disabled={entering || !free || opponentTurn || (game.mode === 'duel' && Boolean(pending))} tabIndex={!entering && free && !opponentTurn && !(game.mode === 'duel' && pending) ? 0 : -1} style={{ ...tilePosition(tile, table), '--rarity-color': rarity.color, '--shine-delay': `${-(index % 11) * .7}s`, zIndex: tile.z * 100 + Math.floor(tile.y * 10) + (active ? 80 : 0) }} initial={false} animate={{ opacity: 1, scale: active ? 1.035 : 1, y: active ? -3 : 0 }} exit={{ opacity: 0, transition: { duration: 0 } }} transition={{ duration: 0.18 }} onClick={() => tap(tile)}><span className="tile-rotator">
                     <span className="tile-side tile-back" aria-hidden="true"><img className="tile-art" src={activeTheme.back} alt="" draggable="false" /></span>
                     <span className="tile-side tile-front" aria-hidden={!faceUp}><TileArt face={faces[game.ruleset][tile.faceId]} /></span>
                   </span>{(faceUp || eagle) && <TileRarity rarity={rarity} />}{active && <span className="selected-dot" />}</motion.button>;
               })}</AnimatePresence>
               {flight && <MatchFlight key={flight.key} flight={flight} faces={faces[game.ruleset]} themeId={game.theme} ruleset={game.ruleset} paused={Boolean(sheet || result || pageHidden)} onComplete={() => setFlight(current => current?.key === flight.key ? null : current)} />}
             </div>
-            <AnimatePresence>{burst && <motion.div key={burst.id} className="match-burst" style={{ left: burst.x, top: burst.y === undefined ? undefined : burst.y - 48 }} initial={{ opacity: 0, scale: 0.7, y: 18 }} animate={{ opacity: 1, scale: 1, y: -10 }} exit={{ opacity: 0, y: -40 }}><Sparkle weight="fill" size={19} /><strong>+{burst.points}</strong>{burst.combo > 1 && <span>{burst.combo}×</span>}</motion.div>}</AnimatePresence>
           </div></div>
           <div className="board-status" aria-live="polite">{pending?.kind === 'peek' ? <span>Remember these faces…</span> : (pending?.kind === 'pair' || pending?.kind === 'collision') ? <span>{pending.matched ? 'Match! Play again.' : 'Remember these faces…'}</span> : selectedTile ? <span>{selectedTile.name}<small> · remember its identical match</small></span> : <span>{uncoveredCount} uncovered<span className="status-dot">·</span>{freeCount} stones remaining</span>}</div>
           <div className="game-tools" aria-label="Boosters">{[
@@ -858,8 +884,39 @@ function App() {
       </>}
     </main>
     <AchievementNotifications batches={achievementBatches} onComplete={id => setAchievementBatches(current => current.filter(batch => batch.id !== id))} paused={Boolean(sheet || entering || matchmaking || pageHidden)} sound={sound} gentle={gentle} />
-    {entering && <MenuScene background={menuBackground} opening paused={pageHidden} onComplete={() => setEntering(false)} />}
+    <span className="duel-entry-announcement" role="status" aria-live="polite">{matchIntro?.phase === 'ready' ? 'You play first' : ''}</span>
+    {matchIntro?.phase === 'travel' && boardReady && <><PortraitTransfer origins={matchIntro.origins} profile={profile} opponent={opponentProfile} paused={Boolean(sheet || pageHidden)} gentle={gentle} /><TileEntrance boardRef={boardRef} paused={Boolean(sheet || pageHidden)} gentle={gentle} /></>}
+    {scoreFlights.map(feedback => <ScoreFlight key={feedback.id} feedback={feedback} paused={Boolean(sheet || result || pageHidden)} gentle={gentle} onComplete={() => setScoreFlights(current => current.filter(item => item.id !== feedback.id))} />)}
   </div></MotionConfig>;
 }
 
-createRoot(document.getElementById('root')).render(<App />);
+function GameLaunch() {
+  const [launch] = useState(() => {
+    const menuBackground = chooseMenuBackground(store.get('menuBackground', null));
+    return {
+      menuBackground,
+      theme: takeLoadingTheme(),
+      gentle: store.get('gentle', false),
+      artwork: [menuBackground.src, AVATAR_SHEET],
+    };
+  });
+  const [appReady, setAppReady] = useState(false);
+  const [complete, setComplete] = useState(false);
+  const appContainer = useRef(null);
+  const ready = useCallback(() => setAppReady(true), []);
+  const finish = useCallback(() => setComplete(true), []);
+  useEffect(() => {
+    if (!complete) return;
+    // Daily pages mount behind the fade; restore their initial focus after inert lifts.
+    const target = appContainer.current?.querySelector('.progression-page-header h2, .sheet[tabindex], .duel-launch');
+    target?.focus({ preventScroll: true });
+  }, [complete]);
+  return <>
+    <div ref={appContainer} style={{ display: 'contents' }} inert={!complete} aria-hidden={!complete || undefined}>
+      {appReady && <App menuBackground={launch.menuBackground} />}
+    </div>
+    {!complete && <LoadingScreen theme={launch.theme} startupArtwork={launch.artwork} gentle={launch.gentle} onReady={ready} onComplete={finish} />}
+  </>;
+}
+
+createRoot(document.getElementById('root')).render(<GameLaunch />);

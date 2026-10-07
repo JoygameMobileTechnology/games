@@ -1,6 +1,10 @@
 import { AVATAR_IDS } from './profile-store.js';
 
-export const MATCH_FOUND_DELAY_MS = 1500;
+export const MATCH_REVEAL_MS = 600;
+export const MATCH_FACEOFF_MS = 600;
+export const MATCH_TRANSFER_MS = 800;
+export const MATCH_READY_MS = 500;
+export const MATCH_FOUND_DELAY_MS = MATCH_REVEAL_MS + MATCH_FACEOFF_MS + MATCH_TRANSFER_MS + MATCH_READY_MS;
 
 const rosterDetails = [
   ['MayaTiles', 'US'], ['Theo_92', 'GB'], ['SakuraTea', 'JP'], ['LucaMoves', 'IT'],

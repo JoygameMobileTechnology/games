@@ -5,7 +5,7 @@ import './player-profile.css';
 
 export { loadProfile, saveProfile, DEFAULT_PROFILE, COUNTRIES, countryFlag } from './profile-store.js';
 
-const AVATAR_SHEET = './assets/remake/avatars-presets.png';
+export const AVATAR_SHEET = './assets/remake/avatars-presets.png';
 const avatarDescriptions = ['Curly hair and teal sweater', 'Wavy hair and rust shirt', 'Black bob and round glasses', 'Short curls and gold shirt', 'Auburn ponytail and blue sweater', 'Dark hair and glasses', 'Silver waves and plum cardigan', 'Silver hair and navy polo'];
 
 function LaurelBranch({ tier, mirrored = false }) {
@@ -19,9 +19,16 @@ function LaurelBranch({ tier, mirrored = false }) {
 }
 
 /** Decorative SVG scales with every existing avatar, including the player's ghost. */
-export function AvatarFrame({ frameId }) {
+export function AvatarFrame({ frameId, shape = 'rounded' }) {
   const frame = getAvatarFrame(frameId);
   if (!frame) return null;
+  if (shape === 'circle') return <svg className={`avatar-frame avatar-frame-${frame.id} avatar-frame-circle`} viewBox="0 0 120 120" aria-hidden="true" focusable="false">
+    <circle className="avatar-frame-outer-ring" cx="60" cy="60" r="57" />
+    <circle className="avatar-frame-inner-ring" cx="60" cy="60" r="57" />
+    {frame.tier >= 2 && <path className="avatar-frame-jewel" d="M60 1L64 6L60 11L56 6ZM60 109L64 114L60 119L56 114Z" />}
+    {frame.tier >= 4 && <path className="avatar-frame-jewel" d="M1 60L6 56L11 60L6 64ZM109 60L114 56L119 60L114 64Z" />}
+    {frame.tier === 5 && <path className="avatar-frame-spark" d="M21 19L25 21L27 25L23 23ZM93 25L95 21L99 19L97 23ZM21 101L23 97L27 95L25 99ZM93 95L97 97L99 101L95 99Z" />}
+  </svg>;
   return <svg className={`avatar-frame avatar-frame-${frame.id}`} viewBox="0 0 120 120" aria-hidden="true" focusable="false">
     <rect className="avatar-frame-outer-ring" x="10" y="10" width="100" height="100" rx="25" />
     <rect className="avatar-frame-inner-ring" x="14" y="14" width="92" height="92" rx="21" />
@@ -32,15 +39,15 @@ export function AvatarFrame({ frameId }) {
   </svg>;
 }
 
-export function PlayerAvatar({ profile, size = 64, showFlag = true, className = '' }) {
+export function PlayerAvatar({ profile, size = 64, showFlag = true, className = '', shape = 'rounded' }) {
   const player = normalizeProfile(profile);
   const frame = getAvatarFrame(player.frameId);
   const index = AVATAR_IDS.indexOf(player.avatarId);
   const country = COUNTRIES.find(item => item.code === player.countryCode);
   const pixels = Number.isFinite(size) ? Math.min(240, Math.max(24, size)) : 64;
-  return <span className={`player-avatar ${frame ? `has-frame frame-${frame.id}` : ''} ${className}`} data-avatar-id={player.avatarId} data-frame-id={player.frameId || undefined} style={{ '--avatar-size': `${pixels}px` }}>
+  return <span className={`player-avatar ${shape === 'circle' ? 'player-avatar-circle' : ''} ${frame ? `has-frame frame-${frame.id}` : ''} ${className}`} data-avatar-id={player.avatarId} data-frame-id={player.frameId || undefined} style={{ '--avatar-size': `${pixels}px` }}>
     <span className="player-avatar-portrait" role="img" aria-label={`${player.name}'s avatar${frame ? `, ${frame.name} frame` : ''}`} style={{ backgroundImage: `url(${JSON.stringify(AVATAR_SHEET)})`, backgroundPosition: `${index % 4 / 3 * 100}% ${index < 4 ? 0 : 100}%` }} />
-    <AvatarFrame frameId={player.frameId} />
+    <AvatarFrame frameId={player.frameId} shape={shape} />
     {showFlag && <span className="player-country-flag" role="img" aria-label={country?.name || 'Global'} title={country?.name || 'Global'}>{countryFlag(player.countryCode)}</span>}
   </span>;
 }

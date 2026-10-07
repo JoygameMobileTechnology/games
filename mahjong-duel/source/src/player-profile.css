@@ -49,6 +49,11 @@
 .avatar-frame-crown { fill: var(--frame-main); stroke: var(--frame-dark); stroke-width: 1.5; }
 .avatar-frame-star { fill: var(--frame-light); stroke: var(--frame-dark); stroke-width: .8; }
 .avatar-frame-spark { fill: var(--frame-light); }
+/* Circular match frames stay inside the team rim and leave the face clear. */
+.player-avatar.player-avatar-circle .player-avatar-portrait { border-radius: 50%; box-shadow: none; }
+.avatar-frame-circle .avatar-frame-outer-ring { stroke-width: 5; }
+.avatar-frame-circle .avatar-frame-inner-ring { stroke-width: 3; }
+.avatar-frame-circle .avatar-frame-jewel { stroke-width: 1; }
 .player-country-flag {
   position: absolute;
   z-index: 2;
