@@ -18,9 +18,11 @@ function usePausedAnimations(animations, paused) {
   }, [paused]);
 }
 
-/** A viewport overlay connects the exact face-off rings to the measured HUD rings. */
+/** Fly in the face-off portraits, then seat their equipped frames in the HUD. */
 export function PortraitTransfer({ origins, profile, opponent, paused, gentle }) {
   const root = useRef(null), animations = useRef([]);
+  const isPaused = useRef(paused);
+  isPaused.current = paused;
   useLayoutEffect(() => {
     const reduced = gentle || matchMedia('(prefers-reduced-motion: reduce)').matches;
     const update = () => {
@@ -33,10 +35,29 @@ export function PortraitTransfer({ origins, profile, opponent, paused, gentle })
         const from = origins?.[actor] || target;
         Object.assign(node.style, { left: `${target.x}px`, top: `${target.y}px`, width: `${target.width}px`, height: `${target.height}px` });
         const transform = `translate(${from.x - target.x}px,${from.y - target.y}px) scale(${from.width / target.width},${from.height / target.height})`;
-        const animation = node.animate(reduced ? [{ opacity: 0 }, { opacity: 1 }] : [{ transform }, { transform: 'translate(0,0) scale(1)' }], { duration: MATCH_TRANSFER_MS, easing: 'cubic-bezier(.32,.04,.22,1)', fill: 'both' });
-        animation.currentTime = time;
-        if (document.hidden) animation.pause();
-        return [animation];
+        const ring = node.querySelector('.travelling-faceoff-ring');
+        const equipped = node.querySelector('.travelling-equipped-avatar');
+        const face = equipped.querySelector('.player-avatar-portrait');
+        const frame = equipped.querySelector('.avatar-frame');
+        const glow = node.querySelector('.travelling-landing-glow');
+        const animate = (element, keyframes) => element.animate(keyframes, { duration: MATCH_TRANSFER_MS, fill: 'both', easing: 'linear' });
+        // The final 240ms belong to the frame reveal, within the existing entry clock.
+        const sequence = reduced ? [
+          animate(equipped, [{ opacity: 0 }, { opacity: 1, offset: .25 }, { opacity: 1 }]),
+          animate(ring, [{ opacity: 0 }, { opacity: 0 }]),
+        ] : [
+          animate(node, [{ transform, easing: 'cubic-bezier(.32,.04,.22,1)' }, { transform: 'translate(0,0) scale(1)', offset: .7 }, { transform: 'translate(0,0) scale(1)' }]),
+          animate(ring, [{ opacity: 1 }, { opacity: 1, offset: .7 }, { opacity: 0, offset: .88 }, { opacity: 0 }]),
+          animate(equipped, [{ opacity: 0, transform: 'scale(.9)' }, { opacity: 0, transform: 'scale(.9)', offset: .7 }, { opacity: 1, transform: 'scale(1.025)', offset: .9 }, { opacity: 1, transform: 'scale(1)' }]),
+          animate(face, [{ borderRadius: '50%' }, { borderRadius: '50%', offset: .7 }, { borderRadius: '19%', offset: .94 }, { borderRadius: '19%' }]),
+          animate(glow, [{ opacity: 0, transform: 'scale(.94)' }, { opacity: 0, transform: 'scale(.94)', offset: .72 }, { opacity: .7, transform: 'scale(1.02)', offset: .86 }, { opacity: 0, transform: 'scale(1.12)' }]),
+          ...(frame ? [animate(frame, [{ opacity: 0, transform: 'scale(.88)' }, { opacity: 0, transform: 'scale(.88)', offset: .74 }, { opacity: 1, transform: 'scale(1.04)', offset: .92 }, { opacity: 1, transform: 'scale(1)' }])] : []),
+        ];
+        for (const animation of sequence) {
+          animation.currentTime = time;
+          if (isPaused.current || document.hidden) animation.pause();
+        }
+        return sequence;
       });
     };
     update();
@@ -44,7 +65,11 @@ export function PortraitTransfer({ origins, profile, opponent, paused, gentle })
     return () => { window.removeEventListener('resize', update); animations.current.forEach(animation => animation.cancel()); };
   }, []);
   usePausedAnimations(animations, paused);
-  return <div className="portrait-transfer" ref={root} aria-hidden="true">{[['you', profile], ['ai', opponent]].map(([actor, person]) => <div className="travelling-portrait" data-travelling-portrait={actor} key={actor}><PlayerAvatar profile={person} showFlag={false} shape="circle" /></div>)}</div>;
+  return <div className="portrait-transfer" ref={root} aria-hidden="true">{[['you', profile], ['ai', opponent]].map(([actor, person]) => <div className="travelling-portrait" data-travelling-portrait={actor} key={actor}>
+    <div className="travelling-faceoff-ring"><PlayerAvatar profile={person} showFlag={false} shape="circle" /></div>
+    <div className="travelling-equipped-avatar"><PlayerAvatar profile={person} showFlag={false} /></div>
+    <div className="travelling-landing-glow" />
+  </div>)}</div>;
 }
 
 export function ScoreFlight({ feedback, paused, gentle, onComplete }) {

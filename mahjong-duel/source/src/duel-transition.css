@@ -1,9 +1,13 @@
 .portrait-transfer { position: fixed; inset: 0; z-index: 50; pointer-events: none; }
-.travelling-portrait { position: absolute; transform-origin: 0 0; padding: 3px; border: 1.5px solid #ffe49e; border-radius: 50%; background: linear-gradient(145deg,#ffffdc,#178fe1 14%,#178fe1 80%,#6e3714); box-shadow: 0 0 0 1px #9e622a,0 2px 3px #160c0660; }
-.travelling-portrait[data-travelling-portrait=ai] { background: linear-gradient(145deg,#ffffdc,#dd443a 14%,#dd443a 80%,#6e3714); }
-.remake .travelling-portrait .player-avatar { display: block; --avatar-size: 100%; width: 100%; height: 100%; padding: 0; border: 0; border-radius: 50%; background: #f2d9a4; box-shadow: none; }
-.travelling-portrait .player-avatar-portrait { border-radius: 50%; box-shadow: none; }
-.travelling-portrait .avatar-frame { inset: 0; width: 100%; height: 100%; filter: none; }
+.travelling-portrait { --team: #178fe1; position: absolute; transform-origin: 0 0; }
+.travelling-portrait[data-travelling-portrait=ai] { --team: #dd443a; }
+.travelling-faceoff-ring { position: absolute; inset: 0; padding: 3px; border: 1.5px solid #ffe49e; border-radius: 50%; background: linear-gradient(145deg,#ffffdc,var(--team) 14%,var(--team) 80%,#6e3714); box-shadow: 0 0 0 1px #9e622a,0 2px 3px #160c0660; }
+.remake .travelling-portrait .player-avatar { display: block; --avatar-size: 100%; width: 100%; height: 100%; }
+.remake .travelling-faceoff-ring .player-avatar { padding: 0; border: 0; border-radius: 50%; background: #f2d9a4; box-shadow: none; }
+.travelling-faceoff-ring .player-avatar-portrait { border-radius: 50%; box-shadow: none; }
+.travelling-faceoff-ring .avatar-frame { inset: 0; width: 100%; height: 100%; filter: none; }
+.travelling-equipped-avatar { position: absolute; inset: 0; opacity: 0; }
+.travelling-landing-glow { position: absolute; inset: -7%; border: 1px solid #ffe8a3; border-radius: 24%; box-shadow: 0 0 7px color-mix(in srgb,var(--team) 55%,transparent); opacity: 0; }
 .duel-score-flight { position: fixed; z-index: 45; pointer-events: none; transform: translate(-50%,-50%); padding: 3px 9px; border: 1.5px solid #f8d581; border-radius: 12px; background: linear-gradient(#269be9,#154c90); color: #fff5bf; font: 800 22px/1.3 Manrope,sans-serif; box-shadow: 0 0 10px #44bfff77,0 2px 5px #30200f55; text-shadow: 0 1px 2px #113458; }
 .duel-score-flight[data-score-flight=ai] { background: linear-gradient(#e66050,#a32323); box-shadow: 0 0 10px #fa644777,0 2px 5px #30200f55; }
 .duel-first-turn { position: absolute; z-index: 8; top: calc(100% + 8px); left: 50%; transform: translateX(-50%); width: max-content; max-width: 95%; padding: 9px 18px; border: 1px solid #c09547; border-radius: 13px; background: linear-gradient(#fffbed,#fae7bd); color: #15558e; box-shadow: 0 2px 7px #482d1838; font: 800 17px/1.2 Manrope,sans-serif; pointer-events: none; animation: first-turn-arrive .5s both; }

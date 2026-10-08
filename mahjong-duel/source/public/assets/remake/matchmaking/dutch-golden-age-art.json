@@ -1,0 +1,58 @@
+{
+  "theme": "dutch-golden-age",
+  "createdAt": "2026-10-08",
+  "tool": "image_gen.imagegen",
+  "mode": "built-in",
+  "reference": {
+    "path": "ChatGPT Image Oct 8, 2026, 11_50_37 AM.png",
+    "role": "Visual style reference inspected with view_image before generation; described in text prompt, not passed as edit input."
+  },
+  "assets": [
+    {
+      "kind": "ink",
+      "prompt": "Use case: style-transfer. Asset type: transparent game matchmaking player ink backdrop, preserve 1536x1024 landscape canvas. Input image 1 is the edit target: existing Dutch tulip and Baroque acanthus/vine ornament. Change the color treatment and painted style only, preserving the positions, scale, tulip silhouettes, curling foliage composition, completely clear central strip, open portrait overlay centers, and transparent background/soft alpha. Recolor EVERY part of the LEFT cluster, INCLUDING leaves, stems, scrolls, tulips, and small flowers, in monochromatic clear powder BLUE with medium cobalt blue pigment. Recolor EVERY part of the RIGHT cluster, INCLUDING leaves, stems, scrolls, tulips, and small flowers, in monochromatic CORAL RED with medium red/coral pigment. The colors must remain distinctly blue vs coral red when the asset is later displayed at 42 percent opacity and saturation 78 percent over cream paper. Eliminate ALL olive green, gray, brown and neutral dark coloring. Simplify the busy naturalistic oil-brush quality into lightly engraved fine botanical watercolor with smooth soft pigment transitions, elegant light line detail, fewer rough dark marks. Preserve soft watercolor fading at edges. No heavy painted opaque fill; authentic translucent watercolors. Center twelve percent stays truly transparent. No parchment, no opaque background, no checkerboard pixels, no text, no UI, no portraits, no medallions, no frames, no gold. The requested change is a faithful composition-preserving monochromatic blue-left/coral-red-right watercolor edit.",
+      "transparent_background": true,
+      "source": "exec-f22ea2e9-e50d-4810-9e18-7954eec70e5d.png",
+      "output": "public/assets/remake/matchmaking/dutch-golden-age-ink.webp",
+      "encoding": {
+        "format": "WebP",
+        "lossless": true,
+        "method": 6,
+        "alpha": "Preserved from edited source without pixel edits"
+      },
+      "previousVersions": [
+        {
+          "kind": "ink",
+          "prompt": "Use case: stylized-concept. Asset type: transparent production game UI illustration, landscape 1536 x 1024. Primary request: Dutch Golden Age watercolor floral ink backdrop for a two-player matchmaking screen. Create two separate airy decorative clusters: pale powder-blue Dutch tulips and finely engraved Baroque acanthus/vine curls on the LEFT, pale coral-red Dutch tulips and finely engraved Baroque acanthus/vine curls on the RIGHT. Reference mood: softly faded 17th-century Dutch botanical engraving printed in watercolor on parchment. Composition: bilateral layout with each cluster centered around x=25% and x=75%, airy hand-painted texture, broad soft irregular outer edges. Both cluster centers should be pale and sparse because circular player portraits will overlay them; expressive tulips, stems, leaves, and curling foliage must remain visible ABOVE, BELOW and on the OUTSIDE of the future portraits. Central 12% vertical strip completely transparent. Background genuinely transparent, including gaps between delicate foliage; preserve watercolor alpha and soft feathered boundaries. Colors must be subdued but visibly blue on left and coral red on right, suitable for overall display opacity 0.42. No UI, no text, no numbers, no portraits, no people, no medallions, no circles or frames, no VS, no gold, no rectangular paper background, no checkerboard pattern rendered into pixels. Output only the isolated transparent botanical ornament asset.",
+          "transparent_background": true,
+          "source": "exec-310eb658-13af-4379-bb24-40a1e01ec7d1.png",
+          "output": "public/assets/remake/matchmaking/dutch-golden-age-ink.webp",
+          "encoding": {
+            "format": "WebP",
+            "quality": 86,
+            "method": 6,
+            "alpha": "Preserved from source without pixel edits"
+          }
+        }
+      ],
+      "tool": "image_gen.imagegen",
+      "mode": "built-in edit",
+      "referenced_image_paths": [
+        "exec-310eb658-13af-4379-bb24-40a1e01ec7d1.png"
+      ]
+    },
+    {
+      "kind": "paper",
+      "prompt": "Use case: historical-scene. Asset type: portrait production game UI paper background, 1024 x 1536. Primary request: luminous warm cream parchment backdrop for a Dutch Golden Age themed matchmaking screen. Very fine softly mottled ivory paper. Along edges and corners only: ghosted Dutch tulips in faint dusty peach and sage, elegant extremely faint Baroque engraved floral scrolls and acanthus. In lower half, around 64–75 percent down: extremely faint sepia Dutch riverside town panorama with a small sailboat, old canal buildings and a windmill on right, receding into blank cream paper at center. Large clean open central area from top to bottom suitable for app controls. Illustration should look almost like a faded antique printed watermark, softly hand-painted, restrained and unobtrusive. Keep the whole background bright warm cream, not brown antique paper. Border elements fade inward without forming a solid border. No blue or red player washes. No text, no UI, no portraits, no medallions, no frames, no buttons, no cards, no phone, no device, no hard edges, no strong dark outlines. Output only flat background artwork.",
+      "transparent_background": false,
+      "source": "exec-bf91c841-49fe-4a52-8752-c5d37d78a02b.png",
+      "output": "public/assets/remake/matchmaking/dutch-golden-age-paper.webp",
+      "encoding": {
+        "format": "WebP",
+        "quality": 86,
+        "method": 6,
+        "alpha": "Preserved from source without pixel edits"
+      }
+    }
+  ]
+}

@@ -4,6 +4,8 @@ import { ProgressionPage } from './progression-page.jsx';
 import { PlayerAvatar } from './player-profile.jsx';
 import { ThemeArtwork } from './theme-select-page.jsx';
 import { defaultTheme, themeById } from './themes.js';
+import { VersusOrnament } from './matchmaking-ornament.jsx';
+import { matchmakingArt } from './matchmaking-art.js';
 import './matchmaking-page.css';
 
 function SearchOrbit() {
@@ -40,18 +42,20 @@ export function MatchmakingPage({ profile, opponent, theme, ruleset = 'eastern',
   const starting = status === 'starting';
   const faceoff = status === 'faceoff';
   const selectedTheme = (typeof theme === 'string' ? themeById[theme] : theme) || defaultTheme;
+  const artwork = matchmakingArt[selectedTheme.id] || matchmakingArt[defaultTheme.id];
   const edition = ruleset === 'western' ? 'western' : 'eastern';
   const seconds = Math.floor(Math.max(0, Number(elapsedMs) || 0) / 1000);
   const elapsed = `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
   const heading = searching ? 'Finding an opponent…' : starting ? 'Starting your duel…' : 'Opponent found!';
   const announcement = searching ? 'Finding an opponent. You are ready.' : starting ? 'Starting your duel.' : `${opponent?.name || 'Your opponent'} is ready. Match found.`;
-  return <ProgressionPage title="Matchmaking" className={`matchmaking-page ${searching ? 'is-searching' : 'is-found'} ${faceoff ? 'is-faceoff' : ''} ${starting ? 'is-starting' : ''} ${paused ? 'is-paused' : ''} ${gentle ? 'is-gentle' : ''}`} onClose={searching ? onCancel : undefined} hideBack>
+  return <ProgressionPage title="Matchmaking" className={`matchmaking-page matchmaking-${selectedTheme.id} ${searching ? 'is-searching' : 'is-found'} ${faceoff ? 'is-faceoff' : ''} ${starting ? 'is-starting' : ''} ${paused ? 'is-paused' : ''} ${gentle ? 'is-gentle' : ''}`} style={{ '--matchmaking-paper': `url(${JSON.stringify(artwork.paper)})` }} onClose={searching ? onCancel : undefined} hideBack>
     <div className="matchmaking-live-status" role="status" aria-live="polite" aria-atomic="true">{announcement}</div>
     <section className="matchmaking-search" aria-label="Duel players">
       <h3 className="matchmaking-heading">{heading}</h3>
       <div className="matchmaking-players">
+        <img className="matchmaking-ink" src={artwork.ink} alt="" aria-hidden="true" draggable="false" />
         <PlayerSeat profile={profile} isPlayer />
-        <span className="matchmaking-versus" aria-label="versus"><span>VS</span><i aria-hidden="true" /></span>
+        <span className="matchmaking-versus" aria-label="versus"><VersusOrnament /><span>VS</span><i aria-hidden="true" /></span>
         <PlayerSeat profile={opponent} searching={searching} />
       </div>
       <div className="matchmaking-progress">
@@ -60,7 +64,7 @@ export function MatchmakingPage({ profile, opponent, theme, ruleset = 'eastern',
       </div>
     </section>
     <section className="matchmaking-theme" data-theme={selectedTheme.id} aria-label={`Selected theme: ${selectedTheme.name}, ${edition === 'western' ? 'Western' : 'Eastern'} collection`}>
-      <ThemeArtwork theme={selectedTheme} ruleset={edition} />
+      <ThemeArtwork theme={selectedTheme} ruleset={edition} surfaceSrc={artwork.paper} />
       <div className="matchmaking-theme-copy"><span>Selected theme</span><strong>{selectedTheme.name}</strong><small>{edition === 'western' ? 'Western' : 'Eastern'} collection</small></div>
     </section>
     <footer className="matchmaking-footer">{searching ? <button className="progression-secondary matchmaking-cancel" type="button" onClick={onCancel}>Cancel</button> : <p className="matchmaking-preparing">Preparing your table…</p>}</footer>

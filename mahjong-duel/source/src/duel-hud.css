@@ -1,14 +1,13 @@
-/* Blue and red enamel stay with their player from face-off to final score. */
+/* Team glows preserve ownership around the player's equipped profile frame. */
 .remake .duel-hud { --team-blue: #178fe1; --team-red: #dd443a; --portrait-size: 52px; position: relative; flex: 0 0 auto; width: 100%; z-index: 4; }
 .remake .duel-hud .duel-scoreboard { position: static; display: grid; grid-template-columns: minmax(0,1fr) 44px minmax(0,1fr); gap: 3px; padding: 5px; border: 2px solid #c58c43; border-radius: 15px; margin: 0; min-height: 0; background: repeating-linear-gradient(2deg,transparent 0 6px,#efad5912 7px,transparent 8px 12px),linear-gradient(180deg,#804316,#47200a); box-shadow: inset 0 1px #ffe1a178,0 3px 6px #2714074a; }
-.remake .duel-hud .player-score { --team: var(--team-blue); display: flex; flex-direction: row; align-items: center; justify-content: flex-start; text-align: left; gap: 4px; padding: 6px 2px; border: 1px solid #c2945366; border-radius: 10px; min-width: 0; background: linear-gradient(110deg,#14579040,transparent); box-shadow: none; transition: border-color .22s,box-shadow .22s,background .22s; }
+.remake .duel-hud .player-score { --team: var(--team-blue); display: flex; flex-direction: row; align-items: center; justify-content: flex-start; text-align: left; gap: 9px; padding: 6px 2px; border: 1px solid #c2945366; border-radius: 10px; min-width: 0; background: linear-gradient(110deg,#14579040,transparent); box-shadow: none; transition: border-color .22s,box-shadow .22s,background .22s; }
 .remake .duel-hud .player-score.opponent { --team: var(--team-red); flex-direction: row-reverse; text-align: right; background: linear-gradient(-110deg,#a5262440,transparent); }
-.remake .duel-hud .player-score.active-turn { border-color: var(--team); box-shadow: inset 0 0 9px color-mix(in srgb,var(--team) 55%,transparent),0 0 7px color-mix(in srgb,var(--team) 60%,transparent); }
-.remake .duel-hud .player-score > .duel-portrait { position: relative; display: block; flex: 0 0 var(--portrait-size); width: var(--portrait-size); height: var(--portrait-size); min-width: 0; padding: 3px; border: 1.5px solid #ffe49e; border-radius: 50%; background: linear-gradient(145deg,#ffffdc,var(--team) 14%,var(--team) 80%,#6e3714); box-shadow: 0 0 0 1px #9e622a,0 2px 3px #160c0660; transition: box-shadow .22s; }
-.remake .duel-hud .active-turn .duel-portrait { box-shadow: 0 0 0 1px #fff2b8,0 0 12px 2px var(--team); }
-.remake .duel-hud .duel-portrait > .player-avatar { display: block; --avatar-size: 100%; width: 100%; height: 100%; padding: 0; border: 0; border-radius: 50%; background: #f2d9a4; box-shadow: none; }
-.remake .duel-hud .duel-portrait .player-avatar-portrait { border-radius: 50%; box-shadow: none; }
-.remake .duel-hud .duel-portrait .avatar-frame { inset: 0; width: 100%; height: 100%; filter: none; }
+.remake .duel-hud .player-score.active-turn { border-color: var(--team); box-shadow: inset 0 0 9px color-mix(in srgb,var(--team) 22%,transparent),0 0 7px color-mix(in srgb,var(--team) 35%,transparent); }
+/* Match transfer measures this unpadded box, which is exactly the PlayerAvatar box. */
+.remake .duel-hud .player-score > .duel-portrait { position: relative; display: block; flex: 0 0 var(--portrait-size); width: var(--portrait-size); height: var(--portrait-size); min-width: 0; padding: 0; border: 0; background: transparent; box-shadow: none; }
+.remake .duel-hud .duel-portrait > .player-avatar { display: block; width: 100%; height: 100%; filter: drop-shadow(0 0 3px color-mix(in srgb,var(--team) 35%,transparent)); transition: filter .22s; }
+.remake .duel-hud .active-turn .duel-portrait > .player-avatar { filter: drop-shadow(0 0 5px color-mix(in srgb,var(--team) 65%,transparent)); }
 .remake .duel-hud[data-intro=travel] .duel-portrait { visibility: hidden; }
 .remake .duel-hud .player-score > .duel-player-copy { display: flex; flex-direction: column; flex: 1 1 0; min-width: 0; gap: 2px; }
 .remake .duel-hud .player-score .duel-player-name { display: block; min-width: 0; width: 100%; max-width: none; color: #fff3d2; font: 800 13px/1.3 Manrope,sans-serif; text-transform: none; letter-spacing: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-shadow: 0 1px #281306; }
@@ -39,7 +38,7 @@
 @media (max-width: 380px) {
   .remake .duel-hud { --portrait-size: 52px; }
   .remake .duel-hud .duel-scoreboard { padding: 5px; gap: 3px; }
-  .remake .duel-hud .player-score { display: grid; grid-template-columns: 52px minmax(0,1fr); grid-template-rows: 52px auto; gap: 2px; padding: 3px 2px; }
+  .remake .duel-hud .player-score { display: grid; grid-template-columns: 52px minmax(0,1fr); grid-template-rows: 52px auto; gap: 2px 9px; padding: 3px 2px; }
   .remake .duel-hud .player-score.opponent { grid-template-columns: minmax(0,1fr) 52px; }
   .remake .duel-hud .player-score > .duel-player-copy { display: contents; }
   .remake .duel-hud .duel-portrait { grid-column: 1; grid-row: 1; }

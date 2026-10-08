@@ -16,10 +16,10 @@ const SIGNATURES = {
 };
 const format = value => Number(value || 0).toLocaleString();
 
-export function ThemeArtwork({ theme, ruleset }) {
+export function ThemeArtwork({ theme, ruleset, surfaceSrc }) {
   const tile = themeTileSets[theme.id][ruleset].find(face => face.id === SIGNATURES[theme.id][ruleset]);
   return <span className="theme-choice-art" aria-hidden="true">
-    <img className="theme-choice-surface" src={boardVariants[theme.id].portrait.src} alt="" draggable="false" />
+    <img className="theme-choice-surface" src={surfaceSrc || boardVariants[theme.id].portrait.src} alt="" draggable="false" />
     <span className="theme-choice-tile"><img src={tile.src} alt="" draggable="false" /></span>
   </span>;
 }

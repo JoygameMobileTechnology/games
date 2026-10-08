@@ -1,0 +1,22 @@
+{
+  "theme": "Dancheong",
+  "reference": "ChatGPT Image Oct 8, 2026, 11_50_30 AM.png",
+  "tool": "image_gen.imagegen (built-in)",
+  "generatedOn": "2026-10-08",
+  "assets": [
+    {
+      "file": "dancheong-ink.webp",
+      "source": "exec-06d5dbae-ba7d-43c5-ba5f-267eca3f321f.png",
+      "prompt": "Use case: stylized-concept. Create a production transparent game UI illustration asset, landscape 1536x1024. Image 1 is ONLY a reference for the Dancheong Korean painted temple floral ink decoration behind the two players. Make only those ink decorations, no UI. Two separate balanced clouds of finely painted Korean Dancheong lotus petals and scrolling clouds. Left cloud entirely pale powder blue watercolor, right cloud entirely pale coral/peach red watercolor. Each cloud forms a loose ornamental bloom, its middle lightly detailed/empty because a circular player portrait will be overlaid there later. Motifs extend around those two centers with distinct lotus petals at the top and elegant Korean cloud-scroll curls at the sides and bottom. Preserve crisp enough engraved shapes inside gently feathered watercolor texture; dreamy soft edges. Keep a completely empty transparent vertical gap of about 12% of canvas width in the exact middle. Leave transparent air around the outside of both blooms. Pastel moderate saturation because app will further reduce opacity to 0.42. NO visible flat background: genuine alpha transparency. NO portraits, people, silhouettes, circular frames, circles, gold, UI, cards, text, logos, borders or phone. Only these two separate traditional Korean decorative ink blooms.",
+      "transparentBackground": true,
+      "format": "Lossless WebP quality 86 (compression effort), exact=True; original RGBA pixels preserved"
+    },
+    {
+      "file": "dancheong-paper.webp",
+      "source": "exec-07e0556a-f64a-4aeb-b693-dcc74e79f274.png",
+      "prompt": "Use case: stylized-concept. Asset type: portrait mobile game background illustration 1024x1536. The provided image is visual style reference ONLY: reproduce the cream paper and extremely faint Korean Dancheong ornamental border from the matchmaking screen, excluding every UI element. Full canvas warm ivory rice paper with gentle natural fiber and subtle watercolor mottling. Decorate four corners and narrow side edges using very pale sage green and soft peach traditional Korean Dancheong painted temple patterns, curved interlocking temple beam motifs, stylized lotus rosettes and curled cloud scrolls. Motifs are like delicate faded old pigment soaked into handmade cream paper, quiet enough to sit behind dark UI labels. They should have visible elegant shapes but very low contrast like the reference, especially muted temple curves in the top two and bottom two corners. Keep the entire center 65% of canvas mostly empty clean cream paper. No large central illustration. Portrait wallpaper only, full-bleed, no perspective. NO phone, UI, text, letters, frames, cards, avatars, silhouettes, portraits, icons, buttons, gold ornament, circles, blue/red player washes, strong saturated color, shadowed edges, vignettes, logo or watermark.",
+      "transparentBackground": false,
+      "format": "WebP quality 86"
+    }
+  ]
+}

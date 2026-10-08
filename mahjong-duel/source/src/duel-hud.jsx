@@ -13,7 +13,7 @@ export function DuelHud({ game, profile, opponentProfile, streakCues, onStreakCo
         {i === 1 && <div className="duel-center"><button className="duel-pause" aria-label="Pause game" disabled={Boolean(introPhase) || !remainingPairs} onClick={onPause}><List size={24} weight="bold" /></button><span aria-hidden="true">VS</span></div>}
         <div className={`player-score ${actor === 'you' ? 'local-player' : 'opponent'} ${game.turn === actor && introPhase !== 'travel' ? 'active-turn' : ''}`} data-side={actor}>
           <div className="duel-portrait local-avatar-wrap" data-score-portrait={actor}>
-            <PlayerAvatar profile={person} showFlag={false} shape="circle" />
+            <PlayerAvatar profile={person} showFlag={false} />
             {actor === 'you' && <StreakPortrait cues={streakCues} paused={paused} gentle={gentle} />}
           </div>
           <div className="duel-player-copy"><span className="duel-player-name" title={person.name}>{actor === 'you' ? 'You' : person.name}</span><strong data-score-target={actor} key={scoreFeedback?.actor === actor ? scoreFeedback.id : actor} className={scoreFeedback?.actor === actor ? 'score-received' : ''}>{score.toLocaleString()}</strong></div>

@@ -1,0 +1,17 @@
+{
+  "tool": "Built-in image_gen",
+  "reference": "ChatGPT Image Oct 8, 2026, 11_50_34 AM.png",
+  "assets": [
+    {
+      "asset": "ming-porcelain-ink.webp",
+      "prompt": "Use case: stylized-concept. Create production game UI decorative illustration, NOT a screenshot. Use attached image solely as STYLE REFERENCE. No text, words, numbers, UI controls, avatars, portrait frames, phone, VS, gold medallions, watermarks. Gentle pale watercolor/pigment and Chinese porcelain linework on warm cream palette. Landscape 1536x1024 TRANSPARENT background reusable portrait backdrop. TWO separated floral ink compositions: LEFT misty soft porcelain BLUE lotus/peony blossoms and elegant curling tendrils with engraved leaves; RIGHT matching pale CORAL RED lotus/peony blossoms and curling vines. Both are ornamental Ming porcelain flowers as in reference, NOT bamboo branches. Large lotus flower at top of each composition, airy looping vines and leaves around sides and bottom. Detailed petals in soft translucent ink with ragged watercolor feathering behind them, rich hand-painted texture but no dense dark patches. Each composition centered at x25% / x75%, light open center where a portrait will overlay. Decorative motifs must be visible ABOVE, BELOW, OUTSIDE each portrait. Center12% transparent negative space. Organic transparent feathered edges, no rectangular cream background. Do not connect the two ink colors; pale translucent blue on left, coral-red on right.",
+      "transparent": true
+    },
+    {
+      "asset": "ming-porcelain-paper.webp",
+      "prompt": "Use case: stylized-concept. Create production game UI decorative illustration, NOT a screenshot. Use attached image solely as STYLE REFERENCE. No text, words, numbers, UI controls, avatars, portrait frames, phone, VS, gold medallions, watermarks. Gentle pale watercolor/pigment and Chinese porcelain linework on warm cream palette. Portrait 1024x1536 full bleed warm ivory paper background ONLY. Extremely faint pale powder-blue Ming porcelain lotus flowers, peonies, curling floral vines, graceful engraved botanical branches around far outer corners and edges, whisper-light delicate blue linework on creamy rice-paper. Subtle stream curves at bottom, faint large circular traditional porcelain line ornament in the lower half, all very pale. Large broadly clear cream central area for readable controls. Emulate the faint background floral ink of supplied reference, not the blue/red portrait washes. NO coral-red ink, NO colored portrait areas. No central focal image. Uniform subtle paper grain, elegant premium mobile Mahjong menu backdrop. Full rectangle background, no border/frame/device.",
+      "transparent": false
+    }
+  ],
+  "encoding": "WebP quality86, alpha preserved; no illustration edits."
+}

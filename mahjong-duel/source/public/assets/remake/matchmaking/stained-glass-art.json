@@ -1,0 +1,37 @@
+{
+  "theme": "stained-glass",
+  "createdAt": "2026-10-08",
+  "tool": "image_gen.imagegen (built-in)",
+  "reference": {
+    "path": "ChatGPT Image Oct 8, 2026, 11_50_40 AM.png",
+    "role": "Style reference only"
+  },
+  "assets": [
+    {
+      "file": "stained-glass-ink.webp",
+      "source": "exec-384ea462-7660-45dd-b6d4-4eda0b12af0c.png",
+      "prompt": "Use case: stylized-concept\nAsset type: production transparent watercolor ornament layer for a mobile matchmaking game.\nInput image role: supplied Stained Glass phone screenshot is STYLE REFERENCE ONLY. Create a new illustration asset, not a screen mockup.\nPrimary request: a landscape 1536x1024 transparent composition of two airy stained-glass tracery clusters, pale dusty blue on the left, pale coral rose-red on the right, like the soft ornamental inks around the two player portraits in the reference. Use delicate Gothic rose-window petal mosaics, quatrefoils, curved lancet lattice, fragmentary decorative circles and airy watercolor diffusion. Faint hand painted variation and feathered ink edges, low contrast. Left and right should feel balanced without being exact mirrors.\nComposition: each cluster occupies about 40% of canvas width. Left loosely centered at 25% width and 50% height, right at 75% width and 50% height. Their centers are lightly detailed, nearly empty translucent space because actual avatar components will overlap. Place more ornamental detail above, below and beyond those centers. Keep center 12% of total canvas width completely transparent. Outer edges gently dissolve into genuine transparency. Separate ornamental fragments must read as stained-glass geometry rather than a frame.\nPalette: left muted powder blue only; right muted dusty coral/rose only. Preserve enough pigment detail to survive display at 42% opacity.\nConstraints: actual transparent alpha background, no cream or white opaque backdrop. NO portrait frames, rings or medallions. NO gold, no metallic trim. NO botanicals, flowers, leaves or natural plant stems; rose-window geometry is architectural. NO avatars, portraits, humans, UI, phones, buttons, cards, words, typography, letters, VS, icons or watermarks.",
+      "transparent_background": true,
+      "dimensions": [
+        1536,
+        1024
+      ]
+    },
+    {
+      "file": "stained-glass-paper.webp",
+      "source": "exec-82395353-cd99-408e-9c0a-589765c1813a.png",
+      "prompt": "Use case: stylized-concept\nAsset type: production portrait background illustration for a mobile matchmaking game, 1024x1536.\nInput image role: supplied Stained Glass phone screenshot is STYLE REFERENCE ONLY. Create an empty background asset, never recreate the phone or UI.\nPrimary request: warm luminous ivory cream parchment paper with extremely faint, thin golden-beige Gothic cathedral window tracery along the outer corners and side edges. Soft pointed arches sweep in from corners; tiny pastel dusty blue, warm butter and muted blush stained glass diamond inserts and quatrefoils punctuate the edges. Symmetrical elegant architectural ornament, gently hand-painted, like the understated paper backdrop in the supplied Stained Glass reference.\nComposition: portrait 2:3 full bleed. Broad calm clear central 65% of image for screen content. Decorative tracery primarily within outer 12% at each side and upper/lower corners; small subtle top-center diamond motif allowed. Faint edge geometry can expand a little at bottom corners. Fine natural paper texture with subtle warm mottling. Overall very low contrast, ornament only a few tones from the cream. No big central object.\nConstraints: no blue/red player washes or ink clusters; only tiny pastel glass inserts in the thin corner architecture. No botanical illustration, flower stems or leaves. No UI, text, numbers, title, cards, buttons, phones, borders, portrait frames, humans or watermarks.",
+      "transparent_background": false,
+      "dimensions": [
+        1024,
+        1536
+      ]
+    }
+  ],
+  "processing": {
+    "operation": "PNG to WebP encoding only",
+    "quality": 86,
+    "alpha": "preserved",
+    "visualEdits": false
+  }
+}
