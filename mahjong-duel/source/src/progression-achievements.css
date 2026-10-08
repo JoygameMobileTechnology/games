@@ -32,13 +32,14 @@
 .achievement-trophy { position: relative; display: block; width: 100%; aspect-ratio: 1; isolation: isolate; }
 .trophy-illustration { position: absolute; display: block; inset: 8%; background-size: 400% 400%; background-repeat: no-repeat; filter: drop-shadow(0 3px 2px #52301c36); transition: filter .2s; }
 .trophy-illustration.sprite-row-2 { clip-path: inset(0 0 4% 0); }
+.trophy-illustration--standalone { background-size: contain; }
 .trophy-ornament { position: absolute; inset: 0; width: 100%; height: 100%; z-index: -1; }
-.glory-0 .trophy-illustration { filter: grayscale(1) sepia(.17) brightness(.92); opacity: .68; }
-.glory-1 .trophy-illustration { filter: saturate(.68) sepia(.2) drop-shadow(0 3px 2px #52301c36); }
-.glory-2 .trophy-illustration { filter: saturate(.9) drop-shadow(0 4px 2px #52301c36); }
-.glory-3 .trophy-illustration { filter: saturate(1.08) drop-shadow(0 0 6px #d4ad6645); }
-.glory-4 .trophy-illustration { filter: saturate(1.14) drop-shadow(0 0 8px #e8bc6288); }
-.glory-5 .trophy-illustration { filter: saturate(1.2) drop-shadow(0 0 10px #e0b34aad); }
+.glory-0 .trophy-illustration { filter: grayscale(1) brightness(.92); opacity: .68; }
+.glory-1 .trophy-illustration { filter: grayscale(.32) drop-shadow(0 3px 2px #52301c36); }
+.glory-2 .trophy-illustration { filter: grayscale(.18) drop-shadow(0 4px 2px #52301c36); }
+.glory-3 .trophy-illustration { filter: grayscale(.08) drop-shadow(0 0 6px #d4ad6645); }
+.glory-4 .trophy-illustration { filter: grayscale(.03) drop-shadow(0 0 8px #e8bc6288); }
+.glory-5 .trophy-illustration { filter: drop-shadow(0 0 10px #e0b34aad); }
 .glory-5::before { content: ''; position: absolute; inset: 0; border-radius: 50%; background: radial-gradient(#ffe29170,transparent 67%); z-index: -2; }
 .trophy-lock { position: absolute; bottom: 11%; left: 50%; transform: translateX(-50%); width: 24%; aspect-ratio: 1; display: grid; place-items: center; color: #eae2d0; border-radius: 50%; border: 1px solid #f3ead4; background: linear-gradient(#a49b87,#655d50); box-shadow: 0 2px 3px #3c322842; }.trophy-lock svg { width: 56%; height: 56%; }
 .trophy-level-seal { position: absolute; bottom: 9%; left: 50%; transform: translateX(-50%); min-width: 24px; height: 18px; display: grid; place-items: center; padding: 0 4px; border: 1px solid #825016; border-radius: 9px; color: #71400f; background: linear-gradient(#fff3ae,#d7a342); font: 800 11px/1 Georgia,serif; box-shadow: 0 1px 2px #51331e50; }

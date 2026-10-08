@@ -62,7 +62,7 @@ export const ACHIEVEMENT_FAMILIES = Object.freeze(familyDetails.map(([counterKey
   const milestones = Object.freeze(ACHIEVEMENTS.filter(item => item.counterKey === counterKey)
     .sort((a, b) => a.target - b.target).map((item, index) => Object.freeze({ ...item, level: index + 1 })));
   const category = ACHIEVEMENT_SHELVES.find(shelf => shelf.id === shelfId).name;
-  return Object.freeze({ id, name, counterKey, category, shelfId, artKey, description: description ?? milestones[0].description,
+  return Object.freeze({ id, name, counterKey, category, shelfId, artKey: milestones.length === 1 ? id : artKey, description: description ?? milestones[0].description,
     milestones, totalLevels: milestones.length, totalPoints: milestones.reduce((sum, milestone) => sum + milestone.points, 0) });
 }));
 

@@ -10,14 +10,6 @@
   opacity: 1;
   transition: opacity 240ms ease-out;
 }
-.launch-loading-background {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: center;
-}
 .launch-loading-vignette {
   position: absolute;
   inset: 0;
@@ -84,7 +76,6 @@
 .launch-loading-cue p { margin: 9px 0 0; font-size: clamp(17px, 4.2vw, 25px); line-height: 1.3; font-weight: 800; color: #fff8dd; text-shadow: 0 2px 2px #502007, 0 0 7px #502007; }
 .launch-loading.is-leaving { opacity: 0; pointer-events: none; }
 @media (orientation: landscape) {
-  .launch-loading-background { object-position: center 58%; }
   .launch-loading-logo { top: max(6%, calc(env(safe-area-inset-top) + 10px)); width: min(52vw, 620px); max-height: 51%; }
   .launch-loading-cue { bottom: max(5%, calc(env(safe-area-inset-bottom) + 12px)); }
   .launch-loading-tiles { --loading-tile-width: clamp(30px, 7vh, 51px); }

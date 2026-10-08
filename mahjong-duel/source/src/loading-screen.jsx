@@ -1,9 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { menuBackgrounds } from './menu-backgrounds.js';
+import { MenuScene } from './menu-scene.jsx';
 import { chooseLoadingTiles } from './loading-state.js';
 import './loading-screen.css';
 
-const BACKGROUND = menuBackgrounds.find(background => background.id === 'autumn-daylight').src;
 const LOGO = './assets/remake/loading-logo.png';
 const CYCLE_MS = 1800;
 const STEP_MS = CYCLE_MS / 3;
@@ -35,7 +34,7 @@ function prepareImages(sources) {
   };
 }
 
-export function LoadingScreen({ theme, startupArtwork = [], gentle = false, onReady, onComplete }) {
+export function LoadingScreen({ theme, background, startupArtwork = [], gentle = false, onReady, onComplete }) {
   const [leaving, setLeaving] = useState(false);
   const [position, setPosition] = useState(0);
   const tiles = useMemo(() => chooseLoadingTiles(theme.id), [theme.id]);
@@ -51,7 +50,7 @@ export function LoadingScreen({ theme, startupArtwork = [], gentle = false, onRe
     let cancelled = false, revealTimer, exitTimer;
     const reduced = gentle || matchMedia('(prefers-reduced-motion: reduce)').matches;
     const started = performance.now();
-    const artwork = prepareImages([BACKGROUND, LOGO, ...tiles.map(tile => tile.src), ...startupArtwork]);
+    const artwork = prepareImages([background.src, LOGO, ...tiles.map(tile => tile.src), ...startupArtwork]);
     artwork.ready.then(() => {
       if (cancelled) return;
       // One readable cycle avoids a flash of loading UI on a warm launch.
@@ -67,10 +66,10 @@ export function LoadingScreen({ theme, startupArtwork = [], gentle = false, onRe
       clearTimeout(exitTimer);
       artwork.dispose();
     };
-  }, [tiles, startupArtwork, gentle, onReady, onComplete]);
+  }, [background.src, tiles, startupArtwork, gentle, onReady, onComplete]);
 
-  return <section className={`launch-loading${gentle ? ' is-gentle' : ''}${leaving ? ' is-leaving' : ''}`} aria-label="Mahjong Duel is loading" data-loading-theme={theme.id}>
-    <img className="launch-loading-background" src={BACKGROUND} alt="" fetchPriority="high" draggable="false" />
+  return <section className={`launch-loading${gentle ? ' is-gentle gentle-motion' : ''}${leaving ? ' is-leaving' : ''}`} aria-label="Mahjong Duel is loading" data-loading-theme={theme.id}>
+    <MenuScene background={background} paused={leaving} />
     <div className="launch-loading-vignette" aria-hidden="true" />
     <img className="launch-loading-logo" src={LOGO} alt="Mahjong Duel" fetchPriority="high" draggable="false" />
     <div className="launch-loading-cue">

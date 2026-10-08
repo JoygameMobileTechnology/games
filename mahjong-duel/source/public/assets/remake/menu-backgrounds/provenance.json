@@ -1,0 +1,30 @@
+{
+  "origin": "User-supplied background artwork, October 8 2026",
+  "processing": "WebP encoding at quality 90; original dimensions and composition retained. No generated or retouched pixels.",
+  "assets": [
+    {
+      "asset": "autumn-daylight.webp",
+      "source": "ChatGPT Image Oct 8, 2026, 05_43_09 PM.png",
+      "source_sha256": "f9cd66f6307787c52a7e0db4f51bf9c06922048fb3a1eef29a2ba10b75e0576e",
+      "sha256": "413029169549e3beb1e6b1208b38050ba6b3b8577451e72c0f0d6c2427a8f33c",
+      "width": 851,
+      "height": 1848
+    },
+    {
+      "asset": "spring-blossom.webp",
+      "source": "ChatGPT Image Oct 8, 2026, 05_54_26 PM.png",
+      "source_sha256": "f3a0dd293b52f0102734f8d0d1f2d1cd9a56204f6c2610d2c4cf69c79dff6c3c",
+      "sha256": "2decba58b09e50214a5fd86881fbcf59b22e63f1cf7a412c8ecbf535931e72d5",
+      "width": 851,
+      "height": 1848
+    },
+    {
+      "asset": "bamboo-garden.webp",
+      "source": "ChatGPT Image Oct 8, 2026, 10_49_45 PM.png",
+      "source_sha256": "49cefa612fbe102336e50a2eab3dc780e45833436049255bf32a7fc9654eb583",
+      "sha256": "91749c6258fb5b0d1e89a3f9b3211c6ca85608c25d7374858006eba97d553860",
+      "width": 851,
+      "height": 1848
+    }
+  ]
+}

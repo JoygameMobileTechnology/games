@@ -1,7 +1,7 @@
 export const menuBackgrounds = [
-  { id: 'bamboo', src: './assets/remake/shoji-doors.png', atmosphere: 'bamboo' },
-  { id: 'lantern-night', src: './assets/remake/lantern-night.png', atmosphere: 'fireflies' },
-  { id: 'autumn-daylight', src: './assets/remake/autumn-daylight.png', atmosphere: 'autumn' },
+  { id: 'autumn-daylight', src: './assets/remake/menu-backgrounds/autumn-daylight.webp', atmosphere: 'autumn' },
+  { id: 'spring-blossom', src: './assets/remake/menu-backgrounds/spring-blossom.webp', atmosphere: 'spring' },
+  { id: 'bamboo-garden', src: './assets/remake/menu-backgrounds/bamboo-garden.webp', atmosphere: 'bamboo' },
 ];
 
 /** Pick once at launch; the previous launch is excluded before drawing. */

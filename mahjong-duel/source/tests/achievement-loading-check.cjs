@@ -12,6 +12,8 @@ const standalone = path.resolve(process.env.STANDALONE_HTML || 'output/mahjong-d
 const output = path.resolve('tmp/achievement-loading-qa');
 const cardsSelector = 'button[data-achievement-family]';
 const sizes = [{ width: 390, height: 844 }, { width: 768, height: 1024 }];
+const atlasHeader = fs.readFileSync(path.resolve(__dirname, '../public/assets/remake/achievement-trophies.png'));
+const atlasSize = { width: atlasHeader.readUInt32BE(16), height: atlasHeader.readUInt32BE(20) };
 
 function assertStable(before, after, label) {
   assert.equal(after.cards.length, 43, `${label}: all 43 trophy controls remain`);
@@ -83,11 +85,14 @@ function assertStable(before, after, label) {
       });
     }, cardsSelector);
     const artUrl = async () => {
-      const urls = await page.locator('.trophy-illustration').evaluateAll(nodes => [...new Set(nodes.map(node => getComputedStyle(node).backgroundImage.match(/^url\(["']?(.*?)["']?\)$/)?.[1]))]);
-      assert.equal(urls.length, 1, `${label}: all trophy artwork shares one URL`);
-      assert.ok(urls[0] && urls[0].length < 256, `${label}: artwork does not repeat a large inline image`);
-      if (offline) assert.match(urls[0], /^blob:/, `${label}: embedded artwork has a short reusable URL`);
-      return urls[0];
+      const art = await page.locator('.trophy-illustration').evaluateAll(nodes => nodes.map(node => ({ standalone: node.classList.contains('trophy-illustration--standalone'), url: getComputedStyle(node).backgroundImage.match(/^url\(["']?(.*?)["']?\)$/)?.[1] })));
+      const atlasUrls = [...new Set(art.filter(image => !image.standalone).map(image => image.url))];
+      assert.equal(atlasUrls.length, 1, `${label}: milestone trophies share one atlas URL`);
+      for (const url of new Set(art.map(image => image.url))) {
+        assert.ok(url && url.length < 256, `${label}: artwork does not repeat a large inline image`);
+        if (offline) assert.match(url, /^blob:/, `${label}: embedded artwork has a short reusable URL`);
+      }
+      return atlasUrls[0];
     };
     try {
       await page.goto(offline ? standaloneUrl : origin);
@@ -99,10 +104,11 @@ function assertStable(before, after, label) {
       await button('Achievements').waitFor();
       await page.evaluate(() => document.fonts.ready);
       // Observe app-initiated work before opening: the test itself never warms the atlas.
-      await page.waitForFunction(offline => window.decodedImages.some(image => image.width > 0 && (offline ? image.url.startsWith('blob:') : image.url.includes('/achievement-trophies.png'))), offline);
+      // Standalone WebPs can finish decoding first; identify the atlas by its PNG dimensions offline.
+      await page.waitForFunction(({ offline, atlasSize }) => window.decodedImages.some(image => image.width > 0 && (offline ? image.url.startsWith('blob:') && image.width === atlasSize.width && image.height === atlasSize.height : image.url.includes('/achievement-trophies.png'))), { offline, atlasSize });
       assert.equal(await page.locator('.achievements-page').count(), 0, `${label}: preloading happens before opening`);
       if (!offline) assert.equal(assetRequests.filter(url => url.includes('/achievement-trophies.png')).length, 1, `${label}: menu starts one atlas request`);
-      const preloaded = await page.evaluate(offline => window.decodedImages.find(image => offline ? image.url.startsWith('blob:') : image.url.includes('/achievement-trophies.png')), offline);
+      const preloaded = await page.evaluate(({ offline, atlasSize }) => window.decodedImages.find(image => offline ? image.url.startsWith('blob:') && image.width === atlasSize.width && image.height === atlasSize.height : image.url.includes('/achievement-trophies.png')), { offline, atlasSize });
 
       await button('Achievements').click();
       await page.getByRole('heading', { name: 'Achievements', exact: true }).waitFor();
@@ -139,6 +145,10 @@ function assertStable(before, after, label) {
         await visibleArtwork();
       }
       assert.equal(await cards().locator('.trophy-illustration').count(), 43, `${label}: every visited shelf reveals its artwork`);
+      const standaloneArt = cards().locator('.trophy-illustration--standalone');
+      assert.equal(await standaloneArt.count(), 27, `${label}: all one-time trophies use individual artwork`);
+      assert.equal(await standaloneArt.evaluateAll(nodes => new Set(nodes.map(node => getComputedStyle(node).backgroundImage)).size), 27, `${label}: each one-time trophy has its own image`);
+      assert.equal(await cards().locator('.trophy-illustration:not(.trophy-illustration--standalone)').count(), 16, `${label}: all progressive trophies keep the shared atlas`);
       await area().evaluate(node => { node.scrollTop = 0; });
       await settle();
       assertStable(original, await geometry(), `${label}: full scroll and return`);

@@ -915,7 +915,7 @@ function GameLaunch() {
     <div ref={appContainer} style={{ display: 'contents' }} inert={!complete} aria-hidden={!complete || undefined}>
       {appReady && <App menuBackground={launch.menuBackground} />}
     </div>
-    {!complete && <LoadingScreen theme={launch.theme} startupArtwork={launch.artwork} gentle={launch.gentle} onReady={ready} onComplete={finish} />}
+    {!complete && <LoadingScreen theme={launch.theme} background={launch.menuBackground} startupArtwork={launch.artwork} gentle={launch.gentle} onReady={ready} onComplete={finish} />}
   </>;
 }
 
