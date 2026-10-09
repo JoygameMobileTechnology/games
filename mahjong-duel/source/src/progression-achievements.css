@@ -32,7 +32,7 @@
 .achievement-trophy { position: relative; display: block; width: 100%; aspect-ratio: 1; isolation: isolate; }
 .trophy-illustration { position: absolute; display: block; inset: 8%; background-size: 400% 400%; background-repeat: no-repeat; filter: drop-shadow(0 3px 2px #52301c36); transition: filter .2s; }
 .trophy-illustration.sprite-row-2 { clip-path: inset(0 0 4% 0); }
-.trophy-illustration--standalone { background-size: contain; }
+.trophy-illustration--standalone, .trophy-illustration--individual { background-size: contain; }
 .trophy-ornament { position: absolute; inset: 0; width: 100%; height: 100%; z-index: -1; }
 .glory-0 .trophy-illustration { filter: grayscale(1) brightness(.92); opacity: .68; }
 .glory-1 .trophy-illustration { filter: grayscale(.32) drop-shadow(0 3px 2px #52301c36); }

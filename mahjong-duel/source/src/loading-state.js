@@ -1,4 +1,4 @@
-import { themes } from './themes.js';
+import { themes, rulesetForTheme } from './themes.js';
 import { themeTileSets } from './tile-data.js';
 
 const STORAGE_KEY = 'porcelain:loadingTheme';
@@ -17,7 +17,7 @@ export function chooseLoadingTheme(previousId, random = Math.random) {
 export function chooseLoadingTiles(themeId, count = 12, random = Math.random) {
   if (!themes.some(theme => theme.id === themeId)) return [];
   const ids = new Set(), sources = new Set();
-  const choices = themeTileSets[themeId].western.filter(tile => {
+  const choices = themeTileSets[themeId][rulesetForTheme(themeId)].filter(tile => {
     if (ids.has(tile.id) || sources.has(tile.src)) return false;
     ids.add(tile.id);
     sources.add(tile.src);

@@ -130,7 +130,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(
           await level.click();
           assert.equal(await level.getAttribute('aria-pressed'), 'true', `${milestone.id} can be inspected`);
           trophyStages.add(await page.locator('.achievement-detail-hero .achievement-trophy').evaluate(node => `${node.dataset.glory}:${node.querySelectorAll('.trophy-ornament path').length}`));
-          if (family.id === 'completed-duels' && [1, 10].includes(milestone.level)) {
+          if (family.id === 'completed-duels' && [1, 4].includes(milestone.level)) {
             await page.waitForFunction(() => document.querySelector('.achievements-page .progression-page-scroll').scrollTop <= 1);
             await capture(`duelist-level-${milestone.level}`);
           }
@@ -143,11 +143,11 @@ ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(
       await closeDetail(family.id, before);
       await unfilteredGallery();
     }
-    assert.equal(new Set(visited).size, 100);
+    assert.equal(new Set(visited).size, 74);
     for (const shelf of shelves) {
       assert.equal(await page.locator(`.achievement-shelf[aria-labelledby="shelf-${shelf.id}"] button[data-achievement-family]`).count(), families.filter(family => family.shelfId === shelf.id).length, `${shelf.name} shows its complete family set`);
     }
-    pass('search and filters stay hidden; all 43 families and 100 milestone targets and increasing rewards are inspectable; Back preserves focus and scroll');
+    pass('search and filters stay hidden; all 43 families and 74 milestone targets and increasing rewards are inspectable; Back preserves focus and scroll');
 
     await load('partial');
     const entries = await page.evaluate(() => window.fixtureState.entries);
@@ -161,11 +161,11 @@ ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(
     await load('legacy');
     assert.equal(await page.locator('.achievement-total > strong').innerText(), '25', 'legacy AP total stays unchanged');
     await card('completed-duels').click();
-    await page.locator('[data-achievement-level="A004"]').click();
-    assert.match(await page.locator('.achievement-progress-note').innerText(), /10 AP earned/, 'legacy milestone shows its original award');
-    assert.match(await page.locator('[data-achievement-level="A004"]').innerText(), /10 AP/, 'legacy tier badge shows its original award');
-    await page.locator('[data-achievement-level="A005"]').click();
-    assert.match(await page.locator('.achievement-progress-note').innerText(), /40 AP on unlock/, 'future milestone uses the new increasing reward');
+    await page.locator('[data-achievement-level="M002"]').click();
+    assert.match(await page.locator('.achievement-progress-note').innerText(), /15 AP earned/, 'legacy milestone shows its original award');
+    assert.match(await page.locator('[data-achievement-level="M002"]').innerText(), /15 AP/, 'legacy tier badge shows its original award');
+    await page.locator('[data-achievement-level="M003"]').click();
+    assert.match(await page.locator('.achievement-progress-note').innerText(), /150 AP on unlock/, 'future milestone uses the round increasing reward');
     await capture('legacy-earned-and-future-points');
     pass('legacy AP total and earned milestone values stay unchanged while future milestones use increasing rewards');
     }

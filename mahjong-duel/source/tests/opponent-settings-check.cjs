@@ -43,6 +43,8 @@ const output = path.resolve('tmp/opponent-settings');
       }
       async function checkSettings(selected, current) {
         await page.getByRole('heading', { name: 'Settings', exact: true }).waitFor();
+        assert.equal(await page.getByRole('group', { name: 'Ruleset', exact: true }).count(), 0, 'tile-set selection is removed from Settings');
+        assert.equal(await page.getByRole('button', { name: /^(Eastern|Western)$/ }).count(), 0, 'themes determine their own tile set');
         for (const name of ['Realistic', 'Modern AI', 'Original AI']) {
           assert.equal(await button(name).getAttribute('aria-pressed'), String(name === selected));
           const rect = await button(name).boundingBox();
@@ -95,7 +97,7 @@ const output = path.resolve('tmp/opponent-settings');
       async function enterDuel() {
         await page.getByRole('heading', { name: 'Choose a theme', exact: true }).waitFor();
         await tap('Play Duel');
-        await advance(4000); await advance(1500);
+        await advance(4000); await advance(2500);
         await page.locator('.game-board').waitFor(); await advance(1000);
       }
       async function checkRules(mode) {

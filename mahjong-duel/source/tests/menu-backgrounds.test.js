@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { statSync } from 'node:fs';
-import { menuBackgrounds, chooseMenuBackground } from '../src/menu-backgrounds.js';
+import { ENABLE_SEASONAL_MENU_BACKGROUNDS, menuBackgrounds, chooseMenuBackground } from '../src/menu-backgrounds.js';
 
 test('menu scenes retain their own artwork and atmosphere', () => {
   assert.deepEqual(menuBackgrounds, [
@@ -19,13 +19,35 @@ test('every menu scene points to existing nonempty public artwork', () => {
   }
 });
 
-test('every previous scene is excluded across the full random range', () => {
+test('only the green forest is enabled by default, regardless of saved scene or random value', () => {
+  assert.equal(ENABLE_SEASONAL_MENU_BACKGROUNDS, false);
+  const forest = menuBackgrounds.find(background => background.id === 'bamboo-garden');
+  for (const previous of [null, undefined, '', ...menuBackgrounds.map(background => background.id), 'bamboo', 'lantern-night', 'winter-garden', 'retired-menu-background']) {
+    for (const random of [0, .25, .5, .75, 1 - Number.EPSILON]) {
+      assert.equal(chooseMenuBackground(previous, () => random), forest);
+    }
+  }
+});
+
+test('repeated default launches retain the green forest without changing the catalogue', () => {
+  const original = structuredClone(menuBackgrounds);
+  let previous = 'spring-blossom';
+  for (let launch = 0; launch < 30; launch++) {
+    const next = chooseMenuBackground(previous, () => (launch % 10) / 10);
+    assert.equal(next.id, 'bamboo-garden');
+    assert.equal(next.atmosphere, 'bamboo');
+    previous = next.id;
+  }
+  assert.deepEqual(menuBackgrounds, original);
+});
+
+test('enabled seasonal rotation excludes every previous scene across the full random range', () => {
   for (const previous of menuBackgrounds) {
     const alternatives = menuBackgrounds.filter(background => background.id !== previous.id);
     for (let index = 0; index < alternatives.length; index++) {
       // Each remaining scene receives half of the range, including boundaries.
       for (const random of [index / alternatives.length, (index + .5) / alternatives.length, (index + 1) / alternatives.length - Number.EPSILON]) {
-        const next = chooseMenuBackground(previous.id, () => random);
+        const next = chooseMenuBackground(previous.id, () => random, true);
         assert.equal(next, alternatives[index]);
         assert.notEqual(next.id, previous.id);
       }
@@ -33,21 +55,21 @@ test('every previous scene is excluded across the full random range', () => {
   }
 });
 
-test('fresh or obsolete stored scene IDs allow all three current scenes', () => {
+test('enabled seasonal rotation allows all three scenes for fresh or obsolete stored IDs', () => {
   for (const previous of [null, undefined, '', 'bamboo', 'lantern-night', 'winter-garden', 'retired-menu-background']) {
     for (let index = 0; index < menuBackgrounds.length; index++) {
-      assert.equal(chooseMenuBackground(previous, () => (index + .5) / menuBackgrounds.length), menuBackgrounds[index]);
+      assert.equal(chooseMenuBackground(previous, () => (index + .5) / menuBackgrounds.length, true), menuBackgrounds[index]);
     }
-    assert.equal(chooseMenuBackground(previous, () => 0), menuBackgrounds[0]);
-    assert.equal(chooseMenuBackground(previous, () => 1 - Number.EPSILON), menuBackgrounds.at(-1));
+    assert.equal(chooseMenuBackground(previous, () => 0, true), menuBackgrounds[0]);
+    assert.equal(chooseMenuBackground(previous, () => 1 - Number.EPSILON, true), menuBackgrounds.at(-1));
   }
 });
 
-test('repeated launches never repeat consecutively and do not mutate the scene catalogue', () => {
+test('enabled seasonal launches never repeat consecutively or mutate the scene catalogue', () => {
   const original = structuredClone(menuBackgrounds);
   let previous = null;
   for (let launch = 0; launch < 120; launch++) {
-    const next = chooseMenuBackground(previous, () => (launch % 10) / 10);
+    const next = chooseMenuBackground(previous, () => (launch % 10) / 10, true);
     assert.ok(menuBackgrounds.includes(next));
     assert.notEqual(next.id, previous);
     previous = next.id;

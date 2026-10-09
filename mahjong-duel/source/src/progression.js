@@ -1,7 +1,7 @@
-import { ACHIEVEMENTS, ACHIEVEMENT_REWARDS_VERSION, isAchievementId, NUMERIC_COUNTER_KEYS, SET_COUNTER_KEYS, evaluateAchievements } from './achievements.js';
-import { normalizeCollection, createCollection, awardCollectedPair, collectionPairId, loadCollection, saveCollection } from './collection.js';
+import { ACHIEVEMENTS, ACHIEVEMENT_REWARDS_VERSION, THEME_ACHIEVEMENTS_VERSION, activeAchievementIdFor, isAchievementId, NUMERIC_COUNTER_KEYS, SET_COUNTER_KEYS, evaluateAchievements, awardedAchievementPoints } from './achievements.js';
+import { normalizeCollection, mergeCollections, createCollection, awardCollectedPair, collectionPairId, loadCollection, saveCollection } from './collection.js';
 import { themeTileSets } from './tile-data.js';
-import { launchThemeIds } from './themes.js';
+import { launchThemeIds, rulesetForTheme } from './themes.js';
 import { FORMATIONS } from './formations.js';
 import { rarityForTile, RARITIES } from './rarity.js';
 import { BOOSTER_IDS } from './boosters.js';
@@ -10,16 +10,23 @@ import { createRanking, normalizeRanking, advanceRanking, LEAGUES } from './lead
 import { DUEL_COIN_REWARDS, STARTER_BOOSTERS, STARTER_BOOSTER_VERSION, SHOP_CURRENCY_PACKS, emptyCurrencies, normalizeCurrencies, addCurrencies, buyBoosterPack } from './economy.js';
 import { createDailyQuestState, normalizeDailyQuests, ensureDailyQuests, applyDailyQuestEvent, recordDailyQuestGameplay } from './daily-quests.js';
 import { PAIRS_PER_DUEL } from './game-balance.js';
+import { unlockedFrameIds, legacyUnlockedFrameIds } from './avatar-frames.js';
 
 export const PROGRESSION_VERSION = 1;
 export const PROGRESSION_STORAGE_KEY = 'porcelain:progression';
+export const ACHIEVEMENT_MIGRATION_BACKUP_KEY = 'porcelain:backup:before-achievement-v3';
+export const THEME_EDITION_MIGRATION_BACKUP_KEY = 'porcelain:backup:before-fixed-theme-editions';
+export const AP_REBALANCE_BACKUP_KEY = 'porcelain:backup:before-round-achievement-points-v4';
+export const AP_PACING_BACKUP_KEY = 'porcelain:backup:before-achievement-pacing-v5';
 const record = value => value && typeof value === 'object' && !Array.isArray(value);
 const safeCount = value => Number.isSafeInteger(value) && value >= 0;
 const formations = new Set(FORMATIONS.map(item => item.id));
 const rulesets = new Set(['eastern', 'western']);
 const rarityIds = new Set(RARITIES.map(item => item.id));
-const launchFaces = new Map(launchThemeIds.flatMap(themeId => Object.entries(themeTileSets[themeId]).flatMap(([rulesetId, tiles]) =>
-  tiles.map(tile => [tile.matchKey, { ...tile, themeId, rulesetId, rarityId: rarityForTile(themeId, rulesetId, tile.id).id }]))));
+const launchFaces = new Map(launchThemeIds.flatMap(themeId => {
+  const rulesetId = rulesetForTheme(themeId);
+  return themeTileSets[themeId][rulesetId].map(tile => [tile.matchKey, { ...tile, themeId, rulesetId, rarityId: rarityForTile(themeId, rulesetId, tile.id).id }]);
+}));
 const collectionCounterKeys = ['distinctCollectedMatchKeys', 'maxCollectionCountForOneMatchKey', 'distinctCollectedRarityIds', ...launchThemeIds.map(id => `distinctCollectedMatchKeysByTheme.${id}`)];
 const backfillIds = ACHIEVEMENTS.filter(item => collectionCounterKeys.includes(item.counterKey)).map(item => item.id);
 const maximaKeys = new Set(['bestPairChain', 'maxRememberedPairsInDuel', 'maxFullyCollectedFaceKeysInDuel', 'maxDistinctMatchedFaceKeysInDuel']);
@@ -41,8 +48,8 @@ function grantStarterBoosters(state, now) {
 }
 export function createProgression({ collection = createCollection(), seed = freshSeed() } = {}) {
   const state = { version: PROGRESSION_VERSION, counters: Object.fromEntries(NUMERIC_COUNTER_KEYS.map(key => [key, 0])),
-    sets: Object.fromEntries(SET_COUNTER_KEYS.map(key => [key, []])), unlocked: {}, awardedPoints: {}, achievementRewardsVersion: ACHIEVEMENT_REWARDS_VERSION,
-    points: 0, wallet: emptyWallet(), currencies: emptyCurrencies(), purchaseReceipts: {}, quests: createDailyQuestState(),
+    sets: Object.fromEntries(SET_COUNTER_KEYS.map(key => [key, []])), unlocked: {}, awardedPoints: {}, achievementRewardsVersion: ACHIEVEMENT_REWARDS_VERSION, themeAchievementsVersion: THEME_ACHIEVEMENTS_VERSION,
+    points: 0, retainedAvatarFrameIds: [], wallet: emptyWallet(), currencies: emptyCurrencies(), purchaseReceipts: {}, quests: createDailyQuestState(),
     collection: normalizeCollection(collection), daily: createDailyState(), ranking: createRanking(seed),
     eventReceipts: {}, attemptCursors: {}, completedGameIds: [], pendingRankingPresentation: null, newAchievementIds: [] };
   return grantStarterBoosters(deriveCollectionCounters(state), Date.now());
@@ -53,15 +60,11 @@ function validSetValue(key, value) {
   if (key === 'distinctCollectedRarityIds') return rarityIds.has(value);
   if (key === 'distinctCompletedFormationIds') return formations.has(value);
   if (key === 'distinctCompletedRulesetIds') return rulesets.has(value);
+  if (key === 'distinctCompletedThemeIds') return launchThemeIds.includes(value);
+  if (key === 'distinctCompletedCulturalRegions') return ['east-asia', 'europe'].includes(value);
   if (key === 'distinctCompletedThemeRulesetCombinations') return launchThemeIds.some(id => [...rulesets].some(rule => value === `${id}:${rule}`));
   if (key === 'distinctLoginDayIds' || key === 'distinctDuelCompletionDayIds') return validDayId(value);
   return false;
-}
-function mergeCollection(authoritative, legacy) {
-  const first = normalizeCollection(authoritative), second = normalizeCollection(legacy);
-  const counts = { ...first.counts };
-  for (const [key, value] of Object.entries(second.counts)) counts[key] = Math.max(counts[key] ?? 0, value);
-  return normalizeCollection({ version: first.version, counts, receipts: { ...second.receipts, ...first.receipts } });
 }
 function deriveCollectionCounters(state) {
   const entries = Object.entries(state.collection.counts).filter(([key, count]) => count > 0 && launchFaces.has(key));
@@ -70,10 +73,17 @@ function deriveCollectionCounters(state) {
   for (const id of launchThemeIds) sets[`distinctCollectedMatchKeysByTheme.${id}`] = entries.filter(([key]) => launchFaces.get(key).themeId === id).map(([key]) => key);
   return { ...state, sets, counters: { ...state.counters, maxCollectionCountForOneMatchKey: Math.max(0, ...entries.map(([, count]) => count)) } };
 }
+function deriveThemedCompletionCounters(state) {
+  // Theme identity, not the old manually selected edition, defines a destination.
+  const themes = [...new Set(state.sets.distinctCompletedThemeRulesetCombinations.map(value => value.split(':')[0]))];
+  return { ...state, sets: { ...state.sets, distinctCompletedThemeIds: themes,
+    distinctCompletedCulturalRegions: [...new Set(themes.map(id => rulesetForTheme(id) === 'eastern' ? 'east-asia' : 'europe'))] } };
+}
 function awardAchievements(state, now, allowedIds) {
   const evaluated = evaluateAchievements(state, now, allowedIds);
-  return { ...state, unlocked: evaluated.unlocked, awardedPoints: evaluated.awardedPoints, achievementRewardsVersion: evaluated.achievementRewardsVersion, points: evaluated.points,
-    newAchievementIds: [...new Set([...state.newAchievementIds, ...evaluated.newlyUnlocked])] };
+  return { ...state, unlocked: evaluated.unlocked, awardedPoints: evaluated.awardedPoints, achievementRewardsVersion: evaluated.achievementRewardsVersion, themeAchievementsVersion: evaluated.themeAchievementsVersion, points: evaluated.points,
+    retainedAvatarFrameIds: unlockedFrameIds(evaluated.points, state.retainedAvatarFrameIds),
+    newAchievementIds: [...new Set([...state.newAchievementIds, ...evaluated.newlyUnlocked].map(activeAchievementIdFor).filter(id => id && Object.hasOwn(evaluated.unlocked, id)))] };
 }
 function normalizePresentation(value, completedGameIds) {
   if (!record(value) || !validEventId(value.gameId) || !completedGameIds.includes(value.gameId) || !['win', 'lose', 'tie'].includes(value.outcome) ||
@@ -82,16 +92,19 @@ function normalizePresentation(value, completedGameIds) {
   return { eventId: validEventId(value.eventId) ? value.eventId : `complete:${value.gameId}`, gameId: value.gameId, outcome: value.outcome,
     position: value.position, previousPosition: value.previousPosition, leagueId: value.leagueId, previousLeagueId: value.previousLeagueId,
     improved: value.position < value.previousPosition, promoted: value.leagueId !== value.previousLeagueId,
-    wins: safeCount(value.wins) ? value.wins : 0, newAchievementIds: [...new Set((Array.isArray(value.newAchievementIds) ? value.newAchievementIds : []).filter(isAchievementId))] };
+    wins: safeCount(value.wins) ? value.wins : 0, newAchievementIds: [...new Set((Array.isArray(value.newAchievementIds) ? value.newAchievementIds : []).map(activeAchievementIdFor).filter(Boolean))] };
 }
 export function normalizeProgression(value, { collection, now = Date.now(), cold = false } = {}) {
   const compatible = value?.version === PROGRESSION_VERSION;
-  let state = createProgression({ collection: mergeCollection(compatible ? value.collection : null, collection), seed: compatible && safeCount(value.ranking?.seed) ? value.ranking.seed : freshSeed() });
+  let state = createProgression({ collection: mergeCollections(compatible ? value.collection : null, collection), seed: compatible && safeCount(value.ranking?.seed) ? value.ranking.seed : freshSeed() });
   if (compatible) {
     for (const key of NUMERIC_COUNTER_KEYS) if (safeCount(value.counters?.[key])) state.counters[key] = value.counters[key];
     for (const key of SET_COUNTER_KEYS) state.sets[key] = [...new Set((Array.isArray(value.sets?.[key]) ? value.sets[key] : []).filter(item => validSetValue(key, item)))];
     state.unlocked = Object.fromEntries(Object.entries(record(value.unlocked) ? value.unlocked : {}).filter(([id, timestamp]) => isAchievementId(id) && validTimestamp(timestamp)));
     state.awardedPoints = record(value.awardedPoints) ? value.awardedPoints : {};
+    state.retainedAvatarFrameIds = unlockedFrameIds(0, value.retainedAvatarFrameIds);
+    state.achievementRewardsVersion = Number.isSafeInteger(value.achievementRewardsVersion) ? value.achievementRewardsVersion : 0;
+    state.themeAchievementsVersion = Number.isSafeInteger(value.themeAchievementsVersion) ? value.themeAchievementsVersion : 0;
     state.wallet = normalizeWallet(value.wallet);
     state.currencies = normalizeCurrencies(value.currencies);
     state.quests = normalizeDailyQuests(value.quests, { cold });
@@ -111,17 +124,55 @@ export function normalizeProgression(value, { collection, now = Date.now(), cold
     state.newAchievementIds = [...new Set((Array.isArray(value.newAchievementIds) ? value.newAchievementIds : []).filter(id => isAchievementId(id) && Object.hasOwn(state.unlocked, id)))];
     state.ranking = normalizeRanking(value.ranking, state.counters.completedWins, state.ranking.seed);
     state.pendingRankingPresentation = cold ? null : normalizePresentation(value.pendingRankingPresentation, state.completedGameIds);
+    if (state.achievementRewardsVersion < 5) {
+      // Grandfather frame rights from validated receipts before today's new
+      // achievements are evaluated. A cached points total is not proof of ownership.
+      const previousPoints = Object.keys(state.unlocked).reduce((sum, id) => sum + awardedAchievementPoints(id, state), 0);
+      state.retainedAvatarFrameIds = unlockedFrameIds(0, [...state.retainedAvatarFrameIds, ...legacyUnlockedFrameIds(previousPoints)]);
+    }
   }
-  state = grantStarterBoosters(deriveCollectionCounters(state), now);
+  state = grantStarterBoosters(deriveThemedCompletionCounters(deriveCollectionCounters(state)), now);
   state.quests = ensureDailyQuests(state.quests, now, state.ranking.seed);
   return awardAchievements(state, timestampOf(now), compatible ? undefined : backfillIds);
 }
 export function loadProgression({ collection, storage, now = Date.now() } = {}) {
-  let value, target = storage;
+  let value, raw, target = storage;
   try {
     target ??= globalThis.localStorage;
-    value = JSON.parse(target?.getItem(PROGRESSION_STORAGE_KEY) ?? 'null');
+    raw = target?.getItem(PROGRESSION_STORAGE_KEY);
+    value = JSON.parse(raw ?? 'null');
   } catch { /* Missing or blocked browser storage starts an honest local profile. */ }
+  // Keep one untouched envelope for manual rollback before first upgrading an
+  // established profile. A blocked/full store must not prevent loading the game.
+  const previousRewards = value?.achievementRewardsVersion ?? 0;
+  const established = Object.entries(record(value?.unlocked) ? value.unlocked : {}).some(([id, at]) => isAchievementId(id) && validTimestamp(at)) ||
+    NUMERIC_COUNTER_KEYS.some(key => safeCount(value?.counters?.[key]) && value.counters[key] > 0) ||
+    Object.values(record(value?.collection?.counts) ? value.collection.counts : {}).some(count => safeCount(count) && count > 0) ||
+    (Array.isArray(value?.daily?.loginDayIds) && value.daily.loginDayIds.some(validDayId)) ||
+    (Array.isArray(value?.sets?.distinctCompletedThemeRulesetCombinations) && value.sets.distinctCompletedThemeRulesetCombinations.some(item => validSetValue('distinctCompletedThemeRulesetCombinations', item)));
+  if (raw && value?.version === PROGRESSION_VERSION && Number.isSafeInteger(previousRewards) && previousRewards >= 0 && previousRewards <= 2 && established) {
+    try {
+      if (target?.getItem(ACHIEVEMENT_MIGRATION_BACKUP_KEY) == null) target?.setItem(ACHIEVEMENT_MIGRATION_BACKUP_KEY, raw);
+    } catch { /* The retained historical ledger still makes the migration safe. */ }
+  }
+  if (raw && value?.version === PROGRESSION_VERSION && established &&
+      (value.themeAchievementsVersion ?? 0) < THEME_ACHIEVEMENTS_VERSION) {
+    try {
+      if (target?.getItem(THEME_EDITION_MIGRATION_BACKUP_KEY) == null) target?.setItem(THEME_EDITION_MIGRATION_BACKUP_KEY, raw);
+    } catch { /* Existing receipt and collection history is retained in the save. */ }
+  }
+  if (raw && value?.version === PROGRESSION_VERSION && established &&
+      Number.isSafeInteger(previousRewards) && previousRewards >= 0 && previousRewards < 4) {
+    try {
+      if (target?.getItem(AP_REBALANCE_BACKUP_KEY) == null) target?.setItem(AP_REBALANCE_BACKUP_KEY, raw);
+    } catch { /* Original awarded amounts are also preserved by the active ledger. */ }
+  }
+  if (raw && value?.version === PROGRESSION_VERSION && established &&
+      Number.isSafeInteger(previousRewards) && previousRewards >= 0 && previousRewards < 5) {
+    try {
+      if (target?.getItem(AP_PACING_BACKUP_KEY) == null) target?.setItem(AP_PACING_BACKUP_KEY, raw);
+    } catch { /* Original AP and earned frame entitlements remain in the active save. */ }
+  }
   // Recover the existing binder even when the separate progression JSON is damaged.
   collection ??= loadCollection(target);
   return normalizeProgression(value, { collection, now, cold: true });
@@ -137,7 +188,7 @@ export function saveProgression(state, storage) {
     return true;
   } catch { return false; }
 }
-function validContext(event) { return validEventId(event.gameId) && launchThemeIds.includes(event.themeId) && rulesets.has(event.rulesetId) && formations.has(event.formationId); }
+function validContext(event) { return validEventId(event.gameId) && launchThemeIds.includes(event.themeId) && event.rulesetId === rulesetForTheme(event.themeId) && formations.has(event.formationId); }
 function validPairs(value) { return record(value) && ['you', 'ai'].every(actor => safeCount(value[actor]) && value[actor] <= PAIRS_PER_DUEL) && value.you + value.ai <= PAIRS_PER_DUEL; }
 function countersValid(values, allowed) { return values == null || record(values) && Object.entries(values).every(([key, value]) => allowed.has(key) && safeCount(value)); }
 function receipt(state, event, now) { return { ...state, eventReceipts: { ...state.eventReceipts, [event.eventId]: now } }; }
@@ -227,9 +278,9 @@ export function reduceProgression(state, event) {
       distinctCompletedRulesetIds: unique(state.sets.distinctCompletedRulesetIds, event.rulesetId),
       distinctCompletedThemeRulesetCombinations: unique(state.sets.distinctCompletedThemeRulesetCombinations, `${event.themeId}:${event.rulesetId}`),
       distinctDuelCompletionDayIds: unique(state.sets.distinctDuelCompletionDayIds, dayIdFor(now)) };
-    let next = awardAchievements(receipt({ ...state, counters, sets, completedGameIds: [...state.completedGameIds, event.gameId],
+    let next = awardAchievements(deriveThemedCompletionCounters(receipt({ ...state, counters, sets, completedGameIds: [...state.completedGameIds, event.gameId],
       currencies: addCurrencies(state.currencies, { coins: DUEL_COIN_REWARDS[outcome], gems: 0 }),
-      quests: recordDailyQuestGameplay(state.quests, event, state.ranking.seed) }, event, now), now);
+      quests: recordDailyQuestGameplay(state.quests, event, state.ranking.seed) }, event, now)), now);
     const ranking = advanceRanking(state.ranking, { outcome, wins: counters.completedWins, eventId: event.eventId, gameId: event.gameId, newAchievementIds: next.newAchievementIds });
     return { ...next, ranking: ranking.ranking, pendingRankingPresentation: ranking.presentation };
   }

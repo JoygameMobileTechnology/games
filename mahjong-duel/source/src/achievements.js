@@ -904,7 +904,8 @@ const LEGACY_ACHIEVEMENTS = Object.freeze([
     "points": 25
   }
 ].map(Object.freeze));
-export const ACHIEVEMENT_REWARDS_VERSION = 2;
+export const ACHIEVEMENT_REWARDS_VERSION = 5;
+export const THEME_ACHIEVEMENTS_VERSION = 1;
 export const MILESTONE_REWARD_SCHEDULE = Object.freeze([5, 10, 15, 25, 40, 60, 85, 115, 150, 200]);
 export const LEGACY_ACHIEVEMENT_POINTS = Object.freeze(Object.fromEntries(LEGACY_ACHIEVEMENTS.map(item => [item.id, item.points])));
 const nextRewards = new Map();
@@ -919,18 +920,99 @@ for (const key of new Set(LEGACY_ACHIEVEMENTS.map(item => item.counterKey))) {
 }
 const winningPairOrdinal = `${PAIRS_TO_WIN}${PAIRS_TO_WIN % 100 >= 11 && PAIRS_TO_WIN % 100 <= 13 ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' }[PAIRS_TO_WIN % 10] ?? 'th')}`;
 // Current copy follows the trial board size; saved IDs and earned point receipts remain unchanged.
-export const ACHIEVEMENTS = Object.freeze(LEGACY_ACHIEVEMENTS.map(item => Object.freeze({ ...item,
+export const PREVIOUS_ACHIEVEMENTS = Object.freeze(LEGACY_ACHIEVEMENTS.map(item => Object.freeze({ ...item,
   description: item.description.replaceAll('all 40 pairs', `all ${PAIRS_PER_DUEL} pairs`)
     .replaceAll('21st pair', `${winningPairOrdinal} pair`).replaceAll('exactly 19', `exactly ${PAIRS_PER_DUEL - PAIRS_TO_WIN}`),
   points: nextRewards.get(item.id),
 })));
+// Keep the v3 receipt ceiling even when a new reward is lower (165 becomes 150).
+// Historical payouts, including partial family-budget payouts, are never repriced.
+export const PREVIOUS_FOUR_LEVEL_POINTS = Object.freeze(Object.fromEntries(
+  [...Array(4).fill([5, 35, 165, 500]), ...Array(2).fill([5, 10, 25, 55])]
+    .flat().map((points, index) => [`M${String(index + 1).padStart(3, '0')}`, points])));
+
+// Every milestone advances by one equally sized AP step. Requirements still
+// become steeper, but no final reward dwarfs the earlier levels or one-time feats.
+export const MILESTONE_POINT_STEPS = Object.freeze([50, 100, 150, 200]);
+export const FOUR_LEVEL_TRACKS = Object.freeze([
+  ['completedDuels', [1, 10, 35, 100], n => `Complete ${n.toLocaleString('en-US')} ${n === 1 ? 'Duel' : 'Duels'}`, n => `Complete ${n.toLocaleString('en-US')} ${n === 1 ? 'duel' : 'duels'} by clearing all ${PAIRS_PER_DUEL} pairs; wins, losses and draws count.`],
+  ['completedWins', [1, 5, 20, 60], n => `Win ${n} ${n === 1 ? 'Duel' : 'Duels'}`, n => `Win ${n} completed ${n === 1 ? 'duel' : 'duels'}; abandoned boards do not count.`],
+  ['personalPairs', [10, 150, 600, 1800], n => `Match ${n.toLocaleString('en-US')} Pairs`, n => `Personally match ${n.toLocaleString('en-US')} pairs across all duels, including pairs matched before leaving.`],
+  ['bestPairChain', [2, 4, 7, 12], n => `Match ${n} Consecutive Pairs`, n => `Match ${n} consecutive pairs without a local mismatch in one duel; boosters do not break the chain.`],
+  ['distinctCollectedMatchKeys', [10, 35, 80, 160], n => `Picture Collection ${n}`, n => `Discover ${n} different tile pictures across the four launch collections.`],
+  ['distinctLoginDayIds', [1, 7, 21, 60], n => `Visit on ${n} ${n === 1 ? 'Day' : 'Days'}`, n => `Visit on ${n} ${n === 1 ? 'UTC day' : 'different UTC days'}; missed days do not erase progress.`],
+].map(([counterKey, targets, name, description], group) => Object.freeze({ counterKey,
+  milestones: Object.freeze(targets.map((target, index) => Object.freeze({
+    id: `M${String(group * 4 + index + 1).padStart(3, '0')}`, counterKey, target, points: MILESTONE_POINT_STEPS[index],
+    category: PREVIOUS_ACHIEVEMENTS.find(item => item.counterKey === counterKey).category, name: name(target), description: description(target),
+  }))),
+})));
+const resizedTracks = new Map(FOUR_LEVEL_TRACKS.map(track => [track.counterKey, track]));
+// Stable IDs retain old reward receipts while the goals follow the four themes.
+const themeAchievementUpdates = {
+  A088: { name: 'Across Continents', counterKey: 'distinctCompletedCulturalRegions', target: 2,
+    description: 'Complete a duel in Ming Porcelain or Dancheong, and a duel in Stained Glass or Dutch Golden Age.' },
+  A099: { name: 'Grand Tour: Two Themes', counterKey: 'distinctCompletedThemeIds', target: 2,
+    description: 'Complete duels in 2 different tile themes; wins, losses and draws count.' },
+  A100: { name: 'Grand Tour: Four Themes', counterKey: 'distinctCompletedThemeIds', target: 4,
+    description: 'Complete duels in all 4 tile themes: Ming Porcelain, Dancheong, Stained Glass and Dutch Golden Age.' },
+};
+// Collection goals also migrate silently because archived counterpart copies
+// can combine into an already-earned picture count.
+const themeTransitionIds = new Set(['A081', 'A082', 'A083', 'A084', 'A088', 'A089', 'A090', 'A099', 'A100', 'M017', 'M018', 'M019', 'M020']);
+// The brief v4 round-reward release is still a valid source of saved receipts.
+const roundRewards = new Map();
+for (const key of new Set(PREVIOUS_ACHIEVEMENTS.map(item => item.counterKey))) {
+  let previous = 0;
+  for (const item of PREVIOUS_ACHIEVEMENTS.filter(item => item.counterKey === key).sort((a, b) => a.target - b.target)) {
+    const points = item.id === 'A042' ? 50 : Math.max(Math.ceil(item.points / 10) * 10, previous + 10);
+    roundRewards.set(item.id, points);
+    previous = points;
+  }
+}
+export const V4_ACHIEVEMENT_POINTS = Object.freeze(Object.fromEntries([
+  ...PREVIOUS_ACHIEVEMENTS.filter(item => !resizedTracks.has(item.counterKey)).map(item => [item.id, roundRewards.get(item.id)]),
+  ...[...Array(4).fill([10, 40, 150, 500]), ...Array(2).fill([10, 20, 40, 80])]
+    .flat().map((points, index) => [`M${String(index + 1).padStart(3, '0')}`, points]),
+]));
+
+// One-time achievements are priced by their actual condition: introductory
+// actions 50, sustained/skillful actions 100, difficult feats 150, perfect win 200.
+export const SINGLE_ACHIEVEMENT_POINTS = Object.freeze({
+  A041: 50, A042: 200, A043: 100, A044: 150, A045: 100, A046: 100, A047: 50, A048: 50, A049: 150, A050: 150,
+  A062: 50, A063: 100, A068: 50, A069: 100, A070: 50, A071: 100, A072: 50, A073: 100, A074: 50, A075: 100,
+  A081: 100, A082: 100, A083: 100, A084: 100, A088: 150, A089: 100, A090: 50,
+});
+const balancedRewards = new Map();
+for (const key of new Set(PREVIOUS_ACHIEVEMENTS.map(item => item.counterKey))) {
+  if (resizedTracks.has(key)) continue;
+  const levels = PREVIOUS_ACHIEVEMENTS.filter(item => item.counterKey === key).sort((a, b) => a.target - b.target);
+  levels.forEach((item, index) => balancedRewards.set(item.id,
+    levels.length === 1 ? SINGLE_ACHIEVEMENT_POINTS[item.id] : MILESTONE_POINT_STEPS[index]));
+}
+export const ACHIEVEMENTS = Object.freeze(PREVIOUS_ACHIEVEMENTS.flatMap(item => {
+  const track = resizedTracks.get(item.counterKey);
+  if (!track) return [Object.freeze({ ...item, points: balancedRewards.get(item.id), description: item.description.replace(' across both editions', ''), ...themeAchievementUpdates[item.id] })];
+  return PREVIOUS_ACHIEVEMENTS.find(previous => previous.counterKey === item.counterKey).id === item.id ? track.milestones : [];
+}));
 export const ACHIEVEMENT_POINTS_MAX = ACHIEVEMENTS.reduce((sum, item) => sum + item.points, 0);
-export const achievementById = Object.freeze(Object.assign(Object.create(null), Object.fromEntries(ACHIEVEMENTS.map(item => [item.id, item]))));
+// Archived IDs remain readable for timestamp/AP receipts and old notification
+// batches. Only ACHIEVEMENTS is evaluated or presented as the active catalogue.
+export const achievementById = Object.freeze(Object.assign(Object.create(null), Object.fromEntries([...PREVIOUS_ACHIEVEMENTS, ...ACHIEVEMENTS].map(item => [item.id, item]))));
 export const isAchievementId = id => typeof id === 'string' && Object.hasOwn(achievementById, id);
 export const ACHIEVEMENT_CATEGORIES = Object.freeze([...new Set(ACHIEVEMENTS.map(item => item.category))]);
-export const COUNTER_KEYS = Object.freeze([...new Set(ACHIEVEMENTS.map(item => item.counterKey))]);
+// Keep the archived edition sets readable as evidence for themed history.
+export const COUNTER_KEYS = Object.freeze([...new Set([...ACHIEVEMENTS.map(item => item.counterKey), 'distinctCompletedRulesetIds', 'distinctCompletedThemeRulesetCombinations'])]);
 export const SET_COUNTER_KEYS = Object.freeze(COUNTER_KEYS.filter(key => key.startsWith('distinct')));
 export const NUMERIC_COUNTER_KEYS = Object.freeze(COUNTER_KEYS.filter(key => !key.startsWith('distinct')));
+
+export function activeAchievementIdFor(id) {
+  if (!isAchievementId(id)) return null;
+  const definition = achievementById[id];
+  const track = resizedTracks.get(definition.counterKey);
+  if (!track || track.milestones.some(item => item.id === id)) return id;
+  return track.milestones.filter(item => item.target <= definition.target).at(-1)?.id ?? track.milestones[0].id;
+}
 
 export function getCounter(state, key) {
   if (!COUNTER_KEYS.includes(key)) return 0;
@@ -949,12 +1031,22 @@ export function achievementProgress(achievement, state) {
     unlocked, unlockedAt: unlocked ? state.unlocked[definition.id] : null };
 }
 
-/** An unlocked ID without a receipt predates tiered rewards. Never reprice it. */
+/** Original receipts retain their AP; converted goals may have explicit zero receipts. */
 export function awardedAchievementPoints(id, state) {
   if (!isAchievementId(id) || !Object.hasOwn(state?.unlocked ?? {}, id)) return 0;
   const amount = Object.hasOwn(state?.awardedPoints ?? {}, id) ? state.awardedPoints[id] : undefined;
-  return amount === LEGACY_ACHIEVEMENT_POINTS[id] || amount === achievementById[id].points
+  if (id.startsWith('M') || themeTransitionIds.has(id) && amount === 0) {
+    // Zero is a migration receipt; partial payouts are valid historical v3 AP.
+    const ceiling = Math.max(achievementById[id].points, PREVIOUS_FOUR_LEVEL_POINTS[id] ?? 0, V4_ACHIEVEMENT_POINTS[id] ?? 0);
+    return Number.isSafeInteger(amount) && amount >= 0 && amount <= ceiling ? amount : 0;
+  }
+  return Number.isSafeInteger(amount) && (amount === LEGACY_ACHIEVEMENT_POINTS[id] || amount === nextRewards.get(id) || amount === V4_ACHIEVEMENT_POINTS[id] || amount === achievementById[id].points)
     ? amount : LEGACY_ACHIEVEMENT_POINTS[id];
+}
+
+export function earnedPointsForCounter(counterKey, state) {
+  return Object.keys(state?.unlocked ?? {}).filter(id => isAchievementId(id) && achievementById[id].counterKey === counterKey)
+    .reduce((sum, id) => sum + awardedAchievementPoints(id, state), 0);
 }
 
 export function evaluateAchievements(state, now = Date.now(), allowedIds) {
@@ -963,13 +1055,40 @@ export function evaluateAchievements(state, now = Date.now(), allowedIds) {
   const awardedPoints = Object.fromEntries(Object.keys(unlocked).map(id => [id, awardedAchievementPoints(id, state)]));
   const newlyUnlocked = [];
   const allowed = allowedIds && new Set(allowedIds);
+  for (const track of FOUR_LEVEL_TRACKS) {
+    const historical = PREVIOUS_ACHIEVEMENTS.filter(item => item.counterKey === track.counterKey && Object.hasOwn(unlocked, item.id));
+    // The persisted reward version makes retries idempotent. The second check
+    // recovers a historical-only family after an older client has saved it.
+    if (state.achievementRewardsVersion < 3 || state.achievementRewardsVersion == null ||
+        historical.length > 0 && !track.milestones.some(item => Object.hasOwn(unlocked, item.id))) {
+      const attained = Math.max(getCounter(state, track.counterKey), ...historical.map(item => item.target));
+      for (const item of track.milestones) {
+        if (attained < item.target || Object.hasOwn(unlocked, item.id)) continue;
+        const evidence = historical.filter(previous => previous.target >= item.target).map(previous => unlocked[previous.id]);
+        unlocked[item.id] = evidence.length ? Math.min(...evidence) : now;
+        awardedPoints[item.id] = 0;
+      }
+    }
+  }
+  // Import already attained replacement goals silently. Existing IDs, timestamps
+  // and AP stay untouched; new copies of historical progress never pay twice.
+  if ((state.themeAchievementsVersion ?? 0) < THEME_ACHIEVEMENTS_VERSION) {
+    for (const definition of ACHIEVEMENTS.filter(item => themeTransitionIds.has(item.id))) {
+      if (!Object.hasOwn(unlocked, definition.id) && getCounter(state, definition.counterKey) >= definition.target) {
+        unlocked[definition.id] = now;
+        awardedPoints[definition.id] = 0;
+      }
+    }
+  }
   for (const definition of ACHIEVEMENTS) {
     if ((!allowed || allowed.has(definition.id)) && !Object.hasOwn(unlocked, definition.id) && getCounter(state, definition.counterKey) >= definition.target) {
       unlocked[definition.id] = now;
+      // Every new unlock pays the advertised amount. Preserved old receipts
+      // must not shave a round future reward into a partial payout such as 490.
       awardedPoints[definition.id] = definition.points;
       newlyUnlocked.push(definition.id);
     }
   }
   const points = Object.values(awardedPoints).reduce((sum, amount) => sum + amount, 0);
-  return { unlocked, awardedPoints, achievementRewardsVersion: ACHIEVEMENT_REWARDS_VERSION, points, newlyUnlocked };
+  return { unlocked, awardedPoints, achievementRewardsVersion: ACHIEVEMENT_REWARDS_VERSION, themeAchievementsVersion: THEME_ACHIEVEMENTS_VERSION, points, newlyUnlocked };
 }

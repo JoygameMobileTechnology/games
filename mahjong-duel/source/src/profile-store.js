@@ -22,7 +22,7 @@ function cleanName(value) {
   return typeof value === 'string' ? value.normalize('NFKC').replace(/[\u0000-\u001f\u007f-\u009f\u200b\u202a-\u202e\u2066-\u2069\ufeff]/g, '').replace(/\s+/g, ' ').trim() : '';
 }
 
-export function profileError(value, achievementPoints) {
+export function profileError(value, achievementPoints, retainedFrameIds = []) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return 'Please choose your player details.';
   const name = cleanName(value.name);
   if (!name) return 'Enter a player name.';
@@ -30,12 +30,12 @@ export function profileError(value, achievementPoints) {
   if (!AVATAR_IDS.includes(value.avatarId)) return 'Choose one of the eight avatars.';
   if (value.countryCode !== '' && !countrySet.has(value.countryCode)) return 'Choose a country from the list.';
   if (value.frameId != null && value.frameId !== '' && !getAvatarFrame(value.frameId)) return 'Choose an available avatar frame.';
-  if (achievementPoints !== undefined && !isFrameUnlocked(value.frameId ?? '', achievementPoints)) return 'Earn more Achievement Points to unlock this frame.';
+  if (achievementPoints !== undefined && !isFrameUnlocked(value.frameId ?? '', achievementPoints, retainedFrameIds)) return 'Earn more Achievement Points to unlock this frame.';
   return '';
 }
 
 /** Pass earned points at the app/storage boundary to discard unavailable frames. */
-export function normalizeProfile(value, achievementPoints) {
+export function normalizeProfile(value, achievementPoints, retainedFrameIds = []) {
   const candidate = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
   const frameId = getAvatarFrame(candidate.frameId) ? candidate.frameId : '';
   return {
@@ -43,24 +43,24 @@ export function normalizeProfile(value, achievementPoints) {
     name: Array.from(cleanName(candidate.name)).slice(0, 16).join('') || DEFAULT_PROFILE.name,
     avatarId: AVATAR_IDS.includes(candidate.avatarId) ? candidate.avatarId : DEFAULT_PROFILE.avatarId,
     countryCode: countrySet.has(candidate.countryCode) ? candidate.countryCode : '',
-    frameId: achievementPoints === undefined ? frameId : resolveFrameId(frameId, achievementPoints),
+    frameId: achievementPoints === undefined ? frameId : resolveFrameId(frameId, achievementPoints, retainedFrameIds),
   };
 }
 
-export function loadProfile(storage, achievementPoints = 0) {
+export function loadProfile(storage, achievementPoints = 0, retainedFrameIds = []) {
   try {
     const raw = JSON.parse((storage ?? globalThis.localStorage)?.getItem(PROFILE_STORAGE_KEY) ?? 'null');
-    return raw?.version === 1 ? normalizeProfile(raw, achievementPoints) : { ...DEFAULT_PROFILE };
+    return raw?.version === 1 ? normalizeProfile(raw, achievementPoints, retainedFrameIds) : { ...DEFAULT_PROFILE };
   } catch { return { ...DEFAULT_PROFILE }; }
 }
 
 /** Returns false if validation or browser persistence fails. Never clears other keys. */
-export function saveProfile(value, storage, achievementPoints = 0) {
-  if (profileError(value, achievementPoints)) return false;
+export function saveProfile(value, storage, achievementPoints = 0, retainedFrameIds = []) {
+  if (profileError(value, achievementPoints, retainedFrameIds)) return false;
   try {
     const target = storage ?? globalThis.localStorage;
     if (!target) return false;
-    target.setItem(PROFILE_STORAGE_KEY, JSON.stringify(normalizeProfile(value, achievementPoints)));
+    target.setItem(PROFILE_STORAGE_KEY, JSON.stringify(normalizeProfile(value, achievementPoints, retainedFrameIds)));
     return true;
   } catch { return false; }
 }

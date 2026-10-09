@@ -1,6 +1,6 @@
 import React, { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { BookOpen, CaretDown, CaretLeft, CaretRight, CheckCircle, LockKey } from '@phosphor-icons/react';
-import { themes, themeById, defaultTheme } from './themes.js';
+import { themes, themeById, defaultTheme, rulesetForTheme } from './themes.js';
 import { themeTileSets } from './tile-data.js';
 import { RARITIES, rarityForTile } from './rarity.js';
 import { collectionCount, collectionStats } from './collection.js';
@@ -43,7 +43,7 @@ function RarityMark({ rarity }) {
 }
 function TileDetails({ tile, theme, ruleset, previous, next, onMove }) {
   return <article className="collection-detail" style={rarityStyle(tile.rarity)} aria-label={`${tile.name} details`}>
-    <p className="collection-detail-context">{theme.name} <span aria-hidden="true">·</span> {ruleset === 'eastern' ? 'Eastern' : 'Western'}</p>
+    <p className="collection-detail-context">{theme.name}</p>
     <div className="collection-detail-art"><span className="collection-detail-tile"><img src={tile.src} alt={tile.name} draggable="false" /><TileRarity rarity={tile.rarity} /></span></div>
     <div className="collection-detail-copy"><h3 aria-live="polite">{tile.name}</h3><span className="collection-detail-rarity"><RarityMark rarity={tile.rarity} />{tile.rarity.label}</span></div>
     <div className="collection-detail-status"><span><CheckCircle size={22} weight="duotone" aria-hidden="true" />Collected</span><span>Matched {tile.count.toLocaleString()} {tile.count === 1 ? 'time' : 'times'}</span></div>
@@ -53,9 +53,9 @@ function TileDetails({ tile, theme, ruleset, previous, next, onMove }) {
 }
 
 /** Full-screen collection; awards and persistence remain owned by the game. */
-export function TileBinder({ collection, initialTheme = defaultTheme.id, initialRuleset = 'eastern', onClose }) {
+export function TileBinder({ collection, initialTheme = defaultTheme.id, onClose }) {
   const [themeId, setThemeId] = useState(() => themeById[initialTheme] ? initialTheme : defaultTheme.id);
-  const ruleset = initialRuleset === 'western' ? 'western' : 'eastern';
+  const ruleset = rulesetForTheme(themeId);
   const [tier, setTier] = useState('all');
   const [selectedKey, setSelectedKey] = useState(null);
   const [wide, setWide] = useState(() => window.matchMedia(SPLIT_VIEW).matches);
@@ -67,7 +67,7 @@ export function TileBinder({ collection, initialTheme = defaultTheme.id, initial
   const cards = useMemo(() => themeTileSets[themeId][ruleset].map(tile => ({
     ...tile, rarity: rarityForTile(themeId, ruleset, tile.id), count: collectionCount(collection, tile.matchKey),
   })).sort((first, second) => second.rarity.order - first.rarity.order || first.id.localeCompare(second.id)), [collection, themeId, ruleset]);
-  const nextTheme = getThemeUnlocks(collection, ruleset).find(state => state.nextToUnlock);
+  const nextTheme = getThemeUnlocks(collection).find(state => state.nextToUnlock);
   const unlockProgress = getThemeProgress(nextTheme);
   const collectionGoals = nextTheme?.requirements.filter(goal => goal.themeId === themeId) ?? [];
   const visible = cards.filter(tile => tier === 'all' || tile.rarity.id === tier);
@@ -113,7 +113,7 @@ export function TileBinder({ collection, initialTheme = defaultTheme.id, initial
         <div className="collection-controls">
           <label className="collection-theme-control" htmlFor={`${id}-theme`}><img src={themeTileSets[themeId][ruleset][0].src} alt="" draggable="false" /><select id={`${id}-theme`} aria-label="Collection theme" value={themeId} onChange={event => { reset(); setThemeId(event.target.value); }}>{themes.map(value => <option key={value.id} value={value.id}>{value.name}</option>)}</select><CaretDown size={20} weight="bold" aria-hidden="true" /></label>
         </div>
-        <div className="collection-progress"><div className="collection-progress-copy"><strong>{pageStats.unique} / {pageStats.totalTiles} collected</strong><span>{ruleset === 'eastern' ? 'Eastern' : 'Western'} · {Math.round(pageStats.unique / pageStats.totalTiles * 100)}%</span></div><progress aria-label={`${theme.name} ${ruleset} collection`} value={pageStats.unique} max={pageStats.totalTiles} /></div>
+        <div className="collection-progress"><div className="collection-progress-copy"><strong>{pageStats.unique} / {pageStats.totalTiles} collected</strong><span>{Math.round(pageStats.unique / pageStats.totalTiles * 100)}%</span></div><progress aria-label={`${theme.name} ${ruleset} collection`} value={pageStats.unique} max={pageStats.totalTiles} /></div>
         {collectionGoals.length > 0 && <section className="collection-unlock-goal" aria-label="Next theme progress">
           <strong>Next: {themeById[nextTheme.themeId].name} <span>{unlockProgress.percent}%</span></strong>
           <progress value={unlockProgress.percent} max={100} aria-label={`${themeById[nextTheme.themeId].name} unlock progress`} />

@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { Check } from '@phosphor-icons/react';
-import { themes } from './themes.js';
+import { themes, rulesetForTheme } from './themes.js';
 import { themeTileSets } from './tile-data.js';
 import { boardVariants } from './board-variants.js';
 
-export function ThemeChooser({ themeId, boardThemeId, ruleset, onConfirm }) {
+export function ThemeChooser({ themeId, boardThemeId, onConfirm }) {
   const [tab, setTab] = useState('tiles');
   const [tileChoice, setTileChoice] = useState(themeId);
   const [boardChoice, setBoardChoice] = useState(boardThemeId);
@@ -16,7 +16,7 @@ export function ThemeChooser({ themeId, boardThemeId, ruleset, onConfirm }) {
     <div className={`collection-scroll ${tab === 'background' ? 'background-grid' : ''}`} role="tabpanel" aria-label={tab === 'tiles' ? 'Tile collections' : 'Board backgrounds'}>
       {themes.map(theme => tab === 'tiles' ? <button key={theme.id} className={`collection-row ${tileChoice === theme.id ? 'chosen' : ''}`} aria-pressed={tileChoice === theme.id} onClick={() => setTileChoice(theme.id)}>
         <strong>{theme.name}</strong>{tileChoice === theme.id && <Check className="collection-check" weight="bold" />}
-        <span className="collection-tiles"><img src={theme.back} alt={`${theme.name} tile back`} />{themeTileSets[theme.id][ruleset].filter((_, i) => [0, 6, 12, 22, 32].includes(i)).map(face => <img key={face.id} src={face.src} alt={face.name} />)}</span>
+        <span className="collection-tiles"><img src={theme.back} alt={`${theme.name} tile back`} />{themeTileSets[theme.id][rulesetForTheme(theme.id)].filter((_, i) => [0, 6, 12, 22, 32].includes(i)).map(face => <img key={face.id} src={face.src} alt={face.name} />)}</span>
       </button> : <button key={theme.id} className={`background-swatch ${boardChoice === theme.id ? 'chosen' : ''}`} aria-pressed={boardChoice === theme.id} onClick={() => setBoardChoice(theme.id)}>
         <img src={boardVariants[theme.id].portrait.src} alt="" /><strong>{theme.name}</strong>{boardChoice === theme.id && <Check weight="bold" />}
       </button>)}

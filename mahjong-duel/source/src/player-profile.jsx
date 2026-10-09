@@ -53,8 +53,8 @@ export function PlayerAvatar({ profile, size = 64, showFlag = true, className = 
 }
 
 /** Render inside the parent's Sheet. The parent owns persistence and dismissal. */
-export function ProfileEditor({ profile, achievementPoints = 0, onSave }) {
-  const [draft, setDraft] = useState(() => normalizeProfile(profile, achievementPoints));
+export function ProfileEditor({ profile, achievementPoints = 0, retainedFrameIds = [], onSave }) {
+  const [draft, setDraft] = useState(() => normalizeProfile(profile, achievementPoints, retainedFrameIds));
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const id = useId();
@@ -64,11 +64,11 @@ export function ProfileEditor({ profile, achievementPoints = 0, onSave }) {
   async function submit(event) {
     event.preventDefault();
     if (saving) return;
-    const problem = profileError(draft, achievementPoints);
+    const problem = profileError(draft, achievementPoints, retainedFrameIds);
     if (problem) { setError(problem); return; }
     setSaving(true);
     try {
-      if (typeof onSave !== 'function' || await onSave(normalizeProfile(draft, achievementPoints)) === false) setError('Your profile could not be saved. Please try again.');
+      if (typeof onSave !== 'function' || await onSave(normalizeProfile(draft, achievementPoints, retainedFrameIds)) === false) setError('Your profile could not be saved. Please try again.');
     } catch { setError('Your profile could not be saved. Please try again.'); }
     finally { setSaving(false); }
   }
@@ -81,7 +81,7 @@ export function ProfileEditor({ profile, achievementPoints = 0, onSave }) {
     <fieldset className="profile-avatar-field"><legend>Choose your avatar</legend><div className="profile-avatar-grid">{AVATAR_IDS.map((avatarId, index) => <button key={avatarId} type="button" className={`profile-avatar-option ${draft.avatarId === avatarId ? 'is-selected' : ''}`} aria-label={`Avatar ${index + 1}: ${avatarDescriptions[index]}`} aria-pressed={draft.avatarId === avatarId} onClick={() => setField('avatarId', avatarId)}><PlayerAvatar profile={{ ...draft, avatarId, frameId: '' }} size={72} showFlag={false} />{draft.avatarId === avatarId && <span className="profile-avatar-check" aria-hidden="true">✓</span>}</button>)}</div></fieldset>
     <fieldset className="profile-frame-field"><legend>Avatar frame <span>{achievementPoints.toLocaleString()} AP earned</span></legend><p>Unlock frames with Achievement Points. Your points stay yours.</p><div className="profile-frame-grid">
       {[{ id: '', name: 'No frame', pointsRequired: 0 }, ...AVATAR_FRAMES].map(frame => {
-        const unlocked = isFrameUnlocked(frame.id, achievementPoints);
+        const unlocked = isFrameUnlocked(frame.id, achievementPoints, retainedFrameIds);
         const selected = draft.frameId === frame.id;
         return <button key={frame.id || 'none'} type="button" className={`profile-frame-option ${selected ? 'is-selected' : ''} ${unlocked ? '' : 'is-locked'}`} disabled={!unlocked} aria-label={`${frame.name}${unlocked ? selected ? ', equipped' : ', available' : `, unlock at ${frame.pointsRequired.toLocaleString()} Achievement Points`}`} aria-pressed={selected} onClick={() => setField('frameId', frame.id)}>
           <PlayerAvatar profile={{ ...draft, frameId: frame.id }} size={48} showFlag={false} /><strong>{frame.name}</strong><span>{selected ? 'Equipped' : unlocked ? 'Available' : `${frame.pointsRequired.toLocaleString()} AP`}</span>

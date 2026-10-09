@@ -14,14 +14,15 @@ const time = new Date('2026-09-30T12:00:00Z');
 (async () => {
   fs.mkdirSync(output, { recursive: true });
   const load = file => import(pathToFileURL(path.resolve('src', file)).href);
-  const [{ themes }, { themeTileSets }, { rarityForTile }, { createCollection }, { boardVariants }] = await Promise.all([
+  const [{ themes, rulesetForTheme }, { themeTileSets }, { rarityForTile }, { createCollection }, { boardVariants }] = await Promise.all([
     load('themes.js'), load('tile-data.js'), load('rarity.js'), load('collection.js'), load('board-variants.js'),
   ]);
   const browser = await require(process.env.PLAYWRIGHT_MODULE || 'playwright')[browserName].launch();
   const reports = [];
-  function collectionFor(edition, unlockedCount) {
+  function collectionFor(unlockedCount) {
     const collection = createCollection();
     const add = (themeId, rarities, required) => {
+      const edition = rulesetForTheme(themeId);
       for (const tile of themeTileSets[themeId][edition]) {
         if (rarities.includes(rarityForTile(themeId, edition, tile.id).id)) collection.counts[tile.matchKey] = required;
       }
@@ -100,8 +101,9 @@ const time = new Date('2026-09-30T12:00:00Z');
       await page.screenshot({ path: path.join(output, `${browserName}-${label}-${suffix}.jpg`), type: 'jpeg', quality: 80, animations: 'disabled' });
       return layout;
     };
-    const checkBoard = async (themeId, edition = 'eastern') => {
-      await advance(4000); await advance(1500);
+    const checkBoard = async themeId => {
+      const edition = rulesetForTheme(themeId);
+      await advance(4000); await advance(2500);
       await page.locator('.game-board').waitFor(); await advance(500);
       const result = await page.evaluate(() => ({
         theme: document.querySelector('.world').dataset.theme,
@@ -154,7 +156,8 @@ const time = new Date('2026-09-30T12:00:00Z');
         assert.equal(await page.locator('.theme-choice-play').count(), 0, 'locked requirements cannot start a duel');
         const expectedGoals = theme.id === 'dancheong' ? 2 : 4;
         assert.equal(await page.locator('.theme-unlock-goal').count(), expectedGoals);
-        assert.match(await page.locator('.theme-unlock-body').textContent(), /Eastern collection progress/);
+        assert.match(await page.locator('.theme-unlock-body').textContent(), /Collection progress/);
+        assert.doesNotMatch(await page.locator('.theme-unlock-body').textContent(), /Eastern|Western/);
         await tap(page.locator('.theme-unlock-goal > summary').first());
         assert.ok(await page.locator('.theme-unlock-goal[open] .theme-goal-tiles > li').count() > 0);
         if (theme.id === 'dancheong') await checkLayout('requirements', { footer: false });
@@ -204,21 +207,21 @@ const time = new Date('2026-09-30T12:00:00Z');
       assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('porcelain:theme'))), 'ming-porcelain');
       return { savedLockedPreferenceGuarded: true };
     });
-    for (const edition of ['eastern', 'western']) {
-      for (const unlocked of [2, 3, 4]) await run(`${edition}-unlocked-${unlocked}`, sizes[1], { collection: collectionFor(edition, unlocked), ruleset: edition }, async ({ page, tap, card, openSelection, checkUnlocked, checkBoard, restart, checkLayout }) => {
+    // Old saved preferences must not change the single collection path or deal.
+    for (const legacyPreference of ['eastern', 'western']) {
+      for (const unlocked of [2, 3, 4]) await run(`${legacyPreference}-preference-unlocked-${unlocked}`, sizes[1], { collection: collectionFor(unlocked), ruleset: legacyPreference }, async ({ page, tap, card, openSelection, checkUnlocked, checkBoard, restart, checkLayout }) => {
         await openSelection(); await checkUnlocked(unlocked);
         const themeId = themes[unlocked - 1].id;
         await tap(card(themeId));
         assert.equal(await card(themeId).getAttribute('aria-pressed'), 'true');
-        if (unlocked === 4) await checkLayout(`${edition}-all-unlocked`);
-        await tap('Play Duel'); await checkBoard(themeId, edition);
+        if (unlocked === 4) await checkLayout(`${legacyPreference}-all-unlocked`);
+        await tap('Play Duel'); await checkBoard(themeId);
         await restart(); await tap('Back to main menu'); await tap('Settings');
-        await tap(edition === 'eastern' ? 'Western' : 'Eastern'); await tap('Done');
-        await openSelection(); await checkUnlocked(1);
-        await tap(card('dancheong'));
-        assert.match(await page.locator('.theme-unlock-edition').textContent(), new RegExp(edition === 'eastern' ? 'Western' : 'Eastern'));
-        assert.match(await page.locator('.theme-unlock-total').textContent(), /^0\s*\//);
-        return { edition, unlocked, selectedTheme: themeId, oppositeEditionUnlocked: 1 };
+        assert.equal(await page.getByRole('group', { name: 'Ruleset', exact: true }).count(), 0, 'Settings no longer selects tile sets');
+        assert.equal(await page.getByRole('button', { name: /^(Eastern|Western)$/ }).count(), 0);
+        await tap('Done');
+        await openSelection(); await checkUnlocked(unlocked);
+        return { legacyPreference, edition: rulesetForTheme(themeId), unlocked, selectedTheme: themeId };
       });
     }
     fs.writeFileSync(path.join(output, `${browserName}-report.json`), JSON.stringify(reports, null, 2));

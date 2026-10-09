@@ -1,7 +1,7 @@
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { CaretDown, CaretRight, Check, DiceFive, LockKey } from '@phosphor-icons/react';
 import { ProgressionPage } from './progression-page.jsx';
-import { themeById } from './themes.js';
+import { themeById, rulesetForTheme } from './themes.js';
 import { themeTileSets } from './tile-data.js';
 import { boardVariants } from './board-variants.js';
 import { rarityById } from './rarity.js';
@@ -16,7 +16,8 @@ const SIGNATURES = {
 };
 const format = value => Number(value || 0).toLocaleString();
 
-export function ThemeArtwork({ theme, ruleset, surfaceSrc }) {
+export function ThemeArtwork({ theme, surfaceSrc }) {
+  const ruleset = rulesetForTheme(theme.id);
   const tile = themeTileSets[theme.id][ruleset].find(face => face.id === SIGNATURES[theme.id][ruleset]);
   return <span className="theme-choice-art" aria-hidden="true">
     <img className="theme-choice-surface" src={surfaceSrc || boardVariants[theme.id].portrait.src} alt="" draggable="false" />
@@ -24,7 +25,7 @@ export function ThemeArtwork({ theme, ruleset, surfaceSrc }) {
   </span>;
 }
 
-function UnlockGoals({ state, ruleset, prerequisite }) {
+function UnlockGoals({ state, prerequisite }) {
   const id = useId(), totals = getThemeProgress(state);
   const dependencies = [...new Set(state.requirements.map(goal => goal.themeId))];
   return <div className="theme-unlock-body">
@@ -32,7 +33,7 @@ function UnlockGoals({ state, ruleset, prerequisite }) {
       <span className="theme-unlock-seal" aria-hidden="true"><LockKey size={26} weight="duotone" /></span>
       <h3 id={`${id}-title`}>A new collection awaits</h3>
       <p>Collect in {dependencies.map(themeId => themeById[themeId].name).join(' and ')} to unlock {themeById[state.themeId].name}.</p>
-      <span className="theme-unlock-edition">{ruleset === 'western' ? 'Western' : 'Eastern'} collection progress</span>
+      <span className="theme-unlock-edition">Collection progress</span>
       {prerequisite && <p className="theme-unlock-prerequisite"><LockKey size={19} weight="fill" aria-hidden="true" /><span>Unlock <strong>{themeById[prerequisite.themeId].name}</strong> first, then complete these goals.</span></p>}
       <div className="theme-unlock-total"><strong>{format(totals.completedTypes)} / {format(totals.requiredTypes)} artworks ready <span>{totals.percent}%</span></strong><progress value={totals.percent} max={100} aria-label="Collection progress toward this theme" /><small>{format(totals.completedMatches)} / {format(totals.requiredMatches)} required matches collected</small></div>
       <p className="theme-unlock-help">Every matching pair adds one copy. Partial copies count toward the bar; extra copies of a ready artwork do not. Meet each goal below; your collection is never spent.</p>
@@ -57,9 +58,8 @@ function UnlockGoals({ state, ruleset, prerequisite }) {
 }
 
 /** Theme availability is derived from collected pairs; a locked card only opens its goals. */
-export function ThemeSelectPage({ collection, ruleset = 'eastern', initialTheme, initialScrollTop = 0, populationCounts = {}, onClose, onPlay }) {
-  const edition = ruleset === 'western' ? 'western' : 'eastern';
-  const unlocks = useMemo(() => getThemeUnlocks(collection, edition), [collection, edition]);
+export function ThemeSelectPage({ collection, initialTheme, initialScrollTop = 0, populationCounts = {}, onClose, onPlay }) {
+  const unlocks = useMemo(() => getThemeUnlocks(collection), [collection]);
   const [selection, setSelection] = useState(() => initialTheme === 'random' ? 'random' : unlocks.find(state => state.themeId === initialTheme && state.unlocked)?.themeId || unlocks.find(state => state.unlocked)?.themeId);
   const [inspectedId, setInspectedId] = useState(null);
   const scroller = useRef(null), scrollPosition = useRef(0), opener = useRef(null), restoreFocus = useRef(false);
@@ -83,9 +83,9 @@ export function ThemeSelectPage({ collection, ruleset = 'eastern', initialTheme,
     setInspectedId(state.themeId);
   };
   return <ProgressionPage title={inspected ? `Unlock ${themeById[inspected.themeId].name}` : 'Choose a theme'} className={`theme-select-page ${inspected ? 'is-viewing-goals' : ''}`} onClose={inspected ? closeDetails : onClose} closeLabel={inspected ? 'Back to theme selection' : 'Back to main menu'}>
-    {inspected ? <div className="theme-unlock-scroll"><UnlockGoals state={inspected} ruleset={edition} prerequisite={previousInspected && !previousInspected.unlocked ? previousInspected : null} /></div> : <>
+    {inspected ? <div className="theme-unlock-scroll"><UnlockGoals state={inspected} prerequisite={previousInspected && !previousInspected.unlocked ? previousInspected : null} /></div> : <>
       <div className="theme-choice-scroll" ref={scroller}>
-        <p className="theme-choice-edition">{edition === 'western' ? 'Western' : 'Eastern'} collection<span>Changed in Settings</span></p>
+        <p className="theme-choice-edition">Your collections<span>Collect tiles to unlock new themes</span></p>
         <button type="button" className={`theme-random-choice ${chosen === 'random' ? 'is-selected' : ''}`} aria-pressed={chosen === 'random'} onClick={() => setSelection('random')}>
           <span><strong>Random Match</strong><small>Unlocked themes only</small></span><span className="theme-random-dice" aria-hidden="true"><DiceFive size={41} weight="duotone" /><DiceFive size={33} weight="duotone" /></span>{chosen === 'random' ? <Check size={24} weight="bold" aria-hidden="true" /> : <CaretRight size={24} weight="bold" aria-hidden="true" />}
         </button>
@@ -93,7 +93,7 @@ export function ThemeSelectPage({ collection, ruleset = 'eastern', initialTheme,
           const theme = themeById[state.themeId], totals = getThemeProgress(state), selected = chosen === theme.id;
           const prerequisite = index > 0 && !unlocks[index - 1].unlocked ? unlocks[index - 1] : null;
           return <button type="button" className={`theme-choice-card ${state.unlocked ? 'is-unlocked' : 'is-locked'} ${selected ? 'is-selected' : ''}`} data-theme={theme.id} key={theme.id} aria-pressed={state.unlocked ? selected : undefined} aria-label={state.unlocked ? theme.name : `${theme.name}, locked. View unlock requirements`} onClick={event => choose(state, event)}>
-            <ThemeArtwork theme={theme} ruleset={edition} />
+            <ThemeArtwork theme={theme} />
             <span className="theme-choice-copy"><strong className="theme-choice-name">{theme.name}</strong><span className="theme-choice-population"><span aria-hidden="true" />Players online · {format(populationCounts[theme.id])}</span>
               {!state.unlocked && <span className="theme-choice-lock"><LockKey size={23} weight="fill" aria-hidden="true" /><span><strong>{prerequisite ? `Unlock ${themeById[prerequisite.themeId].name} first` : state.nextToUnlock ? 'Next to unlock' : 'Locked'}</strong><small>{totals.completedTypes} / {totals.requiredTypes} artworks ready · {totals.percent}%</small><progress value={totals.percent} max={100} aria-label={`${theme.name} unlock progress`} /></span></span>}
             </span>

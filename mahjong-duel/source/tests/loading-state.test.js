@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { themes } from '../src/themes.js';
+import { themes, rulesetForTheme } from '../src/themes.js';
 import { themeTileSets } from '../src/tile-data.js';
 import { chooseLoadingTheme, chooseLoadingTiles, takeLoadingTheme } from '../src/loading-state.js';
 
@@ -87,7 +87,7 @@ test('a browser that throws when accessing localStorage uses the safe fallback',
 
 test('loading artwork stays within its selected collection and never repeats an identity or image', () => {
   for (const theme of themes) {
-    const catalogue = themeTileSets[theme.id].western;
+    const catalogue = themeTileSets[theme.id][rulesetForTheme(theme.id)];
     const selection = chooseLoadingTiles(theme.id, undefined, () => .4);
     assert.equal(selection.length, 12);
     assert.equal(new Set(selection.map(tile => tile.id)).size, selection.length);
@@ -98,7 +98,7 @@ test('loading artwork stays within its selected collection and never repeats an 
 
 test('requesting more loading faces than available returns the collection once', () => {
   for (const theme of themes) {
-    const catalogue = themeTileSets[theme.id].western;
+    const catalogue = themeTileSets[theme.id][rulesetForTheme(theme.id)];
     assert.equal(catalogue.length, 40);
     const selection = chooseLoadingTiles(theme.id, 1000, () => .7);
     assert.equal(selection.length, catalogue.length);
@@ -110,7 +110,7 @@ test('requesting more loading faces than available returns the collection once',
 
 test('loading selection is shuffled without modifying catalogue order or tile records', () => {
   for (const theme of themes) {
-    const catalogue = themeTileSets[theme.id].western;
+    const catalogue = themeTileSets[theme.id][rulesetForTheme(theme.id)];
     const snapshot = structuredClone(catalogue);
     const first = chooseLoadingTiles(theme.id, 12, () => 0);
     const second = chooseLoadingTiles(theme.id, 12, () => 1 - Number.EPSILON);

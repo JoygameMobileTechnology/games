@@ -1,4 +1,4 @@
-import { ACHIEVEMENTS, achievementProgress, awardedAchievementPoints, getCounter, isAchievementId } from './achievements.js';
+import { ACHIEVEMENTS, activeAchievementIdFor, achievementById, achievementProgress, awardedAchievementPoints, earnedPointsForCounter, getCounter, isAchievementId } from './achievements.js';
 import { PAIRS_PER_DUEL } from './game-balance.js';
 
 export const ACHIEVEMENT_SHELVES = Object.freeze([
@@ -31,11 +31,11 @@ const familyDetails = [
   ['maxRememberedPairsInDuel', 'duel-recall', 'Attentive Eye', 'memory', 'fan', 'Remember more pairs within a single duel.'],
   ['matchesImmediatelyAfterOpponentMiss', 'opportunity', 'Ready Observer', 'memory', 'screen', 'Match immediately after your opponent makes a mismatch.'],
   ['matchesAfterOwnPreviousAttemptMissed', 'renewed-focus', 'Second Look', 'comebacks', 'reed', 'Find a pair after your previous attempt was a mismatch.'],
-  ['maxFullyCollectedFaceKeysInDuel', 'complete-pictures', 'Familiar Pictures', 'memory', 'cabinet', 'Collect both pairs of more different pictures in one duel.'],
+  ['maxFullyCollectedFaceKeysInDuel', 'complete-pictures', 'Familiar Pictures', 'memory', 'complete-pictures', 'Collect both pairs of more different pictures in one duel.'],
   ['pairsWithNeitherFacePreviouslyObserved', 'fresh-discovery', 'A Fresh Discovery', 'memory', 'flower'],
   ['maxDistinctMatchedFaceKeysInDuel', 'broad-attention', 'Broad Attention', 'memory', 'fan'],
-  ['delayedRecallPairs', 'lasting-recall', 'Lasting Recall', 'memory', 'heart', 'Remember pairs after at least three intervening attempts since each face was last seen.'],
-  ['successfullyFollowedHints', 'followed-hints', 'Guided Hand', 'boosters', 'compass', 'Follow a Hint by matching its exact highlighted pair on your next valid attempt.'],
+  ['delayedRecallPairs', 'lasting-recall', 'Lasting Recall', 'memory', 'lasting-recall', 'Remember pairs after at least three intervening attempts since each face was last seen.'],
+  ['successfullyFollowedHints', 'followed-hints', 'Guided Hand', 'boosters', 'followed-hints', 'Follow a Hint by matching its exact highlighted pair on your next valid attempt.'],
   ['freezeSavesFollowedByImmediateMatch', 'second-opportunity', 'Second Chance', 'boosters', 'steps'],
   ['freezeSavesFollowedByThreePairRun', 'extended-opportunity', 'Make It Count', 'boosters', 'ribbon'],
   ['paidShufflesFollowedByImmediateMatch', 'fresh-arrangement', 'Fresh Arrangement', 'boosters', 'screen'],
@@ -50,12 +50,12 @@ const familyDetails = [
   ['distinctCollectedMatchKeysByTheme.stained-glass', 'glass-collection', 'Stained Glass', 'collection', 'screen'],
   ['distinctCollectedMatchKeysByTheme.dutch-golden-age', 'dutch-collection', 'Golden Age', 'collection', 'cabinet'],
   ['distinctCompletedFormationIds', 'formations', 'Table Traveller', 'collection', 'compass', 'Complete duels on different board formations.'],
-  ['distinctCompletedRulesetIds', 'both-traditions', 'Both Traditions', 'collection', 'fan'],
+  ['distinctCompletedCulturalRegions', 'both-traditions', 'Across Continents', 'collection', 'fan'],
   ['maxCollectionCountForOneMatchKey', 'familiar-picture', 'A Familiar Picture', 'collection', 'cup'],
   ['distinctCollectedRarityIds', 'every-rarity', 'Every Rarity', 'collection', 'flower'],
   ['distinctLoginDayIds', 'visits', 'Daily Ritual', 'rituals', 'lantern', 'Visit on different UTC days. Missed days never erase your progress.'],
-  ['distinctDuelCompletionDayIds', 'playing-days', 'Returning Rival', 'rituals', 'duelist', 'Complete at least one duel on different UTC days.'],
-  ['distinctCompletedThemeRulesetCombinations', 'settings', 'Every Setting', 'rituals', 'screen', 'Complete duels in different combinations of tile theme and ruleset.'],
+  ['distinctDuelCompletionDayIds', 'playing-days', 'Returning Rival', 'rituals', 'playing-days', 'Complete at least one duel on different UTC days.'],
+  ['distinctCompletedThemeIds', 'settings', 'Grand Tour', 'rituals', 'settings', 'Complete duels across all four tile themes. Each new destination adds to your tour.'],
 ];
 
 export const ACHIEVEMENT_FAMILIES = Object.freeze(familyDetails.map(([counterKey, id, name, shelfId, artKey, description]) => {
@@ -71,14 +71,25 @@ const familyByAchievementId = Object.freeze(Object.assign(Object.create(null), O
 
 export function familyForAchievement(achievement) {
   const id = typeof achievement === 'string' ? achievement : achievement?.id;
-  return isAchievementId(id) ? familyByAchievementId[id] : null;
+  return isAchievementId(id) ? familyByAchievementId[activeAchievementIdFor(id)] : null;
 }
 
 export function achievementFamilyProgress(family, state) {
   const id = typeof family === 'string' ? family : family?.id;
   if (!Object.hasOwn(achievementFamilyById, id)) return null;
   const definition = achievementFamilyById[id];
-  const milestones = definition.milestones.map(item => ({ ...item, ...achievementProgress(item, state), awardedPoints: awardedAchievementPoints(item.id, state) }));
+  const earnedPoints = earnedPointsForCounter(definition.counterKey, state);
+  const milestones = definition.milestones.map(item => {
+    const progress = achievementProgress(item, state);
+    // Attribute preserved historical receipts to their corresponding visible
+    // level without putting a second copy into the authoritative AP ledger.
+    const historicalPoints = Object.keys(state?.unlocked ?? {}).filter(id => id !== item.id && isAchievementId(id) &&
+      achievementById[id].counterKey === definition.counterKey && activeAchievementIdFor(id) === item.id)
+      .reduce((sum, id) => sum + awardedAchievementPoints(id, state), 0);
+    // Future levels always show their full catalogue reward. Past receipts can
+    // differ after a rebalance and must not reduce a player's next reward.
+    return { ...item, ...progress, awardedPoints: awardedAchievementPoints(item.id, state) + historicalPoints };
+  });
   const earned = milestones.filter(item => item.unlocked);
   const nextMilestone = milestones.find(item => !item.unlocked) ?? null;
   const currentMilestone = earned.at(-1) ?? null;
@@ -88,7 +99,7 @@ export function achievementFamilyProgress(family, state) {
   return { ...definition, milestones, current, target, level: currentMilestone?.level ?? 0, unlockedCount: earned.length,
     currentMilestone, nextMilestone, complete, unlocked: earned.length > 0,
     progress: complete ? 1 : Math.min(1, current / target),
-    earnedPoints: earned.reduce((sum, item) => sum + item.awardedPoints, 0),
+    earnedPoints,
     remainingPoints: milestones.filter(item => !item.unlocked).reduce((sum, item) => sum + item.points, 0),
     nextRewardPoints: nextMilestone?.points ?? 0 };
 }

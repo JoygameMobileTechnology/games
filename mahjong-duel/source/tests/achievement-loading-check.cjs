@@ -85,8 +85,8 @@ function assertStable(before, after, label) {
       });
     }, cardsSelector);
     const artUrl = async () => {
-      const art = await page.locator('.trophy-illustration').evaluateAll(nodes => nodes.map(node => ({ standalone: node.classList.contains('trophy-illustration--standalone'), url: getComputedStyle(node).backgroundImage.match(/^url\(["']?(.*?)["']?\)$/)?.[1] })));
-      const atlasUrls = [...new Set(art.filter(image => !image.standalone).map(image => image.url))];
+      const art = await page.locator('.trophy-illustration').evaluateAll(nodes => nodes.map(node => ({ individual: node.classList.contains('trophy-illustration--standalone') || node.classList.contains('trophy-illustration--individual'), url: getComputedStyle(node).backgroundImage.match(/^url\(["']?(.*?)["']?\)$/)?.[1] })));
+      const atlasUrls = [...new Set(art.filter(image => !image.individual).map(image => image.url))];
       assert.equal(atlasUrls.length, 1, `${label}: milestone trophies share one atlas URL`);
       for (const url of new Set(art.map(image => image.url))) {
         assert.ok(url && url.length < 256, `${label}: artwork does not repeat a large inline image`);
@@ -127,11 +127,12 @@ function assertStable(before, after, label) {
       await last.focus();
       await last.locator('.trophy-illustration').waitFor();
       await visibleArtwork();
+      const lastArtUrl = await last.locator('.trophy-illustration').evaluate(node => getComputedStyle(node).backgroundImage);
       const beforeDetail = await area().evaluate(node => node.scrollTop);
       assert.ok(beforeDetail > 0, `${label}: keyboard focus reaches the bottom`);
       await page.keyboard.press('Enter');
       await page.locator('.achievement-detail-hero .trophy-illustration').waitFor();
-      assert.equal(await artUrl(), source, `${label}: detail shares the same atlas`);
+      assert.equal(await page.locator('.achievement-detail-hero .trophy-illustration').evaluate(node => getComputedStyle(node).backgroundImage), lastArtUrl, `${label}: detail reuses its trophy image`);
       await button('Back to achievements').click();
       await page.waitForFunction(id => document.activeElement?.dataset.achievementFamily === id, lastId);
       assert.ok(Math.abs(await area().evaluate(node => node.scrollTop) - beforeDetail) <= 2, `${label}: Back restores scroll`);
@@ -148,7 +149,8 @@ function assertStable(before, after, label) {
       const standaloneArt = cards().locator('.trophy-illustration--standalone');
       assert.equal(await standaloneArt.count(), 27, `${label}: all one-time trophies use individual artwork`);
       assert.equal(await standaloneArt.evaluateAll(nodes => new Set(nodes.map(node => getComputedStyle(node).backgroundImage)).size), 27, `${label}: each one-time trophy has its own image`);
-      assert.equal(await cards().locator('.trophy-illustration:not(.trophy-illustration--standalone)').count(), 16, `${label}: all progressive trophies keep the shared atlas`);
+      assert.equal(await cards().locator('.trophy-illustration--individual').count(), 5, `${label}: five milestone trophies replace reused atlas subjects`);
+      assert.equal(await cards().locator('.trophy-illustration:not(.trophy-illustration--standalone):not(.trophy-illustration--individual)').count(), 11, `${label}: eleven milestone trophies retain distinct atlas subjects`);
       await area().evaluate(node => { node.scrollTop = 0; });
       await settle();
       assertStable(original, await geometry(), `${label}: full scroll and return`);

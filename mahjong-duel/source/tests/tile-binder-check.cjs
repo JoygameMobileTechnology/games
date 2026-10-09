@@ -8,7 +8,7 @@ const { pathToFileURL } = require('node:url');
   const root = path.resolve(__dirname, '..');
   const source = file => import(pathToFileURL(path.join(root, 'src', file)));
   const { createCollection, awardCollectedPair, COLLECTION_STORAGE_KEY } = await source('collection.js');
-  const { themes } = await source('themes.js');
+  const { themes, rulesetForTheme } = await source('themes.js');
   const browserName = process.argv.includes('--webkit') ? 'webkit' : 'chromium';
   const browser = await require(process.env.PLAYWRIGHT_MODULE || 'playwright')[browserName].launch({ headless: true });
   const page = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
@@ -24,15 +24,7 @@ const { pathToFileURL } = require('node:url');
     await launch.or(back).first().waitFor();
     if (await back.isVisible()) await back.click();
     await launch.click(); await collectionPage.waitFor();
-    assert.equal(await page.getByRole('group', { name: 'Collection ruleset', exact: true }).count(), 0, 'Settings owns the edition; Collection has no edition toggle');
-  }
-  async function selectEditionInSettings(ruleset) {
-    await page.getByRole('button', { name: 'Back to main menu', exact: true }).click();
-    await page.getByRole('button', { name: 'Settings', exact: true }).click();
-    await page.getByRole('group', { name: 'Ruleset', exact: true }).getByRole('button', { name: ruleset, exact: true }).click();
-    await page.getByRole('button', { name: 'Done', exact: true }).click();
-    await openCollection();
-    assert.match(await page.locator('.collection-grid').getAttribute('aria-label'), new RegExp(ruleset.toLowerCase()));
+    assert.equal(await page.getByRole('group', { name: 'Collection ruleset', exact: true }).count(), 0, 'the theme determines its artwork; Collection has no edition toggle');
   }
   try {
     await page.goto(process.env.GAME_URL || 'http://localhost:5173');
@@ -47,7 +39,7 @@ const { pathToFileURL } = require('node:url');
     await page.reload(); await openCollection();
     const persisted = await page.evaluate(key => localStorage.getItem(key), COLLECTION_STORAGE_KEY);
     assert.match(await page.locator('.collection-progress-copy').innerText(), /6\s*\/\s*40 collected/);
-    assert.match(await page.locator('.collection-summary').innerText(), /6\s*\/\s*320 total collected/);
+    assert.match(await page.locator('.collection-summary').innerText(), /6\s*\/\s*160 total collected/);
     assert.match(await page.locator('.collection-summary').innerText(), /8 pairs matched/);
     assert.match(await page.locator('[data-match-key="ming-porcelain:eastern:K01"]').innerText(), /Matched ×3/);
     assert.equal(await page.locator('.collection-card[data-collected="true"]').count(), 6);
@@ -82,36 +74,35 @@ const { pathToFileURL } = require('node:url');
       await page.screenshot({ path: path.join(output, `collection-${browserName}-${width}x${height}.png`) });
     }
     await page.setViewportSize({ width: 390, height: 844 });
-    for (const ruleset of ['Eastern', 'Western']) {
-      await selectEditionInSettings(ruleset);
-      for (const theme of themes) {
-        await page.getByLabel('Collection theme', { exact: true }).selectOption(theme.id);
-        assert.equal(await page.locator('.collection-card').count(), 40);
-        await page.locator('.collection-art img').evaluateAll(async images => {
-          for (const image of images) image.loading = 'eager';
-          await Promise.all(images.map(image => image.decode()));
-        });
-      }
+    for (const theme of themes) {
+      await page.getByLabel('Collection theme', { exact: true }).selectOption(theme.id);
+      assert.equal(await page.locator('.collection-card').count(), 40);
+      const expectedPrefix = `${theme.id}:${rulesetForTheme(theme.id)}:`;
+      assert.ok((await page.locator('.collection-card').evaluateAll(nodes => nodes.map(node => node.dataset.matchKey))).every(key => key.startsWith(expectedPrefix)), 'each theme exposes only its assigned tile set');
+      await page.locator('.collection-art img').evaluateAll(async images => {
+        for (const image of images) image.loading = 'eager';
+        await Promise.all(images.map(image => image.decode()));
+      });
     }
     for (const [label, count] of [['Marble', 22], ['Sapphire', 10], ['Amethyst', 5], ['Gold', 3], ['All', 40]]) {
       await filter(label).click(); assert.equal(await filter(label).getAttribute('aria-pressed'), 'true');
       assert.equal(await page.locator('.collection-card').count(), count);
     }
-    await selectEditionInSettings('Eastern');
-    assert.match(await page.locator('.collection-progress-copy').innerText(), /6\s*\/\s*40 collected/, 'Collection reflects the edition selected in Settings');
+    await page.getByLabel('Collection theme', { exact: true }).selectOption('ming-porcelain');
+    assert.match(await page.locator('.collection-progress-copy').innerText(), /6\s*\/\s*40 collected/, 'Ming porcelain keeps its Eastern artwork and saved counts');
     await page.getByLabel('Collection theme', { exact: true }).focus();
     assert.ok(await page.getByLabel('Collection theme', { exact: true }).evaluate(node => parseFloat(getComputedStyle(node).outlineWidth) >= 2));
     await page.getByRole('button', { name: 'Back to main menu', exact: true }).click();
     await page.waitForFunction(() => document.activeElement?.matches('.binder-launch'));
     await page.reload(); await openCollection();
-    assert.match(await page.locator('.collection-summary').innerText(), /6\s*\/\s*320 total collected/);
+    assert.match(await page.locator('.collection-summary').innerText(), /6\s*\/\s*160 total collected/);
     assert.match(await page.locator('.collection-summary').innerText(), /8 pairs matched/);
     await filter('Sapphire').click();
     assert.equal(await page.locator('.collection-card').count(), 10);
     assert.equal(await page.locator('.collection-card[data-collected="true"]').count(), 1);
     assert.equal(await page.evaluate(key => localStorage.getItem(key), COLLECTION_STORAGE_KEY), persisted, 'browsing never modifies collected tiles or duplicate counts');
     assert.deepEqual(errors, []);
-    console.log(`PASS fullscreen Collection: launch themes/editions, 320 assets decode, four rarity filters, duplicate counts persist, seven responsive sizes, full-screen navigation/focus, no errors (${browserName})`);
+    console.log(`PASS fullscreen Collection: fixed tile set per theme, 160 assets decode, four rarity filters, duplicate counts persist, seven responsive sizes, full-screen navigation/focus, no errors (${browserName})`);
   } catch (error) {
     await page.screenshot({ path: path.join(output, `collection-${browserName}-failure.png`), fullPage: true }).catch(() => {});
     console.error('Browser errors:', errors); throw error;

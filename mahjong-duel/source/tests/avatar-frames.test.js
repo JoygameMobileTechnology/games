@@ -18,7 +18,7 @@ test('every frame unlocks at its earned AP boundary without spending points', ()
     assert.ok(unlockedFrameIds(frame.pointsRequired).includes(frame.id));
     assert.equal(getAvatarFrame(frame.id), frame);
   }
-  assert.deepEqual(unlockedFrameIds(1465), AVATAR_FRAMES.map(frame => frame.id), 'a completed legacy catalogue can earn every frame');
+  assert.deepEqual(unlockedFrameIds(6500), AVATAR_FRAMES.map(frame => frame.id), 'the final milestone makes every frame available');
 });
 
 test('missing, invalid, and unknown frame eligibility stays unframed', () => {
@@ -42,22 +42,43 @@ test('legacy profiles load without a frame while preserving their details', () =
 test('equipped frame persists with a profile and is revalidated on reload', () => {
   const target = storage();
   const profile = { ...DEFAULT_PROFILE, name: 'Ada', frameId: 'jade' };
-  assert.equal(saveProfile(profile, target, 500), true);
-  assert.deepEqual(loadProfile(target, 500), profile);
-  assert.equal(loadProfile(target, 499).frameId, '', 'a stale saved selection cannot equip a locked frame');
+  assert.equal(saveProfile(profile, target, 3000), true);
+  assert.deepEqual(loadProfile(target, 3000), profile);
+  assert.equal(loadProfile(target, 2999).frameId, '', 'a stale saved selection cannot equip a locked frame');
   assert.equal(loadProfile(target).frameId, '', 'unknown ownership defaults to no frame');
   assert.equal(target.values.get('unrelated'), 'keep');
-  assert.equal(saveProfile({ ...profile, frameId: '' }, target, 500), true);
-  assert.equal(loadProfile(target, 500).frameId, '', 'unequipping survives reload');
+  assert.equal(saveProfile({ ...profile, frameId: '' }, target, 3000), true);
+  assert.equal(loadProfile(target, 3000).frameId, '', 'unequipping survives reload');
 });
 
 test('locked frame saves fail without replacing a valid profile', () => {
   const existing = { ...DEFAULT_PROFILE, name: 'Ada', frameId: 'bronze' };
   const target = storage(existing);
   const locked = { ...existing, frameId: 'gold' };
-  assert.match(profileError(locked, 999), /unlock this frame/);
-  assert.equal(saveProfile(locked, target, 999), false);
-  assert.deepEqual(loadProfile(target, 100), existing);
+  assert.match(profileError(locked, 4999), /unlock this frame/);
+  assert.equal(saveProfile(locked, target, 4999), false);
+  assert.deepEqual(loadProfile(target, 500), existing);
   assert.equal(saveProfile({ ...existing, frameId: 'invented' }, target, 9999), false);
-  assert.equal(saveProfile(locked, { setItem() { throw new Error('blocked'); } }, 1000), false);
+  assert.equal(saveProfile(locked, { setItem() { throw new Error('blocked'); } }, 5000), false);
+});
+
+
+test('retained frame rights work through profile validation and persistence', () => {
+  const retained = ['bronze', 'porcelain', 'jade'];
+  const profile = { ...DEFAULT_PROFILE, name: 'Ada', frameId: 'jade' };
+  const target = storage(profile);
+  assert.equal(isFrameUnlocked('jade', 540), false, 'new profiles use the new threshold');
+  assert.equal(isFrameUnlocked('jade', 540, retained), true);
+  assert.equal(resolveFrameId('jade', 540, retained), 'jade');
+  assert.deepEqual(unlockedFrameIds(540, retained), retained);
+  assert.equal(profileError(profile, 540, retained), '');
+  assert.deepEqual(normalizeProfile(profile, 540, retained), profile);
+  assert.deepEqual(loadProfile(target, 540, retained), profile);
+  assert.equal(saveProfile(profile, target, 540, retained), true);
+  assert.equal(loadProfile(target, 540, retained).frameId, 'jade');
+  assert.equal(saveProfile({ ...profile, frameId: 'porcelain' }, target, 540, retained), true, 'every previously earned frame remains selectable');
+  assert.equal(saveProfile({ ...profile, frameId: 'gold' }, target, 540, retained), false);
+  assert.equal(isFrameUnlocked('invented', 540, ['invented']), false);
+  assert.deepEqual(unlockedFrameIds(0, ['jade', 'jade', 'invented']), ['jade']);
+  assert.deepEqual(unlockedFrameIds(0, { jade: true }), []);
 });

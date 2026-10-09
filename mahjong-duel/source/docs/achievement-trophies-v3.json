@@ -1,0 +1,62 @@
+{
+  "tool": "Built-in image_gen.imagegen",
+  "created": "2026-10-09",
+  "processing": "Individually generated transparent PNGs encoded as 384 x 384 WebP at quality 90 with alpha preserved.",
+  "assets": [
+    {
+      "id": "complete-pictures",
+      "asset": "public/assets/remake/achievement-milestones/complete-pictures.webp",
+      "original": "outputs/achievement-trophies-v3/complete-pictures.png",
+      "source_file": "exec-6be2174c-1d0c-4e23-bcd9-7c43a41fc2f0.png",
+      "sha256": "f73c8220712d0ddab546d15e26ffc98229076aefdd6942f4ee46e6d96f38c730",
+      "source_sha256": "0e6ada2b50823b69cd0e74734d4b48540665a1b4956d231904cfbeb9e0c0f5b4",
+      "width": 384,
+      "height": 384,
+      "prompt": "Use case: stylized-concept. Asset type: premium hand-painted 2D mobile Mahjong achievement trophy. Square composition on a genuinely transparent background, polished rich cream porcelain, cobalt blue, jade green and warm gold, dimensional painterly highlights, centered on a low oval dark walnut pedestal with gold trim. Keep every part inside 10 percent clear padding. The main silhouette should read beautifully at 80px. No text, letters, numbers, logos, UI, outer shadow, scenery, border, or watermark. Subject: Familiar Pictures, a trophy celebrating collecting both pairs of multiple artworks during one duel. Exactly four upright cream porcelain Mahjong tiles grouped into TWO clearly matching pairs on a stepped trophy display. The left pair both show the same rich blue lotus; the right pair both show the same elegant green bamboo. Two graceful gold twin arches frame each matching pair. Equal sized tiles, clean clear matching motifs, beautiful readable four-tile arrangement."
+    },
+    {
+      "id": "followed-hints",
+      "asset": "public/assets/remake/achievement-milestones/followed-hints.webp",
+      "original": "outputs/achievement-trophies-v3/followed-hints.png",
+      "source_file": "exec-1f5686a2-fd70-4282-8c43-e7cb76ec9fe0.png",
+      "sha256": "1c97385e5e6ef905fdd72157983ab8468237257da1a6760bf395e49123e74967",
+      "source_sha256": "6742adb376175ee18ed0e39c9401c936a56e4ce8fdc4de1b4258d52fedc8680d",
+      "width": 384,
+      "height": 384,
+      "prompt": "Use case: stylized-concept. Asset type: premium hand-painted 2D mobile Mahjong achievement trophy. Square composition on a genuinely transparent background, polished rich cream porcelain, cobalt blue, jade green and warm gold, dimensional painterly highlights, centered on a low oval dark walnut pedestal with gold trim. Keep every part inside 10 percent clear padding. The main silhouette should read beautifully at 80px. No text, letters, numbers, logos, UI, outer shadow, scenery, border, or watermark. Subject: Guided Hand, a trophy celebrating following a hint to its exact matching pair. A luminous sculptural amber lightbulb above two upright matching cream porcelain Mahjong tiles each displaying the same cobalt blue flower. A curved guiding gold pointer arcs gently from the bulb to the pair. The lightbulb and guiding pointer form a clear distinctive silhouette above the matching tiles. Glow remains contained around the bulb, no full background haze."
+    },
+    {
+      "id": "lasting-recall",
+      "asset": "public/assets/remake/achievement-milestones/lasting-recall.webp",
+      "original": "outputs/achievement-trophies-v3/lasting-recall.png",
+      "source_file": "exec-5e597c36-5277-4b17-a035-b14837d49c52.png",
+      "sha256": "ac1211428968eda38935062385b03df8f692699fc04cc22b973a7afdd9ba4fee",
+      "source_sha256": "639f2117ecf5ae42225852b9efc2d40c8c9a8defc4c98c7a1655e92d9f9fb229",
+      "width": 384,
+      "height": 384,
+      "prompt": "Use case: stylized-concept\nAsset type: collectible achievement trophy for a premium Mahjong Duel game, transparent square icon.\nPrimary request: Create a unique trophy for Lasting Recall: two upright ivory mahjong tiles decorated with matching cobalt-blue lotus floral pictures, linked by one long looping jade ribbon path. The ribbon makes a large flowing arch between the two tiles, with exactly three prominent little gold beads spaced along its curve to represent three intervening attempts remembered. The paired tiles and long ribbon form one clearly readable sculptural memory journey. Low oval dark walnut pedestal, with restrained gold edge and jade inlay.\nStyle/medium: polished hand-painted 2D fantasy game asset, gently dimensional porcelain, rich jade enamel and warm gold metal, soft studio highlights, meticulous but readable at 80px. Match a warm cream/wood/gold Mahjong game.\nComposition: centered single trophy, large simple silhouette, all elements fully contained with roughly 10% transparent padding on every side, square canvas, three-quarter front view. Two tiles visibly distinct and connected by the ribbon.\nConstraints: actual transparent background, no backdrop, no cast shadow outside the pedestal, no UI, no labels, no text, no numbers, no watermark. No hourglass, no frame surrounding the whole object, no extra unrelated items. Preserve crisp clean alpha edges."
+    },
+    {
+      "id": "playing-days",
+      "asset": "public/assets/remake/achievement-milestones/playing-days.webp",
+      "original": "outputs/achievement-trophies-v3/playing-days.png",
+      "source_file": "exec-531145bf-b663-46ea-b6e6-4d57026b8589.png",
+      "sha256": "78bd03ce7467e4acdcdd917bdbf43314ed636d5e8b691b3bbb84cfd09427371d",
+      "source_sha256": "c3d791b36fe0f7332ff7692e38f04b5ab63df8876f15bdde1b17d474e99d2b8d",
+      "width": 384,
+      "height": 384,
+      "prompt": "Use case: stylized-concept. Asset type: premium hand-painted 2D mobile Mahjong achievement trophy. Square composition on a genuinely transparent background, polished rich cream porcelain, cobalt blue, jade green and warm gold, dimensional painterly highlights, centered on a low oval dark walnut pedestal with gold trim. Keep every part inside 10 percent clear padding. The main silhouette should read beautifully at 80px. No text, letters, numbers, logos, UI, outer shadow, scenery, border, or watermark. Subject: Returning Rival, a trophy celebrating returning to play duels on different days. An ornate small open tabletop weekly calendar, cream porcelain panels in a two-row grid, with several large jade checkmarks and two blue floral Mahjong tiles leaning at its foot. A compact upright sculptural object, not a paper page. Use blank panels and simple checkmarks only, no calendar labels or numbers."
+    },
+    {
+      "id": "settings",
+      "asset": "public/assets/remake/achievement-milestones/settings.webp",
+      "original": "outputs/achievement-trophies-v3/settings.png",
+      "source_file": "exec-9366521d-0b40-43e0-ae8e-2cb6d37d2a0e.png",
+      "sha256": "397e98630d689ca9fba907bc4fc78421d814b915591dfb909b94de121f4b82c5",
+      "source_sha256": "ecbde4122b47669e811a0f791eae22802417a784bbbbb749f23929ce464ffa9e",
+      "width": 384,
+      "height": 384,
+      "prompt": "Use case: stylized-concept\nAsset type: collectible achievement trophy for a premium Mahjong Duel game, transparent square icon.\nPrimary request: Create a unique trophy for Every Setting, representing playing across four visual themes and both Eastern and Western tile editions. A sculptural four-lobed porcelain medallion arrangement, like a quatrefoil display: top medallion shows a cobalt blue lotus, right shows a Korean Dancheong flower with jade green and coral petals, bottom shows a jewel-colored stained-glass rosette with gold leading, left shows a red Dutch tulip. Each medallion is framed in fine warm gold and mounted together like an elegant cultural display, not a compass. Small ivory mahjong tiles flank the display near the base, one shows green bamboo and one shows a red diamond. Low oval dark walnut pedestal with restrained gold edge and jade inlay.\nStyle/medium: polished hand-painted 2D fantasy game asset, gently dimensional porcelain, rich jade enamel and warm gold metal, soft studio highlights, clear simple shapes readable at 80px. Warm cream/wood/gold Mahjong game style. Cream, cobalt, jade, gold main palette; coral/tulip reds and stained-glass jewel colors as small accents.\nComposition: centered single trophy, large clear silhouette, front three-quarter view, square canvas with about 10% genuinely transparent padding on every side. Four medallions must be visibly distinct and make one cohesive trophy. No tall spires.\nConstraints: actual transparent background, no backdrop, no cast shadow outside pedestal, no UI, no text, no labels, no watermark. No compass needle, no compass letters, no compass ring, no globe, no bridge, no extra unrelated items. Crisp clean alpha edges."
+    }
+  ]
+}

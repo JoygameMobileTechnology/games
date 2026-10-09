@@ -19,3 +19,11 @@ The new illustrations were individually generated with the built-in image-genera
 Locked trophies are neutral grayscale. Earned one-time trophies immediately receive their full natural color, without milestone laurels or crowns. Milestone artwork moves through partial grayscale (32%, 18%, 8%, 3%, then 0%) with increasingly rich glow; the former sepia cast and excess saturation are removed. Existing level-to-glory mapping is unchanged for multi-level achievements.
 
 First-shelf standalone artwork and the original atlas warm during menu idle time. Remaining standalone images follow the existing shelf visibility loading, preserving gallery layout. The offline build embeds each image once and reuses a short Blob URL per source.
+
+## Distinct milestone trophies — October 9, 2026
+
+Five reused atlas subjects are replaced by individual illustrations for Familiar Pictures, Lasting Recall, Guided Hand, Returning Rival and Every Setting. They live in `public/assets/remake/achievement-milestones/`, with explicit runtime paths in `src/achievement-milestone-art.js`. All 43 families now have different artwork identities. The 27 one-time trophies and 11 remaining atlas subjects are unchanged.
+
+The built-in image-generation tool produced each replacement separately on a transparent background; exports are 384 × 384 WebP at quality 90. Originals remain in `outputs/achievement-trophies-v3/`. Exact prompts, source filenames and hashes are recorded in [achievement-trophies-v3.json](achievement-trophies-v3.json).
+
+Four-level tracks grow their laurel decoration through 1, 3, 6 and 10 leaf pairs, reaching their full natural color and crown at Level IV. See [four-level achievement balance](achievement-four-level-balance.md) for targets, rewards and save compatibility.

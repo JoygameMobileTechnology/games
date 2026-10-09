@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { achievementById, isAchievementId } from './achievements.js';
+import { achievementById, activeAchievementIdFor, isAchievementId } from './achievements.js';
 import { familyForAchievement } from './achievement-milestones.js';
 import { playProgressSound } from './sound.js';
 import './achievement-toast.css';
@@ -25,7 +25,7 @@ export function AchievementNotifications({ batches = [], onComplete, paused = fa
   const batch = batches.find(value => typeof value?.id === 'string' && value.id &&
     Array.isArray(value.achievementIds) && value.achievementIds.some(isAchievementId));
   const id = batch?.id;
-  const ids = [...new Set((batch?.achievementIds ?? []).filter(isAchievementId))];
+  const ids = [...new Set((batch?.achievementIds ?? []).map(activeAchievementIdFor).filter(Boolean))];
   const definitions = ids.map(value => achievementById[value]);
   const duration = ACHIEVEMENT_TOAST_MS + (ids.length > 1 ? 500 : 0);
   const held = paused || hidden;

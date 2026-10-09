@@ -37,13 +37,12 @@ function PlayerSeat({ profile, isPlayer = false, searching = false }) {
 }
 
 /** The caller owns search, pause, and transition timing; this page only presents it. */
-export function MatchmakingPage({ profile, opponent, theme, ruleset = 'eastern', status = 'searching', elapsedMs = 0, onCancel, paused = false, gentle = false }) {
+export function MatchmakingPage({ profile, opponent, theme, status = 'searching', elapsedMs = 0, onCancel, paused = false, gentle = false }) {
   const searching = status === 'searching';
   const starting = status === 'starting';
   const faceoff = status === 'faceoff';
   const selectedTheme = (typeof theme === 'string' ? themeById[theme] : theme) || defaultTheme;
   const artwork = matchmakingArt[selectedTheme.id] || matchmakingArt[defaultTheme.id];
-  const edition = ruleset === 'western' ? 'western' : 'eastern';
   const seconds = Math.floor(Math.max(0, Number(elapsedMs) || 0) / 1000);
   const elapsed = `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
   const heading = searching ? 'Finding an opponent…' : starting ? 'Starting your duel…' : 'Opponent found!';
@@ -63,9 +62,9 @@ export function MatchmakingPage({ profile, opponent, theme, ruleset = 'eastern',
         <p className="matchmaking-elapsed" aria-live="off">{searching ? <>{paused ? 'Search paused' : 'Searching'}<span aria-hidden="true"> · </span><time>{elapsed}</time></> : starting ? 'Your table is ready' : 'Both players are ready'}</p>
       </div>
     </section>
-    <section className="matchmaking-theme" data-theme={selectedTheme.id} aria-label={`Selected theme: ${selectedTheme.name}, ${edition === 'western' ? 'Western' : 'Eastern'} collection`}>
-      <ThemeArtwork theme={selectedTheme} ruleset={edition} surfaceSrc={artwork.paper} />
-      <div className="matchmaking-theme-copy"><span>Selected theme</span><strong>{selectedTheme.name}</strong><small>{edition === 'western' ? 'Western' : 'Eastern'} collection</small></div>
+    <section className="matchmaking-theme" data-theme={selectedTheme.id} aria-label={`Selected theme: ${selectedTheme.name}`}>
+      <ThemeArtwork theme={selectedTheme} surfaceSrc={artwork.paper} />
+      <div className="matchmaking-theme-copy"><span>Selected theme</span><strong>{selectedTheme.name}</strong><small>40 unique artworks</small></div>
     </section>
     <footer className="matchmaking-footer">{searching ? <button className="progression-secondary matchmaking-cancel" type="button" onClick={onCancel}>Cancel</button> : <p className="matchmaking-preparing">Preparing your table…</p>}</footer>
   </ProgressionPage>;

@@ -8,7 +8,7 @@ const { pathToFileURL } = require('node:url');
   const root = path.resolve(__dirname, '..');
   const source = file => import(pathToFileURL(path.join(root, 'src', file)));
   const { createCollection, awardCollectedPair, COLLECTION_STORAGE_KEY } = await source('collection.js');
-  const { themes } = await source('themes.js');
+  const { themes, rulesetForTheme } = await source('themes.js');
   const { themeTileSets } = await source('tile-data.js');
   const { rarityForTile } = await source('rarity.js');
   const { tileDescription } = await source('tile-descriptions.js');
@@ -21,13 +21,12 @@ const { pathToFileURL } = require('node:url');
   page.on('response', response => { if (response.status() >= 400) errors.push(`${response.status()} ${response.url()}`); });
   let value = createCollection();
   for (const theme of themes) {
-    for (const ruleset of ['eastern', 'western']) {
-      for (const id of (ruleset === 'eastern' ? ['C01', 'A01', 'A11', 'K01'] : ['W01', 'W10', 'W40'])) {
-        const tile = themeTileSets[theme.id][ruleset].find(item => item.id === id);
-        assert.ok(tile, `${theme.id} ${ruleset} fixture ${id} exists`);
-        for (let index = 0; index < (id === 'C01' ? 3 : 1); index += 1) {
-          value = awardCollectedPair(value, { gameId: 'inspector-check', pairId: `${tile.matchKey}-${index}`, actor: 'you', matchKey: tile.matchKey });
-        }
+    const ruleset = rulesetForTheme(theme.id);
+    for (const id of (ruleset === 'eastern' ? ['C01', 'A01', 'A11', 'K01'] : ['W01', 'W10', 'W40'])) {
+      const tile = themeTileSets[theme.id][ruleset].find(item => item.id === id);
+      assert.ok(tile, `${theme.id} ${ruleset} fixture ${id} exists`);
+      for (let index = 0; index < (id === 'C01' ? 3 : 1); index += 1) {
+        value = awardCollectedPair(value, { gameId: 'inspector-check', pairId: `${tile.matchKey}-${index}`, actor: 'you', matchKey: tile.matchKey });
       }
     }
   }
@@ -54,15 +53,6 @@ const { pathToFileURL } = require('node:url');
     const overlapHeight = Math.min(artLayout.copy.bottom, artLayout.image.bottom) - Math.max(artLayout.copy.top, artLayout.image.top);
     assert.ok(overlapWidth <= 1 || overlapHeight <= 1, 'detail artwork never overlaps the tile title in stacked or side-by-side layouts');
     return tile;
-  }
-  async function selectEdition(ruleset) {
-    await page.getByRole('button', { name: 'Back to main menu', exact: true }).click();
-    await page.getByRole('button', { name: 'Settings', exact: true }).click();
-    await page.getByRole('group', { name: 'Ruleset', exact: true }).getByRole('button', { name: ruleset === 'eastern' ? 'Eastern' : 'Western', exact: true }).click();
-    await page.getByRole('button', { name: 'Done', exact: true }).click();
-    await page.getByRole('button', { name: 'Collection', exact: true }).click();
-    assert.equal(await page.getByRole('group', { name: 'Collection ruleset', exact: true }).count(), 0, 'no edition toggle inside Collection');
-    assert.match(await page.locator('.collection-grid').getAttribute('aria-label'), new RegExp(ruleset));
   }
   try {
     await page.goto(process.env.GAME_URL || 'http://localhost:5173');
@@ -112,16 +102,13 @@ const { pathToFileURL } = require('node:url');
     await back();
     await page.getByRole('group', { name: 'Rarity filter' }).getByRole('button', { name: 'All', exact: true }).click();
 
-    for (const ruleset of ['eastern', 'western']) {
-      await selectEdition(ruleset);
-      for (const theme of themes) {
-        await page.getByLabel('Collection theme', { exact: true }).selectOption(theme.id);
-        const id = ruleset === 'eastern' ? 'A01' : 'W10';
-        await card(`${theme.id}:${ruleset}:${id}`).getByRole('button').click();
-        await verifyDetails(theme.id, ruleset, id); await back();
-      }
+    for (const theme of themes) {
+      const ruleset = rulesetForTheme(theme.id);
+      await page.getByLabel('Collection theme', { exact: true }).selectOption(theme.id);
+      const id = ruleset === 'eastern' ? 'A01' : 'W10';
+      await card(`${theme.id}:${ruleset}:${id}`).getByRole('button').click();
+      await verifyDetails(theme.id, ruleset, id); await back();
     }
-    await selectEdition('eastern');
     await page.getByLabel('Collection theme', { exact: true }).selectOption('ming-porcelain');
     await card('ming-porcelain:eastern:K01').getByRole('button').click();
     for (const [width, height, split] of [[320, 568, false], [390, 664, false], [440, 956, false], [768, 1024, false], [1024, 768, true], [844, 390, false], [390, 844, false]]) {

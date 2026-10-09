@@ -1,9 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ACHIEVEMENTS, ACHIEVEMENT_POINTS_MAX, LEGACY_ACHIEVEMENT_POINTS, NUMERIC_COUNTER_KEYS, SET_COUNTER_KEYS, achievementProgress, getCounter, evaluateAchievements } from '../src/achievements.js';
+import { ACHIEVEMENTS, ACHIEVEMENT_POINTS_MAX, LEGACY_ACHIEVEMENT_POINTS, PREVIOUS_ACHIEVEMENTS, NUMERIC_COUNTER_KEYS, SET_COUNTER_KEYS, achievementProgress, getCounter, evaluateAchievements } from '../src/achievements.js';
 import { createProgression, normalizeProgression, loadProgression, saveProgression, reduceProgression, consumeRankingPresentation, PROGRESSION_STORAGE_KEY } from '../src/progression.js';
 import { createCollection, awardCollectedPair, COLLECTION_STORAGE_KEY } from '../src/collection.js';
 import { themeTileSets } from '../src/tile-data.js';
+import { launchThemeIds, rulesetForTheme } from '../src/themes.js';
 import { rarityForTile } from '../src/rarity.js';
 import { DAY_POLICY, getDailyView, dayIdFor, rewardsForLogin } from '../src/daily-rewards.js';
 import { STARTER_BOOSTERS, STARTER_BOOSTER_VERSION } from '../src/economy.js';
@@ -39,16 +40,16 @@ function legacyRarityProgression(rarities = Object.keys(legacyRarityFaces)) {
   return state;
 }
 
- test('catalogue retains all 100 IDs and legacy rewards, with 3,730 points available to new players', () => {
-  assert.deepEqual(ACHIEVEMENTS.map(item => item.id), Array.from({ length: 100 }, (_, i) => `A${String(i + 1).padStart(3, '0')}`));
-  assert.equal(new Set(ACHIEVEMENTS.map(item => item.id)).size, 100);
-  assert.equal(ACHIEVEMENT_POINTS_MAX, 3730);
+test('catalogue retains 100 historical IDs and exposes 74 active levels with 7,500 AP available', () => {
+  assert.deepEqual(PREVIOUS_ACHIEVEMENTS.map(item => item.id), Array.from({ length: 100 }, (_, i) => `A${String(i + 1).padStart(3, '0')}`));
+  assert.equal(new Set(ACHIEVEMENTS.map(item => item.id)).size, 74);
+  assert.equal(ACHIEVEMENT_POINTS_MAX, 7500);
   assert.equal(Object.values(LEGACY_ACHIEVEMENT_POINTS).reduce((sum, points) => sum + points, 0), 1465);
   assert.equal(ACHIEVEMENTS.reduce((sum, item) => sum + item.points, 0), ACHIEVEMENT_POINTS_MAX);
   for (const item of ACHIEVEMENTS) {
     assert.ok(item.name && item.description.length > 30 && item.category && item.counterKey);
     assert.ok(Number.isSafeInteger(item.target) && item.target > 0);
-    assert.ok(Number.isSafeInteger(item.points) && item.points >= LEGACY_ACHIEVEMENT_POINTS[item.id]);
+    assert.ok(Number.isSafeInteger(item.points) && item.points >= (LEGACY_ACHIEVEMENT_POINTS[item.id] ?? 0));
     assert.doesNotMatch(item.counterKey, /points/i);
   }
 });
@@ -64,7 +65,7 @@ test('rarity achievements use the four current tiers and retain the saved Eagle 
 
 test('current achievement descriptions use the 30-pair board and 16-pair winning boundary', () => {
   for (const item of ACHIEVEMENTS) assert.doesNotMatch(item.description, /all 40 pairs|21st pair|exactly 19/);
-  assert.match(ACHIEVEMENTS.find(item => item.id === 'A001').description, /all 30 pairs/);
+  assert.match(ACHIEVEMENTS.find(item => item.id === 'M001').description, /all 30 pairs/);
   assert.match(ACHIEVEMENTS.find(item => item.id === 'A045').description, /16th pair.*exactly 14/);
 });
 
@@ -89,12 +90,12 @@ test('every achievement evaluator has positive, below-threshold and unrelated-co
   assert.equal(achievementProgress('A101', fresh()), null);
 });
 
-test('collection migration backfills only the eleven permitted collection achievements', () => {
+test('collection migration backfills only the ten current collection achievements', () => {
   const counts = Object.fromEntries(Object.values(themeTileSets).flatMap(sets => Object.values(sets).flat()).map(tile => [tile.matchKey, 10]));
   const collection = { ...createCollection(), counts };
   const state = loadProgression({ collection, storage: storage(), now: NOW });
-  assert.deepEqual(Object.keys(state.unlocked).sort(), ['A076','A077','A078','A079','A080','A081','A082','A083','A084','A089','A090']);
-  assert.equal(getCounter(state, 'distinctCollectedMatchKeys'), 320);
+  assert.deepEqual(Object.keys(state.unlocked).sort(), ['A081','A082','A083','A084','A089','A090','M017','M018','M019','M020']);
+  assert.equal(getCounter(state, 'distinctCollectedMatchKeys'), 160);
   assert.equal(state.counters.personalPairs, 0);
   assert.equal(state.counters.completedWins, 0);
   assert.equal(state.counters.bestPairChain, 0);
@@ -120,9 +121,10 @@ test('five-tier version 1 saves preserve collection, receipts, wallet, ranking a
   target.setItem(PROGRESSION_STORAGE_KEY, JSON.stringify(stored));
   let loaded = loadProgression({ storage: target, now: NOW });
   assert.equal(loaded.version, 1);
-  for (const key of ['collection', 'counters', 'ranking', 'unlocked', 'newAchievementIds', 'attemptCursors', 'completedGameIds']) {
+  for (const key of ['collection', 'counters', 'ranking', 'newAchievementIds', 'attemptCursors', 'completedGameIds']) {
     assert.deepEqual(loaded[key], stored[key], key);
   }
+  assert.deepEqual(loaded.unlocked, { ...stored.unlocked, M001: stored.unlocked.A001, M005: stored.unlocked.A011 });
   assert.deepEqual(loaded.wallet, withStarter(stored.wallet), 'the legacy wallet receives only the once-only sampler');
   assert.deepEqual(loaded.eventReceipts, { ...stored.eventReceipts, [starterReceiptId]: NOW });
   assert.deepEqual(loaded.sets.distinctCollectedRarityIds, ['marble', 'sapphire', 'amethyst', 'gold']);
@@ -131,7 +133,7 @@ test('five-tier version 1 saves preserve collection, receipts, wallet, ranking a
   assert.strictEqual(reduceProgression(loaded, complete({ gameId: 'legacy-complete' })), loaded);
   const continued = reduceProgression(loaded, attempt({ counterDeltas: { goldOrCelestialPairsDuringEagleEye: 1, matchedPairsDuringEagleEye: 1 } }));
   assert.equal(continued.counters.goldOrCelestialPairsDuringEagleEye, 3);
-  assert.deepEqual(continued.unlocked, stored.unlocked);
+  assert.deepEqual(continued.unlocked, loaded.unlocked);
   assert.equal(continued.points, stored.points);
   assert.equal(saveProgression(continued, target), true);
   loaded = loadProgression({ storage: target, now: NOW + 1000 });
@@ -146,14 +148,14 @@ test('an old save missing either Gold or Celestial now unlocks Every Rarity once
     assert.equal(getCounter(loaded, 'distinctCollectedRarityIds'), 4);
     assert.deepEqual(loaded.unlocked, { A090: NOW });
     assert.deepEqual(loaded.newAchievementIds, ['A090']);
-    assert.equal(loaded.points, 15);
+    assert.equal(loaded.points, 50);
     assert.deepEqual(loaded.collection, stored.collection);
     loaded = reduceProgression(loaded, { type: 'achievements-seen', ids: ['A090'] });
     assert.equal(saveProgression(loaded, target), true);
     const reloaded = loadProgression({ storage: target, now: NOW + 1000 });
     assert.deepEqual(reloaded.unlocked, { A090: NOW });
     assert.deepEqual(reloaded.newAchievementIds, []);
-    assert.equal(reloaded.points, 15);
+    assert.equal(reloaded.points, 50);
   }
 });
 
@@ -170,7 +172,7 @@ test('old Gold and Celestial count as one collected tier and stale rarity sets c
   const next = reduceProgression(loaded, attempt({ matchKey: amethyst.matchKey, rarity: 'amethyst' }));
   assert.equal(getCounter(next, 'distinctCollectedRarityIds'), 4);
   assert.deepEqual(next.unlocked, { A090: NOW });
-  assert.equal(next.points, 15);
+  assert.equal(next.points, 50);
 });
 
 test('a personal pair, collection receipt and event counters commit atomically exactly once', () => {
@@ -184,7 +186,7 @@ test('a personal pair, collection receipt and event counters commit atomically e
   assert.equal(first.counters.personalPairs, 0);
   assert.strictEqual(reduceProgression(next, event), next);
   assert.strictEqual(reduceProgression(next, { ...event, eventId: 'replayed', attemptSequence: 2 }), next, 'physical pair cannot be repaid with another event identity');
-  assert.ok(next.unlocked.A031 && next.unlocked.A051 && next.unlocked.A064);
+  assert.ok(next.unlocked.M013 && next.unlocked.A051 && next.unlocked.A064);
 });
 
 test('opponent matches and local mismatches cannot grant personal or collection achievements', () => {
@@ -276,16 +278,19 @@ test('stable simulated rows stay ordered, nonnegative, profile-independent and n
   assert.equal(rankingRows(state, undefined, { view: 'top' }).filter(row => row.isPlayer).length, 0);
 });
 
-test('completed variety sets count exact launch theme/ruleset/formations and completion days', () => {
+test('completed variety follows each themes fixed edition, regions, formations and completion days', () => {
   let state = fresh(), index = 0;
-  for (const themeId of ['ming-porcelain', 'dancheong', 'stained-glass', 'dutch-golden-age']) for (const rulesetId of ['eastern', 'western']) {
+  for (const themeId of launchThemeIds) {
+    const rulesetId = rulesetForTheme(themeId);
     index++; state = reduceProgression(state, complete({ gameId: `game-${index}`, eventId: `done-${index}`, themeId, rulesetId,
       formationId: index % 2 ? 'crown' : 'fan', now: day(index) }));
   }
-  assert.equal(getCounter(state, 'distinctCompletedThemeRulesetCombinations'), 8);
+  assert.equal(getCounter(state, 'distinctCompletedThemeRulesetCombinations'), 4);
   assert.equal(getCounter(state, 'distinctCompletedRulesetIds'), 2);
   assert.equal(getCounter(state, 'distinctCompletedFormationIds'), 2);
-  assert.equal(getCounter(state, 'distinctDuelCompletionDayIds'), 8);
+  assert.equal(getCounter(state, 'distinctDuelCompletionDayIds'), 4);
+  assert.equal(getCounter(state, 'distinctCompletedThemeIds'), 4);
+  assert.equal(getCounter(state, 'distinctCompletedCulturalRegions'), 2);
   assert.ok(state.unlocked.A088 && state.unlocked.A099 && state.unlocked.A100);
 });
 
@@ -455,9 +460,9 @@ test('inherited object-member IDs cannot enter achievement, receipt or daily ent
   dirty.daily.adAttempts.safe = { status: 'pending', startedAt: NOW, entitlementIds: [...reserved, [entitlementId]] };
   dirty.daily.activeAdAttemptId = '__proto__';
   const state = normalizeProgression(dirty, { now: NOW });
-  assert.deepEqual(state.unlocked, { A001: NOW });
-  assert.equal(state.points, 5);
-  assert.deepEqual(state.newAchievementIds, ['A001']);
+  assert.deepEqual(state.unlocked, { A001: NOW, M001: NOW, M021: NOW });
+  assert.equal(state.points, 55);
+  assert.deepEqual(state.newAchievementIds, ['M001', 'M021']);
   assert.deepEqual(state.eventReceipts, { [starterReceiptId]: NOW });
   assert.deepEqual(state.attemptCursors, {});
   assert.deepEqual(state.completedGameIds, []);
@@ -467,7 +472,7 @@ test('inherited object-member IDs cannot enter achievement, receipt or daily ent
   assert.deepEqual(state.daily.adAttempts.safe.entitlementIds, []);
   assert.equal(getDailyView(state, NOW).adAttempt, null);
   assert.equal(getDailyView(state, NOW).hasClaim, true);
-  assert.equal(evaluateAchievements(dirty, NOW).points, 5);
+  assert.equal(evaluateAchievements(dirty, NOW).points, 55);
   for (const id of reserved) {
     assert.equal(achievementProgress(id, state), null);
     assert.strictEqual(reduceProgression(state, { type: 'daily-claim', eventId: id, now: NOW }), state);
@@ -478,4 +483,73 @@ test('inherited object-member IDs cannot enter achievement, receipt or daily ent
   assert.equal(claimed.wallet.hint, dirty.wallet.hint + STARTER_BOOSTERS.hint + 1);
   assert.equal(getDailyView(claimed, NOW).hasClaim, false);
   assert.equal(Object.getPrototypeOf(claimed.daily.claims), Object.prototype);
+});
+
+
+test('new completed duels reject an edition which does not belong to their theme', () => {
+  for (const themeId of launchThemeIds) {
+    const state = fresh();
+    const wrongRuleset = rulesetForTheme(themeId) === 'eastern' ? 'western' : 'eastern';
+    const event = complete({ themeId, rulesetId: wrongRuleset });
+    assert.strictEqual(reduceProgression(state, event), state, themeId);
+    assert.strictEqual(reduceProgression(state, attempt({ themeId, rulesetId: wrongRuleset, matched: false,
+      beforePairs: { you: 0, ai: 0 }, afterPairs: { you: 0, ai: 0 } })), state, themeId);
+  }
+});
+
+test('collection progression counts the 160 playable faces and retains archived counts', () => {
+  const counts = Object.fromEntries(launchThemeIds.flatMap(themeId => Object.values(themeTileSets[themeId]).flat()).map(tile => [tile.matchKey, 2]));
+  const state = normalizeProgression({ ...fresh(), collection: { ...createCollection(), counts } }, { now: NOW });
+  assert.equal(Object.keys(state.collection.counts).length, 320);
+  assert.equal(getCounter(state, 'distinctCollectedMatchKeys'), 160);
+  for (const themeId of launchThemeIds) {
+    const keys = state.sets[`distinctCollectedMatchKeysByTheme.${themeId}`];
+    assert.equal(keys.length, 40);
+    assert.deepEqual(keys, themeTileSets[themeId][rulesetForTheme(themeId)].map(tile => tile.matchKey));
+  }
+});
+
+
+test('two legacy collection mirrors reconcile before counterpart copies are combined', () => {
+  const byMarbleId = ruleset => themeTileSets['ming-porcelain'][ruleset]
+    .filter(tile => rarityForTile('ming-porcelain', ruleset, tile.id).id === 'marble')
+    .sort((a, b) => a.id.localeCompare(b.id));
+  const canonical = byMarbleId('eastern')[0], archived = byMarbleId('western')[0];
+  const source = { ...fresh(), collection: { version: 1, counts: { [canonical.matchKey]: 3 }, receipts: {} } };
+  const mirror = { version: 1, counts: { [archived.matchKey]: 4 }, receipts: {} };
+  const state = normalizeProgression(source, { collection: mirror, now: NOW });
+  assert.equal(state.collection.counts[canonical.matchKey], 7);
+  assert.equal(state.collection.counts[archived.matchKey], 4);
+  assert.equal(normalizeProgression(state, { collection: mirror, now: NOW }).collection.counts[canonical.matchKey], 7);
+});
+
+test('retained theme unlocks survive envelope and independent collection reconciliation', () => {
+  const source = { ...fresh(), collection: { ...createCollection(), retainedThemeIds: ['dancheong'] } };
+  const mirror = { ...createCollection(), retainedThemeIds: ['stained-glass'] };
+  const state = normalizeProgression(source, { collection: mirror, now: NOW });
+  assert.deepEqual(state.collection.retainedThemeIds, launchThemeIds.slice(0, 3));
+  const target = storage();
+  saveProgression(state, target);
+  assert.deepEqual(loadProgression({ storage: target, now: NOW }).collection.retainedThemeIds, launchThemeIds.slice(0, 3));
+});
+
+test('loading an independently upgraded legacy mirror preserves complementary copy credits', () => {
+  const byMarbleId = ruleset => themeTileSets['ming-porcelain'][ruleset]
+    .filter(tile => rarityForTile('ming-porcelain', ruleset, tile.id).id === 'marble')
+    .sort((a, b) => a.id.localeCompare(b.id));
+  const canonical = byMarbleId('eastern')[0], archived = byMarbleId('western')[0];
+  const source = { ...fresh(), collection: { version: 1, counts: { [canonical.matchKey]: 3 }, receipts: {} } };
+  delete source.themeAchievementsVersion;
+  const mirror = { version: 1, counts: { [archived.matchKey]: 4 }, receipts: {} };
+  const target = storage();
+  target.setItem(PROGRESSION_STORAGE_KEY, JSON.stringify(source));
+  target.setItem(COLLECTION_STORAGE_KEY, JSON.stringify(mirror));
+  const loaded = loadProgression({ storage: target, now: NOW });
+  assert.equal(loaded.collection.counts[canonical.matchKey], 7);
+  assert.equal(loaded.collection.counts[archived.matchKey], 4);
+  saveProgression(loaded, target);
+  target.setItem(COLLECTION_STORAGE_KEY, JSON.stringify(mirror));
+  const reloaded = loadProgression({ storage: target, now: NOW });
+  assert.equal(reloaded.collection.counts[canonical.matchKey], 7);
+  assert.deepEqual(reloaded.awardedPoints, loaded.awardedPoints);
 });

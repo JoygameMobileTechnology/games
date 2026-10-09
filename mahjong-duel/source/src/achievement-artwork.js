@@ -1,4 +1,5 @@
 import { STANDALONE_TROPHY_ART } from './achievement-standalone-art.js';
+import { MILESTONE_TROPHY_ART } from './achievement-milestone-art.js';
 
 const atlas = './assets/remake/achievement-trophies.png';
 const imageUrls = new Map();
@@ -26,6 +27,10 @@ export function getTrophyAtlasUrl() {
 
 export function getStandaloneTrophyUrl(artKey) {
   return Object.hasOwn(STANDALONE_TROPHY_ART, artKey) ? getArtworkUrl(STANDALONE_TROPHY_ART[artKey]) : null;
+}
+
+export function getMilestoneTrophyUrl(artKey) {
+  return Object.hasOwn(MILESTONE_TROPHY_ART, artKey) ? getArtworkUrl(MILESTONE_TROPHY_ART[artKey]) : null;
 }
 
 /** Warm once during menu idle time; failure must never block opening the page. */

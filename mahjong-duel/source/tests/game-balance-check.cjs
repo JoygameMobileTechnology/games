@@ -18,12 +18,13 @@ const sizes = [{ width: 320, height: 568 }, { width: 390, height: 844 }, { width
 (async () => {
   fs.mkdirSync(output, { recursive: true });
   const load = file => import(pathToFileURL(path.resolve(__dirname, '../src', file)).href);
-  const [{ themes }, { themeTileSets }, { createCollection }, { rarityForTile }, formations, engine, duel, opponent] = await Promise.all([
+  const [{ themes, rulesetForTheme }, { themeTileSets }, { createCollection }, { rarityForTile }, formations, engine, duel, opponent] = await Promise.all([
     load('themes.js'), load('tile-data.js'), load('collection.js'), load('rarity.js'), load('formations.js'), load('engine.js'), load('duel.js'), load('opponent-ai.js'),
   ]);
   const collection = createCollection();
-  for (const theme of themes) for (const edition of ['eastern', 'western']) {
-    assert.equal(themeTileSets[theme.id][edition].length, 40, 'the artwork catalogue still contains 40 faces per edition');
+  for (const theme of themes) {
+    const edition = rulesetForTheme(theme.id);
+    assert.equal(themeTileSets[theme.id][edition].length, 40, 'each theme has 40 active faces');
     for (const tile of themeTileSets[theme.id][edition]) collection.counts[tile.matchKey] = 3;
   }
   const seedFor = (id, after = 0) => {
@@ -68,11 +69,13 @@ const sizes = [{ width: 320, height: 568 }, { width: 390, height: 844 }, { width
   const browser = await require(process.env.PLAYWRIGHT_MODULE || 'playwright')[browserName].launch({ headless: true });
   const reports = [];
   async function run(label, fixture, scenario) {
-    const { themeId = themes[0].id, edition = 'eastern', seed, viewport = sizes[1] } = fixture;
+    const { themeId = themes[0].id, seed, viewport = sizes[1] } = fixture;
+    const edition = rulesetForTheme(themeId);
     const context = await browser.newContext({ viewport, isMobile: true, hasTouch: true, reducedMotion: 'reduce' });
     await context.addInitScript(({ collection, edition, seed }) => {
       localStorage.setItem('porcelain:collection', JSON.stringify(collection));
-      localStorage.setItem('porcelain:ruleset', JSON.stringify(edition));
+      // An obsolete preference must not override the selected theme's tile set.
+      localStorage.setItem('porcelain:ruleset', JSON.stringify(edition === 'eastern' ? 'western' : 'eastern'));
       // The deterministic tie replay intentionally exercises the unchanged Modern AI.
       localStorage.setItem('porcelain:aiMode', JSON.stringify('modern'));
       localStorage.setItem('porcelain:aiModeVersion', '1');
@@ -189,7 +192,7 @@ const sizes = [{ width: 320, height: 568 }, { width: 390, height: 844 }, { width
       await tap('Back to main menu'); await tap('Play Duel');
       await page.getByRole('heading', { name: 'Choose a theme', exact: true }).waitFor();
       await tap(page.locator(`.theme-choice-card[data-theme="${themeId}"]`)); await tap('Play Duel');
-      await advance(4000); await advance(1500); await page.locator('.game-board').waitFor(); await advance(1000);
+      await advance(4000); await advance(2500); await page.locator('.game-board').waitFor(); await advance(1000);
       const board = await inspectBoard();
       const details = scenario ? await scenario({ page, tap, tapTile, advance, stored, snapshot, checkRules, resultAndRank }) : {};
       assert.deepEqual(errors, []);
@@ -204,11 +207,12 @@ const sizes = [{ width: 320, height: 568 }, { width: 390, height: 844 }, { width
   try {
     const representative = ['crown', 'turtle', 'moon-gate', 'twin-towers', 'diamond', 'bridge', 'serpent', 'lotus'];
     let firstBoard;
-    for (const [editionIndex, edition] of ['eastern', 'western'].entries()) for (const [index, theme] of themes.entries()) {
-      const seed = seedFor(representative[editionIndex * themes.length + index]);
-      const first = editionIndex === 0 && index === 0;
+    for (const round of [0, 1]) for (const [index, theme] of themes.entries()) {
+      const edition = rulesetForTheme(theme.id);
+      const seed = seedFor(representative[round * themes.length + index]);
+      const first = round === 0 && index === 0;
       if (outcomesOnly && !first) continue;
-      const board = await run(`${edition}-${theme.id}`, { themeId: theme.id, edition, seed, viewport: sizes[index] }, first ? async ui => {
+      const board = await run(`${theme.id}-${edition}-formation-${round + 1}`, { themeId: theme.id, seed, viewport: sizes[index] }, first ? async ui => {
         await ui.checkRules(); const baseline = await ui.stored();
         for (let matched = 0; matched < 30; matched++) {
           let pair;

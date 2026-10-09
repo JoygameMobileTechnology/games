@@ -1,16 +1,18 @@
 import React, { useId } from 'react';
-import { getStandaloneTrophyUrl, getTrophyAtlasUrl } from './achievement-artwork.js';
+import { getMilestoneTrophyUrl, getStandaloneTrophyUrl, getTrophyAtlasUrl } from './achievement-artwork.js';
 import { getTrophyGlory } from './achievement-trophy-state.js';
 
 const subjects = ['duelist', 'bamboo', 'banner', 'ribbon', 'heart', 'fan', 'reed', 'scales', 'steps', 'cabinet', 'flower', 'screen', 'lantern', 'compass', 'eagle', 'cup'];
 
-/** One illustrated subject; each earned level adds another pair of laurel leaves. */
+/** One illustrated subject; earned levels build its laurel and full-color finish. */
 export function AchievementTrophy({ artKey = 'cup', level = 0, totalLevels = 1, preview = false }) {
   const id = useId().replace(/:/g, '');
   const standaloneUrl = getStandaloneTrophyUrl(artKey);
+  const individualUrl = standaloneUrl || getMilestoneTrophyUrl(artKey);
   const index = Math.max(0, subjects.indexOf(artKey));
   const glory = getTrophyGlory(level, totalLevels);
-  const leaves = totalLevels > 1 ? Math.min(level, 10) : 0;
+  // Four levels still reach the full ten-leaf wreath of the former long tracks.
+  const leaves = totalLevels === 4 ? [0, 1, 3, 6, 10][Math.max(0, Math.min(level, 4))] : totalLevels > 1 ? Math.min(level, 10) : 0;
   return <span className={`achievement-trophy glory-${glory} ${preview ? 'is-preview' : ''}`} data-glory={glory} aria-hidden="true">
     <svg className="trophy-ornament" viewBox="0 0 240 240">
       <defs><linearGradient id={`laurel-${id}`} x1="0" x2="1" y1="0" y2="1"><stop stopColor="#fff2b4" /><stop offset=".45" stopColor="#e6b547" /><stop offset="1" stopColor="#97521b" /></linearGradient></defs>
@@ -21,7 +23,7 @@ export function AchievementTrophy({ artKey = 'cup', level = 0, totalLevels = 1, 
       {totalLevels > 1 && glory >= 4 && <path fill={`url(#laurel-${id})`} stroke="#a86b23" d="m98 24-6-17 19 9 9-14 9 14 19-9-6 17z" />}
       {totalLevels > 1 && glory === 5 && <g fill="#fff4b9"><path d="m27 57 3 9 9 3-9 3-3 9-3-9-9-3 9-3zM207 106l3 9 9 3-9 3-3 9-3-9-9-3 9-3z" /></g>}
     </svg>
-    <span className={`trophy-illustration ${standaloneUrl ? 'trophy-illustration--standalone' : `sprite-row-${Math.floor(index / 4)}`}`} style={{ backgroundImage: `url("${standaloneUrl || getTrophyAtlasUrl()}")`, backgroundPosition: standaloneUrl ? 'center' : `${(index % 4) * 100 / 3}% ${Math.floor(index / 4) * 100 / 3}%` }} />
+    <span className={`trophy-illustration ${standaloneUrl ? 'trophy-illustration--standalone' : individualUrl ? 'trophy-illustration--individual' : `sprite-row-${Math.floor(index / 4)}`}`} style={{ backgroundImage: `url("${individualUrl || getTrophyAtlasUrl()}")`, backgroundPosition: individualUrl ? 'center' : `${(index % 4) * 100 / 3}% ${Math.floor(index / 4) * 100 / 3}%` }} />
     {level === 0 && <span className="trophy-lock"><svg viewBox="0 0 24 24"><path d="M7 10V7a5 5 0 0 1 10 0v3M6 10h12v11H6z" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinejoin="round" /><circle cx="12" cy="15" r="1.5" /></svg></span>}
   </span>;
 }

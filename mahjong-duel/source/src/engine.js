@@ -2,6 +2,7 @@ import { themeTileSets } from './tile-data.js';
 import { FORMATION_WIDTH, FORMATION_HEIGHT, FORMATION_IDS, getFormation, chooseFormationId } from './formations.js';
 import { TILES_PER_DUEL, RARITY_PAIRS_PER_DUEL } from './game-balance.js';
 import { rarityForTile } from './rarity.js';
+import { launchThemeIds, rulesetForTheme } from './themes.js';
 
 export const BOARD_WIDTH = FORMATION_WIDTH;
 export const BOARD_HEIGHT = FORMATION_HEIGHT;
@@ -182,6 +183,13 @@ function chooseFaces(ruleset, difficulty, theme, random) {
   });
 }
 
+/** Production duels always use the selected theme's assigned collection. */
+export function createThemeGame(theme, seed = randomSeed(), difficulty = 'balanced', options = {}) {
+  if (!launchThemeIds.includes(theme)) throw new RangeError(`Unknown playable theme: ${theme}`);
+  return createGame(rulesetForTheme(theme), seed, difficulty, theme, options);
+}
+
+// Retained for catalogue tooling and historical deal validation.
 export function createGame(ruleset = 'eastern', seed = randomSeed(), difficulty = 'balanced', theme = 'ming-porcelain', options = {}) {
   const normalizedSeed = normalizeSeed(seed);
   if (!options || typeof options !== 'object' || Array.isArray(options)) throw new TypeError('Deal options must be an object.');
