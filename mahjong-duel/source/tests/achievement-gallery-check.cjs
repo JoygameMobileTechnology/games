@@ -39,6 +39,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(
   fs.mkdirSync(output, { recursive: true });
   const browser = await require(process.env.PLAYWRIGHT_MODULE || 'playwright')[browserName].launch();
   const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  await context.addInitScript(() => { try { localStorage.setItem('porcelain:language', '"en"'); } catch { /* Storage-denied fixtures use the Turkish default. */ } });
   const page = await context.newPage();
   page.setDefaultTimeout(12000);
   const errors = [], checks = [], metrics = [];

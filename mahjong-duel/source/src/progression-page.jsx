@@ -1,3 +1,4 @@
+import { t } from './i18n.js';
 import React, { useEffect, useId, useRef } from 'react';
 import { ArrowLeft } from '@phosphor-icons/react';
 import './progression-pages.css';
@@ -23,7 +24,7 @@ export function ProgressionPage({ title, className = '', style, onClose, childre
   }, []);
   useEffect(() => { heading.current?.focus({ preventScroll: true }); }, [title]);
   return <section className={`progression-page ${className}`} style={style} ref={root} role="dialog" aria-modal="true" aria-labelledby={id}>
-    <header className="progression-page-header">{hideBack ? <span aria-hidden="true" /> : <button className="icon-button" type="button" aria-label={closeLabel} onClick={onClose}><ArrowLeft size={27} weight="bold" /></button>}<h2 id={id} ref={heading} tabIndex={-1}>{title}</h2><span aria-hidden="true" /></header>
+    <header className="progression-page-header">{hideBack ? <span aria-hidden="true" /> : <button className="icon-button" type="button" aria-label={t(closeLabel)} onClick={onClose}><ArrowLeft size={27} weight="bold" /></button>}<h2 id={id} ref={heading} tabIndex={-1}>{t(title)}</h2><span aria-hidden="true" /></header>
     <div className="progression-page-scroll" ref={bodyRef}><div className="progression-page-content">{children}</div></div>
   </section>;
 }

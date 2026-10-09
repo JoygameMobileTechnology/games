@@ -36,6 +36,7 @@ const near = (actual, expected, message, tolerance = 1) => assert.ok(Math.abs(ac
   async function newPage(seed, viewport, preference = 'normal') {
     const context = await browser.newContext({ viewport, isMobile: true, hasTouch: true,
       reducedMotion: preference === 'system' ? 'reduce' : 'no-preference' });
+    await context.addInitScript(() => { try { localStorage.setItem('porcelain:language', '"en"'); } catch { /* Storage-denied fixtures use the Turkish default. */ } });
     await context.addInitScript(({ seed, preference }) => {
       localStorage.setItem('porcelain:menuBackground', JSON.stringify(seed.previous));
       localStorage.setItem('porcelain:sound', 'false');
@@ -57,7 +58,7 @@ const near = (actual, expected, message, tolerance = 1) => assert.ok(Math.abs(ac
 
   async function home(page, expected) {
     await page.waitForFunction(() => !document.querySelector('.progression-page, .sheet-backdrop, .game-board'));
-    await button(page, 'Play Duel').waitFor();
+    await button(page, 'Play').waitFor();
     await page.waitForFunction(selector => {
       const image = document.querySelector(`${selector} .menu-scene-art`);
       return image?.complete && image.naturalWidth > 0;
@@ -68,10 +69,10 @@ const near = (actual, expected, message, tolerance = 1) => assert.ok(Math.abs(ac
   }
 
   async function chooseTheme(page) {
-    await button(page, 'Play Duel').click();
+    await button(page, 'Play').click();
     await page.getByRole('heading', { name: 'Choose a theme', exact: true }).waitFor();
-    assert.equal(await page.locator(transitionSelector).count(), 0, 'home Play Duel opens theme selection before the transition');
-    assert.equal(await page.locator('.game-board').count(), 0, 'no board is dealt before the final Play Duel');
+    assert.equal(await page.locator(transitionSelector).count(), 0, 'home Play opens theme selection before the transition');
+    assert.equal(await page.locator('.game-board').count(), 0, 'no board is dealt before the final Play');
     await page.locator('.theme-choice-play').waitFor();
   }
 

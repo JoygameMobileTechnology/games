@@ -12,6 +12,7 @@ const { pathToFileURL } = require('node:url');
   const browserName = process.argv.includes('--webkit') ? 'webkit' : 'chromium';
   const browser = await require(process.env.PLAYWRIGHT_MODULE || 'playwright')[browserName].launch({ headless: true });
   const page = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  await page.addInitScript(() => { localStorage.setItem('porcelain:language', '"en"'); });
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   page.on('response', response => { if (response.status() >= 400) errors.push(`${response.status()} ${response.url()}`); });
@@ -33,7 +34,7 @@ const { pathToFileURL } = require('node:url');
       value = awardCollectedPair(value, { gameId: 'binder-test', pairId: `pair-${index}`, actor: 'you', matchKey: `ming-porcelain:eastern:${id}` });
     }
     await page.evaluate(({ key, value }) => {
-      localStorage.clear(); localStorage.setItem(key, JSON.stringify(value));
+      localStorage.clear(); localStorage.setItem('porcelain:language', '"en"'); localStorage.setItem(key, JSON.stringify(value));
       localStorage.setItem('porcelain:gentle', 'true'); localStorage.setItem('porcelain:sound', 'false');
     }, { key: COLLECTION_STORAGE_KEY, value });
     await page.reload(); await openCollection();

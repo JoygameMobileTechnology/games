@@ -11,6 +11,7 @@ const output = path.resolve('tmp/realistic-ai');
 
 async function checkCompletedProfile(browser) {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, reducedMotion: 'reduce' });
+  await context.addInitScript(() => { try { localStorage.setItem('porcelain:language', '"en"'); } catch { /* Storage-denied fixtures use the Turkish default. */ } });
   await context.addInitScript(() => {
     localStorage.setItem('porcelain:gentle', 'true');
     localStorage.setItem('porcelain:sound', 'false');
@@ -54,9 +55,9 @@ async function checkCompletedProfile(browser) {
     };
   });
   async function launch() {
-    await tap('Play Duel');
+    await tap('Play');
     await page.getByRole('heading', { name: 'Choose a theme', exact: true }).waitFor();
-    await tap('Play Duel'); await advance(4000); await advance(1500);
+    await tap('Play'); await advance(4000); await advance(1500);
     await page.locator('.game-board').waitFor(); await advance(1000);
     assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('porcelain:aiMode'))), 'realistic');
   }
@@ -101,7 +102,7 @@ async function checkCompletedProfile(browser) {
     await launch(); await matchPair(0, learned);
     // Duels deliberately have no saved session; reloading abandons this board.
     await page.reload(); await advance(400);
-    await button('Play Duel').waitFor();
+    await button('Play').waitFor();
     assert.deepEqual(await profile(), learned, 'abandoning a later duel preserves the learned profile');
     assert.deepEqual(errors, []);
     fs.writeFileSync(path.join(output, `${browserName}-completion-report.json`), JSON.stringify({ browserName, learned, matchedPairs: 30, abandonedNextDuel: true, errors }, null, 2));
@@ -120,6 +121,7 @@ async function checkCompletedProfile(browser) {
     return;
   }
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, reducedMotion: 'reduce' });
+  await context.addInitScript(() => { try { localStorage.setItem('porcelain:language', '"en"'); } catch { /* Storage-denied fixtures use the Turkish default. */ } });
   await context.addInitScript(() => {
     localStorage.setItem('porcelain:gentle', 'true');
     localStorage.setItem('porcelain:sound', 'false');
@@ -213,9 +215,9 @@ async function checkCompletedProfile(browser) {
     await page.getByRole('heading', { name: 'Daily Rewards', exact: true }).waitFor();
     await advance(400); await tap('Claim rewards', 400);
     await page.getByRole('heading', { name: 'Daily Quests', exact: true }).waitFor();
-    await tap('Back to main menu', 400); await tap('Play Duel', 400);
+    await tap('Back to main menu', 400); await tap('Play', 400);
     await page.getByRole('heading', { name: 'Choose a theme', exact: true }).waitFor();
-    await tap('Play Duel', 400); await advance(4000); await advance(1500);
+    await tap('Play', 400); await advance(4000); await advance(1500);
     await page.locator('.game-board').waitFor(); await advance(1000);
     assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('porcelain:aiMode'))), 'realistic');
 

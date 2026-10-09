@@ -16,6 +16,7 @@ const output = path.resolve('tmp/opponent-settings');
     for (const viewport of [{ width: 320, height: 568 }, { width: 390, height: 844 }, { width: 768, height: 1024 }]) {
       const label = `${browserName}-${viewport.width}x${viewport.height}`;
       const context = await browser.newContext({ viewport, isMobile: true, hasTouch: true, reducedMotion: 'reduce' });
+      await context.addInitScript(() => { try { localStorage.setItem('porcelain:language', '"en"'); } catch { /* Storage-denied fixtures use the Turkish default. */ } });
       const previousMode = viewport.width === 320 ? 'modern' : viewport.width === 768 ? 'original' : null;
       await context.addInitScript(previousMode => {
         // Legacy settings lack the migration stamp. Later choices use the UI.
@@ -96,7 +97,7 @@ const output = path.resolve('tmp/opponent-settings');
       }
       async function enterDuel() {
         await page.getByRole('heading', { name: 'Choose a theme', exact: true }).waitFor();
-        await tap('Play Duel');
+        await tap('Play');
         await advance(4000); await advance(2500);
         await page.locator('.game-board').waitFor(); await advance(1000);
       }
@@ -127,7 +128,7 @@ const output = path.resolve('tmp/opponent-settings');
         await tap('Done'); await page.reload(); await advance(400);
         await tap('Settings'); await checkSettings('Realistic');
         assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('porcelain:aiMode'))), 'realistic');
-        await tap('Done'); await tap('Play Duel'); await enterDuel();
+        await tap('Done'); await tap('Play'); await enterDuel();
         const moves = [await playAttempts('Realistic')];
         await tap('Pause game'); await tap('Settings');
         await checkSettings('Realistic', 'Realistic');
@@ -138,7 +139,7 @@ const output = path.resolve('tmp/opponent-settings');
         await page.reload(); await advance(400);
         await tap('Settings'); await checkSettings('Original AI');
         assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('porcelain:aiMode'))), 'original');
-        await tap('Done'); await tap('Play Duel'); await enterDuel();
+        await tap('Done'); await tap('Play'); await enterDuel();
         moves.push(await playAttempts('Original AI'));
         await tap('Pause game'); await tap('Settings');
         await checkSettings('Original AI', 'Original AI');

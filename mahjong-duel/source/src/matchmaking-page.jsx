@@ -1,3 +1,4 @@
+import { t } from './i18n.js';
 import React from 'react';
 import { Check } from '@phosphor-icons/react';
 import { ProgressionPage } from './progression-page.jsx';
@@ -31,8 +32,8 @@ function PlayerSeat({ profile, isPlayer = false, searching = false }) {
         {searching ? <AnonymousPortrait /> : <PlayerAvatar profile={profile} size={180} showFlag={false} shape="circle" className="matchmaking-avatar" />}
       </div>
     </div>
-    <strong className="matchmaking-player-name" title={isPlayer ? profile?.name : searching ? undefined : profile?.name}>{isPlayer ? 'You' : searching ? 'Opponent' : profile?.name || 'Opponent'}</strong>
-    <span className={`matchmaking-player-state ${searching ? '' : 'is-ready'}`}>{searching ? 'Searching…' : <><Check size={16} weight="bold" aria-hidden="true" />Ready</>}</span>
+    <strong className="matchmaking-player-name" title={isPlayer ? profile?.name : searching ? undefined : profile?.name}>{isPlayer ? t("You") : searching ? t("Opponent") : profile?.name || t("Opponent")}</strong>
+    <span className={`matchmaking-player-state ${searching ? '' : 'is-ready'}`}>{searching ? t("Searching…") : <><Check size={16} weight="bold" aria-hidden="true" />{t("Ready")}</>}</span>
   </div>;
 }
 
@@ -45,27 +46,27 @@ export function MatchmakingPage({ profile, opponent, theme, status = 'searching'
   const artwork = matchmakingArt[selectedTheme.id] || matchmakingArt[defaultTheme.id];
   const seconds = Math.floor(Math.max(0, Number(elapsedMs) || 0) / 1000);
   const elapsed = `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
-  const heading = searching ? 'Finding an opponent…' : starting ? 'Starting your duel…' : 'Opponent found!';
-  const announcement = searching ? 'Finding an opponent. You are ready.' : starting ? 'Starting your duel.' : `${opponent?.name || 'Your opponent'} is ready. Match found.`;
-  return <ProgressionPage title="Matchmaking" className={`matchmaking-page matchmaking-${selectedTheme.id} ${searching ? 'is-searching' : 'is-found'} ${faceoff ? 'is-faceoff' : ''} ${starting ? 'is-starting' : ''} ${paused ? 'is-paused' : ''} ${gentle ? 'is-gentle' : ''}`} style={{ '--matchmaking-paper': `url(${JSON.stringify(artwork.paper)})` }} onClose={searching ? onCancel : undefined} hideBack>
+  const heading = searching ? t("Finding an opponent…") : starting ? t("Starting your duel…") : t("Opponent found!");
+  const announcement = searching ? t("Finding an opponent. You are ready.") : starting ? t("Starting your duel.") : t('{name} is ready. Match found.', { name: opponent?.name || t('Your opponent') });
+  return <ProgressionPage title={t("Matchmaking")} className={`matchmaking-page matchmaking-${selectedTheme.id} ${searching ? 'is-searching' : 'is-found'} ${faceoff ? 'is-faceoff' : ''} ${starting ? 'is-starting' : ''} ${paused ? 'is-paused' : ''} ${gentle ? 'is-gentle' : ''}`} style={{ '--matchmaking-paper': `url(${JSON.stringify(artwork.paper)})` }} onClose={searching ? onCancel : undefined} hideBack>
     <div className="matchmaking-live-status" role="status" aria-live="polite" aria-atomic="true">{announcement}</div>
-    <section className="matchmaking-search" aria-label="Duel players">
+    <section className="matchmaking-search" aria-label={t("Duel players")}>
       <h3 className="matchmaking-heading">{heading}</h3>
       <div className="matchmaking-players">
         <img className="matchmaking-ink" src={artwork.ink} alt="" aria-hidden="true" draggable="false" />
         <PlayerSeat profile={profile} isPlayer />
-        <span className="matchmaking-versus" aria-label="versus"><VersusOrnament /><span>VS</span><i aria-hidden="true" /></span>
+        <span className="matchmaking-versus" aria-label={t("versus")}><VersusOrnament /><span>VS</span><i aria-hidden="true" /></span>
         <PlayerSeat profile={opponent} searching={searching} />
       </div>
       <div className="matchmaking-progress">
         {searching && <span className="matchmaking-progress-dots" aria-hidden="true"><span /><span /><span /></span>}
-        <p className="matchmaking-elapsed" aria-live="off">{searching ? <>{paused ? 'Search paused' : 'Searching'}<span aria-hidden="true"> · </span><time>{elapsed}</time></> : starting ? 'Your table is ready' : 'Both players are ready'}</p>
+        <p className="matchmaking-elapsed" aria-live="off">{searching ? <>{paused ? t("Search paused") : t("Searching")}<span aria-hidden="true"> · </span><time>{elapsed}</time></> : starting ? t("Your table is ready") : t("Both players are ready")}</p>
       </div>
     </section>
-    <section className="matchmaking-theme" data-theme={selectedTheme.id} aria-label={`Selected theme: ${selectedTheme.name}`}>
+    <section className="matchmaking-theme" data-theme={selectedTheme.id} aria-label={t('Selected theme: {name}', { name: t(selectedTheme.name) })}>
       <ThemeArtwork theme={selectedTheme} surfaceSrc={artwork.paper} />
-      <div className="matchmaking-theme-copy"><span>Selected theme</span><strong>{selectedTheme.name}</strong><small>40 unique artworks</small></div>
+      <div className="matchmaking-theme-copy"><span>{t("Selected theme")}</span><strong>{t(selectedTheme.name)}</strong><small>{t("40 unique artworks")}</small></div>
     </section>
-    <footer className="matchmaking-footer">{searching ? <button className="progression-secondary matchmaking-cancel" type="button" onClick={onCancel}>Cancel</button> : <p className="matchmaking-preparing">Preparing your table…</p>}</footer>
+    <footer className="matchmaking-footer">{searching ? <button className="progression-secondary matchmaking-cancel" type="button" onClick={onCancel}>{t("Cancel")}</button> : <p className="matchmaking-preparing">{t("Preparing your table…")}</p>}</footer>
   </ProgressionPage>;
 }

@@ -72,6 +72,7 @@ const sizes = [{ width: 320, height: 568 }, { width: 390, height: 844 }, { width
     const { themeId = themes[0].id, seed, viewport = sizes[1] } = fixture;
     const edition = rulesetForTheme(themeId);
     const context = await browser.newContext({ viewport, isMobile: true, hasTouch: true, reducedMotion: 'reduce' });
+    await context.addInitScript(() => { try { localStorage.setItem('porcelain:language', '"en"'); } catch { /* Storage-denied fixtures use the Turkish default. */ } });
     await context.addInitScript(({ collection, edition, seed }) => {
       localStorage.setItem('porcelain:collection', JSON.stringify(collection));
       // An obsolete preference must not override the selected theme's tile set.
@@ -189,9 +190,9 @@ const sizes = [{ width: 320, height: 568 }, { width: 390, height: 844 }, { width
     try {
       await page.goto(origin); await page.getByRole('heading', { name: 'Daily Rewards', exact: true }).waitFor(); await advance(400);
       await tap('Claim rewards'); await page.getByRole('heading', { name: 'Daily Quests', exact: true }).waitFor();
-      await tap('Back to main menu'); await tap('Play Duel');
+      await tap('Back to main menu'); await tap('Play');
       await page.getByRole('heading', { name: 'Choose a theme', exact: true }).waitFor();
-      await tap(page.locator(`.theme-choice-card[data-theme="${themeId}"]`)); await tap('Play Duel');
+      await tap(page.locator(`.theme-choice-card[data-theme="${themeId}"]`)); await tap('Play');
       await advance(4000); await advance(2500); await page.locator('.game-board').waitFor(); await advance(1000);
       const board = await inspectBoard();
       const details = scenario ? await scenario({ page, tap, tapTile, advance, stored, snapshot, checkRules, resultAndRank }) : {};

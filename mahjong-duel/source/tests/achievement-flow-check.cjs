@@ -11,9 +11,10 @@ const origin = process.env.GAME_URL || 'http://localhost:5173';
 (async () => {
   const browser = await require(process.env.PLAYWRIGHT_MODULE || 'playwright')[browserName].launch();
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  await context.addInitScript(() => { try { localStorage.setItem('porcelain:language', '"en"'); } catch { /* Storage-denied fixtures use the Turkish default. */ } });
   await context.addInitScript(() => {
     if (!sessionStorage.getItem('achievement-flow-started')) {
-      localStorage.clear();
+      localStorage.clear(); localStorage.setItem('porcelain:language', '"en"');
       localStorage.setItem('porcelain:gentle', 'true');
       localStorage.setItem('porcelain:sound', 'false');
       sessionStorage.setItem('achievement-flow-started', 'true');
@@ -53,7 +54,7 @@ const origin = process.env.GAME_URL || 'http://localhost:5173';
   try {
     await page.goto(origin);
     await button('Back to main menu').click();
-    await button('Play Duel').click();
+    await button('Play').click();
     await page.locator('.game-tile').first().waitFor();
     const before = await page.locator('.game-board').boundingBox();
     await matchPair(58);
@@ -82,7 +83,7 @@ const origin = process.env.GAME_URL || 'http://localhost:5173';
     const saved = await stored();
     assert.ok(saved.unlocked.M013);
     await page.reload();
-    await button('Play Duel').waitFor();
+    await button('Play').waitFor();
     assert.equal(await page.locator('.achievement-toast-stage').count(), 0, 'Stored achievements never replay on reload');
     assert.deepEqual((await stored()).unlocked, saved.unlocked);
     assert.deepEqual(errors, []);

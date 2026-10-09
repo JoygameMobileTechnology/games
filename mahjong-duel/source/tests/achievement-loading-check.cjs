@@ -36,6 +36,7 @@ function assertStable(before, after, label) {
   async function run(viewport, { offline = false, fallback = false } = {}) {
     const label = `${offline ? 'standalone-offline' : 'development'}-${viewport.width}x${viewport.height}${fallback ? '-without-observer' : ''}`;
     const context = await browser.newContext({ viewport, isMobile: true, hasTouch: true, reducedMotion: 'reduce' });
+    await context.addInitScript(() => { try { localStorage.setItem('porcelain:language', '"en"'); } catch { /* Storage-denied fixtures use the Turkish default. */ } });
     await context.addInitScript(({ fallback }) => {
       localStorage.setItem('porcelain:gentle', 'true');
       localStorage.setItem('porcelain:sound', 'false');

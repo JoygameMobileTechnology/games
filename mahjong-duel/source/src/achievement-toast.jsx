@@ -1,3 +1,4 @@
+import { t, formatNumber as format } from './i18n.js';
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { achievementById, activeAchievementIdFor, isAchievementId } from './achievements.js';
@@ -75,14 +76,14 @@ export function AchievementNotifications({ batches = [], onComplete, paused = fa
   const names = displayed.map(definition => {
     const family = familyForAchievement(definition.id);
     const level = family?.milestones.find(item => item.id === definition.id)?.level;
-    return family ? `${family.name}${family.totalLevels > 1 ? ` · Level ${level}` : ''}` : definition.name;
+    return family ? (family.totalLevels > 1 ? t('{name} · Level {level}', { name: t(family.name), level: format(level) }) : t(family.name)) : t(definition.name);
   });
-  const announcement = `Achievement unlocked: ${names.join('; ')}.`;
+  const announcement = t('Achievement unlocked: {names}.', { names: names.join('; ') });
   return createPortal(<div className={`achievement-toast-stage ${held ? 'is-paused' : ''} ${gentle ? 'is-gentle' : ''}`}
     aria-live="polite" aria-atomic="true" role="status" aria-label={announcement} data-achievement-batch={id}>
     <div className="achievement-toast" key={id} style={{ '--achievement-duration': `${duration}ms` }}>
       <Medal />
-      <div className="achievement-toast-copy"><div className="achievement-toast-heading"><span>Achievement unlocked</span>{more > 0 && <b>+{more} more</b>}</div>
+      <div className="achievement-toast-copy"><div className="achievement-toast-heading"><span>{t('Achievement unlocked')}</span>{more > 0 && <b>{t('+{count} more', { count: format(more) })}</b>}</div>
         <strong title={names.join('\n')}>{names[0]}</strong></div>
       <span className="achievement-toast-timer" aria-hidden="true" />
     </div>

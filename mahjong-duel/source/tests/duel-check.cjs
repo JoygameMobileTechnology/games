@@ -23,6 +23,7 @@ const load = name => import(pathToFileURL(path.join(root, 'src', name)));
   const playwright = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
   const browser = await playwright[browserName].launch({ headless: true });
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  await context.addInitScript(() => { try { localStorage.setItem('porcelain:language', '"en"'); } catch { /* Storage-denied fixtures use the Turkish default. */ } });
   fs.mkdirSync(output, { recursive: true });
   await context.addInitScript(() => {
     window.__duelSelections = [];
@@ -88,7 +89,7 @@ const load = name => import(pathToFileURL(path.join(root, 'src', name)));
   }
   async function reset() {
     await page.goto(origin);
-    await page.evaluate(() => { localStorage.clear(); localStorage.setItem('porcelain:sound', 'false'); localStorage.setItem('porcelain:gentle', 'true'); });
+    await page.evaluate(() => { localStorage.clear(); localStorage.setItem('porcelain:language', '"en"'); localStorage.setItem('porcelain:sound', 'false'); localStorage.setItem('porcelain:gentle', 'true'); });
     await page.reload();
     await button('Duel').waitFor();
   }

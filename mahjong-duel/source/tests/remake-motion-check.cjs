@@ -23,6 +23,7 @@ const root = path.resolve(__dirname, '..');
   try {
     for (const reduced of [false, true]) {
       const context = await browser.newContext({ viewport: { width: 390, height: 844 }, reducedMotion: reduced ? 'reduce' : 'no-preference' });
+      await context.addInitScript(() => { try { localStorage.setItem('porcelain:language', '"en"'); } catch { /* Storage-denied fixtures use the Turkish default. */ } });
       await context.addInitScript(() => {
         window.__audioStarts = 0;
         for (const Type of [window.AudioBufferSourceNode, window.OscillatorNode]) {

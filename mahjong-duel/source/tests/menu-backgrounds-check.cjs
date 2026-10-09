@@ -27,11 +27,12 @@ const viewports = [{ width: 320, height: 568 }, { width: 390, height: 844 }, { w
   const savedId = page => page.evaluate(() => JSON.parse(localStorage.getItem('porcelain:menuBackground')));
   async function newPage(seed, deniedStorage = false) {
     const context = await browser.newContext({ viewport: viewports[1], isMobile: true, hasTouch: true });
+    await context.addInitScript(() => { try { localStorage.setItem('porcelain:language', '"en"'); } catch { /* Storage-denied fixtures use the Turkish default. */ } });
     await context.addInitScript(({ seed, deniedStorage }) => {
       if (deniedStorage) {
         Object.defineProperty(window, 'localStorage', { get() { throw new DOMException('Storage blocked for test', 'SecurityError'); } });
       } else if (!sessionStorage.getItem('menu-background-check-seeded')) {
-        localStorage.clear();
+        localStorage.clear(); localStorage.setItem('porcelain:language', '"en"');
         if (seed) localStorage.setItem('porcelain:menuBackground', JSON.stringify(seed.previous));
         localStorage.setItem('porcelain:sound', 'false');
         sessionStorage.setItem('menu-background-check-seeded', 'true');
@@ -48,7 +49,7 @@ const viewports = [{ width: 320, height: 568 }, { width: 390, height: 844 }, { w
   async function home(page) {
     await page.locator('.world').waitFor();
     if (await button(page, 'Back to main menu').count()) await button(page, 'Back to main menu').click();
-    await button(page, 'Play Duel').waitFor();
+    await button(page, 'Play').waitFor();
     await page.locator('.game-board, .sheet-backdrop, .progression-page').waitFor({ state: 'detached' });
     await page.waitForFunction(() => {
       const image = document.querySelector('.menu-scene:not(.menu-scene-transition) .menu-scene-art');
@@ -115,7 +116,7 @@ const viewports = [{ width: 320, height: 568 }, { width: 390, height: 844 }, { w
     await unchanged(page, expected, 'return from Daily Rewards');
   }
   async function duelAndReturn(page, expected, storageAvailable = true) {
-    await button(page, 'Play Duel').click();
+    await button(page, 'Play').click();
     const transition = page.locator(expected === 'bamboo' ? '.door-transition' : '.menu-scene-transition');
     await transition.waitFor();
     if (expected !== 'bamboo') {
@@ -162,7 +163,7 @@ const viewports = [{ width: 320, height: 568 }, { width: 390, height: 844 }, { w
       assert.ok(left >= -1 && right <= viewport.width + 1 && top >= -1 && bottom <= viewport.height + 1, `${control.name} stays on screen`);
       assert.ok(control.clickable, `${control.name} is not blocked by menu artwork or atmosphere`);
     }
-    for (const name of ['Settings', 'Choose tile theme', 'Play Duel', 'Collection']) await button(page, name).click({ trial: true });
+    for (const name of ['Settings', 'Choose tile theme', 'Play', 'Collection']) await button(page, name).click({ trial: true });
     await page.screenshot({ path: path.join(output, `${expected}-${browserName}-${viewport.width}x${viewport.height}.png`) });
     layouts.push({ scene: expected, ...metrics });
     await settings(page, expected);

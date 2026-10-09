@@ -19,10 +19,11 @@ const browserName = process.argv.includes('--webkit') ? 'webkit' : 'chromium';
   const initialCollection = { version: 1, counts: { 'ming-porcelain:eastern:K01': 2 }, receipts: {} };
   const browser = await require(process.env.PLAYWRIGHT_MODULE || 'playwright')[browserName].launch({ headless: true });
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  await context.addInitScript(() => { try { localStorage.setItem('porcelain:language', '"en"'); } catch { /* Storage-denied fixtures use the Turkish default. */ } });
   await context.addInitScript(({ oldSave, initialCollection }) => {
     const originalSet = Storage.prototype.setItem;
     if (!sessionStorage.getItem('menu-flow-seeded')) {
-      localStorage.clear();
+      localStorage.clear(); localStorage.setItem('porcelain:language', '"en"');
       for (const [key, value] of Object.entries({ session: oldSave, collection: initialCollection, sound: false, gentle: true }))
         originalSet.call(localStorage, `porcelain:${key}`, JSON.stringify(value));
       originalSet.call(sessionStorage, 'menu-flow-seeded', 'true');
@@ -58,7 +59,7 @@ const browserName = process.argv.includes('--webkit') ? 'webkit' : 'chromium';
     await page.getByRole('dialog', { name, exact: true }).waitFor();
   }
   async function home() {
-    await button('Play Duel').waitFor();
+    await button('Play').waitFor();
     await page.locator('.game-board').waitFor({ state: 'detached' });
     assert.equal(await page.locator('.menu-fan:visible').count(), 0, 'the decorative tile fan is hidden');
     assert.equal(await page.locator('.home-resume, .home-rules, .home-help, .collection-label').count(), 0);
@@ -82,7 +83,7 @@ const browserName = process.argv.includes('--webkit') ? 'webkit' : 'chromium';
     tools: [...document.querySelectorAll('.game-tools button')].map(node => node.getAttribute('aria-label')),
   }));
   async function launch(ruleset) {
-    await button('Play Duel').click(); await page.locator('.game-board').waitFor();
+    await button('Play').click(); await page.locator('.game-board').waitFor();
     await page.waitForFunction(() => document.querySelectorAll('.game-tile').length === 60);
     assert.match(await page.locator('.game-board').getAttribute('aria-label'), new RegExp(`^${ruleset} Mahjong board, 60 tiles left$`));
     assert.equal(await page.locator('.game-tile[data-face-up="true"]').count(), 0);

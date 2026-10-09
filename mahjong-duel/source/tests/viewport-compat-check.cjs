@@ -62,6 +62,7 @@ async function checkTable(page, mode, width, height) {
     try {
       for (const mode of modes) {
         const context = await browser.newContext({ viewport: { width: 375, height: 667 }, isMobile: true, hasTouch: true });
+        await context.addInitScript(() => { try { localStorage.setItem('porcelain:language', '"en"'); } catch { /* Storage-denied fixtures use the Turkish default. */ } });
         try {
           await context.addInitScript(mode => {
             localStorage.setItem('porcelain:gentle', 'true'); localStorage.setItem('porcelain:sound', 'false');
@@ -74,7 +75,7 @@ async function checkTable(page, mode, width, height) {
           page.on('pageerror', error => errors.push(error.message));
           await page.goto(origin); await page.evaluate(() => document.fonts.ready);
           await emulateStyles(page, mode);
-          await page.getByRole('button', { name: 'Play Duel', exact: true }).click();
+          await page.getByRole('button', { name: 'Play', exact: true }).click();
           await page.locator('.game-board').waitFor();
           await checkTable(page, mode, 375, 667);
           await checkTable(page, mode, 667, 375);

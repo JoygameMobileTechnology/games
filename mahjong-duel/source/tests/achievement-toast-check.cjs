@@ -9,6 +9,7 @@ const origin = process.env.GAME_URL || 'http://localhost:5173';
 (async () => {
   const browser = await require(process.env.PLAYWRIGHT_MODULE || 'playwright')[browserName].launch();
   const context = await browser.newContext({ viewport: { width: 320, height: 568 }, reducedMotion: 'reduce' });
+  await context.addInitScript(() => { try { localStorage.setItem('porcelain:language', '"en"'); } catch { /* Storage-denied fixtures use the Turkish default. */ } });
   const page = await context.newPage(), errors = [];
   const output = path.resolve('tmp/progression-qa'); fs.mkdirSync(output, { recursive: true });
   page.on('pageerror', error => errors.push(error.message));

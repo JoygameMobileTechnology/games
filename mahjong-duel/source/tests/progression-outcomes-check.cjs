@@ -16,10 +16,11 @@ fs.mkdirSync(output, { recursive: true });
   try {
     for (const outcome of ['lose', 'tie']) {
       const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+      await context.addInitScript(() => { try { localStorage.setItem('porcelain:language', '"en"'); } catch { /* Storage-denied fixtures use the Turkish default. */ } });
       // Preferences only. Every progress counter, deal, attempt and result is earned in the UI.
       await context.addInitScript(() => {
         if (!sessionStorage.getItem('outcome-preferences')) {
-          localStorage.clear();
+          localStorage.clear(); localStorage.setItem('porcelain:language', '"en"');
           localStorage.setItem('porcelain:gentle', 'true');
           localStorage.setItem('porcelain:sound', 'false');
           sessionStorage.setItem('outcome-preferences', 'true');
@@ -69,7 +70,7 @@ fs.mkdirSync(output, { recursive: true });
         await page.getByRole('heading', { name: 'Daily Rewards', exact: true }).waitFor();
         await advance(400);
         await clickControl('Claim rewards');
-        await clickControl('Play Duel');
+        await clickControl('Play');
         await page.locator('.game-board').waitFor(); await advance(600);
         await page.evaluate(() => {
           window.__observedOutcomeCues = [];
@@ -136,8 +137,8 @@ fs.mkdirSync(output, { recursive: true });
         assert.equal(await page.locator('.is-climbing,.is-promoting').count(), 0);
         assert.match(await page.locator('.ranking-outcome').textContent(), /Position held at #10,000/);
         await page.screenshot({ path: path.join(output, `${browserName}-${outcome}-rank-held.png`), animations: 'disabled' });
-        await clickControl('Back to main menu'); await page.getByRole('button', { name: 'Play Duel', exact: true }).waitFor();
-        await page.reload(); await advance(400); await page.getByRole('button', { name: 'Play Duel', exact: true }).waitFor();
+        await clickControl('Back to main menu'); await page.getByRole('button', { name: 'Play', exact: true }).waitFor();
+        await page.reload(); await advance(400); await page.getByRole('button', { name: 'Play', exact: true }).waitFor();
         const reloaded = await stored();
         assert.equal(reloaded.counters.completedDuels, 1); assert.equal(reloaded.counters.completedWins, 0);
         assert.equal(reloaded.ranking.position, 10000); assert.equal(reloaded.pendingRankingPresentation, null);

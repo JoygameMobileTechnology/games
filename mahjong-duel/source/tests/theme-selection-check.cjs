@@ -35,6 +35,7 @@ const time = new Date('2026-09-30T12:00:00Z');
   }
   async function run(label, viewport, fixture, scenario) {
     const context = await browser.newContext({ viewport, isMobile: true, hasTouch: true, reducedMotion: 'reduce' });
+    await context.addInitScript(() => { try { localStorage.setItem('porcelain:language', '"en"'); } catch { /* Storage-denied fixtures use the Turkish default. */ } });
     await context.addInitScript(({ fixture }) => {
       // Seed only once, so a reload genuinely exercises the saved app state.
       if (!localStorage.getItem('theme-selection-check-seeded')) {
@@ -66,9 +67,9 @@ const time = new Date('2026-09-30T12:00:00Z');
       await advance();
     };
     const openSelection = async () => {
-      await tap('Play Duel');
+      await tap('Play');
       await page.getByRole('heading', { name: 'Choose a theme', exact: true }).waitFor();
-      assert.equal(await page.locator('.game-board').count(), 0, `${label}: home Play Duel opens selection before dealing`);
+      assert.equal(await page.locator('.game-board').count(), 0, `${label}: home Play opens selection before dealing`);
     };
     const checkUnlocked = async count => {
       assert.equal(await page.locator('.theme-choice-card').count(), 4);
@@ -96,7 +97,7 @@ const time = new Date('2026-09-30T12:00:00Z');
       });
       assert.ok(layout.overflow.every(node => node.excess <= 1), `${label}: no horizontal overflow ${JSON.stringify(layout.overflow)}`);
       assert.ok(layout.targets.every(node => node.width >= 44 && node.height >= 44), `${label}: controls meet 44px targets ${JSON.stringify(layout.targets)}`);
-      if (footer) assert.ok(layout.footer && layout.footer.top >= 0 && layout.footer.bottom <= layout.height && layout.footer.left >= 0 && layout.footer.right <= layout.width && layout.footer.reachable, `${label}: Play Duel footer stays fully visible and reachable`);
+      if (footer) assert.ok(layout.footer && layout.footer.top >= 0 && layout.footer.bottom <= layout.height && layout.footer.left >= 0 && layout.footer.right <= layout.width && layout.footer.reachable, `${label}: Play footer stays fully visible and reachable`);
       await page.locator('.theme-select-page img:not([loading="lazy"])').evaluateAll(nodes => Promise.all(nodes.map(node => node.decode())));
       await page.screenshot({ path: path.join(output, `${browserName}-${label}-${suffix}.jpg`), type: 'jpeg', quality: 80, animations: 'disabled' });
       return layout;
@@ -194,7 +195,7 @@ const time = new Date('2026-09-30T12:00:00Z');
       }
       // The only unlocked collection must always win, even across repeated random deals.
       for (let attempt = 0; attempt < 3; attempt++) {
-        await tap(page.locator('.theme-random-choice')); await tap('Play Duel');
+        await tap(page.locator('.theme-random-choice')); await tap('Play');
         await checkBoard('ming-porcelain');
         if (attempt < 2) await restart();
       }
@@ -203,7 +204,7 @@ const time = new Date('2026-09-30T12:00:00Z');
     await run('saved-locked-theme', sizes[1], { theme: 'dutch-golden-age', boardTheme: 'stained-glass' }, async ({ page, tap, card, openSelection, checkUnlocked, checkBoard }) => {
       await openSelection(); await checkUnlocked(1);
       assert.equal(await card('ming-porcelain').getAttribute('aria-pressed'), 'true');
-      await tap('Play Duel'); await checkBoard('ming-porcelain');
+      await tap('Play'); await checkBoard('ming-porcelain');
       assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('porcelain:theme'))), 'ming-porcelain');
       return { savedLockedPreferenceGuarded: true };
     });
@@ -215,7 +216,7 @@ const time = new Date('2026-09-30T12:00:00Z');
         await tap(card(themeId));
         assert.equal(await card(themeId).getAttribute('aria-pressed'), 'true');
         if (unlocked === 4) await checkLayout(`${legacyPreference}-all-unlocked`);
-        await tap('Play Duel'); await checkBoard(themeId);
+        await tap('Play'); await checkBoard(themeId);
         await restart(); await tap('Back to main menu'); await tap('Settings');
         assert.equal(await page.getByRole('group', { name: 'Ruleset', exact: true }).count(), 0, 'Settings no longer selects tile sets');
         assert.equal(await page.getByRole('button', { name: /^(Eastern|Western)$/ }).count(), 0);

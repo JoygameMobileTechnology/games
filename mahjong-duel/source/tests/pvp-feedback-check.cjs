@@ -13,6 +13,7 @@ const overlaps = (a, b) => a.x < b.right && a.right > b.x && a.y < b.bottom && a
   const browser = await browserType.launch({ headless: true });
   try {
     const page = await browser.newPage({ viewport: viewports[1] });
+    await page.addInitScript(() => { localStorage.setItem('porcelain:language', '"en"'); });
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
     await page.goto(base);
@@ -133,6 +134,7 @@ const overlaps = (a, b) => a.x < b.right && a.right > b.x && a.y < b.bottom && a
     await page.close();
 
     const context = await browser.newContext({ viewport: viewports[1] });
+    await context.addInitScript(() => { try { localStorage.setItem('porcelain:language', '"en"'); } catch { /* Storage-denied fixtures use the Turkish default. */ } });
     await context.addInitScript(() => {
       localStorage.setItem('porcelain:profile', JSON.stringify({ version: 1, name: 'Ada', avatarId: 'avatar-1', countryCode: 'TR', frameId: '' }));
       localStorage.setItem('porcelain:aiModeVersion', '1'); localStorage.setItem('porcelain:aiMode', '"modern"');
@@ -148,7 +150,7 @@ const overlaps = (a, b) => a.x < b.right && a.right > b.x && a.y < b.bottom && a
     // The starter dialog opens in an effect after the quests page finishes leaving.
     const starter = live.locator('.starter-boosters-intro');
     if (await starter.waitFor({ timeout: 3000 }).then(() => true, () => false)) await live.getByRole('button', { name: 'Got it', exact: true }).click();
-    await live.getByRole('button', { name: 'Play Duel', exact: true }).click();
+    await live.getByRole('button', { name: 'Play', exact: true }).click();
     await live.locator('.theme-choice-play').click();
     await live.waitForSelector('.duel-stage:not([inert])');
     const moves = await live.evaluate(async () => {

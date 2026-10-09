@@ -8,6 +8,7 @@ import { getThemeUnlocks, getThemeProgress } from './theme-unlocks.js';
 import { tileDescription } from './tile-descriptions.js';
 import { TileRarity } from './tile-rarity.jsx';
 import { ProgressionPage } from './progression-pages.jsx';
+import { t, formatNumber } from './i18n.js';
 import './tile-binder.css';
 
 const SPLIT_VIEW = '(min-width: 1000px) and (min-height: 600px) and (orientation: landscape)';
@@ -42,13 +43,13 @@ function RarityMark({ rarity }) {
   </svg></span>;
 }
 function TileDetails({ tile, theme, ruleset, previous, next, onMove }) {
-  return <article className="collection-detail" style={rarityStyle(tile.rarity)} aria-label={`${tile.name} details`}>
-    <p className="collection-detail-context">{theme.name}</p>
-    <div className="collection-detail-art"><span className="collection-detail-tile"><img src={tile.src} alt={tile.name} draggable="false" /><TileRarity rarity={tile.rarity} /></span></div>
-    <div className="collection-detail-copy"><h3 aria-live="polite">{tile.name}</h3><span className="collection-detail-rarity"><RarityMark rarity={tile.rarity} />{tile.rarity.label}</span></div>
-    <div className="collection-detail-status"><span><CheckCircle size={22} weight="duotone" aria-hidden="true" />Collected</span><span>Matched {tile.count.toLocaleString()} {tile.count === 1 ? 'time' : 'times'}</span></div>
-    <p className="collection-detail-description">{tileDescription(theme.id, ruleset, tile.id)}</p>
-    <nav className="collection-detail-nav" aria-label="Browse collected tiles"><button type="button" aria-label="Previous tile" disabled={!previous} onClick={() => onMove(previous)}><CaretLeft size={24} weight="bold" /><span>Previous</span></button><button type="button" aria-label="Next tile" disabled={!next} onClick={() => onMove(next)}><span>Next</span><CaretRight size={24} weight="bold" /></button></nav>
+  return <article className="collection-detail" style={rarityStyle(tile.rarity)} aria-label={t('{name} details', { name: t(tile.name) })}>
+    <p className="collection-detail-context">{t(theme.name)}</p>
+    <div className="collection-detail-art"><span className="collection-detail-tile"><img src={tile.src} alt={t(tile.name)} draggable="false" /><TileRarity rarity={tile.rarity} /></span></div>
+    <div className="collection-detail-copy"><h3 aria-live="polite">{t(tile.name)}</h3><span className="collection-detail-rarity"><RarityMark rarity={tile.rarity} />{t(tile.rarity.label)}</span></div>
+    <div className="collection-detail-status"><span><CheckCircle size={22} weight="duotone" aria-hidden="true" />{t('Collected')}</span><span>{t(tile.count === 1 ? 'Matched {count} time' : 'Matched {count} times', { count: formatNumber(tile.count) })}</span></div>
+    <p className="collection-detail-description">{t(tileDescription(theme.id, ruleset, tile.id))}</p>
+    <nav className="collection-detail-nav" aria-label={t('Browse collected tiles')}><button type="button" aria-label={t('Previous tile')} disabled={!previous} onClick={() => onMove(previous)}><CaretLeft size={24} weight="bold" /><span>{t('Previous')}</span></button><button type="button" aria-label={t('Next tile')} disabled={!next} onClick={() => onMove(next)}><span>{t('Next')}</span><CaretRight size={24} weight="bold" /></button></nav>
   </article>;
 }
 
@@ -106,33 +107,33 @@ export function TileBinder({ collection, initialTheme = defaultTheme.id, onClose
     }
     setSelectedKey(tile.matchKey);
   };
-  return <ProgressionPage title={singleDetail ? 'Tile details' : 'Collection'} className={`collection-page ${singleDetail ? 'is-inspecting' : ''}`} bodyRef={pageBody}
-    closeLabel={singleDetail ? 'Back to collection' : 'Back to main menu'} onClose={singleDetail ? closeDetails : onClose}>
+  return <ProgressionPage title={t(singleDetail ? 'Tile details' : 'Collection')} className={`collection-page ${singleDetail ? 'is-inspecting' : ''}`} bodyRef={pageBody}
+    closeLabel={t(singleDetail ? 'Back to collection' : 'Back to main menu')} onClose={singleDetail ? closeDetails : onClose}>
     <div className="collection-layout" data-split={wide}>
-      <section className="collection-browser" ref={browser} aria-label="Tile collection" hidden={singleDetail} onScroll={event => { if (!singleDetail) scrollPosition.current.browser = event.currentTarget.scrollTop; }}>
+      <section className="collection-browser" ref={browser} aria-label={t('Tile collection')} hidden={singleDetail} onScroll={event => { if (!singleDetail) scrollPosition.current.browser = event.currentTarget.scrollTop; }}>
         <div className="collection-controls">
-          <label className="collection-theme-control" htmlFor={`${id}-theme`}><img src={themeTileSets[themeId][ruleset][0].src} alt="" draggable="false" /><select id={`${id}-theme`} aria-label="Collection theme" value={themeId} onChange={event => { reset(); setThemeId(event.target.value); }}>{themes.map(value => <option key={value.id} value={value.id}>{value.name}</option>)}</select><CaretDown size={20} weight="bold" aria-hidden="true" /></label>
+          <label className="collection-theme-control" htmlFor={`${id}-theme`}><img src={themeTileSets[themeId][ruleset][0].src} alt="" draggable="false" /><select id={`${id}-theme`} aria-label={t('Collection theme')} value={themeId} onChange={event => { reset(); setThemeId(event.target.value); }}>{themes.map(value => <option key={value.id} value={value.id}>{t(value.name)}</option>)}</select><CaretDown size={20} weight="bold" aria-hidden="true" /></label>
         </div>
-        <div className="collection-progress"><div className="collection-progress-copy"><strong>{pageStats.unique} / {pageStats.totalTiles} collected</strong><span>{Math.round(pageStats.unique / pageStats.totalTiles * 100)}%</span></div><progress aria-label={`${theme.name} ${ruleset} collection`} value={pageStats.unique} max={pageStats.totalTiles} /></div>
-        {collectionGoals.length > 0 && <section className="collection-unlock-goal" aria-label="Next theme progress">
-          <strong>Next: {themeById[nextTheme.themeId].name} <span>{unlockProgress.percent}%</span></strong>
-          <progress value={unlockProgress.percent} max={100} aria-label={`${themeById[nextTheme.themeId].name} unlock progress`} />
-          <p>{collectionGoals.map(goal => `${Math.min(goal.completedTypes, goal.requiredTypes)} / ${goal.requiredTypes} ${RARITIES.find(rarity => rarity.id === goal.rarityId).label} artworks at ${goal.matchesPerType} matches`).join(' · ')}</p>
+        <div className="collection-progress"><div className="collection-progress-copy"><strong>{t('{count} / {total} collected', { count: pageStats.unique, total: pageStats.totalTiles })}</strong><span>{Math.round(pageStats.unique / pageStats.totalTiles * 100)}%</span></div><progress aria-label={t('{theme} collection', { theme: t(theme.name) })} value={pageStats.unique} max={pageStats.totalTiles} /></div>
+        {collectionGoals.length > 0 && <section className="collection-unlock-goal" aria-label={t('Next theme progress')}>
+          <strong>{t('Next: {theme}', { theme: t(themeById[nextTheme.themeId].name) })} <span>{unlockProgress.percent}%</span></strong>
+          <progress value={unlockProgress.percent} max={100} aria-label={t('{theme} unlock progress', { theme: t(themeById[nextTheme.themeId].name) })} />
+          <p>{collectionGoals.map(goal => t('{count} / {total} {rarity} artworks at {matches} matches', { count: Math.min(goal.completedTypes, goal.requiredTypes), total: goal.requiredTypes, rarity: t(RARITIES.find(rarity => rarity.id === goal.rarityId).label), matches: goal.matchesPerType })).join(' · ')}</p>
         </section>}
-        <p className="collection-help">Match pairs to discover tiles. Tap a found tile to explore.</p>
-        <div className="collection-tiers" role="group" aria-label="Rarity filter"><button type="button" aria-pressed={tier === 'all'} onClick={() => { reset(); setTier('all'); }}>All</button>{RARITIES.map(value => <button type="button" key={value.id} aria-pressed={tier === value.id} style={rarityStyle(value)} onClick={() => { reset(); setTier(value.id); }}><RarityMark rarity={value} /><span>{value.label}</span></button>)}</div>
-        <div className="collection-grid" ref={grid} role="region" aria-label={`${theme.name} ${ruleset} tiles`} tabIndex={0} onScroll={event => { if (!singleDetail) scrollPosition.current.grid = event.currentTarget.scrollTop; }}>
+        <p className="collection-help">{t('Match pairs to discover tiles. Tap a found tile to explore.')}</p>
+        <div className="collection-tiers" role="group" aria-label={t('Rarity filter')}><button type="button" aria-pressed={tier === 'all'} onClick={() => { reset(); setTier('all'); }}>{t('All')}</button>{RARITIES.map(value => <button type="button" key={value.id} aria-pressed={tier === value.id} style={rarityStyle(value)} onClick={() => { reset(); setTier(value.id); }}><RarityMark rarity={value} /><span>{t(value.label)}</span></button>)}</div>
+        <div className="collection-grid" ref={grid} role="region" aria-label={t('{theme} tiles', { theme: t(theme.name) })} tabIndex={0} onScroll={event => { if (!singleDetail) scrollPosition.current.grid = event.currentTarget.scrollTop; }}>
           {visible.map(tile => <figure key={tile.matchKey} className={`collection-card ${tile.count ? 'is-collected' : 'is-locked'} ${selectedKey === tile.matchKey ? 'is-selected' : ''}`} data-match-key={tile.matchKey} data-rarity={tile.rarity.id} data-collected={Boolean(tile.count)} style={rarityStyle(tile.rarity)}>
-            <div className="collection-art"><span className="collection-art-tile"><img src={tile.src} alt={tile.name} loading="lazy" decoding="async" draggable="false" />{tile.count > 0 && <TileRarity rarity={tile.rarity} />}</span>{!tile.count && <span className="collection-lock" aria-hidden="true"><LockKey size={24} weight="fill" /></span>}</div>
-            <figcaption><strong>{tile.name}</strong><span className="collection-rarity"><RarityMark rarity={tile.rarity} />{tile.rarity.label}</span><span className="collection-card-count">{tile.count ? `Matched ×${tile.count.toLocaleString()}` : 'Not found'}</span>{collectionGoals.filter(goal => goal.rarityId === tile.rarity.id).map(goal => <span className="collection-copy-goal" key={goal.rarityId}>{tile.count >= goal.matchesPerType ? 'Ready for unlock' : `${tile.count} / ${goal.matchesPerType} for unlock`}</span>)}</figcaption>
-            {tile.count > 0 && <button type="button" className="collection-inspect-button" aria-label={`Inspect ${tile.name}`} aria-pressed={wide ? selectedKey === tile.matchKey : undefined} onClick={event => inspect(tile, event.currentTarget)} />}
+            <div className="collection-art"><span className="collection-art-tile"><img src={tile.src} alt={t(tile.name)} loading="lazy" decoding="async" draggable="false" />{tile.count > 0 && <TileRarity rarity={tile.rarity} />}</span>{!tile.count && <span className="collection-lock" aria-hidden="true"><LockKey size={24} weight="fill" /></span>}</div>
+            <figcaption><strong>{t(tile.name)}</strong><span className="collection-rarity"><RarityMark rarity={tile.rarity} />{t(tile.rarity.label)}</span><span className="collection-card-count">{tile.count ? t('Matched ×{count}', { count: formatNumber(tile.count) }) : t('Not found')}</span>{collectionGoals.filter(goal => goal.rarityId === tile.rarity.id).map(goal => <span className="collection-copy-goal" key={goal.rarityId}>{tile.count >= goal.matchesPerType ? t('Ready for unlock') : t('{count} / {total} for unlock', { count: tile.count, total: goal.matchesPerType })}</span>)}</figcaption>
+            {tile.count > 0 && <button type="button" className="collection-inspect-button" aria-label={t('Inspect {name}', { name: t(tile.name) })} aria-pressed={wide ? selectedKey === tile.matchKey : undefined} onClick={event => inspect(tile, event.currentTarget)} />}
           </figure>)}
         </div>
-        <footer className="collection-summary"><span>{allStats.unique} / {allStats.totalTiles} total collected</span><span>{allStats.totalMatches.toLocaleString()} {allStats.totalMatches === 1 ? 'pair' : 'pairs'} matched</span><span className="sr-only" aria-live="polite">{visible.length} {tier === 'all' ? '' : `${tier} `}tiles shown</span></footer>
+        <footer className="collection-summary"><span>{t('{count} / {total} total collected', { count: allStats.unique, total: allStats.totalTiles })}</span><span>{t(allStats.totalMatches === 1 ? '{count} pair matched' : '{count} pairs matched', { count: formatNumber(allStats.totalMatches) })}</span><span className="sr-only" aria-live="polite">{tier === 'all' ? t('{count} tiles shown', { count: visible.length }) : t('{count} {rarity} tiles shown', { count: visible.length, rarity: t(RARITIES.find(rarity => rarity.id === tier).label) })}</span></footer>
       </section>
-      <aside className="collection-detail-pane" hidden={!wide && !selected} aria-label="Tile details">
-        {wide && <h2 className="collection-detail-heading">Tile details</h2>}
-        {selected ? <TileDetails tile={selected} theme={theme} ruleset={ruleset} previous={collected[selectedIndex - 1]} next={collected[selectedIndex + 1]} onMove={tile => inspect(tile)} /> : <div className="collection-detail-empty"><BookOpen size={55} weight="duotone" aria-hidden="true" /><h3>Your collection has a story</h3><p>Select a collected tile to discover its meaning.</p></div>}
+      <aside className="collection-detail-pane" hidden={!wide && !selected} aria-label={t('Tile details')}>
+        {wide && <h2 className="collection-detail-heading">{t('Tile details')}</h2>}
+        {selected ? <TileDetails tile={selected} theme={theme} ruleset={ruleset} previous={collected[selectedIndex - 1]} next={collected[selectedIndex + 1]} onMove={tile => inspect(tile)} /> : <div className="collection-detail-empty"><BookOpen size={55} weight="duotone" aria-hidden="true" /><h3>{t('Your collection has a story')}</h3><p>{t('Select a collected tile to discover its meaning.')}</p></div>}
       </aside>
     </div>
   </ProgressionPage>;

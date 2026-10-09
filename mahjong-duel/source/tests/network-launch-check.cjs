@@ -10,6 +10,7 @@ const uuidV4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]
     const browser = await playwright[browserName].launch({ headless: true });
     try {
       const page = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+      await page.addInitScript(() => { localStorage.setItem('porcelain:language', '"en"'); });
       const errors = [];
       page.on('pageerror', error => errors.push(error.message));
       page.on('response', response => { if (response.status() >= 400) errors.push(`${response.status()} ${response.url()}`); });
@@ -18,7 +19,7 @@ const uuidV4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]
       async function home() {
         await button('Pause game').click();
         await button('Save & return home').click();
-        await button('Play Duel').waitFor();
+        await button('Play').waitFor();
       }
       async function launch(name) {
         await button(name).click();
@@ -32,7 +33,7 @@ const uuidV4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]
       await page.goto(url);
       assert.deepEqual(await page.evaluate(() => ({ secure: isSecureContext, uuid: typeof crypto.randomUUID, random: typeof crypto.getRandomValues })),
         { secure: false, uuid: 'undefined', random: 'function' }, 'Exercise real HTTP restrictions, without mocking crypto');
-      const first = await launch('Play Duel');
+      const first = await launch('Play');
       await home();
       await page.reload();
       const resumed = await launch(/^Continue duel/);
@@ -49,7 +50,7 @@ const uuidV4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]
       assert.notEqual(migrated.gameId, first.gameId, 'Legacy saves get a valid ID on HTTP');
       assert.deepEqual(migrated.tiles, first.tiles);
       await home();
-      const fresh = await launch('Play Duel');
+      const fresh = await launch('Play');
       assert.notEqual(fresh.gameId, migrated.gameId, 'New rounds have separate collection identities');
       assert.deepEqual(errors, []);
       console.log(`PASS ${browserName}: LAN HTTP new Duel, reload/resume, legacy save and unique round IDs`);

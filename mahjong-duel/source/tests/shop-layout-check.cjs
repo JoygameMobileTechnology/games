@@ -20,6 +20,7 @@ const sizes = [[320,568],[375,667],[390,844],[430,932],[768,1024],[1024,768],[56
   const zero = { coins: 0, gems: 0 }, large = { coins: 123456789, gems: 987654 };
   const browser = await require(process.env.PLAYWRIGHT_MODULE || 'playwright')[kind].launch();
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'en-US', isMobile: true, hasTouch: true, reducedMotion: 'reduce' });
+  await context.addInitScript(() => { try { localStorage.setItem('porcelain:language', '"en"'); } catch { /* Storage-denied fixtures use the Turkish default. */ } });
   await context.addInitScript(initial => {
     if (!localStorage.getItem('shop-layout-seeded')) {
       localStorage.setItem('porcelain:progression', JSON.stringify(initial));

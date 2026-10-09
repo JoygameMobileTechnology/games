@@ -9,6 +9,7 @@ fs.mkdirSync(output, { recursive: true });
   for (const [name, browserType] of Object.entries({ chromium, webkit })) {
     const browser = await browserType.launch({ headless: true });
     const page = await browser.newPage({ viewport: { width: 320, height: 568 } });
+    await page.addInitScript(() => { localStorage.setItem('porcelain:language', '"en"'); });
     try {
       await page.goto(base); await page.waitForSelector('.home-screen, .progression-page');
       await page.evaluate(async () => {

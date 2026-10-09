@@ -23,6 +23,7 @@ const load = file => import(pathToFileURL(path.resolve(file)).href);
     try {
       for (const [width, height] of [[320,568], [390,844], [768,1024], [1024,768]]) {
         const context = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce' });
+        await context.addInitScript(() => { try { localStorage.setItem('porcelain:language', '"en"'); } catch { /* Storage-denied fixtures use the Turkish default. */ } });
         const page = await context.newPage(), errors = [];
         page.on('pageerror', error => errors.push(error.message));
         await page.clock.install({ time: new Date(now) });

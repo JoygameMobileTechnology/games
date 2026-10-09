@@ -1,15 +1,24 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { t, formatNumber, getLanguage, setLanguage, subscribeLanguage, LANGUAGES } from './i18n.js';
 import { createRoot } from 'react-dom/client';
 import { AnimatePresence, motion, MotionConfig, useIsPresent } from 'motion/react';
 import { ArrowRight, ArrowLeft, ArrowsClockwise, Check, CaretRight, Diamond, FlowerLotus, GearSix, Info, Leaf, Lightbulb, Play, SpeakerHigh, SpeakerSlash, Sparkle, Sword, X, BookOpen, Snowflake, Eye, Storefront } from '@phosphor-icons/react';
 import '@fontsource/cormorant-garamond/latin-400.css';
+import '@fontsource/cormorant-garamond/latin-ext-400.css';
 import '@fontsource/cormorant-garamond/latin-500.css';
+import '@fontsource/cormorant-garamond/latin-ext-500.css';
 import '@fontsource/cormorant-garamond/latin-600.css';
+import '@fontsource/cormorant-garamond/latin-ext-600.css';
 import '@fontsource/manrope/latin-400.css';
+import '@fontsource/manrope/latin-ext-400.css';
 import '@fontsource/manrope/latin-500.css';
+import '@fontsource/manrope/latin-ext-500.css';
 import '@fontsource/manrope/latin-600.css';
+import '@fontsource/manrope/latin-ext-600.css';
 import '@fontsource/manrope/latin-700.css';
+import '@fontsource/manrope/latin-ext-700.css';
 import '@fontsource/manrope/latin-800.css';
+import '@fontsource/manrope/latin-ext-800.css';
 import { themeTileSets } from './tile-data.js';
 import { themeById, defaultTheme, rulesetForTheme } from './themes.js';
 import { boardArtStyle } from './board-art.js';
@@ -94,7 +103,7 @@ const MATCH_CHIP_MS = 900;
 function TileArt({ face, badge = true }) {
   return <><img className="tile-art" src={face.src} alt="" draggable="false" />{badge && ['count', 'tier'].includes(face.family) && face.pipCount > 0 && <span className="tile-rank" aria-hidden="true">{Array.from({length: face.pipCount}, (_, i) => <i key={i} />)}</span>}</>;
 }
-function IconButton({ label, children, ...props }) { return <button className="icon-button" aria-label={label} title={label} {...props}>{children}</button>; }
+function IconButton({ label, children, ...props }) { return <button className="icon-button" aria-label={t(label)} title={t(label)} {...props}>{children}</button>; }
 
 function MatchFlight({ flight, faces, themeId, ruleset, paused, onComplete }) {
   const layer = useRef(null);
@@ -173,10 +182,10 @@ function TileFan({ faces, theme, sound, gentle }) {
     if (node && event.currentTarget.contains(node)) strike(node);
     else last.current.tile = null;
   }
-  return <section className="menu-fan" aria-label={`${theme.name} tile collection`}>
+  return <section className="menu-fan" aria-label={t('{name} tile collection', { name: t(theme.name) })}>
     <div className="tile-showcase" onPointerDown={event => { unlockAudio(sound); last.current.tile = null; sweep(event); }} onPointerMove={sweep} onPointerLeave={() => { last.current.tile = null; }} onPointerCancel={() => { last.current.tile = null; }}>
       <div className="showcase-halo"><div /><div /></div>
-      {faces.map((face, index) => <motion.button key={`${theme.id}-${face.id}`} type="button" data-hero-index={index} aria-label={`Play tile sound ${index + 1}`} className={`hero-tile hero-tile-${index}`} initial={{ opacity: 0, y: 30, rotate: 0 }} animate={{ opacity: 1, y: 0, rotate: [-22, -12, 0, 12, 22][index] }} transition={{ type: 'spring', stiffness: 150, damping: 20, delay: Math.abs(index - 2) * .06 }} onClick={event => { if (event.detail === 0) { last.current.tile = null; strike(event.currentTarget); } }}><TileArt face={face} badge={false} />{index === 2 && <img className="hero-back" src={theme.back} alt="" draggable="false" />}</motion.button>)}
+      {faces.map((face, index) => <motion.button key={`${theme.id}-${face.id}`} type="button" data-hero-index={index} aria-label={t('Play tile sound {count}', { count: index + 1 })} className={`hero-tile hero-tile-${index}`} initial={{ opacity: 0, y: 30, rotate: 0 }} animate={{ opacity: 1, y: 0, rotate: [-22, -12, 0, 12, 22][index] }} transition={{ type: 'spring', stiffness: 150, damping: 20, delay: Math.abs(index - 2) * .06 }} onClick={event => { if (event.detail === 0) { last.current.tile = null; strike(event.currentTarget); } }}><TileArt face={face} badge={false} />{index === 2 && <img className="hero-back" src={theme.back} alt="" draggable="false" />}</motion.button>)}
     </div>
   </section>;
 }
@@ -205,25 +214,26 @@ function Sheet({ title, subtitle, onClose, children }) {
   }, [isPresent]);
   return <motion.div className="sheet-backdrop" inert={!isPresent} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={isPresent ? onClose : undefined}>
     <motion.section className="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title" tabIndex={-1} ref={panel} initial={{ y: 70 }} animate={{ y: 0 }} exit={{ y: 70 }} transition={{ type: 'spring', stiffness: 340, damping: 32 }} onClick={e => e.stopPropagation()}>
-      <header className="parchment-header"><h2 id="sheet-title">{title}</h2><IconButton label="Close dialog" onClick={onClose}><X size={27} weight="bold" /></IconButton><span className="red-tassel" aria-hidden="true" /></header>
-      <div className="parchment-body">{subtitle && <p className="sheet-subtitle">{subtitle}</p>}{children}</div>
+      <header className="parchment-header"><h2 id="sheet-title">{t(title)}</h2><IconButton label={t("Close dialog")} onClick={onClose}><X size={27} weight="bold" /></IconButton><span className="red-tassel" aria-hidden="true" /></header>
+      <div className="parchment-body">{subtitle && <p className="sheet-subtitle">{t(subtitle)}</p>}{children}</div>
     </motion.section>
   </motion.div>;
 }
 
 function Rules({ ruleset, aiMode }) {
   return <div className="rules-content">
-    <div className="rule-step"><span>01</span><div><h3>Flip. Remember. Match.</h3><p>Every stone starts face down. Flip two uncovered stones. Matches leave the board; different faces turn back over after a short pause. Clear all {PAIRS_PER_DUEL} pairs to finish the board.</p></div></div>
-    <div className="rule-step"><span>02</span><div><h3>Work from the top.</h3><p>Only a stone with another stone on top is blocked. Neighbors on either side never stop you from flipping. Remember the faces as you uncover new layers.</p></div></div>
-    <div className="rule-step"><span>03</span><div><h3>{ruleset === 'eastern' ? 'Know your families.' : 'Trust the picture.'}</h3><p>{ruleset === 'eastern' ? 'Match two identical faces. Counts and tiers form ordered groups; symbols, kin, and anchors are unranked pictures. Sharing a family does not make two different faces a match.' : 'Every pair must show the exact same picture. Each picture has four identical copies.'}</p></div></div>
-    <div className="rule-note"><Sword size={24} /><p><strong>Your opponent</strong> is selected from a roster of simulated players with imperfect memory. Match for 100 points and play again. Miss, and the turn passes. The highest score when the board is clear wins.</p></div>
-    <p className="rules-footnote">First to {PAIRS_TO_WIN} pairs secures the win; keep playing until all {PAIRS_PER_DUEL} pairs are cleared. Your matches collect artwork in your Collection.</p>
-    <p className="rules-footnote"><strong>{AI_MODES.find(value => value.id === normalizeAiMode(aiMode)).label}</strong>{' '}{normalizeAiMode(aiMode) === 'realistic' ? 'only learns faces that either player reveals. Its memory and recall gradually adapt to your skill between completed duels. It thinks at an uneven pace and can have good matches, bad matches and streaks. It guesses blindly when it cannot remember a match.' : aiMode === 'original' ? 'observes every tile either player reveals. It has a 40% chance of recalling an uncovered known pair, and a 35% chance of recalling a known partner after its first flip. After each pair attempt by either player, each memory has a 25% chance of being forgotten. Otherwise, it guesses among uncovered tiles.' : 'remembers both players’ reveals from the last two completed pair attempts, plus the current attempt. It uses remembered uncovered pairs and partners; otherwise, it guesses among uncovered tiles.'}</p>
-    <div className="booster-rules"><h3>Your booster collection</h3><p>Claim Daily Rewards or visit the Shop to get boosters. Unused boosters carry over to your next duel.</p><p><strong>Shuffle</strong> rearranges the stones and clears the opponent’s memory. Automatic board recovery is free.</p><p><strong>Hint</strong> highlights an uncovered matching pair for 1.5 seconds, keeping it face down.</p><p><strong>Freeze</strong> skips the opponent’s next turn after your next miss.</p><p><strong>Eagle Eye</strong> reveals hidden tile rarity glows for 10 seconds.</p></div>
+    <div className="rule-step"><span>01</span><div><h3>{t('Flip. Remember. Match.')}</h3><p>{t('Every stone starts face down. Flip two uncovered stones. Matches leave the board; different faces turn back over after a short pause. Clear all {count} pairs to finish the board.', { count: PAIRS_PER_DUEL })}</p></div></div>
+    <div className="rule-step"><span>02</span><div><h3>{t('Work from the top.')}</h3><p>{t('Only a stone with another stone on top is blocked. Neighbors on either side never stop you from flipping. Remember the faces as you uncover new layers.')}</p></div></div>
+    <div className="rule-step"><span>03</span><div><h3>{t(ruleset === 'eastern' ? t("Know your families.") : t("Trust the picture."))}</h3><p>{t(ruleset === 'eastern' ? t("Match two identical faces. Counts and tiers form ordered groups; symbols, kin, and anchors are unranked pictures. Sharing a family does not make two different faces a match.") : t("Every pair must show the exact same picture. Each picture has four identical copies."))}</p></div></div>
+    <div className="rule-note"><Sword size={24} /><p>{t('Your opponent is selected from a roster of simulated players with imperfect memory. Match for 100 points and play again. Miss, and the turn passes. The highest score when the board is clear wins.')}</p></div>
+    <p className="rules-footnote">{t('First to {target} pairs secures the win; keep playing until all {total} pairs are cleared. Your matches collect artwork in your Collection.', { target: PAIRS_TO_WIN, total: PAIRS_PER_DUEL })}</p>
+    <p className="rules-footnote"><strong>{t(AI_MODES.find(value => value.id === normalizeAiMode(aiMode)).label)}</strong>{' '}{t(normalizeAiMode(aiMode) === 'realistic' ? t("only learns faces that either player reveals. Its memory and recall gradually adapt to your skill between completed duels. It thinks at an uneven pace and can have good matches, bad matches and streaks. It guesses blindly when it cannot remember a match.") : aiMode === 'original' ? t("observes every tile either player reveals. It has a 40% chance of recalling an uncovered known pair, and a 35% chance of recalling a known partner after its first flip. After each pair attempt by either player, each memory has a 25% chance of being forgotten. Otherwise, it guesses among uncovered tiles.") : t("remembers both players’ reveals from the last two completed pair attempts, plus the current attempt. It uses remembered uncovered pairs and partners; otherwise, it guesses among uncovered tiles."))}</p>
+    <div className="booster-rules"><h3>{t('Your booster collection')}</h3>{[t("Claim Daily Rewards or visit the Shop to get boosters. Unused boosters carry over to your next duel."), t("Shuffle rearranges the stones and clears the opponent’s memory. Automatic board recovery is free."), t("Hint highlights an uncovered matching pair for 1.5 seconds, keeping it face down."), t("Freeze skips the opponent’s next turn after your next miss."), t("Eagle Eye reveals hidden tile rarity glows for 10 seconds.")].map(text => <p key={text}>{t(text)}</p>)}</div>
   </div>;
 }
 
 function App({ menuBackground }) {
+  const language = getLanguage();
   const [screen, setScreen] = useState('menu');
   useEffect(() => { store.set('menuBackground', menuBackground.id); }, [menuBackground]);
   const [pageHidden, setPageHidden] = useState(() => document.hidden);
@@ -477,7 +487,7 @@ function App({ menuBackground }) {
       const shuffled = shuffleBoard(game.tiles, game.seed + game.shuffles + 1, { formationId: game.formationId });
       tracker.current = trackAutomaticShuffle(tracker.current);
       commitGame({ ...gameRef.current, tiles: shuffled.tiles, shuffles: gameRef.current.shuffles + 1, aiMemory: {}, hintEffect: null });
-      announce('No open pairs. The shared board has been shuffled.');
+      announce(t("No open pairs. The shared board has been shuffled."));
     }
   }, [game?.tiles, game?.mode, screen, sheet, result, pending, flippedIds.length]);
 
@@ -552,7 +562,7 @@ function App({ menuBackground }) {
             tileSmack(sound, { strength: 1 });
             if (!transition.cues.length) playEffect('score', sound);
           } else {
-            announce(resolved.turn === 'you' ? current.freezeReady ? 'Opponent frozen. Play again!' : 'Your turn' : `${current.opponent.name}’s turn`);
+            announce(resolved.turn === 'you' ? current.freezeReady ? t("Opponent frozen. Play again!") : t("Your turn") : t('{name}’s turn', { name: current.opponent.name }));
             if (resolved.turn !== current.turn) playEffect('turn', sound);
           }
         }
@@ -641,7 +651,7 @@ function App({ menuBackground }) {
     if (lock.current || pending || sheet || result || entering) return;
     const current = gameRef.current;
     if (current.mode === 'duel' && current.turn !== 'you') return;
-    if (!isFree(tile, current.tiles)) { playSound('error'); announce('Remove the stone on top first.'); return; }
+    if (!isFree(tile, current.tiles)) { playSound('error'); announce(t("Remove the stone on top first.")); return; }
     const turn = flipMemoryTile(current.tiles, flippedIds, tile.id, current.difficulty);
     if (!turn) return;
     playSound('tap');
@@ -665,7 +675,7 @@ function App({ menuBackground }) {
       commitGame({ ...next, boosters: { ...progressionRef.current.wallet }, tiles: shuffled.tiles, shuffles: current.shuffles + 1, aiMemory: {}, hintEffect: null });
       resetTurn(); playEffect('shuffle', sound);
     } else { commitGame({ ...next, boosters: { ...progressionRef.current.wallet } }); playEffect('confirm', sound); }
-    announce({ shuffle: 'A fresh arrangement.', hint: 'A matching pair is glowing.', freeze: 'Opponent’s next turn is frozen.', eagle: 'Rarities revealed for 10 seconds.' }[id]);
+    announce({ shuffle: t("A fresh arrangement."), hint: t("A matching pair is glowing."), freeze: t("Opponent’s next turn is frozen."), eagle: t("Rarities revealed for 10 seconds.") }[id]);
   }
   const uncoveredCount = useMemo(() => game ? game.tiles.filter(tile => isFree(tile, game.tiles)).length : 0, [game?.tiles]);
   const activeTheme = themeById[screen === 'game' ? game.theme : themeId] || defaultTheme;
@@ -679,13 +689,13 @@ function App({ menuBackground }) {
   const opponentProfile = game?.opponent || OPPONENT_ROSTER[0];
   const opponentName = opponentProfile.name;
   function updateProfile(next) {
-    if (!saveProfile(next, undefined, progressionRef.current.points, progressionRef.current.retainedAvatarFrameIds)) { announce('Profile updated for this visit. Browser storage is unavailable.'); }
+    if (!saveProfile(next, undefined, progressionRef.current.points, progressionRef.current.retainedAvatarFrameIds)) { announce(t("Profile updated for this visit. Browser storage is unavailable.")); }
     setProfile(next); setSheet(null); playEffect('confirm', sound);
   }
   function equipAchievementFrame(frameId) {
     if (!isFrameUnlocked(frameId, progressionRef.current.points, progressionRef.current.retainedAvatarFrameIds)) return;
     const next = { ...profile, frameId };
-    if (!saveProfile(next, undefined, progressionRef.current.points, progressionRef.current.retainedAvatarFrameIds)) announce('Frame equipped for this visit. Browser storage is unavailable.');
+    if (!saveProfile(next, undefined, progressionRef.current.points, progressionRef.current.retainedAvatarFrameIds)) announce(t("Frame equipped for this visit. Browser storage is unavailable."));
     setProfile(next); playEffect('confirm', sound);
   }
   function closeSheet() {
@@ -702,7 +712,7 @@ function App({ menuBackground }) {
 
   function openPage(value) {
     if (value === 'theme-select') setThemeChoice(null);
-    pageOpener.current = { daily: '.daily-menu-control', quests: '.quests-menu-control', shop: '.shop-launch', achievements: '[aria-label="Achievements"]', collection: '.binder-launch', leaderboards: '.leaderboard-menu-control', 'theme-select': '.duel-launch' }[value];
+    pageOpener.current = { daily: '.daily-menu-control', quests: '.quests-menu-control', shop: '.shop-launch', achievements: '.achievements-menu-control', collection: '.binder-launch', leaderboards: '.leaderboard-menu-control', 'theme-select': '.duel-launch' }[value];
     if (value === 'daily' || value === 'quests') {
       const now = Date.now();
       progressEvent({ type: 'login', now });
@@ -731,7 +741,7 @@ function App({ menuBackground }) {
   function claimDaily() {
     if (adBusy.current || !getDailyView(progressionRef.current).hasClaim) return;
     progressEvent({ type: 'daily-claim', eventId: `claim:${createGameId()}`, now: Date.now() });
-    finishDailyPage(); playEffect('confirm', sound); announce('Daily rewards collected.');
+    finishDailyPage(); playEffect('confirm', sound); announce(t("Daily rewards collected."));
   }
   async function doubleDaily() {
     if (adBusy.current || !getDailyView(progressionRef.current).hasClaim) return;
@@ -742,7 +752,7 @@ function App({ menuBackground }) {
     progressEvent({ type: 'daily-ad-complete', eventId: `${attemptId}:complete`, attemptId, status: result.status, now: Date.now() });
     adBusy.current = false; setAdState(result.status);
     if (result.status === 'completed') {
-      finishDailyPage(); playEffect('confirm', sound); announce('Double daily rewards collected.');
+      finishDailyPage(); playEffect('confirm', sound); announce(t("Double daily rewards collected."));
     }
   }
   function claimQuest(questId, dayId) {
@@ -784,7 +794,7 @@ function App({ menuBackground }) {
     const next = progressEvent({ type: 'shop-buy', productId, payment, eventId: `shop:${createGameId()}`, now: Date.now() });
     const bought = next !== before && next.wallet !== before.wallet;
     if (bought) playEffect('confirm', sound);
-    return { ok: bought, message: bought ? `${product.name} added to your boosters.` : 'Not enough Coins or Gems for this pack.' };
+    return { ok: bought, message: bought ? t('{name} added to your boosters.', { name: t(product.name) }) : 'Not enough Coins or Gems for this pack.' };
   }
   async function purchaseCurrency(productId) {
     const product = SHOP_CURRENCY_PACKS.find(item => item.id === productId);
@@ -798,7 +808,7 @@ function App({ menuBackground }) {
       const next = progressEvent({ type: 'shop-purchase-simulated', productId, transactionId, eventId: transactionId, now: Date.now() });
       const bought = next !== before && next.currencies !== before.currencies;
       if (bought) playEffect('confirm', sound);
-      return { ok: bought, message: bought ? `${product.name} added. Test purchase—no money charged.` : 'Purchase could not be completed.' };
+      return { ok: bought, message: bought ? t('{name} added. Test purchase—no money charged.', { name: t(product.name) }) : 'Purchase could not be completed.' };
     } finally { purchaseBusy.current = false; }
   }
   function continueResult() {
@@ -832,20 +842,20 @@ function App({ menuBackground }) {
             onAchievements={() => openPage('achievements')}
             onSettings={() => openSheet('settings')} onLeaderboards={() => openPage('leaderboards')} />
           <div className="home-collection" hidden aria-hidden="true"><TileFan faces={[menuFaces[27], menuFaces[6], menuFaces[0], menuFaces[15], menuFaces[7]]} theme={activeTheme} sound={sound} gentle={gentle} /></div>
-          <section className="home-actions" aria-label="Play Duel">
-            <motion.button className="duel-launch" whileTap={{ y: 4, scale: .985 }} onClick={() => openPage('theme-select')}><Sword weight="fill" size={31} /><span>Play Duel</span><ArrowRight size={25} weight="bold" /></motion.button>
-            <div className="home-links"><button className="binder-launch" onClick={() => openPage('collection')}><BookOpen size={23} weight="duotone" />Collection</button></div>
-            <button className="shop-launch" onClick={() => openPage('shop')}><Storefront size={23} weight="duotone" />Shop</button>
+          <section className="home-actions" aria-label={t("Play")}>
+            <motion.button className="duel-launch" whileTap={{ y: 4, scale: .985 }} onClick={() => openPage('theme-select')}><Sword weight="fill" size={31} /><span>{t("Play")}</span><ArrowRight size={25} weight="bold" /></motion.button>
+            <div className="home-links"><button className="binder-launch" onClick={() => openPage('collection')}><BookOpen size={23} weight="duotone" />{t("Collection")}</button></div>
+            <button className="shop-launch" onClick={() => openPage('shop')}><Storefront size={23} weight="duotone" />{t("Shop")}</button>
           </section>
         </motion.div> : <motion.div key="game" data-intro={matchIntro?.phase} data-paused={Boolean(sheet || pageHidden)} className={`game-screen duel-stage ${streakCues.length ? 'has-streak' : ''}`} inert={Boolean(sheet || result || entering)} initial={false} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
           <DuelHud game={game} profile={profile} opponentProfile={opponentProfile} streakCues={streakCues} onStreakComplete={completedCues => setStreakCues(current => current === completedCues ? [] : current)} paused={Boolean(sheet || result || entering || pageHidden)} gentle={gentle} sound={sound} remainingPairs={freeCount / 2} introPhase={matchIntro?.phase} scoreFeedback={burst} onPause={() => openSheet('pause')} />
           <div className="board-space" style={{ '--board-ratio': table.width / table.height }}><div className="board-frame">
-            <div className="game-board" ref={attachBoard} role="group" aria-label={`${game.ruleset} Mahjong board, ${freeCount} tiles left`}>
+            <div className="game-board" ref={attachBoard} role="group" aria-label={t('{edition} Mahjong board, {count} tiles left', { edition: t(game.ruleset), count: freeCount })}>
               <AnimatePresence>{game.tiles.filter(tile => !tile.removed).map((tile, index) => {
                 const free = isFree(tile, game.tiles), faceUp = flippedIds.includes(tile.id), active = selected === tile.id && faceUp, inFlight = flight?.ids.includes(tile.id);
                 const rarity = rarityForTile(game.theme, game.ruleset, tile.faceId);
                 const hinted = game.hintEffect?.ids.includes(tile.id), eagle = game.eagleMs > 0 && !faceUp;
-                return <motion.button layout="position" key={tile.id} data-tile-id={tile.id} data-free={free} data-face-up={faceUp} data-rarity={rarity.id} data-rarity-visible={faceUp || eagle} className={`game-tile ${free ? 'free' : 'blocked'} ${active ? 'tile-selected' : ''} ${faceUp ? opponentTurn ? 'opponent-reveal' : 'player-reveal' : ''} ${inFlight ? 'tile-in-flight' : ''} ${hinted ? 'hinted' : ''} ${eagle ? 'eagle-lit' : ''}`} aria-label={faceUp ? `${tile.name}, ${rarity.label}, revealed` : `Hidden stone, row ${tile.y + 1}, column ${tile.x + 1}, layer ${tile.z + 1}, ${free ? 'uncovered' : 'covered'}${eagle ? `, ${rarity.label}` : ''}`} aria-pressed={faceUp} aria-disabled={entering || !free || opponentTurn || (game.mode === 'duel' && Boolean(pending))} tabIndex={!entering && free && !opponentTurn && !(game.mode === 'duel' && pending) ? 0 : -1} style={{ ...tilePosition(tile, table), '--rarity-color': rarity.color, '--shine-delay': `${-(index % 11) * .7}s`, zIndex: tile.z * 100 + Math.floor(tile.y * 10) + (active ? 80 : 0) }} initial={false} animate={{ opacity: 1, scale: active ? 1.035 : 1, y: active ? -3 : 0 }} exit={{ opacity: 0, transition: { duration: 0 } }} transition={{ duration: 0.18 }} onClick={() => tap(tile)}><span className="tile-rotator">
+                return <motion.button layout="position" key={tile.id} data-tile-id={tile.id} data-free={free} data-face-up={faceUp} data-rarity={rarity.id} data-rarity-visible={faceUp || eagle} className={`game-tile ${free ? 'free' : 'blocked'} ${active ? 'tile-selected' : ''} ${faceUp ? opponentTurn ? 'opponent-reveal' : 'player-reveal' : ''} ${inFlight ? 'tile-in-flight' : ''} ${hinted ? 'hinted' : ''} ${eagle ? 'eagle-lit' : ''}`} aria-label={faceUp ? t('{name}, {rarity}, revealed', { name: t(tile.name), rarity: t(rarity.label) }) : t('Hidden stone, row {row}, column {column}, layer {layer}, {state}', { row: tile.y + 1, column: tile.x + 1, layer: tile.z + 1, state: t(free ? t("uncovered") : t("covered")) }) + (eagle ? `, ${t(rarity.label)}` : '')} aria-pressed={faceUp} aria-disabled={entering || !free || opponentTurn || (game.mode === 'duel' && Boolean(pending))} tabIndex={!entering && free && !opponentTurn && !(game.mode === 'duel' && pending) ? 0 : -1} style={{ ...tilePosition(tile, table), '--rarity-color': rarity.color, '--shine-delay': `${-(index % 11) * .7}s`, zIndex: tile.z * 100 + Math.floor(tile.y * 10) + (active ? 80 : 0) }} initial={false} animate={{ opacity: 1, scale: active ? 1.035 : 1, y: active ? -3 : 0 }} exit={{ opacity: 0, transition: { duration: 0 } }} transition={{ duration: 0.18 }} onClick={() => tap(tile)}><span className="tile-rotator">
                     <span className="tile-side tile-back" aria-hidden="true"><img className="tile-art" src={activeTheme.back} alt="" draggable="false" /></span>
                     <span className="tile-side tile-front" aria-hidden={!faceUp}><TileArt face={faces[game.ruleset][tile.faceId]} /></span>
                   </span>{(faceUp || eagle) && <TileRarity rarity={rarity} />}{active && <span className="selected-dot" />}</motion.button>;
@@ -853,40 +863,54 @@ function App({ menuBackground }) {
               {flight && <MatchFlight key={flight.key} flight={flight} faces={faces[game.ruleset]} themeId={game.theme} ruleset={game.ruleset} paused={Boolean(sheet || result || pageHidden)} onComplete={() => setFlight(current => current?.key === flight.key ? null : current)} />}
             </div>
           </div></div>
-          <div className="board-status" aria-live="polite">{pending?.kind === 'peek' ? <span>Remember these faces…</span> : (pending?.kind === 'pair' || pending?.kind === 'collision') ? <span>{pending.matched ? 'Match! Play again.' : 'Remember these faces…'}</span> : selectedTile ? <span>{selectedTile.name}<small> · remember its identical match</small></span> : <span>{uncoveredCount} uncovered<span className="status-dot">·</span>{freeCount} stones remaining</span>}</div>
-          <div className="game-tools" aria-label="Boosters">{[
-            ['shuffle', 'Shuffle', ArrowsClockwise], ['hint', 'Hint', Lightbulb], ['freeze', 'Freeze', Snowflake], ['eagle', 'Eagle Eye', Eye],
-          ].map(([id, label, Icon]) => <button key={id} aria-label={`${label}, ${game.boosters[id]} uses left`} onClick={() => activateBooster(id)} disabled={!canUseBooster(game, id) || Boolean(pending) || (flippedIds.length > 0 && ['shuffle', 'hint'].includes(id))} className={id === 'freeze' && game.freezeReady || id === 'eagle' && game.eagleMs > 0 ? 'booster-active' : ''}><span className="tool-medallion"><Icon size={27} weight="duotone" /><small>{game.boosters[id]}</small></span><span>{label}</span></button>)}</div>
+          <div className="board-status" aria-live="polite">{pending?.kind === 'peek' ? <span>{t("Remember these faces…")}</span> : (pending?.kind === 'pair' || pending?.kind === 'collision') ? <span>{pending.matched ? t("Match! Play again.") : t("Remember these faces…")}</span> : selectedTile ? <span>{t(selectedTile.name)}<small> · {t('remember its identical match')}</small></span> : <span>{t('{count} uncovered', { count: uncoveredCount })}<span className="status-dot">·</span>{t('{count} stones remaining', { count: freeCount })}</span>}</div>
+          <div className="game-tools" aria-label={t("Boosters")}>{[
+            ['shuffle', t("Shuffle"), ArrowsClockwise], ['hint', t("Hint"), Lightbulb], ['freeze', t("Freeze"), Snowflake], ['eagle', t("Eagle Eye"), Eye],
+          ].map(([id, label, Icon]) => <button key={id} aria-label={t('{name}, {count} uses left', { name: t(label), count: game.boosters[id] })} onClick={() => activateBooster(id)} disabled={!canUseBooster(game, id) || Boolean(pending) || (flippedIds.length > 0 && ['shuffle', 'hint'].includes(id))} className={id === 'freeze' && game.freezeReady || id === 'eagle' && game.eagleMs > 0 ? 'booster-active' : ''}><span className="tool-medallion"><Icon size={27} weight="duotone" /><small>{game.boosters[id]}</small></span><span>{t(label)}</span></button>)}</div>
         </motion.div>}
       </AnimatePresence>
-      <AnimatePresence>{toast && <motion.div className="toast" role="status" key={toast.id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5 }}>{toast.message}</motion.div>}</AnimatePresence>
-      <AnimatePresence>{sheet && <Sheet key={sheet} title={{ starter: 'Your starter boosters', rules: 'How to play', settings: 'Settings', profile: 'Profile', pause: 'Paused', restart: 'New duel', leave: 'Leave duel?' }[sheet]} onClose={closeSheet}>
-        {sheet === 'starter' && <div className="starter-boosters-intro"><p>Eight boosters to try on your next duels. Two of each have been added to your balance.</p><RewardItems rewards={STARTER_BOOSTERS} /><button className="primary-button" onClick={closeSheet}>Got it <Check size={22} weight="bold" /></button></div>}
+      <AnimatePresence>{toast && <motion.div className="toast" role="status" key={toast.id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5 }}>{t(toast.message)}</motion.div>}</AnimatePresence>
+      <AnimatePresence>{sheet && <Sheet key={sheet} title={{ starter: t("Your starter boosters"), rules: t("How to play"), settings: t("Settings"), profile: t("Profile"), pause: t("Paused"), restart: t("New duel"), leave: t("Leave duel?") }[sheet]} onClose={closeSheet}>
+        {sheet === 'starter' && <div className="starter-boosters-intro"><p>{t("Eight boosters to try on your next duels. Two of each have been added to your balance.")}</p><RewardItems rewards={STARTER_BOOSTERS} /><button className="primary-button" onClick={closeSheet}>{t("Got it")} <Check size={22} weight="bold" /></button></div>}
         {sheet === 'profile' && <ProfileEditor profile={profile} achievementPoints={progression.points} retainedFrameIds={progression.retainedAvatarFrameIds} onSave={updateProfile} />}
-        {sheet === 'rules' && <><Rules ruleset={screen === 'game' ? game.ruleset : ruleset} aiMode={screen === 'game' ? game.aiMode : aiMode} /><button className="primary-button" onClick={closeSheet}>Got it <Check size={22} weight="bold" /></button></>}
+        {sheet === 'rules' && <><Rules ruleset={screen === 'game' ? game.ruleset : ruleset} aiMode={screen === 'game' ? game.aiMode : aiMode} /><button className="primary-button" onClick={closeSheet}>{t("Got it")} <Check size={22} weight="bold" /></button></>}
         {sheet === 'settings' && <div className="settings-content">
-          <section className="settings-ruleset" aria-labelledby="settings-ai-heading">
-            <h3 id="settings-ai-heading" className="settings-ruleset-heading">Opponent AI</h3>
-            {screen === 'game' && <p className="settings-ruleset-note">Applies to your next duel. Playing now: {AI_MODES.find(value => value.id === normalizeAiMode(game.aiMode)).label}.</p>}
-            <div className="settings-ruleset-switch settings-ai-switch" role="group" aria-label="Opponent AI" aria-describedby="settings-ai-description">{AI_MODES.map(value => <button key={value.id} className={aiMode === value.id ? 'active' : ''} aria-pressed={aiMode === value.id} onClick={() => { setAiMode(value.id); playSound('tap'); }}>{value.label}</button>)}</div>
-            <p id="settings-ai-description" className="settings-ruleset-note">{AI_MODES.find(value => value.id === aiMode).description}</p>
+          <section className="settings-ruleset" aria-labelledby="settings-language-heading">
+            <h3 id="settings-language-heading" className="settings-ruleset-heading"><label htmlFor="settings-language">{t('Language')}</label></h3>
+            <div className="settings-language-control">
+              <select id="settings-language" value={language} onChange={event => { setLanguage(event.target.value); playSound('tap'); }}>
+                {LANGUAGES.map(item => <option key={item.id} value={item.id} lang={item.id}>{item.label}</option>)}
+              </select>
+              <CaretRight size={20} weight="bold" aria-hidden="true" />
+            </div>
           </section>
-          <label className="setting-row"><span><SpeakerHigh size={25} weight="fill" /><span><strong>Sound</strong><small>Tiles, buttons & celebrations</small></span></span><input type="checkbox" role="switch" checked={sound} onChange={e => { setSound(e.target.checked); chime('tap', e.target.checked); }} /><span className="toggle" /></label><label className="setting-row"><span><Sparkle size={25} weight="fill" /><span><strong>Gentle motion</strong><small>Fewer animated effects</small></span></span><input type="checkbox" role="switch" checked={gentle} onChange={e => setGentle(e.target.checked)} /><span className="toggle" /></label><label className="setting-row"><span><Diamond size={25} weight="fill" /><span><strong>Rank pips</strong><small>Help identify count & tier tiles</small></span></span><input type="checkbox" role="switch" checked={pips} onChange={e => setPips(e.target.checked)} /><span className="toggle" /></label><button className="secondary-button settings-rules-button" onClick={() => openSheet('rules')}><span><Info size={21} weight="bold" />Rules</span><CaretRight size={21} /></button><button className="primary-button" onClick={closeSheet}>Done <Check size={22} weight="bold" /></button></div>}
-        {sheet === 'pause' && <div className="pause-content"><div className="pause-flower"><FlowerLotus size={70} weight="duotone" /></div><button className="primary-button" onClick={closeSheet}>Continue <Play size={21} weight="fill" /></button><button className="secondary-button" onClick={() => openSheet('settings')}>Settings <GearSix size={21} /></button><button className="secondary-button" onClick={() => openSheet('restart')}>New duel <ArrowsClockwise size={21} /></button><button className="plain-button" onClick={() => openSheet('leave')}>Leave duel</button></div>}
-        {sheet === 'restart' && <div className="pause-content"><p className="restart-copy">End this duel and choose a theme for your next board?</p><button className="primary-button" onClick={() => { leaveDuel(); openPage('theme-select'); }}>Choose a theme <ArrowsClockwise size={22} /></button><button className="plain-button" onClick={() => setSheet('pause')}>Keep this duel</button></div>}
-        {sheet === 'leave' && <div className="pause-content"><p className="restart-copy">Leaving ends this duel. Tiles you collected stay in your binder.</p><button className="primary-button" onClick={leaveDuel}>Leave duel <ArrowRight size={22} /></button><button className="plain-button" onClick={() => setSheet('pause')}>Keep playing</button></div>}
+          <section className="settings-ruleset" aria-labelledby="settings-ai-heading">
+            <h3 id="settings-ai-heading" className="settings-ruleset-heading">{t("Opponent AI")}</h3>
+            {screen === 'game' && <p className="settings-ruleset-note">{t('Applies to your next duel. Playing now: {mode}.', { mode: t(AI_MODES.find(value => value.id === normalizeAiMode(game.aiMode)).label) })}</p>}
+            <div className="settings-ruleset-switch settings-ai-switch" role="group" aria-label={t("Opponent AI")} aria-describedby="settings-ai-description">{AI_MODES.map(value => <button key={value.id} className={aiMode === value.id ? 'active' : ''} aria-pressed={aiMode === value.id} onClick={() => { setAiMode(value.id); playSound('tap'); }}>{t(value.label)}</button>)}</div>
+            <p id="settings-ai-description" className="settings-ruleset-note">{t(AI_MODES.find(value => value.id === aiMode).description)}</p>
+          </section>
+          <label className="setting-row"><span><SpeakerHigh size={25} weight="fill" /><span><strong>{t("Sound")}</strong><small>{t("Tiles, buttons & celebrations")}</small></span></span><input type="checkbox" role="switch" checked={sound} onChange={e => { setSound(e.target.checked); chime('tap', e.target.checked); }} /><span className="toggle" /></label><label className="setting-row"><span><Sparkle size={25} weight="fill" /><span><strong>{t("Gentle motion")}</strong><small>{t("Fewer animated effects")}</small></span></span><input type="checkbox" role="switch" checked={gentle} onChange={e => setGentle(e.target.checked)} /><span className="toggle" /></label><label className="setting-row"><span><Diamond size={25} weight="fill" /><span><strong>{t("Rank pips")}</strong><small>{t("Help identify count & tier tiles")}</small></span></span><input type="checkbox" role="switch" checked={pips} onChange={e => setPips(e.target.checked)} /><span className="toggle" /></label><button className="secondary-button settings-rules-button" onClick={() => openSheet('rules')}><span><Info size={21} weight="bold" />{t("Rules")}</span><CaretRight size={21} /></button><button className="primary-button" onClick={closeSheet}>{t("Done")} <Check size={22} weight="bold" /></button></div>}
+        {sheet === 'pause' && <div className="pause-content"><div className="pause-flower"><FlowerLotus size={70} weight="duotone" /></div><button className="primary-button" onClick={closeSheet}>{t("Continue")} <Play size={21} weight="fill" /></button><button className="secondary-button" onClick={() => openSheet('settings')}>{t("Settings")} <GearSix size={21} /></button><button className="secondary-button" onClick={() => openSheet('restart')}>{t("New duel")} <ArrowsClockwise size={21} /></button><button className="plain-button" onClick={() => openSheet('leave')}>{t("Leave duel")}</button></div>}
+        {sheet === 'restart' && <div className="pause-content"><p className="restart-copy">{t("End this duel and choose a theme for your next board?")}</p><button className="primary-button" onClick={() => { leaveDuel(); openPage('theme-select'); }}>{t("Choose a theme")} <ArrowsClockwise size={22} /></button><button className="plain-button" onClick={() => setSheet('pause')}>{t("Keep this duel")}</button></div>}
+        {sheet === 'leave' && <div className="pause-content"><p className="restart-copy">{t("Leaving ends this duel. Tiles you collected stay in your binder.")}</p><button className="primary-button" onClick={leaveDuel}>{t("Leave duel")} <ArrowRight size={22} /></button><button className="plain-button" onClick={() => setSheet('pause')}>{t("Keep playing")}</button></div>}
       </Sheet>}</AnimatePresence>
-      <AnimatePresence>{result && <motion.div className="result-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }}><motion.section className="result-card" role="dialog" aria-modal="true" aria-label="Game results" initial={{ y: 25, scale: .9 }} animate={{ y: 0, scale: 1 }} transition={{ type: 'spring', damping: 20 }}><VictoryBloom /><h2>{result === 'win' ? 'Victory!' : result === 'tie' ? 'A perfect tie!' : 'Well played!'}</h2><p>{result === 'win' ? `You outmatched ${opponentName}.` : result === 'tie' ? 'A memory match, perfectly balanced.' : `${opponentName} takes this round.`}</p><div className="result-stats"><div><span>You</span><strong>{game.score.toLocaleString()}</strong></div><div><span>{opponentName}</span><strong>{game.aiScore.toLocaleString()}</strong></div><div><span>Your pairs</span><strong>{game.score / POINTS_PER_PAIR}</strong></div></div><div className="result-currency-reward"><CurrencyIcon kind="coins" /><strong>+{DUEL_COIN_REWARDS[result]} Coins</strong><span>Added to your balance</span></div><CollectionProgressSummary beforeCollection={beforeDuelCollection.current} collection={progression.collection} /><div className="result-memory"><PlayerAvatar profile={profile} /><span>{(game.tiles.length - freeCount) / 2} pairs cleared<small>Every duel starts with a fresh board.</small></span></div>{progression.newAchievementIds.length > 0 && <p className="result-achievement-summary">{progression.newAchievementIds.length} achievement{progression.newAchievementIds.length === 1 ? '' : 's'} unlocked</p>}<button className="primary-button" onClick={continueResult}>Continue <ArrowRight size={25} weight="bold" /></button></motion.section></motion.div>}</AnimatePresence>
+      <AnimatePresence>{result && <motion.div className="result-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }}><motion.section className="result-card" role="dialog" aria-modal="true" aria-label={t("Game results")} initial={{ y: 25, scale: .9 }} animate={{ y: 0, scale: 1 }} transition={{ type: 'spring', damping: 20 }}><VictoryBloom /><h2>{result === 'win' ? t("Victory!") : result === 'tie' ? t("A perfect tie!") : t("Well played!")}</h2><p>{result === 'win' ? t('You outmatched {name}.', { name: opponentName }) : result === 'tie' ? t("A memory match, perfectly balanced.") : t('{name} takes this round.', { name: opponentName })}</p><div className="result-stats"><div><span>{t("You")}</span><strong>{formatNumber(game.score)}</strong></div><div><span>{opponentName}</span><strong>{formatNumber(game.aiScore)}</strong></div><div><span>{t("Your pairs")}</span><strong>{game.score / POINTS_PER_PAIR}</strong></div></div><div className="result-currency-reward"><CurrencyIcon kind="coins" /><strong>{t('+{count} Coins', { count: DUEL_COIN_REWARDS[result] })}</strong><span>{t("Added to your balance")}</span></div><CollectionProgressSummary beforeCollection={beforeDuelCollection.current} collection={progression.collection} /><div className="result-memory"><PlayerAvatar profile={profile} /><span>{t('{count} pairs cleared', { count: (game.tiles.length - freeCount) / 2 })}<small>{t("Every duel starts with a fresh board.")}</small></span></div>{progression.newAchievementIds.length > 0 && <p className="result-achievement-summary">{t('{count} achievements unlocked', { count: progression.newAchievementIds.length })}</p>}<button className="primary-button" onClick={continueResult}>{t("Continue")} <ArrowRight size={25} weight="bold" /></button></motion.section></motion.div>}</AnimatePresence>
       </>}
     </main>
     <AchievementNotifications batches={achievementBatches} onComplete={id => setAchievementBatches(current => current.filter(batch => batch.id !== id))} paused={Boolean(sheet || entering || matchmaking || pageHidden)} sound={sound} gentle={gentle} />
-    <span className="duel-entry-announcement" role="status" aria-live="polite">{matchIntro?.phase === 'ready' ? 'You play first' : ''}</span>
+    <span className="duel-entry-announcement" role="status" aria-live="polite">{matchIntro?.phase === 'ready' ? t("You play first") : ''}</span>
     {matchIntro?.phase === 'travel' && boardReady && <><PortraitTransfer origins={matchIntro.origins} profile={profile} opponent={opponentProfile} paused={Boolean(sheet || pageHidden)} gentle={gentle} /><TileEntrance boardRef={boardRef} paused={Boolean(sheet || pageHidden)} gentle={gentle} /></>}
     {scoreFlights.map(feedback => <ScoreFlight key={feedback.id} feedback={feedback} paused={Boolean(sheet || result || pageHidden)} gentle={gentle} onComplete={() => setScoreFlights(current => current.filter(item => item.id !== feedback.id))} />)}
   </div></MotionConfig>;
 }
 
 function GameLaunch() {
+  const language = useSyncExternalStore(subscribeLanguage, getLanguage, getLanguage);
+  useEffect(() => {
+    document.documentElement.lang = language;
+    document.title = t('Mahjong Duel — The Memory Collection');
+  }, [language]);
   const [launch] = useState(() => {
     const menuBackground = chooseMenuBackground(store.get('menuBackground', null));
     return {

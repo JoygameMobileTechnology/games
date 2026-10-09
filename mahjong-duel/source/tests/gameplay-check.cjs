@@ -11,6 +11,7 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
   const [engine, { themes }] = await Promise.all([load('engine.js'), load('themes.js')]);
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  await context.addInitScript(() => { try { localStorage.setItem('porcelain:language', '"en"'); } catch { /* Storage-denied fixtures use the Turkish default. */ } });
   const page = await context.newPage(), errors = [];
   page.on('pageerror', error => errors.push(error.message));
   page.on('response', response => { if (response.status() >= 400 && response.url().startsWith(origin)) errors.push(`${response.status()} ${response.url()}`); });
@@ -43,7 +44,7 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
   }
   async function reset() {
     await page.goto(origin);
-    await page.evaluate(() => { localStorage.clear(); localStorage.setItem('porcelain:sound', 'false'); localStorage.setItem('porcelain:gentle', 'true'); });
+    await page.evaluate(() => { localStorage.clear(); localStorage.setItem('porcelain:language', '"en"'); localStorage.setItem('porcelain:sound', 'false'); localStorage.setItem('porcelain:gentle', 'true'); });
     await page.reload();
   }
   async function fixture(game, extras = {}) {

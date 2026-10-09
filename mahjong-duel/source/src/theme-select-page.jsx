@@ -6,6 +6,7 @@ import { themeTileSets } from './tile-data.js';
 import { boardVariants } from './board-variants.js';
 import { rarityById } from './rarity.js';
 import { getThemeProgress, getThemeUnlocks } from './theme-unlocks.js';
+import { t, formatNumber, getLanguage } from './i18n.js';
 import './theme-select-page.css';
 
 const SIGNATURES = {
@@ -14,7 +15,7 @@ const SIGNATURES = {
   'stained-glass': { eastern: 'A13', western: 'W40' },
   'dutch-golden-age': { eastern: 'A11', western: 'W06' },
 };
-const format = value => Number(value || 0).toLocaleString();
+const format = value => formatNumber(Number(value || 0));
 
 export function ThemeArtwork({ theme, surfaceSrc }) {
   const ruleset = rulesetForTheme(theme.id);
@@ -31,26 +32,26 @@ function UnlockGoals({ state, prerequisite }) {
   return <div className="theme-unlock-body">
     <section className="theme-unlock-intro" aria-labelledby={`${id}-title`}>
       <span className="theme-unlock-seal" aria-hidden="true"><LockKey size={26} weight="duotone" /></span>
-      <h3 id={`${id}-title`}>A new collection awaits</h3>
-      <p>Collect in {dependencies.map(themeId => themeById[themeId].name).join(' and ')} to unlock {themeById[state.themeId].name}.</p>
-      <span className="theme-unlock-edition">Collection progress</span>
-      {prerequisite && <p className="theme-unlock-prerequisite"><LockKey size={19} weight="fill" aria-hidden="true" /><span>Unlock <strong>{themeById[prerequisite.themeId].name}</strong> first, then complete these goals.</span></p>}
-      <div className="theme-unlock-total"><strong>{format(totals.completedTypes)} / {format(totals.requiredTypes)} artworks ready <span>{totals.percent}%</span></strong><progress value={totals.percent} max={100} aria-label="Collection progress toward this theme" /><small>{format(totals.completedMatches)} / {format(totals.requiredMatches)} required matches collected</small></div>
-      <p className="theme-unlock-help">Every matching pair adds one copy. Partial copies count toward the bar; extra copies of a ready artwork do not. Meet each goal below; your collection is never spent.</p>
+      <h3 id={`${id}-title`}>{t('A new collection awaits')}</h3>
+      <p>{t('Collect in {themes} to unlock {theme}.', { themes: dependencies.map(themeId => t(themeById[themeId].name)).join(t(' and ')), theme: t(themeById[state.themeId].name) })}</p>
+      <span className="theme-unlock-edition">{t('Collection progress')}</span>
+      {prerequisite && <p className="theme-unlock-prerequisite"><LockKey size={19} weight="fill" aria-hidden="true" /><span>{t('Unlock {theme} first, then complete these goals.', { theme: t(themeById[prerequisite.themeId].name) })}</span></p>}
+      <div className="theme-unlock-total"><strong>{t('{count} / {total} artworks ready', { count: format(totals.completedTypes), total: format(totals.requiredTypes) })} <span>{totals.percent}%</span></strong><progress value={totals.percent} max={100} aria-label={t('Collection progress toward this theme')} /><small>{t('{count} / {total} required matches collected', { count: format(totals.completedMatches), total: format(totals.requiredMatches) })}</small></div>
+      <p className="theme-unlock-help">{t('Every matching pair adds one copy. Partial copies count toward the bar; extra copies of a ready artwork do not. Meet each goal below; your collection is never spent.')}</p>
     </section>
     <div className="theme-unlock-goals">{state.requirements.map((goal, index) => {
       const rarity = rarityById[goal.rarityId], complete = goal.completedTypes >= goal.requiredTypes;
-      const tiles = [...goal.tiles].sort((a, b) => Number(a.complete) - Number(b.complete) || b.count - a.count || a.name.localeCompare(b.name));
+      const tiles = [...goal.tiles].sort((a, b) => Number(a.complete) - Number(b.complete) || b.count - a.count || t(a.name).localeCompare(t(b.name), getLanguage()));
       return <details className={`theme-unlock-goal ${complete ? 'is-complete' : ''}`} key={`${goal.themeId}:${goal.rarityId}`}>
         <summary tabIndex={0} aria-controls={`${id}-tiles-${index}`}>
-          <span className="theme-goal-heading"><span>{themeById[goal.themeId].name}</span><strong><span className="theme-goal-rarity" style={{ '--goal-color': rarity.color, '--goal-ink': rarity.ink }} aria-hidden="true" />{rarity.label}<small>{goal.requiredTypes === goal.availableTypes ? `All ${goal.availableTypes} artworks` : `Any ${goal.requiredTypes} of ${goal.availableTypes} artworks`} · {goal.matchesPerType} matches each</small></strong></span>
-          <span className="theme-goal-fraction"><strong>{Math.min(goal.completedTypes, goal.requiredTypes)} / {goal.requiredTypes}</strong><small>artworks ready</small><span>{complete ? <><Check size={14} weight="bold" />Complete</> : <>View tiles<CaretDown size={14} weight="bold" /></>}</span></span>
+          <span className="theme-goal-heading"><span>{t(themeById[goal.themeId].name)}</span><strong><span className="theme-goal-rarity" style={{ '--goal-color': rarity.color, '--goal-ink': rarity.ink }} aria-hidden="true" />{t(rarity.label)}<small>{goal.requiredTypes === goal.availableTypes ? t('All {count} artworks', { count: goal.availableTypes }) : t('Any {count} of {total} artworks', { count: goal.requiredTypes, total: goal.availableTypes })} · {t('{count} matches each', { count: goal.matchesPerType })}</small></strong></span>
+          <span className="theme-goal-fraction"><strong>{Math.min(goal.completedTypes, goal.requiredTypes)} / {goal.requiredTypes}</strong><small>{t('artworks ready')}</small><span>{complete ? <><Check size={14} weight="bold" />{t('Complete')}</> : <>{t('View tiles')}<CaretDown size={14} weight="bold" /></>}</span></span>
         </summary>
-        <div className="theme-goal-progress"><progress value={goal.completedMatches} max={goal.requiredMatches || 1} aria-label={`${themeById[goal.themeId].name} ${rarity.label}: ${goal.completedMatches} of ${goal.requiredMatches} required matches collected`} /></div>
+        <div className="theme-goal-progress"><progress value={goal.completedMatches} max={goal.requiredMatches || 1} aria-label={t('{theme} {rarity}: {count} of {total} required matches collected', { theme: t(themeById[goal.themeId].name), rarity: t(rarity.label), count: goal.completedMatches, total: goal.requiredMatches })} /></div>
         <ul className="theme-goal-tiles" id={`${id}-tiles-${index}`}>{tiles.map(tile => <li className={tile.complete ? 'is-complete' : ''} key={tile.matchKey}>
           <img src={tile.src} alt="" loading="lazy" width="38" height="48" />
-          <span><strong>{tile.name}</strong><small>{tile.complete ? 'Ready' : `Matched ${format(tile.count)} of ${tile.required} times`}</small></span>
-          <span className="theme-goal-tile-count" aria-label={`${tile.name}, ${format(tile.count)} of ${tile.required} matches`}>{tile.complete ? <Check size={19} weight="bold" aria-hidden="true" /> : <>{Math.min(tile.count, tile.required)}<small>/{tile.required}</small></>}</span>
+          <span><strong>{t(tile.name)}</strong><small>{tile.complete ? t('Ready') : t('Matched {count} of {total} times', { count: format(tile.count), total: tile.required })}</small></span>
+          <span className="theme-goal-tile-count" aria-label={t('{name}, {count} of {total} matches', { name: t(tile.name), count: format(tile.count), total: tile.required })}>{tile.complete ? <Check size={19} weight="bold" aria-hidden="true" /> : <>{Math.min(tile.count, tile.required)}<small>/{tile.required}</small></>}</span>
         </li>)}</ul>
       </details>;
     })}</div>
@@ -82,26 +83,26 @@ export function ThemeSelectPage({ collection, initialTheme, initialScrollTop = 0
     opener.current = state.themeId;
     setInspectedId(state.themeId);
   };
-  return <ProgressionPage title={inspected ? `Unlock ${themeById[inspected.themeId].name}` : 'Choose a theme'} className={`theme-select-page ${inspected ? 'is-viewing-goals' : ''}`} onClose={inspected ? closeDetails : onClose} closeLabel={inspected ? 'Back to theme selection' : 'Back to main menu'}>
+  return <ProgressionPage title={inspected ? t('Unlock {theme}', { theme: t(themeById[inspected.themeId].name) }) : t('Choose a theme')} className={`theme-select-page ${inspected ? 'is-viewing-goals' : ''}`} onClose={inspected ? closeDetails : onClose} closeLabel={t(inspected ? 'Back to theme selection' : 'Back to main menu')}>
     {inspected ? <div className="theme-unlock-scroll"><UnlockGoals state={inspected} prerequisite={previousInspected && !previousInspected.unlocked ? previousInspected : null} /></div> : <>
       <div className="theme-choice-scroll" ref={scroller}>
-        <p className="theme-choice-edition">Your collections<span>Collect tiles to unlock new themes</span></p>
+        <p className="theme-choice-edition">{t('Your collections')}<span>{t('Collect tiles to unlock new themes')}</span></p>
         <button type="button" className={`theme-random-choice ${chosen === 'random' ? 'is-selected' : ''}`} aria-pressed={chosen === 'random'} onClick={() => setSelection('random')}>
-          <span><strong>Random Match</strong><small>Unlocked themes only</small></span><span className="theme-random-dice" aria-hidden="true"><DiceFive size={41} weight="duotone" /><DiceFive size={33} weight="duotone" /></span>{chosen === 'random' ? <Check size={24} weight="bold" aria-hidden="true" /> : <CaretRight size={24} weight="bold" aria-hidden="true" />}
+          <span><strong>{t('Random Match')}</strong><small>{t('Unlocked themes only')}</small></span><span className="theme-random-dice" aria-hidden="true"><DiceFive size={41} weight="duotone" /><DiceFive size={33} weight="duotone" /></span>{chosen === 'random' ? <Check size={24} weight="bold" aria-hidden="true" /> : <CaretRight size={24} weight="bold" aria-hidden="true" />}
         </button>
-        <div className="theme-choice-list" role="group" aria-label="Choose your duel theme">{unlocks.map((state, index) => {
+        <div className="theme-choice-list" role="group" aria-label={t('Choose your duel theme')}>{unlocks.map((state, index) => {
           const theme = themeById[state.themeId], totals = getThemeProgress(state), selected = chosen === theme.id;
           const prerequisite = index > 0 && !unlocks[index - 1].unlocked ? unlocks[index - 1] : null;
-          return <button type="button" className={`theme-choice-card ${state.unlocked ? 'is-unlocked' : 'is-locked'} ${selected ? 'is-selected' : ''}`} data-theme={theme.id} key={theme.id} aria-pressed={state.unlocked ? selected : undefined} aria-label={state.unlocked ? theme.name : `${theme.name}, locked. View unlock requirements`} onClick={event => choose(state, event)}>
+          return <button type="button" className={`theme-choice-card ${state.unlocked ? 'is-unlocked' : 'is-locked'} ${selected ? 'is-selected' : ''}`} data-theme={theme.id} key={theme.id} aria-pressed={state.unlocked ? selected : undefined} aria-label={state.unlocked ? t(theme.name) : t('{theme}, locked. View unlock requirements', { theme: t(theme.name) })} onClick={event => choose(state, event)}>
             <ThemeArtwork theme={theme} />
-            <span className="theme-choice-copy"><strong className="theme-choice-name">{theme.name}</strong><span className="theme-choice-population"><span aria-hidden="true" />Players online · {format(populationCounts[theme.id])}</span>
-              {!state.unlocked && <span className="theme-choice-lock"><LockKey size={23} weight="fill" aria-hidden="true" /><span><strong>{prerequisite ? `Unlock ${themeById[prerequisite.themeId].name} first` : state.nextToUnlock ? 'Next to unlock' : 'Locked'}</strong><small>{totals.completedTypes} / {totals.requiredTypes} artworks ready · {totals.percent}%</small><progress value={totals.percent} max={100} aria-label={`${theme.name} unlock progress`} /></span></span>}
+            <span className="theme-choice-copy"><strong className="theme-choice-name">{t(theme.name)}</strong><span className="theme-choice-population"><span aria-hidden="true" />{t('Players online · {count}', { count: format(populationCounts[theme.id]) })}</span>
+              {!state.unlocked && <span className="theme-choice-lock"><LockKey size={23} weight="fill" aria-hidden="true" /><span><strong>{prerequisite ? t('Unlock {theme} first', { theme: t(themeById[prerequisite.themeId].name) }) : t(state.nextToUnlock ? 'Next to unlock' : 'Locked')}</strong><small>{t('{count} / {total} artworks ready', { count: totals.completedTypes, total: totals.requiredTypes })} · {totals.percent}%</small><progress value={totals.percent} max={100} aria-label={t('{theme} unlock progress', { theme: t(theme.name) })} /></span></span>}
             </span>
             {selected && <span className="theme-choice-check" aria-hidden="true"><Check size={24} weight="bold" /></span>}
           </button>;
         })}</div>
       </div>
-      <footer className="theme-choice-footer"><button type="button" className="progression-primary theme-choice-play" disabled={!chosen} onClick={() => onPlay(chosen, scroller.current?.scrollTop || 0)}>Play Duel<CaretRight size={26} weight="bold" /></button><span className="theme-choice-selection-note">{chosen === 'random' ? 'A surprise from your unlocked collections' : themeById[chosen]?.name}</span></footer>
+      <footer className="theme-choice-footer"><button type="button" className="progression-primary theme-choice-play" disabled={!chosen} onClick={() => onPlay(chosen, scroller.current?.scrollTop || 0)}>{t('Play')}<CaretRight size={26} weight="bold" /></button><span className="theme-choice-selection-note">{chosen === 'random' ? t('A surprise from your unlocked collections') : t(themeById[chosen]?.name)}</span></footer>
     </>}
   </ProgressionPage>;
 }

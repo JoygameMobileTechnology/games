@@ -1,3 +1,4 @@
+import { t, formatNumber, countryName as localizedCountryName, locale } from './i18n.js';
 import React, { useId, useState } from 'react';
 import { AVATAR_IDS, COUNTRIES, countryFlag, normalizeProfile, profileError } from './profile-store.js';
 import { AVATAR_FRAMES, getAvatarFrame, isFrameUnlocked } from './avatar-frames.js';
@@ -43,12 +44,11 @@ export function PlayerAvatar({ profile, size = 64, showFlag = true, className = 
   const player = normalizeProfile(profile);
   const frame = getAvatarFrame(player.frameId);
   const index = AVATAR_IDS.indexOf(player.avatarId);
-  const country = COUNTRIES.find(item => item.code === player.countryCode);
   const pixels = Number.isFinite(size) ? Math.min(240, Math.max(24, size)) : 64;
   return <span className={`player-avatar ${shape === 'circle' ? 'player-avatar-circle' : ''} ${frame ? `has-frame frame-${frame.id}` : ''} ${className}`} data-avatar-id={player.avatarId} data-frame-id={player.frameId || undefined} style={{ '--avatar-size': `${pixels}px` }}>
-    <span className="player-avatar-portrait" role="img" aria-label={`${player.name}'s avatar${frame ? `, ${frame.name} frame` : ''}`} style={{ backgroundImage: `url(${JSON.stringify(AVATAR_SHEET)})`, backgroundPosition: `${index % 4 / 3 * 100}% ${index < 4 ? 0 : 100}%` }} />
+    <span className="player-avatar-portrait" role="img" aria-label={frame ? t("{name}'s avatar, {frame} frame", { name: player.name, frame: t(frame.name) }) : t("{name}'s avatar", { name: player.name })} style={{ backgroundImage: `url(${JSON.stringify(AVATAR_SHEET)})`, backgroundPosition: `${index % 4 / 3 * 100}% ${index < 4 ? 0 : 100}%` }} />
     <AvatarFrame frameId={player.frameId} shape={shape} />
-    {showFlag && <span className="player-country-flag" role="img" aria-label={country?.name || 'Global'} title={country?.name || 'Global'}>{countryFlag(player.countryCode)}</span>}
+    {showFlag && <span className="player-country-flag" role="img" aria-label={localizedCountryName(player.countryCode)} title={localizedCountryName(player.countryCode)}>{countryFlag(player.countryCode)}</span>}
   </span>;
 }
 
@@ -60,7 +60,7 @@ export function ProfileEditor({ profile, achievementPoints = 0, retainedFrameIds
   const id = useId();
   const setField = (field, value) => { setDraft(previous => ({ ...previous, [field]: value })); setError(''); };
   const nameLength = Array.from(draft.name).length;
-  const countryName = COUNTRIES.find(country => country.code === draft.countryCode)?.name || 'Global player';
+  const countryName = draft.countryCode ? localizedCountryName(draft.countryCode) : t('Global player');
   async function submit(event) {
     event.preventDefault();
     if (saving) return;
@@ -72,25 +72,25 @@ export function ProfileEditor({ profile, achievementPoints = 0, retainedFrameIds
     } catch { setError('Your profile could not be saved. Please try again.'); }
     finally { setSaving(false); }
   }
-  return <form className="profile-editor" onSubmit={submit} noValidate aria-label="Player profile">
-    <div className="profile-preview"><PlayerAvatar profile={draft} size={82} /><div><strong>{draft.name.trim() || 'Your name'}</strong><span>{countryName}</span></div></div>
+  return <form className="profile-editor" onSubmit={submit} noValidate aria-label={t("Player profile")}>
+    <div className="profile-preview"><PlayerAvatar profile={draft} size={82} /><div><strong>{draft.name.trim() || t('Your name')}</strong><span>{countryName}</span></div></div>
     <div className="profile-field">
-      <label htmlFor={`${id}-name`}>Player name <span>{nameLength}/16</span></label>
-      <input id={`${id}-name`} name="playerName" type="text" value={draft.name} maxLength={32} autoComplete="off" autoCapitalize="words" spellCheck={false} placeholder="Enter your name" aria-invalid={Boolean(error && profileError(draft).includes('name'))} aria-describedby={error ? `${id}-error` : undefined} onChange={event => setField('name', Array.from(event.target.value).slice(0, 16).join(''))} />
+      <label htmlFor={`${id}-name`}>{t('Player name')} <span>{nameLength}/16</span></label>
+      <input id={`${id}-name`} name="playerName" type="text" value={draft.name} maxLength={32} autoComplete="off" autoCapitalize="words" spellCheck={false} placeholder={t("Enter your name")} aria-invalid={Boolean(error && profileError(draft).includes('name'))} aria-describedby={error ? `${id}-error` : undefined} onChange={event => setField('name', Array.from(event.target.value).slice(0, 16).join(''))} />
     </div>
-    <fieldset className="profile-avatar-field"><legend>Choose your avatar</legend><div className="profile-avatar-grid">{AVATAR_IDS.map((avatarId, index) => <button key={avatarId} type="button" className={`profile-avatar-option ${draft.avatarId === avatarId ? 'is-selected' : ''}`} aria-label={`Avatar ${index + 1}: ${avatarDescriptions[index]}`} aria-pressed={draft.avatarId === avatarId} onClick={() => setField('avatarId', avatarId)}><PlayerAvatar profile={{ ...draft, avatarId, frameId: '' }} size={72} showFlag={false} />{draft.avatarId === avatarId && <span className="profile-avatar-check" aria-hidden="true">✓</span>}</button>)}</div></fieldset>
-    <fieldset className="profile-frame-field"><legend>Avatar frame <span>{achievementPoints.toLocaleString()} AP earned</span></legend><p>Unlock frames with Achievement Points. Your points stay yours.</p><div className="profile-frame-grid">
+    <fieldset className="profile-avatar-field"><legend>{t("Choose your avatar")}</legend><div className="profile-avatar-grid">{AVATAR_IDS.map((avatarId, index) => <button key={avatarId} type="button" className={`profile-avatar-option ${draft.avatarId === avatarId ? 'is-selected' : ''}`} aria-label={t('Avatar {number}: {description}', { number: index + 1, description: t(avatarDescriptions[index]) })} aria-pressed={draft.avatarId === avatarId} onClick={() => setField('avatarId', avatarId)}><PlayerAvatar profile={{ ...draft, avatarId, frameId: '' }} size={72} showFlag={false} />{draft.avatarId === avatarId && <span className="profile-avatar-check" aria-hidden="true">✓</span>}</button>)}</div></fieldset>
+    <fieldset className="profile-frame-field"><legend>{t('Avatar frame')} <span>{t('{count} AP earned', { count: achievementPoints })}</span></legend><p>{t("Unlock frames with Achievement Points. Your points stay yours.")}</p><div className="profile-frame-grid">
       {[{ id: '', name: 'No frame', pointsRequired: 0 }, ...AVATAR_FRAMES].map(frame => {
         const unlocked = isFrameUnlocked(frame.id, achievementPoints, retainedFrameIds);
         const selected = draft.frameId === frame.id;
-        return <button key={frame.id || 'none'} type="button" className={`profile-frame-option ${selected ? 'is-selected' : ''} ${unlocked ? '' : 'is-locked'}`} disabled={!unlocked} aria-label={`${frame.name}${unlocked ? selected ? ', equipped' : ', available' : `, unlock at ${frame.pointsRequired.toLocaleString()} Achievement Points`}`} aria-pressed={selected} onClick={() => setField('frameId', frame.id)}>
-          <PlayerAvatar profile={{ ...draft, frameId: frame.id }} size={48} showFlag={false} /><strong>{frame.name}</strong><span>{selected ? 'Equipped' : unlocked ? 'Available' : `${frame.pointsRequired.toLocaleString()} AP`}</span>
+        return <button key={frame.id || 'none'} type="button" className={`profile-frame-option ${selected ? 'is-selected' : ''} ${unlocked ? '' : 'is-locked'}`} disabled={!unlocked} aria-label={t(unlocked ? selected ? '{name}, equipped' : '{name}, available' : '{name}, unlock at {count} Achievement Points', { name: t(frame.name), count: frame.pointsRequired })} aria-pressed={selected} onClick={() => setField('frameId', frame.id)}>
+          <PlayerAvatar profile={{ ...draft, frameId: frame.id }} size={48} showFlag={false} /><strong>{t(frame.name)}</strong><span>{selected ? t('Equipped') : unlocked ? t('Available') : t('{count} AP', { count: frame.pointsRequired })}</span>
           {!unlocked && <svg className="profile-frame-lock" viewBox="0 0 16 18" aria-hidden="true"><path d="M4 7V5a4 4 0 0 1 8 0v2M2 7h12v9H2Z" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" /><circle cx="8" cy="11" r="1" fill="currentColor" /></svg>}
         </button>;
       })}
     </div></fieldset>
-    <div className="profile-field"><label htmlFor={`${id}-country`}>Country</label><div className="profile-country-control"><span aria-hidden="true">{countryFlag(draft.countryCode)}</span><select id={`${id}-country`} name="countryCode" value={draft.countryCode} onChange={event => setField('countryCode', event.target.value)}><option value="">Global</option>{COUNTRIES.map(country => <option key={country.code} value={country.code}>{country.name}</option>)}</select><span className="profile-country-chevron" aria-hidden="true">⌄</span></div></div>
-    {error && <p className="profile-error" role="alert" id={`${id}-error`}>{error}</p>}
-    <button className="profile-save-button" type="submit" disabled={saving}>{saving ? 'Saving…' : 'Save profile'}</button>
+    <div className="profile-field"><label htmlFor={`${id}-country`}>{t("Country")}</label><div className="profile-country-control"><span aria-hidden="true">{countryFlag(draft.countryCode)}</span><select id={`${id}-country`} name="countryCode" value={draft.countryCode} onChange={event => setField('countryCode', event.target.value)}><option value="">{t("Global")}</option>{[...COUNTRIES].sort((a, b) => localizedCountryName(a.code).localeCompare(localizedCountryName(b.code), locale())).map(country => <option key={country.code} value={country.code}>{localizedCountryName(country.code)}</option>)}</select><span className="profile-country-chevron" aria-hidden="true">⌄</span></div></div>
+    {error && <p className="profile-error" role="alert" id={`${id}-error`}>{t(error)}</p>}
+    <button className="profile-save-button" type="submit" disabled={saving}>{saving ? t('Saving…') : t('Save profile')}</button>
   </form>;
 }

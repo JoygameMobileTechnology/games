@@ -30,6 +30,7 @@ const sizes = [[320,568],[375,667],[390,844],[430,932],[768,1024],[1024,768],[56
   const mixedIds = ['easy-recall-1', 'medium-recovery-3', 'hard-pairs-50'];
   const browser = await require(process.env.PLAYWRIGHT_MODULE || 'playwright')[kind].launch();
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, reducedMotion: 'reduce' });
+  await context.addInitScript(() => { try { localStorage.setItem('porcelain:language', '"en"'); } catch { /* Storage-denied fixtures use the Turkish default. */ } });
   await context.addInitScript(initial => {
     if (!localStorage.getItem('daily-quests-layout-seeded')) {
       localStorage.setItem('porcelain:progression', JSON.stringify(initial));
@@ -52,7 +53,7 @@ const sizes = [[320,568],[375,667],[390,844],[430,932],[768,1024],[1024,768],[56
       await page.evaluate(state => localStorage.setItem('porcelain:progression', JSON.stringify(state)), state);
       await page.reload();
     }
-    await page.getByRole('button', { name: 'Play Duel', exact: true }).waitFor();
+    await page.getByRole('button', { name: 'Play', exact: true }).waitFor();
     await page.getByRole('button', { name: 'Daily Quests', exact: true }).click();
     await page.getByRole('heading', { name: 'Daily Quests', exact: true }).waitFor();
     await page.evaluate(() => document.fonts.ready);
@@ -169,7 +170,7 @@ const sizes = [[320,568],[375,667],[390,844],[430,932],[768,1024],[1024,768],[56
     for (const button of await page.getByRole('button', { name: /^Replace / }).all()) assert.equal(await button.isDisabled(), true, 'No second daily replacement');
     await textScale(1); await textScale(1.25); await check('replacement-exhausted-text125', true);
     await page.getByRole('button', { name: 'Back to main menu', exact: true }).click();
-    await page.getByRole('button', { name: 'Play Duel', exact: true }).waitFor();
+    await page.getByRole('button', { name: 'Play', exact: true }).waitFor();
     await page.reload(); await page.getByRole('button', { name: 'Daily Quests', exact: true }).click();
     await page.getByRole('heading', { name: 'Daily Quests', exact: true }).waitFor();
     assert.equal((await stored()).quests.rerollsUsed, 1, 'Exhausted replacement survives reload');

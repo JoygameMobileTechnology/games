@@ -12,6 +12,7 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
   for (const browserName of (process.env.POLISH_BROWSER ? [process.env.POLISH_BROWSER] : ['chromium', 'webkit'])) {
     const browser = await playwright[browserName].launch({ headless: true });
     const context = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+    await context.addInitScript(() => { try { localStorage.setItem('porcelain:language', '"en"'); } catch { /* Storage-denied fixtures use the Turkish default. */ } });
     await context.addInitScript(() => {
       window.__polish = { sounds: [], nudges: [], changes: [], pointerTypes: [], animationStarts: [], sessionWrites: [] };
       const originalStore = Storage.prototype.setItem;
@@ -81,7 +82,7 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
     }
     async function reset() {
       await page.goto(origin);
-      await page.evaluate(() => { localStorage.clear(); localStorage.setItem('porcelain:sound', 'true'); localStorage.setItem('porcelain:gentle', 'false'); });
+      await page.evaluate(() => { localStorage.clear(); localStorage.setItem('porcelain:language', '"en"'); localStorage.setItem('porcelain:sound', 'true'); localStorage.setItem('porcelain:gentle', 'false'); });
       await page.reload(); await page.locator('[data-hero-index="4"]').waitFor(); await sleep(750);
     }
     async function fixture(reduced = false, mode = 'solo') {

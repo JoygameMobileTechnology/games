@@ -32,6 +32,7 @@ const sizes = [
   async function run(label, viewport, preference, scenario) {
     const context = await browser.newContext({ viewport, isMobile: true, hasTouch: true,
       reducedMotion: preference === 'system' ? 'reduce' : 'no-preference' });
+    await context.addInitScript(() => { try { localStorage.setItem('porcelain:language', '"en"'); } catch { /* Storage-denied fixtures use the Turkish default. */ } });
     await context.addInitScript(({ profile, collection, preference }) => {
       localStorage.setItem('porcelain:profile', JSON.stringify(profile));
       localStorage.setItem('porcelain:collection', JSON.stringify(collection));
@@ -233,7 +234,7 @@ const sizes = [
       await page.getByRole('heading', { name: 'Daily Quests', exact: true }).waitFor();
       await tap('Back to main menu');
       if (await page.locator('.starter-boosters-intro').count()) await tap('Got it');
-      await tap('Play Duel');
+      await tap('Play');
       await page.getByRole('heading', { name: 'Choose a theme', exact: true }).waitFor();
       const result = await scenario({ page, advance, tap, button, status, noBoard, selection, choose, start, foundAfter, enterBoard, capture, checkMotion, visibility });
       assert.deepEqual(errors, [], `${label}: no browser or asset errors`);

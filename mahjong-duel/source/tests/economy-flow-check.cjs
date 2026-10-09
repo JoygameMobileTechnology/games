@@ -14,6 +14,7 @@ const output = path.resolve('tmp/economy-qa');
   const { createProgression } = await import(pathToFileURL(path.resolve('src/progression.js')).href);
   const browser = await require(process.env.PLAYWRIGHT_MODULE || 'playwright')[browserName].launch();
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, reducedMotion: 'reduce' });
+  await context.addInitScript(() => { try { localStorage.setItem('porcelain:language', '"en"'); } catch { /* Storage-denied fixtures use the Turkish default. */ } });
   // A fixed empty player seed makes quest selection repeatable; all rewards are earned through UI actions.
   await context.addInitScript(initial => {
     if (!localStorage.getItem('economy-check-seeded')) {
@@ -73,7 +74,7 @@ const output = path.resolve('tmp/economy-qa');
     await tap('Back to main menu'); await advance();
     await heading('Your starter boosters').waitFor(); await tap('Got it');
     await page.reload(); await advance();
-    await button('Play Duel').waitFor();
+    await button('Play').waitFor();
     assert.equal(await heading('Daily Quests').count(), 0, 'Daily auto presentation occurs once');
     assert.equal(getDailyQuestView(await stored(), time.getTime()).rerollsLeft, 0);
     await tap('Shop'); await heading('Shop').waitFor();
@@ -91,7 +92,7 @@ const output = path.resolve('tmp/economy-qa');
     await page.screenshot({ path: path.join(output, `${browserName}-shop.jpg`), animations: 'disabled' });
     await tap('Back to main menu'); await page.reload(); await advance();
     assert.deepEqual((await stored()).currencies, { coins: 800, gems: 50 });
-    await tap('Play Duel'); await heading('Choose a theme').waitFor(); await tap('Play Duel');
+    await tap('Play'); await heading('Choose a theme').waitFor(); await tap('Play');
     await advance(4000); await advance(1500);
     await page.locator('.game-board').waitFor(); await advance(1500);
     for (let matched = 0; matched < 30; matched++) {
@@ -128,7 +129,7 @@ const output = path.resolve('tmp/economy-qa');
     assert.deepEqual((await stored()).currencies, expected);
     assert.equal(await heading('Daily Quests').count(), 1, 'Claims do not close quests');
     assert.equal(await button('Claim').count(), 0);
-    await tap('Back to main menu'); await page.reload(); await advance(); await button('Play Duel').waitFor();
+    await tap('Back to main menu'); await page.reload(); await advance(); await button('Play').waitFor();
     assert.deepEqual((await stored()).currencies, expected, 'Reload does not duplicate any reward');
     await page.clock.fastForward(24 * 60 * 60 * 1000); await page.reload(); await advance();
     await heading('Daily Rewards').waitFor(); await tap('Close daily welcome'); await heading('Daily Quests').waitFor();

@@ -15,6 +15,7 @@ const { pathToFileURL } = require('node:url');
   const browserName = process.argv.includes('--webkit') ? 'webkit' : 'chromium';
   const browser = await require(process.env.PLAYWRIGHT_MODULE || 'playwright')[browserName].launch({ headless: true });
   const page = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  await page.addInitScript(() => { localStorage.setItem('porcelain:language', '"en"'); });
   const output = path.join(root, 'tmp/collection-fullscreen'); fs.mkdirSync(output, { recursive: true });
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
@@ -57,7 +58,7 @@ const { pathToFileURL } = require('node:url');
   try {
     await page.goto(process.env.GAME_URL || 'http://localhost:5173');
     await page.evaluate(({ key, value }) => {
-      localStorage.clear(); localStorage.setItem(key, JSON.stringify(value));
+      localStorage.clear(); localStorage.setItem('porcelain:language', '"en"'); localStorage.setItem(key, JSON.stringify(value));
       localStorage.setItem('porcelain:gentle', 'true'); localStorage.setItem('porcelain:sound', 'false');
     }, { key: COLLECTION_STORAGE_KEY, value });
     await page.reload();

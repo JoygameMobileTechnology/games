@@ -16,6 +16,7 @@ const sizes = [[320,568],[375,553],[375,667],[390,844],[430,932],[768,1024],[102
   const { rewardsForLogin } = await import(pathToFileURL(path.resolve('src/daily-rewards.js')));
   const browser = await require(process.env.PLAYWRIGHT_MODULE || 'playwright')[kind].launch();
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce', isMobile: true, hasTouch: true });
+  await context.addInitScript(() => { try { localStorage.setItem('porcelain:language', '"en"'); } catch { /* Storage-denied fixtures use the Turkish default. */ } });
   await context.addInitScript(() => { localStorage.setItem('porcelain:sound', 'false'); });
   const page = await context.newPage(), errors = [];
   page.setDefaultTimeout(10000);
@@ -36,7 +37,7 @@ const sizes = [[320,568],[375,553],[375,667],[390,844],[430,932],[768,1024],[102
     const note = await page.locator('.daily-quests-footnote').boundingBox(), ok = await button('OK').boundingBox();
     assert.ok(ok.y >= note.y + note.height && ok.height >= 44, 'login OK sits below the reroll note with a touch-friendly target');
     await button('OK').click();
-    await button('Play Duel').waitFor();
+    await button('Play').waitFor();
   }
   function beforeLogin(day, unclaimed = false) {
     let state = createProgression({ seed: 14 });
@@ -76,7 +77,7 @@ const sizes = [[320,568],[375,553],[375,667],[390,844],[430,932],[768,1024],[102
     assert.equal(await page.locator('.daily-rewards-page').count(), 0, 'first visit opens welcome, not the calendar');
     await button('Claim rewards').click(); await closeQuests();
     assert.deepEqual((await stored()).wallet, rewardsForLogin(1));
-    await page.reload(); await button('Play Duel').waitFor();
+    await page.reload(); await button('Play').waitFor();
     assert.equal(await welcome().count(), 0, 'no repeated welcome on same-day reload');
     await page.locator('.daily-menu-control').click();
     await page.locator('.daily-rewards-page .daily-long-track').waitFor();
@@ -87,7 +88,7 @@ const sizes = [[320,568],[375,553],[375,667],[390,844],[430,932],[768,1024],[102
     await welcome().waitFor(); await expectMessage(2);
     await button('Close daily welcome').click(); await closeQuests();
     assert.equal(Object.keys((await stored()).daily.claims).length, 1, 'dismissal does not claim rewards');
-    await page.reload(); await button('Play Duel').waitFor();
+    await page.reload(); await button('Play').waitFor();
     assert.equal(await welcome().count(), 0, 'dismissed welcome persists');
 
     now += 3 * 86400000; await page.clock.setFixedTime(new Date(now)); await page.reload();
@@ -95,7 +96,7 @@ const sizes = [[320,568],[375,553],[375,667],[390,844],[430,932],[768,1024],[102
     assert.equal((await stored()).daily.loginDayIds.length, 3, 'missed days preserve accumulated visits');
     await button('Claim rewards 2x').click(); await closeQuests();
     assert.deepEqual((await stored()).wallet, { hint: 1, shuffle: 2, freeze: 2, eagle: 0 }, '2x pays outstanding rewards once');
-    await page.reload(); await button('Play Duel').waitFor();
+    await page.reload(); await button('Play').waitFor();
     assert.deepEqual((await stored()).wallet, { hint: 1, shuffle: 2, freeze: 2, eagle: 0 }, 'reload cannot duplicate claim');
     await page.locator('.quests-menu-control').click();
     assert.equal(await button('OK').count(), 0, 'main-menu Daily Quests hides the login action');

@@ -30,6 +30,7 @@ const browserName = process.argv.includes('--webkit') ? 'webkit' : 'chromium';
   assert.ok(engine.isCurrentCatalogueDeal(fixture));
   const browser = await playwright[browserName].launch({ headless: true });
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  await context.addInitScript(() => { try { localStorage.setItem('porcelain:language', '"en"'); } catch { /* Storage-denied fixtures use the Turkish default. */ } });
   const errors = [], timings = {};
   await context.addInitScript(() => {
     window.__pacing = { states: [], clicks: [], sounds: [], boardMounted: null };
@@ -76,7 +77,7 @@ const browserName = process.argv.includes('--webkit') ? 'webkit' : 'chromium';
   async function load(extra = {}, gentle = false) {
     await page.goto(origin);
     await page.evaluate(({ value, gentle }) => {
-      localStorage.clear();
+      localStorage.clear(); localStorage.setItem('porcelain:language', '"en"');
       localStorage.setItem('porcelain:session', JSON.stringify(value));
       localStorage.setItem('porcelain:sound', 'true');
       localStorage.setItem('porcelain:gentle', JSON.stringify(gentle));

@@ -10,6 +10,7 @@ const near = (actual, expected, label, tolerance = .002) => assert.ok(Math.abs(a
 (async () => {
   const browser = await require(process.env.PLAYWRIGHT_MODULE || 'playwright')[kind].launch();
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, reducedMotion: 'no-preference' });
+  await context.addInitScript(() => { try { localStorage.setItem('porcelain:language', '"en"'); } catch { /* Storage-denied fixtures use the Turkish default. */ } });
   const page = await context.newPage(), errors = [];
   page.setDefaultTimeout(10000);
   page.on('pageerror', error => errors.push(error.message));

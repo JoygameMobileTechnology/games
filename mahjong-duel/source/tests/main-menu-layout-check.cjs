@@ -17,6 +17,7 @@ const sizes = [[320,480],[320,568],[360,640],[375,667],[375,812],[390,844],[393,
   seed.currencies = {coins:123456789,gems:987654};
   const browser = await require(process.env.PLAYWRIGHT_MODULE || 'playwright')[kind].launch();
   const context = await browser.newContext({viewport:{width:390,height:844}, isMobile:true, hasTouch:true, reducedMotion:'reduce'});
+  await context.addInitScript(() => { try { localStorage.setItem('porcelain:language', '"en"'); } catch { /* Storage-denied fixtures use the Turkish default. */ } });
   await context.addInitScript(seed => {
     localStorage.setItem('porcelain:progression',JSON.stringify(seed));
     localStorage.setItem('porcelain:gentle','true'); localStorage.setItem('porcelain:sound','false');
@@ -26,7 +27,7 @@ const sizes = [[320,480],[320,568],[360,640],[375,667],[375,812],[390,844],[393,
   page.on('pageerror', error => errors.push(error.message));
   const output = path.resolve('tmp/main-menu-layout-qa'); fs.mkdirSync(output,{recursive:true});
   try {
-    await page.goto(origin); await page.getByRole('button',{name:'Play Duel',exact:true}).waitFor();
+    await page.goto(origin); await page.getByRole('button',{name:'Play',exact:true}).waitFor();
     await page.evaluate(()=>document.fonts.ready);
     await page.waitForFunction(()=>Number(getComputedStyle(document.querySelector('.home-screen')).opacity)>.99);
     async function check(label,w,h) {
@@ -81,7 +82,7 @@ const sizes = [[320,480],[320,568],[360,640],[375,667],[375,812],[390,844],[393,
     for(const [label,title] of [['Daily Quests','Daily Quests'],['Leaderboards','Leaderboards'],['Shop','Shop']]){
       const button=page.getByRole('button',{name:label,exact:true});const r=await button.boundingBox();await page.mouse.click(r.x+r.width/2,r.y+r.height/2);
       await page.getByRole('heading',{name:title,exact:true}).waitFor();await page.getByRole('button',{name:'Back to main menu',exact:true}).click();
-      await page.getByRole('button',{name:'Play Duel',exact:true}).waitFor();await page.waitForFunction(()=>Number(getComputedStyle(document.querySelector('.home-screen')).opacity)>.99);
+      await page.getByRole('button',{name:'Play',exact:true}).waitFor();await page.waitForFunction(()=>Number(getComputedStyle(document.querySelector('.home-screen')).opacity)>.99);
     }
     assert.deepEqual(errors,[]);
     console.log(`PASS ${kind}: ${report.length} responsive layouts, balances beside portrait, top-right utilities, title clearance, 44px targets, pointer navigation and legacy selector fallback`);

@@ -1,3 +1,4 @@
+import { t } from './i18n.js';
 import React, { useEffect, useId, useRef, useState } from 'react';
 import { coalesceStreakCues } from './duel-progress.js';
 import { playProgressSound } from './sound.js';
@@ -81,13 +82,13 @@ export function StreakFeedback({ cues, profile, paused = false, sound = true, ge
   if (!primaryCues.length) return null;
   const [primary, secondary] = primaryCues;
   const duration = streakPresentationDuration(primary);
-  return <div className={`streak-feedback streak-primary-${primary.family} ${gentle || reduced ? 'streak-gentle' : ''} ${paused || hidden ? 'streak-paused' : ''}`} role="status" aria-label={`${profile?.name || 'You'}: ${primary.name}${primary.family === 'chain' ? `, ${primary.count} consecutive pairs` : `, ${primary.subtitle}`}`} aria-live="polite" aria-atomic="true" data-streak-id={primary.id} data-streak-owner="you" style={{ '--streak-duration': `${duration}ms`, '--streak-intensity': primary.family === 'chain' ? primary.intensity : primary.intensity / 3, '--streak-tier': Math.min(primary.count || 8, 15) }}>
+  return <div className={`streak-feedback streak-primary-${primary.family} ${gentle || reduced ? 'streak-gentle' : ''} ${paused || hidden ? 'streak-paused' : ''}`} role="status" aria-label={`${profile?.name || t('You')}: ${t(primary.name)}, ${primary.family === 'chain' ? t('{count} consecutive pairs', { count: primary.count }) : t(primary.subtitle)}`} aria-live="polite" aria-atomic="true" data-streak-id={primary.id} data-streak-owner="you" style={{ '--streak-duration': `${duration}ms`, '--streak-intensity': primary.family === 'chain' ? primary.intensity : primary.intensity / 3, '--streak-tier': Math.min(primary.count || 8, 15) }}>
     <div key={primary.eventId} className={`streak-primary ${primary.reinforcement ? 'streak-reinforcement' : ''} ${primary.peak ? 'streak-peak' : ''}`}>
       <CelebrationArtwork cue={primary} />
       {primary.family === 'turning' && <div className="streak-banner-seal"><SealMotif cue={primary} /></div>}
-      <div className="streak-player-signature"><PlayerAvatar profile={profile} showFlag={false} /><span>{profile?.name || 'You'}</span></div>
-      <div className="streak-copy"><b className="streak-title">{primary.name}</b><div className="streak-subtitle">{primary.family === 'chain' ? <><PairMotif /><small><strong>{primary.count}</strong> pairs in a row</small></> : <small>{primary.subtitle}</small>}</div></div>
-      {secondary && <div className={`streak-secondary secondary-${secondary.family}`} key={secondary.eventId}><i aria-hidden="true">✦</i><b>{secondary.name}</b>{secondary.family === 'chain' && <small>{secondary.count} pairs</small>}</div>}
+      <div className="streak-player-signature"><PlayerAvatar profile={profile} showFlag={false} /><span>{profile?.name || t("You")}</span></div>
+      <div className="streak-copy"><b className="streak-title">{t(primary.name)}</b><div className="streak-subtitle">{primary.family === 'chain' ? <><PairMotif /><small>{t('{count} pairs in a row', { count: primary.count })}</small></> : <small>{t(primary.subtitle)}</small>}</div></div>
+      {secondary && <div className={`streak-secondary secondary-${secondary.family}`} key={secondary.eventId}><i aria-hidden="true">✦</i><b>{t(secondary.name)}</b>{secondary.family === 'chain' && <small>{t('{count} pairs', { count: secondary.count })}</small>}</div>}
     </div>
   </div>;
 }

@@ -1,3 +1,4 @@
+import { t } from './i18n.js';
 import React, { useEffect, useMemo, useState } from 'react';
 import { MenuScene } from './menu-scene.jsx';
 import { chooseLoadingTiles } from './loading-state.js';
@@ -68,7 +69,7 @@ export function LoadingScreen({ theme, background, startupArtwork = [], gentle =
     };
   }, [background.src, tiles, startupArtwork, gentle, onReady, onComplete]);
 
-  return <section className={`launch-loading${gentle ? ' is-gentle gentle-motion' : ''}${leaving ? ' is-leaving' : ''}`} aria-label="Mahjong Duel is loading" data-loading-theme={theme.id}>
+  return <section className={`launch-loading${gentle ? ' is-gentle gentle-motion' : ''}${leaving ? ' is-leaving' : ''}`} aria-label={t("Mahjong Duel is loading")} data-loading-theme={theme.id}>
     <MenuScene background={background} paused={leaving} />
     <div className="launch-loading-vignette" aria-hidden="true" />
     <img className="launch-loading-logo" src={LOGO} alt="Mahjong Duel" fetchPriority="high" draggable="false" />
@@ -81,7 +82,7 @@ export function LoadingScreen({ theme, background, startupArtwork = [], gentle =
           </span>;
         })}
       </div>
-      <p role="status" aria-live="polite">Loading…</p>
+      <p role="status" aria-live="polite">{t("Loading…")}</p>
     </div>
   </section>;
 }

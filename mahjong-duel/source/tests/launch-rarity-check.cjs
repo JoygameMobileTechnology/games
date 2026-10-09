@@ -19,6 +19,7 @@ const browserName = process.argv.includes('--webkit') ? 'webkit' : 'chromium';
   assert.deepEqual(themes.map(theme => theme.id), expectedIds);
   const browser = await require(process.env.PLAYWRIGHT_MODULE || 'playwright')[browserName].launch({ headless: true });
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  await context.addInitScript(() => { try { localStorage.setItem('porcelain:language', '"en"'); } catch { /* Storage-denied fixtures use the Turkish default. */ } });
   const page = await context.newPage();
   page.setDefaultTimeout(12000);
   const output = path.join(root, 'tmp/launch-rarity-qa'); fs.mkdirSync(output, { recursive: true });
@@ -42,11 +43,11 @@ const browserName = process.argv.includes('--webkit') ? 'webkit' : 'chromium';
   async function seed(extra = {}) {
     await page.goto(origin);
     await page.evaluate(({ collection, extra }) => {
-      localStorage.clear();
+      localStorage.clear(); localStorage.setItem('porcelain:language', '"en"');
       const values = { gentle: true, sound: false, collection, ...extra };
       for (const [key, value] of Object.entries(values)) localStorage.setItem(`porcelain:${key}`, JSON.stringify(value));
     }, { collection, extra });
-    await page.reload(); await button('Play Duel').waitFor();
+    await page.reload(); await button('Play').waitFor();
   }
   async function closeSheet() {
     await button('Close dialog').click();
@@ -167,7 +168,7 @@ const browserName = process.argv.includes('--webkit') ? 'webkit' : 'chromium';
     await page.waitForFunction(() => JSON.parse(localStorage.getItem('porcelain:session'))?.boardTheme === 'dancheong');
     report('a launch-theme saved game replaces its unavailable board background with the matching launch theme');
 
-    await seed(); await button('Play Duel').click(); await page.locator('.game-board').waitFor();
+    await seed(); await button('Play').click(); await page.locator('.game-board').waitFor();
     await page.waitForFunction(() => JSON.parse(localStorage.getItem('porcelain:session'))?.boosters?.eagle === 20);
     assert.deepEqual((await session()).boosters, { shuffle: 20, hint: 20, freeze: 20, eagle: 20 });
     for (const name of ['Shuffle', 'Hint', 'Freeze', 'Eagle Eye']) assert.ok(await button(`${name}, 20 uses left`).isEnabled());

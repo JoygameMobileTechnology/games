@@ -21,6 +21,7 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
   const playwright = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
   const browser = await playwright[browserName].launch({ headless: true });
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  await context.addInitScript(() => { try { localStorage.setItem('porcelain:language', '"en"'); } catch { /* Storage-denied fixtures use the Turkish default. */ } });
   const page = await context.newPage();
   page.setDefaultTimeout(12000);
   const errors = [], checks = [];
@@ -65,8 +66,8 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
   }
   async function reset() {
     await page.goto(origin);
-    await page.evaluate(() => { localStorage.clear(); localStorage.setItem('porcelain:sound', 'false'); localStorage.setItem('porcelain:gentle', 'true'); });
-    await page.reload(); await button('Play Duel').waitFor();
+    await page.evaluate(() => { localStorage.clear(); localStorage.setItem('porcelain:language', '"en"'); localStorage.setItem('porcelain:sound', 'false'); localStorage.setItem('porcelain:gentle', 'true'); });
+    await page.reload(); await button('Play').waitFor();
   }
   async function fixture(game, extra = {}, beforeContinue) {
     const value = save(game, extra);
@@ -98,11 +99,11 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
     return waitState(value => value.attempts === number && !value.duelView?.pending, 'human attempt completes');
   }
   async function pause() { await button('Pause game').click(); await page.getByRole('dialog', { name: 'Paused', exact: true }).waitFor(); await sleep(100); }
-  async function home() { await pause(); await button('Save & return home').click(); await button('Play Duel').waitFor(); }
+  async function home() { await pause(); await button('Save & return home').click(); await button('Play').waitFor(); }
   const totalCollection = collection => Object.values(collection?.counts || {}).reduce((sum, count) => sum + count, 0);
 
   try {
-    await reset(); await button('Play Duel').click(); await page.locator('.game-board').waitFor();
+    await reset(); await button('Play').click(); await page.locator('.game-board').waitFor();
     let state = await waitState(value => value.boosters, 'fresh duel');
     assert.equal(remaining(state), 80); assert.ok(state.gameId);
     assert.equal(await page.locator('.game-tile').count(), 80);
@@ -277,13 +278,13 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
     await reset(); let previous;
     for (let index = 0; index < 5; index += 1) {
-      await button('Play Duel').click(); await page.locator('.game-board').waitFor();
+      await button('Play').click(); await page.locator('.game-board').waitFor();
       state = await waitState(value => value.formationId, 'new formation starts');
       assert.ok(FORMATION_IDS.includes(state.formationId));
       assert.notEqual(state.formationId, previous, 'new games never repeat the immediately preceding formation');
       assert.equal(await stored('lastFormation'), state.formationId);
       previous = state.formationId;
-      await home(); await page.reload(); await button('Play Duel').waitFor();
+      await home(); await page.reload(); await button('Play').waitFor();
       assert.equal(await stored('lastFormation'), previous, 'formation history persists through reload');
     }
     report('successive new games avoid the last formation across saves and reloads');
