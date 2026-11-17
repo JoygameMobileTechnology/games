@@ -10,7 +10,7 @@
 - Rengindeki bütün küplerin üstü kapalı olan kamyon sallanır; ona dokunup sıraya geri gönderebilirsin.
 - Sürükle: kamerayı döndür. Tekerlek / iki parmak: yakınlaş. Çift tık: kamerayı sıfırla.
 - `1` `2` `3` `4`: sütundaki kamyonu gönder. Boşluk: mola. Üstteki ▶ düğmesi oyunu kendi kendine oynatır, `1×` düğmesi oyunu hızlandırır: `2×` yazar, gerçek hız 1,7 kattır.
-- 150 bölüm, 22 renk ve toplam 103.830 küp var. Sol üstteki bölüm düğmesinden herhangi bir bölümü seçebilirsin. Adres sonuna `?level=150` ekleyerek doğrudan bir bölümü açabilirsin. 150. bölümden sonra tekrar dizisi 30. bölümden başlar; bu dizide 51, 71, 91 ve 111 atlanır. Bölüm seçicide 150 bölümün tamamı her zaman erişilebilir.
+- 150 bölüm, 22 renk ve toplam 102.765 küp var. İlk beş bölüm parkuru öne çıkarmak için elle tasarlandı: İkiz Kuleler, Merdiven, Kale, Sütun Ormanı ve Köprü. Ayrık kuleler, basamak sütunlar ve köprüler ekibi kuleden kuleye atlamaya yönlendirir; yüksek kulelere duvardan koşmak, basamaklardan sıçrayarak çıkmaktan pahalı olduğu için ekip sıçramayı seçer. Bu bölümler `scripts/intro-levels.cjs` ile üretilir (`npm run design:intro`); kamyon sırası, önce üstteki küpleri alan bir deneme oyunuyla dağıtılır. Sol üstteki bölüm düğmesinden herhangi bir bölümü seçebilirsin. Adres sonuna `?level=150` ekleyerek doğrudan bir bölümü açabilirsin. 150. bölümden sonra tekrar dizisi 30. bölümden başlar; bu dizide 51, 71, 91 ve 111 atlanır. Bölüm seçicide 150 bölümün tamamı her zaman erişilebilir.
 
 ## Parkur
 

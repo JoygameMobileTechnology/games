@@ -27,9 +27,9 @@ function validateCatalog() {
     assert.deepEqual(packets, colors, `level ${i + 1}: counts by color`);
     assert.equal(count, colors.reduce((a, b) => a + b, 0)); total += count;
   }
-  assert.equal(total, 103830);
+  assert.equal(total, 102765);
   assert.equal(Math.max(...packed.levels.map(l => l.count)), 2008);
-  console.log('PASS all 150 complete records, 22 colors, 103830 cells, queues and metadata round-trip');
+  console.log('PASS all 150 complete records, 22 colors, 102765 cells, queues and metadata round-trip');
 }
 
 async function main() {

@@ -3,6 +3,6 @@
   "version": "1.0.0",
   "private": true,
   "description": "A self-contained, offline 3D cube collection game with parkour stickmen",
-  "scripts": { "build:levels": "node scripts/build-levels.cjs", "test": "node tests/ground-routes.cjs && node tests/levels.cjs && node tests/game.cjs && node tests/side-exits.cjs && node tests/trails.cjs" },
+  "scripts": { "build:levels": "node scripts/build-levels.cjs", "design:intro": "node scripts/intro-levels.cjs && node scripts/build-levels.cjs", "test": "node tests/ground-routes.cjs && node tests/levels.cjs && node tests/game.cjs && node tests/side-exits.cjs && node tests/trails.cjs" },
   "devDependencies": { "playwright": "1.56.1" }
 }
