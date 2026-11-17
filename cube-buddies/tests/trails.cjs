@@ -38,9 +38,14 @@ const chrome = process.env.CHROME_PATH || '/Applications/Google Chrome.app/Conte
     assert(contrast.strong >= 100 && contrast.peak >= 15, `trails must visibly affect the actual render: ${JSON.stringify(contrast)}`);
     const trails = await page.evaluate(() => cubeBuddies.getTrails());
     assert(trails.trails.some(t => t.visible), 'moving workers leave trails');
+    // Upright on screen: each rung runs along the camera's up axis (a world-vertical sheet goes edge-on when a worker
+    // runs towards the camera), points upwards, and is no taller than the torso.
+    const [ux, uy, uz] = trails.up;
+    assert(uy > .5, 'camera up axis points mostly upwards');
     for (const t of trails.trails.filter(t => t.visible)) for (let i=0; i<t.positions.length; i+=6) {
-      const p=t.positions; assert(Math.abs(p[i]-p[i+3])<1e-5 && Math.abs(p[i+2]-p[i+5])<1e-5, 'ribbon stays upright');
-      assert(p[i+4]-p[i+1] <= .5, 'ribbon stays torso-height');
+      const p=t.positions, dx=p[i+3]-p[i], dy=p[i+4]-p[i+1], dz=p[i+5]-p[i+2], len=Math.hypot(dx, dy, dz);
+      assert(len > 0 && Math.abs((dx*ux+dy*uy+dz*uz)/len - 1) < 1e-4, 'ribbon stays upright on screen');
+      assert(len <= .5 + 1e-6, 'ribbon stays torso-height');
     }
     await page.setViewportSize({ width: 390, height: 844 }); await page.waitForTimeout(200);
     const mobile = await page.evaluate(() => cubeBuddies.trailContrast());
@@ -51,6 +56,6 @@ const chrome = process.env.CHROME_PATH || '/Applications/Google Chrome.app/Conte
     await reduced.goto(pathToFileURL(file).href); await reduced.waitForFunction(() => window.cubeBuddies);
     assert.equal((await reduced.evaluate(() => cubeBuddies.getTrails())).trails.length, 0);
     assert.deepEqual(errors, []);
-    console.log(`PASS visible rendered trails (${contrast.strong} contrasting pixels, peak ${contrast.peak}), mobile ${mobile.strong} pixels, upright torso height, reset and reduced motion`);
+    console.log(`PASS visible rendered trails (${contrast.strong} contrasting pixels, peak ${contrast.peak}), mobile ${mobile.strong} pixels, screen-upright torso height, reset and reduced motion`);
   } finally { await browser.close(); fs.rmSync(dir, { recursive: true, force: true }); }
 })().catch(e => { console.error(e); process.exitCode = 1; });

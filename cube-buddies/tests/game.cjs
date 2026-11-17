@@ -48,6 +48,14 @@ async function main() {
       assert(box.tray.left >= 0 && box.tray.right <= width && box.tray.bottom <= height && box.tray.top >= box.progress.bottom, `crate tray fits at ${width}px`);
       assert(await page.locator('[data-col]').first().isVisible());
     }
+    // The fast button says 2× but plays at 1.7×.
+    await page.locator('#speed').click();
+    assert.equal(await page.locator('#speed').textContent(), '2×');
+    const t0 = (await state(page)).time; await page.waitForTimeout(1000);
+    const rate = (await state(page)).time - t0;
+    assert(rate > 1.4 && rate < 1.95, `2× should run at about 1.7× (${rate.toFixed(2)}s per second)`);
+    await page.locator('#speed').click();
+    assert.equal((await state(page)).speed, 1, 'the button toggles back to 1×; there is no 3×');
     await page.close();
 
     // Whole levels on autoplay. hold() stops the real-time loop and advance() steps the same simulation without
@@ -84,6 +92,9 @@ async function main() {
     assert(s.moves.pull > 0 && s.moves.pluck > 0 && s.moves.topPluck > 0, 'all three ways of taking a cube are used');
     assert(s.moves.pull + s.moves.pluck > 3 * s.moves.topPluck, 'standing on the cube being taken is the exception');
     for (const move of ['coveredTake', 'superJump', 'wallBackflip']) assert(!s.moves[move], `unexpected ${move}`);
+    // Long pieces: two of the crew lift each bar together, carry it in step and throw it onto the truck together.
+    assert(s.moves.barJoin > 0 && s.moves.barShot > 0, 'bars are carried by two');
+    assert(s.moves.barShot <= s.moves.barClaim, 'every bar thrown was claimed first');
     // Nobody stands around: every moment without a move in progress counts against this share of crew time.
     assert(s.still < .1, `crew stood still ${Math.round(s.still * 100)}% of the time`);
     console.log('PASS parkour: ' + Object.entries(s.moves).map(([k, v]) => `${k} ${v}`).join(', '));

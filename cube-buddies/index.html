@@ -55,12 +55,22 @@ button.box.hint{animation:wiggle .5s 3}
 .box.dim{opacity:.55;transform:scale(.88);margin:-3px 0;filter:saturate(.75)}
 .box.dim~.box.dim{opacity:.36}
 .more{font-size:11px;font-weight:900;opacity:.45;height:12px;line-height:12px}
+/* Phones and other tall screens: a full-width dock under the scene. Each column shows the crate it will send next as
+   a big button and the ones after it as small chips, so the dock stays short and the scene gets the height. */
+.tray.dock{left:max(12px,calc(50% - 280px));right:max(12px,calc(50% - 280px));transform:none;padding:8px;border-radius:28px}
+.tray.dock.shake{animation:shakeDock .35s}
+.tray.dock .cols{justify-content:space-evenly;padding:12px 8px 10px;border-radius:21px}
+.tray.dock .col{gap:8px}
+.next{display:flex;gap:4px;justify-content:center;align-items:center;height:calc(var(--b)*.42)}
+.next i{width:calc(var(--b)*.42);height:calc(var(--b)*.42);flex:none;border-radius:30%;display:grid;place-items:center;padding-bottom:2px;font-style:normal;font-weight:900;font-size:calc(var(--b)*.2);color:#fff;background:linear-gradient(var(--l),var(--c));box-shadow:inset 0 -3px 0 var(--s);text-shadow:0 1px 0 var(--k),0 -1px 0 var(--k),1px 0 var(--k),-1px 0 var(--k);opacity:.75}
+.next i+i{opacity:.5}
+.next b{font-size:11px;font-weight:900;opacity:.45}
 .col-done{width:var(--b);height:var(--b);border-radius:27%;border:3px dashed #d9bd8f;display:grid;place-items:center;color:#c9a871;font-weight:900;font-size:22px}
 
 .hand{position:absolute;z-index:5;width:54px;height:54px;pointer-events:none;opacity:0;transition:opacity .25s;transform:translate(2px,8px)}
 .hand.show{opacity:1}
 .hand svg{width:100%;height:100%;animation:tap 1s ease-in-out infinite;transform-origin:30% 10%;filter:drop-shadow(0 4px 0 #2b1d4a33)}
-.toast{position:absolute;z-index:7;left:50%;top:76px;transform:translate(-50%,-10px) scale(.9);max-width:calc(100% - 32px);padding:11px 20px 13px;border-radius:22px;background:var(--ink);color:#fff;font-size:14px;font-weight:800;text-align:center;box-shadow:0 4px 0 #1a113399;opacity:0;pointer-events:none;transition:opacity .2s,transform .25s cubic-bezier(.2,1.5,.4,1)}
+.toast{position:absolute;z-index:7;left:50%;top:76px;width:max-content;transform:translate(-50%,-10px) scale(.9);max-width:calc(100% - 32px);padding:11px 20px 13px;border-radius:22px;background:var(--ink);color:#fff;font-size:14px;font-weight:800;text-align:center;box-shadow:0 4px 0 #1a113399;opacity:0;pointer-events:none;transition:opacity .2s,transform .25s cubic-bezier(.2,1.5,.4,1)}
 .toast.show{opacity:1;transform:translate(-50%,0) scale(1)}
 
 /* ---------- dialogs ---------- */
@@ -89,6 +99,7 @@ button.box.hint{animation:wiggle .5s 3}
 @keyframes rise{from{transform:translateY(22px) scale(.85)}}
 @keyframes wiggle{25%{transform:rotate(-7deg) scale(1.08)}75%{transform:rotate(7deg) scale(1.08)}}
 @keyframes shake{25%{transform:translateX(calc(-50% - 7px))}75%{transform:translateX(calc(-50% + 7px))}}
+@keyframes shakeDock{25%{transform:translateX(-7px)}75%{transform:translateX(7px)}}
 @keyframes shakeSide{25%{transform:translate(-7px,-46%)}75%{transform:translate(7px,-46%)}}
 @keyframes tap{50%{transform:translateY(-10px) rotate(-6deg) scale(.94)}}
 @keyframes pop{from{transform:scale(.8);opacity:0}}
@@ -100,10 +111,18 @@ button.box.hint{animation:wiggle .5s 3}
   .progress{grid-row:2;grid-column:1/-1;justify-self:center;width:min(100%,330px);height:38px}
   .round{width:42px;height:42px}
   .tools{gap:6px}
-  .toast{top:118px}
+  .toast{top:116px;max-width:calc(100% - 48px);padding:8px 15px 10px;border-radius:18px;font-size:13px;line-height:1.3}
 }
 @media(max-width:400px){:root{--b:56px;--gap:10px}.level span{display:none}.level{padding-right:9px}}
 @media(max-height:620px){:root{--b:52px}}
+/* Phone on its side: a slimmer top bar leaves the scene more of the little height there is. */
+@media(max-height:500px){
+  .hud{padding-top:max(8px,env(safe-area-inset-top));padding-left:max(12px,env(safe-area-inset-left));padding-right:max(12px,env(safe-area-inset-right))}
+  .pill{height:38px}.round{width:38px;height:38px}.round svg{width:17px;height:17px}.tools{gap:6px}
+  .level b{min-width:28px;height:28px;font-size:15px}.level small{display:none}.progress{width:min(36vw,280px)}
+  .toast{top:auto;bottom:max(10px,env(safe-area-inset-bottom))}
+  .tray.side{right:max(14px,env(safe-area-inset-right));transform:translateY(-40%)}
+}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important}}
 </style>
 </head>
@@ -204,13 +223,19 @@ const FRONT = v3(Math.sin(YAW0), 0, Math.cos(YAW0)), RIGHT = v3(Math.cos(YAW0), 
 const TRUCK_YAW = .87, HEAD = FRONT.clone().multiplyScalar(Math.cos(TRUCK_YAW)).addScaledVector(RIGHT, Math.sin(TRUCK_YAW)), CAB_Z = .82, LOAD = .45, TRUCK = 1.1;
 const BAY_RUN = 2.6, BAY_TURN = Math.PI / 2 - TRUCK_YAW, ROAD_END = 21, PARK_T = .45;
 const SIZE = 1.25, HIP = .31, COM = .42, CARRY = .8 / SIZE, CUBE_REST = v3(0, .61 + CARRY / 2, 0), WALL_OFF = .5 - .43 * SIZE, WALL_TOP = .42 * SIZE, HANG_D = .5 + .17 * SIZE, HANG_H = .8 * SIZE;
-const TRAIL_POINTS = 32, TRAIL_HEIGHT = .34 * SIZE, TRAIL_LIFE = .26, TRAIL_LENGTH = 1.1, TRAIL_OPACITY = .38;
-let scene, camera, renderer, cubes, bits, actors, crates;
+// Long pieces: two neighbouring cubes of one colour fused into a 2×1 bar that takes two of the crew to lift and carry.
+// A bar still counts as two cubes, so level sizes and crate counts are unchanged.
+const BAR_EVERY = 30, BAR_MAX = 8, BAR_GAP = 1.2, BAR_WAIT = 8, BAR_SCALE = CARRY * SIZE;
+const TRAIL_POINTS = 32, TRAIL_HEIGHT = .4 * SIZE, TRAIL_LIFE = .5, TRAIL_LENGTH = 1.5, TRAIL_OPACITY = .55;
+let scene, camera, renderer, cubes, bars, bits, actors, crates;
+let pieces = [], barMeshes = [], barPool = [];
 let trees = [], boardBounds = { x0: -4, x1: 4, z0: -4, z1: 4 }, boardBack = -5;
 let blocks = [], workers = [], shots = [], particles = [], slots = Array(SLOTS).fill(null), leaving = [], queue = [[], [], []];
 const occ = new Map(), hot = new Set(), slotPos = [], shotPool = [], moveStats = {};
 let worldVer = 0, ledgeCache = null, crewT = 0, stillT = 0, truckSeq = 0, arrivalT = -9;
 let level = 0, looped = false, total = 0, collected = 0, clock = 0, levelT = 0, levelTop = 6, frame = 0;
+// The 1×/2× button. "2×" reads better than the real rate, which is gentler so the parkour stays readable.
+const FAST = 1.7;
 let paused = false, hold = false, speed = 1, auto = false, won = false, winT = -1, started = false, jam = 0, jamTold = false, idleT = 0, autoT = 0, dogT = 0, introDone = false;
 let yaw = YAW0, pitch = PITCH0, tYaw = YAW0, tPitch = PITCH0, zoom = 1, camDist = 40, viewW = 1, viewH = 1, lastTime = 0;
 let actx = null, muted = false, toastTimer = 0, modalAction = null, modalAction2 = null, modalPauses = false, prevFocus = null;
@@ -505,8 +530,8 @@ function goalsFor(b) {
   return out;
 }
 function goalValid(job) {
-  const b = job.block, g = job.goal;
-  if (b.gone || !topFree(b)) return false;
+  const b = job.block, g = job.goal, p = job.piece;
+  if (p ? p.gone || !topFree(p.a) || !topFree(p.b) || (job.role === 'partner' && !p.leader) : b.gone || !topFree(b)) return false;
   return g.kind === 'warp' || stand(g.x, g.y, g.z);
 }
 function findJob(w) {
@@ -517,6 +542,7 @@ function findJob(w) {
   const perch = new Set(); for (const o of workers) if (o !== w && o.state === 'toCube' && o.job) perch.add(K(o.job.goal.x, o.job.goal.y - 1, o.job.goal.z));
   for (const b of blocks) {
     if (b.gone || b.reserved || b.color !== s.color || !topFree(b)) continue;
+    if (b.piece) { const j = b.piece.a === b && barLead(w, b.piece, ex); if (j && j.sc < score) { score = j.sc; best = j; } continue; }
     // Two separate choices. Where to stand is decided per block, by the foothold penalties. Which block to go for
     // is decided by how near it is and how high — not by how it will be taken — so structures still come down
     // from the top in the order the crates were dealt for.
@@ -543,6 +569,76 @@ function findJob(w) {
   // Safety net: a block nobody can route to is reached with one giant leap rather than stalling the level.
   if (any && s.stuckT > 3) return { block: any.block, goal: { ...any.goal, kind: 'warp' }, path: [] };
   return null;
+}
+
+// Footholds for lifting a bar: next to either of its cells, on the bar's level or on a neighbouring block of that
+// height. Standing on the bar and pulling it out from underfoot is the fallback, as for single cubes ('top').
+function barSides(p) {
+  const out = [];
+  for (const c of [p.a, p.b]) for (const [dx, dz] of DIR4) {
+    const nx = c.x + dx, nz = c.z + dz;
+    if ((nx === p.a.x && nz === p.a.z) || (nx === p.b.x && nz === p.b.z)) continue;
+    if (solid(nx, c.y, nz)) { if (stand(nx, c.y + 1, nz)) out.push({ x: nx, y: c.y + 1, z: nz, kind: 'down', dx: -dx, dz: -dz, pen: .4, end: c }); }
+    else if (stand(nx, c.y, nz)) out.push({ x: nx, y: c.y, z: nz, kind: 'front', dx: -dx, dz: -dz, pen: 0, end: c });
+  }
+  for (const c of [p.a, p.b]) if (stand(c.x, c.y + 1, c.z)) out.push({ x: c.x, y: c.y + 1, z: c.z, kind: 'top', dx: 0, dz: 0, pen: TOP_PEN, end: c });
+  return out;
+}
+// The first of the two carriers: picks a foothold like it would for a cube, as long as one is left for a partner.
+function barLead(w, p, ex) {
+  if (p.reserved || clock < p.coolUntil || !topFree(p.b)) return null;
+  const sides = barSides(p); if (sides.length < 2) return null;
+  let nav = null, goal = null, gs = Infinity;
+  for (const g of sides) {
+    if (g.y === 0) {
+      nav ||= createGroundNavigator((x, z) => [occ.get(K(x, 0, z)), occ.get(K(x, 1, z))].some(o => o && o.piece !== p), onReturnFloor, returnApron);
+      const q = cellPos(w, g); if (!nav.clear(q) || !nav.path(q, w.dock)) continue;
+    }
+    const d = ex.dist.get(K(g.x, g.y, g.z)); if (d === undefined) continue;
+    const under = g.kind === 'down' ? occ.get(K(g.x, g.y - 1, g.z)) : null, sc = d + g.pen + (under && under.reserved ? FOOT_PEN : 0);
+    if (sc < gs) { gs = sc; goal = g; }
+  }
+  // Same safety net as for single cubes: a bar nobody can walk to is reached with a giant leap.
+  if (!goal && w.slot.stuckT > 3) return { block: p.a, piece: p, role: 'lead', goal: { ...sides[0], kind: 'warp' }, sc: 1e6 };
+  return goal && { block: p.a, piece: p, role: 'lead', goal, sc: gs - p.a.y * 4 + rand() * 1.5 };
+}
+function claimBar(w, job) {
+  const p = job.piece, s = w.slot;
+  p.reserved = p.a.reserved = p.b.reserved = true; p.leader = w; p.partner = null; p.taken = false;
+  // A bar is two cubes. If the truck only needs one more, it reserves one; the other goes to another truck (spill()).
+  job.units = Math.min(2, s.remaining - s.inFlight); s.inFlight += job.units; count('barClaim');
+}
+// Someone is at a bar, or on the way, and nobody has come to take the other end yet.
+const needsPartner = s => s.squad.some(o => o.job && o.job.role === 'lead' && !o.job.piece.partner && !o.carry);
+function joinBar(w) {
+  const lead = clock >= w.joinTry && w.slot.squad.find(o => o !== w && o.job && o.job.role === 'lead' && !o.job.piece.partner && !o.carry);
+  if (!lead) return false;
+  w.joinTry = clock + .5;   // a failed look is not repeated every frame
+  const p = lead.job.piece, lg = lead.job.goal, c = w.cell, ex = explore(c.x, c.y, c.z), sides = barSides(p).filter(g => !same(g, lg));
+  let goal = null, gs = Infinity;
+  for (const g of sides) {
+    const d = ex.dist.get(K(g.x, g.y, g.z)); if (d === undefined) continue;
+    // Prefer the other end of the bar, at the leader's height, so the two lift it level.
+    const sc = d + g.pen + (g.end === lg.end ? 3 : 0) + Math.abs(g.y - lg.y) * 2;
+    if (sc < gs) { gs = sc; goal = g; }
+  }
+  if (!goal) {
+    if (!sides.length || !(lead.job.waitSince && clock - lead.job.waitSince > 2)) return false;
+    goal = { ...sides[0], kind: 'warp' };
+  }
+  p.partner = w; w.job = { block: p.a, piece: p, role: 'partner', goal, units: 0 }; w.state = 'toCube'; w.failed = false; w.pauseUntil = 0; w.alert = false; count('barJoin', w);
+  if (goal.kind === 'warp') { megaJump(w, goal); return true; }
+  w.route = ex.path(K(goal.x, goal.y, goal.z)); w.ri = 0;
+  if (w.route.length) stepRoute(w); else barArrive(w);
+  return true;
+}
+// Giving up a bar before it is lifted. The leader frees it (and sends the partner away); a partner just leaves its end.
+function leaveBar(w) {
+  const p = w.job.piece;
+  if (w.job.role === 'partner') { if (p.partner === w) p.partner = null; return; }
+  p.reserved = p.a.reserved = p.b.reserved = false; cool(p.a); w.slot.inFlight -= w.job.units; p.leader = null; p.coolUntil = clock + 1.5;
+  const o = p.partner; p.partner = null;
+  if (o && o.job && o.job.piece === p && !o.carry) { o.job = null; o.route = null; o.state = 'idle'; o.retryAt = clock + .15; if (o.mv && o.mv.barWait) o.mv = null; }
 }
 
 // ---------------------------------------------------------------- geometry
@@ -578,6 +674,7 @@ function canvasTexture(w, h, draw) { const c = document.createElement('canvas');
 function buildAssets() {
   const sph = (r, a = 14, b = 10) => new THREE.SphereGeometry(r, a, b), cap = (r, l) => new THREE.CapsuleGeometry(r, l, 5, 12);
   GEO.cube = roundedBox(.97, .97, .97, .13);
+  GEO.bar = roundedBox(1.97, .97, .97, .13);
   GEO.head = sph(.17, 24, 18).scale(1.07, .97, 1.02);
   GEO.torso = cap(.108, .12).scale(1.08, 1, .98);
   GEO.upperArm = cap(.04, .09);
@@ -712,6 +809,7 @@ function init() {
   buildAssets();
   cubes = new THREE.InstancedMesh(GEO.cube, new THREE.MeshStandardMaterial({ roughness: .34, metalness: 0, envMapIntensity: .32 }), MAX_BLOCKS);
   cubes.castShadow = cubes.receiveShadow = true; cubes.frustumCulled = false; cubes.count = 0; scene.add(cubes);
+  bars = new THREE.InstancedMesh(GEO.bar, cubes.material.clone(), BAR_MAX); bars.castShadow = bars.receiveShadow = true; bars.frustumCulled = false; bars.count = 0; bars.setColorAt(0, WHITE); scene.add(bars);
   bits = new THREE.InstancedMesh(GEO.bit, new THREE.MeshBasicMaterial({ transparent: true, opacity: .9, depthWrite: false }), 420); bits.frustumCulled = false; bits.count = 0; scene.add(bits);
   actors = new THREE.Group(); scene.add(actors); crates = new THREE.Group(); scene.add(crates);
   for (let i = 0; i < SLOTS; i++) slotPos.push(FRONT.clone().multiplyScalar(CRATE_D).addScaledVector(RIGHT, (i - (SLOTS - 1) / 2) * CRATE_GAP));
@@ -751,12 +849,15 @@ function makeWorker(id) {
   root.visible = false; actors.add(root);
   return { id, bub, root, sq, tilt, body, torso, head, face, tails, arm, elbow, leg, knee, cube, skin, trail: makeTrail(), state: 'pool', color: 0, slot: null, cell: { x: 0, y: 0, z: 0 }, dock: null, dj: 0,
     job: null, route: null, ri: 0, mv: null, carry: false, failed: false, retryAt: 0, heading: 0, tHeading: 0, flipX: 0, flipZ: 0, spinY: 0, u: 0, land: 0, cheer: 0,
-    anim: null, animT: id * 1.37, strollDir: null, gazeKind: 0, pauseUntil: 0, pauseDur: 1, pauseAnim: null, gazed: false, alert: false, bubbleOn: false, bubK: 0, blend: 1, T: new Float32Array(NCH), P: new Float32Array(NCH), F: new Float32Array(NCH), cubeFrom: v3(), cubeT: 1, flow: 0,
+    anim: null, animT: id * 1.37, strollDir: null, gazeKind: 0, pauseUntil: 0, pauseDur: 1, pauseAnim: null, gazed: false, alert: false, bubbleOn: false, bubK: 0, blend: 1, T: new Float32Array(NCH), P: new Float32Array(NCH), F: new Float32Array(NCH), cubeFrom: v3(), cubeT: 1, flow: 0, bar: null, joinTry: 0,
     ox: ((id * 7) % 5 - 2) * .11, oz: ((id * 3) % 5 - 2) * .11, phase: id * 2.3 };
 }
-function setColor(w, c) { w.color = c; for (let i = 0; i < w.skin.length; i += 2) { w.skin[i].material = MAT.body[c]; w.skin[i + 1].material = MAT.line[c]; } w.cube.material = MAT.cube[c]; if (w.trail) w.trail.material.uniforms.tint.value.set(PALETTE[c].hex).lerp(WHITE, .12); }
+function setColor(w, c) { w.color = c; for (let i = 0; i < w.skin.length; i += 2) { w.skin[i].material = MAT.body[c]; w.skin[i + 1].material = MAT.line[c]; } w.cube.material = MAT.cube[c]; if (w.trail) w.trail.material.uniforms.tint.value.set(PALETTE[c].hex).lerp(WHITE, .15); }
 
-// A short, upright ribbon in world space: torso height, soft edges, no glow or depth-writing.
+// A short ribbon of torso height that stands upright on screen: its height runs along the camera's up axis, because a
+// world-vertical sheet is seen exactly edge-on whenever a worker runs towards or away from the camera (most runs).
+// Flat core, soft top/bottom edges, tapering towards the tail; a near-body tint (paler tints vanished on the light
+// ground). No glow or depth-writing.
 function makeTrail() {
   if (REDUCED) return null;
   const geometry = new THREE.BufferGeometry(), positions = new Float32Array(TRAIL_POINTS * 6), fades = new Float32Array(TRAIL_POINTS * 2), uv = new Float32Array(TRAIL_POINTS * 4), indices = [];
@@ -770,16 +871,18 @@ function makeTrail() {
   const material = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, depthTest: true, side: THREE.DoubleSide,
     uniforms: { tint: { value: new THREE.Color(0xffffff) }, opacity: { value: TRAIL_OPACITY } },
     vertexShader: 'attribute float fade; varying float vFade; varying float vEdge; void main(){vFade=fade;vEdge=uv.y;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
-    fragmentShader: 'uniform vec3 tint; uniform float opacity; varying float vFade; varying float vEdge; void main(){float edge=pow(sin(3.14159265*clamp(vEdge,0.,1.)),1.5);float alpha=opacity*vFade*edge;if(alpha<.001)discard;gl_FragColor=vec4(tint,alpha);\n#include <colorspace_fragment>\n}' });
-  const mesh = new THREE.Mesh(geometry, material); mesh.visible = false; mesh.frustumCulled = false; scene.add(mesh);
+    fragmentShader: 'uniform vec3 tint; uniform float opacity; varying float vFade; varying float vEdge; void main(){float edge=smoothstep(0.,.26,vEdge)*smoothstep(1.,.74,vEdge);float alpha=opacity*vFade*edge;if(alpha<.001)discard;gl_FragColor=vec4(tint,alpha);\n#include <colorspace_fragment>\n}' });
+  const mesh = new THREE.Mesh(geometry, material); mesh.visible = false; mesh.frustumCulled = false; mesh.renderOrder = 2; scene.add(mesh);
   return { mesh, material, geometry, positions, fades, samples: Array.from({ length: TRAIL_POINTS }, () => ({ p: v3(), at: -99 })), cursor: -1, count: 0, anchor: v3(), previous: v3(), initialized: false, strength: 0, length: 0, vertices: 0 };
 }
 function clearTrail(t) {
   if (!t) return;
   t.cursor = -1; t.count = 0; t.initialized = false; t.strength = 0; t.length = 0; t.vertices = 0; t.mesh.visible = false; t.geometry.setDrawRange(0, 0);
 }
+const trailUp = v3();
 function updateTrails(dt) {
   if (REDUCED) return;
+  camera.updateMatrixWorld(); trailUp.setFromMatrixColumn(camera.matrixWorld, 1).normalize();
   for (const w of workers) {
     const t = w.trail;
     if (w.state === 'pool' || !w.root.visible) { if (t.initialized) clearTrail(t); continue; }
@@ -788,7 +891,9 @@ function updateTrails(dt) {
     const distance = t.anchor.distanceTo(t.previous), speed = distance / Math.max(dt, .001);
     if (distance > 2.5) { clearTrail(t); continue; }
     const moving = speed > 1.8 && w.mv && w.state !== 'idle' && w.state !== 'party';
-    t.strength += ((moving ? .55 + .45 * clamp((speed - 1.8) / 3.5, 0, 1) : 0) - t.strength) * (1 - Math.exp(-22 * dt));
+    // Rise fast, fall slowly, so a stop lets the streak fade out instead of snapping off.
+    const goal = moving ? .55 + .45 * clamp((speed - 1.8) / 3.5, 0, 1) : 0;
+    t.strength += (goal - t.strength) * (1 - Math.exp(-(goal > t.strength ? 22 : 5) * dt));
     if (moving && distance > .018) {
       t.cursor = (t.cursor + 1) % TRAIL_POINTS;
       const s = t.samples[t.cursor]; s.p.copy(t.anchor); s.at = clock; t.count = Math.min(TRAIL_POINTS, t.count + 1);
@@ -800,9 +905,11 @@ function updateTrails(dt) {
       if (age >= TRAIL_LIFE) break;
       if (previous) length += s.p.distanceTo(previous);
       if (length >= TRAIL_LENGTH) break;
-      // Use one fade envelope: multiplying time, distance and speed hid the exposed tail.
-      const ageFade = 1 - age / TRAIL_LIFE, fade = Math.min(ageFade, 1 - length / TRAIL_LENGTH) * t.strength, half = TRAIL_HEIGHT * (.65 + .35 * ageFade) / 2;
-      t.positions.set([s.p.x, s.p.y - half, s.p.z, s.p.x, s.p.y + half, s.p.z], count * 6);
+      // One fade envelope (the smaller of age and distance), kept full near the body so the streak reads at a glance;
+      // multiplying time, distance and speed together hid it. The ribbon narrows to a point-ish tail.
+      const k = length / TRAIL_LENGTH, fade = Math.min(Math.sqrt(1 - age / TRAIL_LIFE), 1 - k * k) * t.strength, half = TRAIL_HEIGHT * (1 - .45 * k) / 2;
+      const ux = trailUp.x * half, uy = trailUp.y * half, uz = trailUp.z * half;
+      t.positions.set([s.p.x - ux, s.p.y - uy, s.p.z - uz, s.p.x + ux, s.p.y + uy, s.p.z + uz], count * 6);
       t.fades[count * 2] = t.fades[count * 2 + 1] = fade; previous = s.p; count++;
     }
     t.length = Math.min(length, TRAIL_LENGTH); t.vertices = count * 2; t.mesh.visible = count >= 2 && t.strength > .015;
@@ -915,6 +1022,8 @@ const A = {
     T[LEAN] = .3 + .5 * k; T[HDX] = -.5 * k; T[LLX] = .5 * k; T[LRX] = .2 * k; T[LLK] = .5 * k; T[LRK] = .9 * k;
     if (w.carry) carryArms(T); else { T[ALX] = T[ARX] = -2.2 - .6 * k; T[ALZ] = T[ARZ] = .2; }
   },
+  // Holding a bar overhead while standing still.
+  hold(T, w) { const t = w.animT * 3 + w.phase; T[HY] = -.02 - .01 * Math.sin(t); carryArms(T, .03 * Math.sin(t)); },
   crouch(T, w) { T[HY] = -.115; T[LLX] = T[LRX] = -1.0; T[LLK] = T[LRK] = 1.9; T[LEAN] = .55; if (w.carry) carryArms(T); else { T[ALX] = T[ARX] = .9; T[ALE] = T[ARE] = -.3; } },
   reach(T, w) { T[LLX] = .3; T[LRX] = -.2; T[LLK] = .6; T[LRK] = .25; T[HDX] = -.4; T[ALX] = T[ARX] = -3.05; T[ALZ] = T[ARZ] = .14; },
   grabFront(T, w) { grab(T, w, .75, -.05, -.5, .9, -1.5); },
@@ -982,7 +1091,7 @@ function air(a, b, apex, o = {}) {
   }, w => { w.flipX = w.flipZ = w.spinY = 0; landFx(w, o.land === undefined ? .55 : o.land); if (o.done) o.done(w); });
 }
 function run(w, a, b) {
-  const d = Math.hypot(b.x - a.x, b.z - a.z), flair = !REDUCED && !(w.state === 'toCrate' && w.returnGround) && d > .8 && rand() < (w.carry ? .06 : .1), dur = Math.max(.04, d / (w.carry ? 4 : 4.8)) * (flair ? 1.3 : 1);
+  const d = Math.hypot(b.x - a.x, b.z - a.z), flair = !REDUCED && !w.bar && !(w.state === 'toCrate' && w.returnGround) && d > .8 && rand() < (w.carry ? .06 : .1), dur = Math.max(.04, d / (w.carry ? 4 : 4.8)) * (flair ? 1.3 : 1);
   if (flair) count(w.carry ? 'twirl' : 'cartwheel');
   return mv(dur, (w, u) => {
     w.root.position.lerpVectors(a, b, u); w.flipX = 0; w.u = u;
@@ -1089,11 +1198,12 @@ function plan(w) {
   megaJump(w, t);
 }
 function dropJob(w, now) {
-  if (w.job && !w.carry) { w.job.block.reserved = false; cool(w.job.block); w.slot.inFlight--; }
+  if (w.job && !w.carry) { if (w.job.piece) leaveBar(w); else { w.job.block.reserved = false; cool(w.job.block); w.slot.inFlight--; } }
   w.job = null; w.route = null; w.state = 'idle'; w.retryAt = clock + (now ? 0 : .15);
 }
 
 function startPick(w) {
+  if (w.job.piece) return barArrive(w);
   const job = w.job, b = job.block, g = job.goal;
   if (!goalValid(job)) return dropJob(w);
   // Standing on the cube: crouch, yank it out and jump in the same beat, so nobody lingers on thin air.
@@ -1107,7 +1217,7 @@ function startPick(w) {
       // Hands are on the cube. Anyone standing on it or crossing it springs off as it comes out, so nobody waits.
       // The exception is a team-mate who is after the cube under this character: those two trade places instead.
       const riders = workers.filter(o => o !== w && o.cell && o.cell.x === b.x && o.cell.y === b.y + 1 && o.cell.z === b.z && (o.state === 'toCube' || o.state === 'toCrate' || o.state === 'toDock' || o.state === 'idle'));
-      const rival = riders.find(o => { const ob = o.state === 'toCube' && !o.carry && o.job ? o.job.block : null; return ob && !ob.gone && ob.x === c.x && ob.y === c.y - 1 && ob.z === c.z; });
+      const rival = riders.find(o => { const ob = o.state === 'toCube' && !o.carry && o.job && !o.job.piece ? o.job.block : null; return ob && !ob.gone && ob.x === c.x && ob.y === c.y - 1 && ob.z === c.z; });
       if (rival) { m.t = at - .002; return swapPlaces(w, rival); }
       taken = true; takeBlock(w, b);
       for (const o of riders) springOff(o, b, onTop);
@@ -1270,27 +1380,135 @@ function exitToGround(w) {
   return false;
 }
 function goHome(w) { w.state = 'toCrate'; w.route = null; w.exitTarget = null; w.returnGround = w.root.position.y < .15; w.exitPending = !w.returnGround; return w.exitPending && exitToGround(w); }
-// Jump shot: crouch, pop up, and throw the cube onto the truck's load from the top of the jump.
+// ---------------------------------------------------------------- bars (two-person pieces)
+// At one end of a bar: crouch, ready, until the other end is manned too; then both lift it in the same beat.
+function barArrive(w) {
+  const job = w.job, p = job.piece;
+  if (!goalValid(job)) return dropJob(w);
+  const o = job.role === 'lead' ? p.partner : p.leader;
+  if (o && o.job && o.job.piece === p && o.state === 'toCube' && same(o.cell, o.job.goal) && o.mv && o.mv.barWait) return liftBar(p);
+  if (!job.waitSince) { job.waitSince = clock; count('barWait', w); }
+  if (job.role === 'lead' && clock - job.waitSince > (p.partner ? 2 : 1) * BAR_WAIT) { count('barGiveUp', w); return dropJob(w); }
+  const q = w.root.position;
+  w.mv = mv(.25, w => { w.flipX = w.flipZ = w.spinY = 0; look(w, p.x - q.x, p.z - q.z); setAnim(w, A.ready); }); w.mv.barWait = true;
+}
+function liftBar(p) {
+  count('barLift', p.leader); p.lift = [];
+  for (const w of [p.leader, p.partner]) {
+    const g = w.job.goal, side = g.y === p.a.y;
+    w.route = null; look(w, g.dx, g.dz);
+    w.mv = mv(.46, (w, u, m) => {
+      // Only if both are still lifting: one of them may have been bounced off its foothold meanwhile.
+      if (!p.taken && m.t >= .207 && p.leader && p.partner && p.lift.includes(p.leader.mv) && p.lift.includes(p.partner.mv)) takeBar(p);
+      w.u = u; w.flipX = w.flipZ = w.spinY = 0; setAnim(w, side ? A.grabFront : A.grabDown);
+    }, w => { if (w.bar === p) { if (w === p.leader) goHome(w); else follow(w); } });
+    p.lift.push(w.mv);
+  }
+}
+function newBarMesh() { const m = new THREE.Mesh(GEO.bar, MAT.cube[0]); m.castShadow = true; m.visible = false; scene.add(m); barMeshes.push(m); return m; }
+function takeBar(p) {
+  if (!topFree(p.a) || !topFree(p.b)) count('coveredTake');   // must stay at zero; the test suite checks it
+  let L = p.leader, P = p.partner;
+  const on = c => o => o.cell && o.cell.x === c.x && o.cell.y === c.y + 1 && o.cell.z === c.z;
+  const riders = workers.filter(o => o !== L && o !== P && (on(p.a)(o) || on(p.b)(o)) && (o.state === 'toCube' || o.state === 'toCrate' || o.state === 'toDock' || o.state === 'idle'));
+  p.taken = p.gone = true; p.reserved = false;
+  for (const c of [p.a, p.b]) { c.gone = true; c.reserved = false; occ.delete(K(c.x, c.y, c.z)); }
+  hot.delete(p.a); worldVer++; bars.setMatrixAt(p.j, ZERO); bars.instanceMatrix.needsUpdate = true;
+  // Whoever is nearer the truck leads the way back, so the pair never has to turn round under the bar.
+  const toDock = w => Math.hypot(w.root.position.x - w.dock.x, w.root.position.z - w.dock.z);
+  if (toDock(P) < toDock(L)) { [L, P] = [P, L]; [L.job, P.job] = [P.job, L.job]; p.leader = L; p.partner = P; }
+  for (const w of [L, P]) { w.carry = true; w.bar = p; }
+  // From here on the back carrier answers only to the bar: never a rider sent off on its own, never a carrier itself.
+  P.state = 'follow'; P.route = null;
+  const m = barPool.pop() || newBarMesh(); m.material = MAT.cube[p.color]; m.visible = true; m.scale.setScalar(1);
+  m.position.set(p.x, p.y, p.z); m.quaternion.setFromAxisAngle(UP, p.alongX ? 0 : Math.PI / 2);
+  p.mesh = m; p.thrown = false; p.from = m.position.clone(); p.fromQ = m.quaternion.clone(); p.q = m.quaternion.clone(); p.liftT = 0;
+  // The follower's breadcrumbs start with the straight line from where it stands to the leader.
+  p.gap = P.root.position.distanceTo(L.root.position);
+  p.path = [{ p: P.root.position.clone(), s: 0, anim: A.hold, u: 0 }, { p: L.root.position.clone(), s: p.gap, anim: A.hold, u: 0 }];
+  burst(tmpV.set(p.x, p.y, p.z), p.color, 10); sfx.pick();
+  for (const o of riders) springOff(o, on(p.a)(o) ? p.a : p.b, false);
+}
+// The back carrier walks in the leader's footsteps a bar's length behind, replaying the leader's moves as it goes.
+function follow(w) {
+  w.state = 'follow'; w.route = null; w.act = 'barFollow';
+  w.mv = mv(1e9, (w, u, m, dt) => followStep(w, dt));
+}
+function followStep(w, dt) {
+  const p = w.bar, L = p && p.leader;
+  if (!L || L.bar !== p) return;
+  const last = p.path[p.path.length - 1], d = L.root.position.distanceTo(last.p);
+  if (d > .02) p.path.push({ p: L.root.position.clone(), s: last.s + d, anim: L.anim, u: L.u });
+  p.gap += (BAR_GAP - p.gap) * (1 - Math.exp(-3 * dt));
+  const at = Math.max(p.path[0].s, p.path[p.path.length - 1].s - p.gap);
+  while (p.path.length > 2 && p.path[1].s <= at) p.path.shift();
+  const a = p.path[0], b = p.path[1] || a, k = b.s > a.s ? clamp((at - a.s) / (b.s - a.s), 0, 1) : 1, e = k < .5 ? a : b;
+  const q = w.root.position, ox = q.x, oy = q.y, oz = q.z; q.lerpVectors(a.p, b.p, k);
+  w.flipX = w.flipZ = w.spinY = 0;
+  if (Math.hypot(q.x - ox, q.y - oy, q.z - oz) > .6 * dt) { look(w, q.x - ox, q.z - oz); w.u = e.u; setAnim(w, e.anim); }
+  else { look(w, L.root.position.x - q.x, L.root.position.z - q.z); setAnim(w, A.hold); }
+}
+// Back from the truck: the follower is a free hand again, on whatever cell it ended up on.
+function unfollow(w) {
+  landFx(w, .35); w.state = 'idle'; w.job = null; w.bar = null; w.carry = false; w.route = null; w.retryAt = 0; w.cheer = .45; w.act = 'barDone';
+  const q = w.root.position, c = { x: Math.round(q.x - w.ox), y: Math.max(0, Math.round(q.y)), z: Math.round(q.z - w.oz) };
+  const n = [[0, 0], ...DIR8].map(([dx, dz]) => ({ x: c.x + dx, y: c.y, z: c.z + dz })).find(n => stand(n.x, n.y, n.z));
+  if (n) w.cell = n; else megaJump(w, w.dock);
+}
+// The bar rides on both carriers' hands: centred between them, pointing from the back carrier to the front one.
+const UP = v3(0, 1, 0), AXIS_X = v3(1, 0, 0), barA = v3(), barB = v3();
+function updateBars(dt) {
+  for (const p of pieces) {
+    if (!p.mesh || p.thrown || !p.leader || !p.partner) continue;
+    const L = p.leader, P = p.partner, m = p.mesh;
+    L.root.updateWorldMatrix(true, true); P.root.updateWorldMatrix(true, true);
+    L.torso.localToWorld(barA.copy(CUBE_REST)); P.torso.localToWorld(barB.copy(CUBE_REST));
+    const mid = tmpV.addVectors(barA, barB).multiplyScalar(.5); barA.sub(barB);
+    if (barA.lengthSq() > .01) p.q.setFromUnitVectors(AXIS_X, barA.normalize());
+    p.liftT = Math.min(1, p.liftT + dt / .26); const e = outBack(p.liftT);
+    m.position.lerpVectors(p.from, mid, e); m.quaternion.slerpQuaternions(p.fromQ, p.q, Math.min(1, e)); m.scale.setScalar(lerp(1, BAR_SCALE, p.liftT));
+  }
+}
+
+// Jump shot: crouch, pop up, and throw the cube onto the truck's load from the top of the jump. With a bar, the
+// follower jumps in the same beat and the pair throw it together.
 function shoot(w) {
-  const s = w.slot, a = w.root.position.clone(); let thrown = false;
-  count('shot', w);
+  const s = w.slot, a = w.root.position.clone(), p = w.bar, mate = p && p.partner && p.partner.bar === p ? p.partner : null; let thrown = false;
+  count(p ? 'barShot' : 'shot', w);
+  const jump = (w, from, u) => { const j = clamp((u - .22) / .78, 0, 1); w.root.position.y = from.y + 2.2 * j * (1 - j); w.u = u; look(w, s.pos.x - from.x, s.pos.z - from.z); setAnim(w, A.shoot); };
+  if (mate) { const b = mate.root.position.clone(); mate.mv = mv(.52, (m, u) => { m.flipX = m.flipZ = m.spinY = 0; jump(m, b, u); }, unfollow); }
   w.mv = mv(.52, (w, u) => {
-    const j = clamp((u - .22) / .78, 0, 1); w.root.position.y = a.y + 2.2 * j * (1 - j); w.u = u;
-    look(w, s.pos.x - a.x, s.pos.z - a.z); setAnim(w, A.shoot);
+    jump(w, a, u);
     if (!thrown && u >= .5) {
-      thrown = true; w.cube.getWorldPosition(tmpV); w.carry = false; w.cube.visible = false;
-      const m = shotPool.pop(); if (m) { m.material = MAT.cube[w.color]; m.visible = true; m.position.copy(tmpV); }
-      shots.push({ m, a: tmpV.clone(), b: s.stack.localToWorld(loadPos(s.initial - s.remaining + shots.filter(q => q.slot === s).length, v3(), s.load)), t: 0, slot: s });
+      thrown = true; w.carry = false;
+      const own = w.job && w.job.units || 1, pending = shots.reduce((n, q) => n + (q.slot === s ? q.own : 0), 0);
+      let m;
+      if (p) { m = p.mesh; tmpV.copy(m.position); p.thrown = true; w.bar = null; if (mate) { mate.carry = false; mate.bar = null; } }
+      else { w.cube.getWorldPosition(tmpV); w.cube.visible = false; m = shotPool.pop(); if (m) { m.material = MAT.cube[w.color]; m.visible = true; m.position.copy(tmpV); } }
+      shots.push({ m, a: tmpV.clone(), b: s.stack.localToWorld(loadPos(s.initial - s.remaining + pending, v3(), s.load)), t: 0, slot: s, units: p ? 2 : 1, own, bar: !!p });
     }
   }, w => { landFx(w, .35); w.state = 'idle'; w.job = null; w.retryAt = 0; w.cheer = .45; });
 }
-function deliver(s) {
-  stackCube(s, s.initial - s.remaining); s.remaining--; s.inFlight--; collected++; s.bump = 1; drawLabel(s);
+function deliver(s, q) {
+  for (let i = 0; i < q.own; i++) { stackCube(s, s.initial - s.remaining); s.remaining--; }
+  s.inFlight -= q.own; collected += q.units; s.bump = 1; drawLabel(s);
+  if (q.units > q.own) spill(s, q.units - q.own);
   burst(tmpV.set(s.pos.x, 1.1, s.pos.z), s.color, 5); sfx.drop(collected / total); renderHud();
+}
+// A bar is two cubes. When its truck needed only one more, the other one goes to a truck of the same colour that still
+// has room — this one if room has opened up meanwhile, else another parked one, else the next crate in the queue.
+// One always has room: the colour's crates add up to its cubes, and this cube was never promised to any of them.
+function spill(s, n) {
+  for (let i = 0; i < n; i++) {
+    count('spill');
+    const o = [s, ...slots.filter(o => o && o !== s && o.color === s.color)].find(o => o.remaining - o.inFlight > 0);
+    if (o) { stackCube(o, o.initial - o.remaining); o.remaining--; o.bump = 1; drawLabel(o); continue; }
+    for (const col of queue) { const k = col.findIndex(c => c.color === s.color && c.count > 0); if (k >= 0) { if (--col[k].count === 0) col.splice(k, 1); renderQueue(); break; } }
+  }
 }
 
 function think(w) {
-  if (w.state === 'pool' || w.state === 'spawn') return;
+  if (w.state === 'pool' || w.state === 'spawn' || w.state === 'follow') return;
   if (w.state === 'party') {
     if (clock < w.retryAt) return;
     w.retryAt = clock + .7 + rand() * 1.3; const p = w.root.position.clone();
@@ -1320,10 +1538,12 @@ function think(w) {
     count('dive'); w.state = 'spawn';
     w.mv = air(w.root.position.clone(), s.cab.clone(), .75, { x1: TAU * FLIP, shrink: true, land: 0, done(w) { s.bump = 1; release(w); } }); return;
   }
+  if (joinBar(w)) return;
   if (s.remaining - s.inFlight > 0 && clock >= w.retryAt) {
     const job = findJob(w);
     if (job) {
-      job.block.reserved = true; hot.add(job.block); s.inFlight++; w.job = job; w.state = 'toCube'; w.failed = false; w.pauseUntil = 0;
+      if (job.piece) claimBar(w, job); else { job.block.reserved = true; job.units = 1; s.inFlight++; }
+      hot.add(job.block); w.job = job; w.state = 'toCube'; w.failed = false; w.pauseUntil = 0;
       if (job.goal.kind === 'warp') return megaJump(w, job.goal);
       w.route = job.path; w.ri = 0; return job.path.length ? stepRoute(w) : startPick(w);
     }
@@ -1359,7 +1579,7 @@ function ready(w) {
 }
 const STROLL_R = 3.6, DIR8 = [...DIR4, ...DIAG];
 // True when a strolling or gazing character should stop what it is doing: work has turned up, or it is time to board.
-const called = w => { const s = w.slot; return s.remaining === 0 || s.recall || (s.remaining - s.inFlight > 0 && clock >= w.retryAt); };
+const called = w => { const s = w.slot; return s.remaining === 0 || s.recall || (s.remaining - s.inFlight > 0 && clock >= w.retryAt) || (clock >= w.joinTry && needsPartner(s)); };
 // The colour a blocked crew is waiting for: whichever colour most often tops the columns that bury its own cubes,
 // counting only colours with no truck parked — only then is there a truck to wait for. -1 when there is none.
 function wanted(s) {
@@ -1432,12 +1652,14 @@ function stepWorker(w, dt) {
     w.flipX = w.flipZ = w.spinY = 0; setAnim(w, w.state === 'party' ? A.dance : A.idle);
     if (w.state === 'idle') { if (w.slot.waiting) look(w, -w.root.position.x, -w.root.position.z); else look(w, FRONT.x, FRONT.z); }
   }
+  // Two people under one bar do not somersault.
+  if (w.bar) w.flipX = w.flipZ = w.spinY = 0;
   if (w.state !== 'pool') { applyPose(w, dt); if (w.state !== 'party') { crewT += dt; if (!w.mv) stillT += dt; } }
 }
 function release(w) {
   if (w.slot) { const i = w.slot.squad.indexOf(w); if (i >= 0) w.slot.squad.splice(i, 1); }
   w.state = 'pool'; w.slot = null; w.job = null; w.route = null; w.mv = null; w.carry = false; w.cube.visible = false; w.root.visible = false; w.root.scale.setScalar(1);
-  w.exitPending = false; w.returnGround = false; w.groundEscape = false; w.exitTarget = null; w.airborneReturn = false;
+  w.exitPending = false; w.returnGround = false; w.groundEscape = false; w.exitTarget = null; w.airborneReturn = false; w.bar = null;
   clearTrail(w.trail);
   w.flipX = w.flipZ = w.spinY = 0; w.land = 0; w.cheer = 0;
 }
@@ -1457,7 +1679,7 @@ function makeSlot(i, p, col) {
   // The load: every delivered cube takes its place on the bed, six to a layer.
   const stack = new THREE.InstancedMesh(GEO.cube, MAT.cube[p.color], Math.max(24, p.count)); stack.count = 0; stack.castShadow = stack.receiveShadow = true; stack.frustumCulled = false; body.add(stack);
   const tex = canvasTexture(352, 128, () => {}), label = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true, fog: false }));
-  label.scale.set(2.2, .8, 1); label.position.set(0, LABEL_Y, CAB_Z * TRUCK); label.renderOrder = 5; g.add(label);
+  label.position.set(0, LABEL_Y, CAB_Z * TRUCK); sizeLabel(label); label.renderOrder = 5; g.add(label);
   // The model's origin is under the bed; `rest` shifts it so the whole truck is centred in its bay.
   // The model's origin is under the bed; `rest` shifts it so the whole truck is centred in its bay. `rho` is the
   // radius of the arc that takes it from its parking direction into the driving lane, `join` where that arc ends.
@@ -1470,6 +1692,8 @@ function makeSlot(i, p, col) {
   return s;
 }
 const LABEL_Y = 1.85;
+// On a phone the whole yard is drawn small, so the truck counters are drawn larger to stay readable.
+function sizeLabel(label) { const k = Math.min(viewW, viewH) < 560 ? 1.45 : 1; label.scale.set(2.2 * k, .8 * k, 1); label.userData.y = LABEL_Y + .3 * (k - 1); label.position.y = label.userData.y; }
 // Puts a truck `d` units along its way out of the bay: straight ahead for BAY_RUN, round an arc into the driving
 // lane (reached at d = s.out), then down the lane. With `lane` set, d is a point on the lane itself, which is how
 // the approach from the left (d < s.out) is expressed.
@@ -1546,7 +1770,7 @@ function updateSlot(s, dt) {
   }
   // Suspension: the truck dips when a cube lands or someone jumps off, and idles with a shake while it waits.
   s.bump *= Math.exp(-13 * dt); const b = s.bump, wob = s.waiting ? .035 * Math.sin(clock * 9) : 0;
-  s.g.scale.set(1 + .05 * b, 1 - .1 * b, 1 + .05 * b); s.g.rotation.z = wob; s.label.position.y = LABEL_Y + .22 * b;
+  s.g.scale.set(1 + .05 * b, 1 - .1 * b, 1 + .05 * b); s.g.rotation.z = wob; s.label.position.y = s.label.userData.y + .22 * b;
   for (let i = s.pops.length - 1; i >= 0; i--) { const q = s.pops[i]; q.t += dt; const u = Math.min(1, q.t / .22); setLoad(s, q.n, 1 + .3 * (1 - u) * Math.cos(u * 9)); if (u >= 1) s.pops.splice(i, 1); }
   if (s.remaining === 0 || s.recall) {
     if (!s.squad.length && !shots.some(q => q.slot === s) && !laneBusy(s)) { s.state = 'out'; s.t = 0; s.g.traverse(o => { o.userData.slot = null; }); if (!s.recall) { sfx.crate(); burst(tmpV.set(s.pos.x, 1.2, s.pos.z), s.color, 16); } }
@@ -1554,7 +1778,7 @@ function updateSlot(s, dt) {
   }
   const need = s.remaining - s.inFlight;
   s.spawnT += dt;
-  if (need > 0 && s.spawnT > .15 && s.squad.length < SQUAD && !s.squad.some(w => w.state === 'idle' || w.state === 'spawn' || w.state === 'toDock')) { spawnWorker(s); s.spawnT = 0; }
+  if ((need > 0 || needsPartner(s)) && s.spawnT > .15 && s.squad.length < SQUAD && !s.squad.some(w => w.state === 'idle' || w.state === 'spawn' || w.state === 'toDock')) { spawnWorker(s); s.spawnT = 0; }
   const stuck = need > 0 && s.inFlight === 0 && s.squad.length > 0 && s.squad.every(w => w.state === 'idle' && w.failed);
   s.stuckT = stuck ? s.stuckT + dt : 0;
   const waiting = s.stuckT > 1.1; if (waiting !== s.waiting) { s.waiting = waiting; drawLabel(s); }
@@ -1573,6 +1797,23 @@ function recall(s) {
 }
 
 // ---------------------------------------------------------------- level
+// Fuse a few pairs of neighbouring same-coloured cubes into bars. Each cell stays a block in the grid, so routes,
+// footholds and cover work as before; the pair just draws as one piece and only ever comes out whole.
+function makePieces() {
+  pieces = [];
+  const want = Math.min(BAR_MAX, Math.floor(blocks.length / BAR_EVERY)), order = blocks.slice();
+  for (let i = order.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [order[i], order[j]] = [order[j], order[i]]; }
+  for (const a of order) {
+    if (pieces.length >= want) break;
+    if (a.piece) continue;
+    for (const [dx, dz] of rand() < .5 ? [[1, 0], [0, 1]] : [[0, 1], [1, 0]]) {
+      const b = occ.get(K(a.x + dx, a.y, a.z + dz));
+      if (!b || b.piece || b.color !== a.color) continue;
+      const p = { j: pieces.length, a, b, color: a.color, col: a.col, alongX: dx === 1, x: a.x + dx / 2, y: a.y + .5, z: a.z + dz / 2, reserved: false, gone: false, taken: false, leader: null, partner: null, coolUntil: 0, mesh: null };
+      a.piece = b.piece = p; pieces.push(p); break;
+    }
+  }
+}
 function addBlock(x, y, z, color) {
   const k = K(x, y, z); if (occ.has(k)) return;
   const b = { x, y, z, color, i: blocks.length, reserved: false, gone: false, delay: 0, col: new THREE.Color(PALETTE[color].hex).offsetHSL(0, 0, (rand() - .5) * .05) };
@@ -1581,7 +1822,8 @@ function addBlock(x, y, z, color) {
 function buildLevel() {
   seed = 9001 + (level % LEVELS.length) * 131;
   slots.forEach(s => { if (s) freeSlot(s); }); slots = Array(SLOTS).fill(null); leaving.forEach(freeSlot); leaving = [];
-  workers.forEach(release); shots.forEach(q => { if (q.m) { q.m.visible = false; shotPool.push(q.m); } }); shots = []; particles = []; hot.clear();
+  workers.forEach(release); shots.forEach(q => { if (q.m) { q.m.visible = false; if (!q.bar) shotPool.push(q.m); } }); shots = [];
+  barMeshes.forEach(m => m.visible = false); barPool = barMeshes.slice(); particles = []; hot.clear();
   blocks = []; occ.clear(); worldVer++;
   const L = LEVELS[level % LEVELS.length];
   if (L.build) L.build((x0, x1, y0, y1, z0, z1, c) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) for (let z = z0; z <= z1; z++) addBlock(x, y, z, typeof c === 'function' ? c(x, y, z) : c); });
@@ -1597,6 +1839,8 @@ function buildLevel() {
     const shift = Math.max(0, front - 4.8), dx = Math.ceil(FRONT.x * shift), dz = Math.ceil(FRONT.z * shift);
     for (const b of filled) addBlock(b.x - dx, b.y, b.z - dz, b.color + COLOR_OFFSET);
   }
+  // Own random stream, so the deal, drop-in timing and everything else seeded per level stay exactly as without bars.
+  const keep = seed; seed = keep ^ 0x5bd1e995; makePieces(); seed = keep;
   boardBounds = { x0: Math.min(...blocks.map(b => b.x)), x1: Math.max(...blocks.map(b => b.x)), z0: Math.min(...blocks.map(b => b.z)), z1: Math.max(...blocks.map(b => b.z)) };
   buildReturnApron();
   boardBack = Math.min(...blocks.map(b => b.x * FRONT.x + b.z * FRONT.z));
@@ -1604,6 +1848,7 @@ function buildLevel() {
   total = blocks.length; collected = 0; won = false; winT = -1; started = false; jam = 0; jamTold = false; idleT = 0; levelT = 0; introDone = false; levelTop = 1;
   for (const b of blocks) { b.delay = .15 + b.y * .075 + rand() * .2; levelTop = Math.max(levelTop, b.y + 1); cubes.setColorAt(b.i, b.col); cubes.setMatrixAt(b.i, ZERO); }
   cubes.count = total; cubes.instanceColor.needsUpdate = true; cubes.instanceMatrix.needsUpdate = true;
+  bars.count = pieces.length; for (const p of pieces) { bars.setMatrixAt(p.j, ZERO); bars.setColorAt(p.j, p.col); } bars.instanceMatrix.needsUpdate = true; bars.instanceColor.needsUpdate = true;
   if (L.columns) queue = L.columns.map(col => col.map(b => ({ color: b.color + COLOR_OFFSET, count: b.count })));
   else makeQueue();
   $('levelNo').textContent = level + 1; $('levelName').textContent = L.name;
@@ -1636,20 +1881,23 @@ function updateBlocks(dt) {
     let busy = false;
     for (const b of blocks) {
       if (b.gone) continue;
-      const u = clamp((levelT - b.delay) / .5, 0, 1); if (u < 1) busy = true;
-      dummy.position.set(b.x, b.y + .5 + (1 - outBounce(u)) * 6, b.z); dummy.scale.setScalar(u <= 0 ? 0 : Math.min(1, .4 + u * 2)); dummy.rotation.set(0, 0, 0); dummy.updateMatrix(); cubes.setMatrixAt(b.i, dummy.matrix);
+      const u = clamp((levelT - b.delay) / .5, 0, 1), p = b.piece; if (u < 1) busy = true;
+      if (p) cubes.setMatrixAt(b.i, ZERO);
+      if (p && p.a !== b) continue;
+      dummy.position.set(p ? p.x : b.x, b.y + .5 + (1 - outBounce(u)) * 6, p ? p.z : b.z); dummy.scale.setScalar(u <= 0 ? 0 : Math.min(1, .4 + u * 2)); dummy.rotation.set(0, p && !p.alongX ? Math.PI / 2 : 0, 0); dummy.updateMatrix();
+      if (p) bars.setMatrixAt(p.j, dummy.matrix); else cubes.setMatrixAt(b.i, dummy.matrix);
     }
-    cubes.instanceMatrix.needsUpdate = true; introDone = !busy;
+    cubes.instanceMatrix.needsUpdate = true; bars.instanceMatrix.needsUpdate = true; introDone = !busy;
   }
   if (hot.size) {
     // Blocks someone is on the way to pulse brighter, so the swarm's targets can be read at a glance.
     const k = .22 + .16 * Math.sin(clock * 11);
-    for (const b of hot) { tmpC.copy(b.col).lerp(WHITE, k); cubes.setColorAt(b.i, tmpC); }
-    cubes.instanceColor.needsUpdate = true;
+    for (const b of hot) { tmpC.copy(b.col).lerp(WHITE, k); if (b.piece) bars.setColorAt(b.piece.j, tmpC); else cubes.setColorAt(b.i, tmpC); }
+    cubes.instanceColor.needsUpdate = true; bars.instanceColor.needsUpdate = true;
   }
 }
 const WHITE = new THREE.Color(0xffffff);
-function cool(b) { hot.delete(b); cubes.setColorAt(b.i, b.col); cubes.instanceColor.needsUpdate = true; }
+function cool(b) { hot.delete(b); if (b.piece) { bars.setColorAt(b.piece.j, b.piece.col); bars.instanceColor.needsUpdate = true; } else { cubes.setColorAt(b.i, b.col); cubes.instanceColor.needsUpdate = true; } }
 
 // ---------------------------------------------------------------- particles
 const DUST = new THREE.Color(0xfffaf0), PCOL = PALETTE.map(p => new THREE.Color(p.hex).lerp(WHITE, .15));
@@ -1698,16 +1946,18 @@ function renderHud() {
   $('count').textContent = `${collected}/${total}`; $('bar').style.width = pct + '%'; $('progress').setAttribute('aria-valuenow', pct);
 }
 function renderQueue(riseCol = -1) {
-  const columns = queue.length || 3, maxWidth = sideTray() ? Math.min(330, viewW * .36) : viewW - 24;
-  $('tray').style.setProperty('--b', Math.min(viewH < 620 ? 52 : viewW < 400 ? 56 : 62, Math.floor((maxWidth - 48 - (columns - 1) * 10) / columns)) + 'px');
+  const columns = queue.length || 3, side = sideTray(), dock = !side, chips = dock || viewH < 560;
+  $('tray').classList.toggle('dock', dock);
+  if (dock) { const inner = Math.min(viewW - 24, 560) - 32; $('tray').style.setProperty('--b', clamp(Math.floor((inner - (columns + 1) * 14) / columns), 44, viewH < 620 ? 60 : 74) + 'px'); }
+  else $('tray').style.setProperty('--b', Math.min(viewH < 620 ? 52 : 62, Math.floor((Math.min(330, viewW * .36) - 48 - (columns - 1) * 10) / columns)) + 'px');
   $('tray').style.setProperty('--gap', '10px');
-  const rows = sideTray() ? (viewH >= 640 ? 4 : 3) : (viewH >= 700 ? 4 : 3), had = document.activeElement && document.activeElement.dataset ? document.activeElement.dataset.col : undefined;
+  const rows = viewH >= 640 ? 4 : 3, had = document.activeElement && document.activeElement.dataset ? document.activeElement.dataset.col : undefined;
   $('queue').innerHTML = queue.map((q, c) => {
     if (!q.length) return '<div class="col"><div class="col-done">✓</div></div>';
-    const cell = (p, i) => {
-      const P = PALETTE[p.color], st = `--c:${P.css};--l:${P.lite};--s:${P.shade};--k:${P.ink}`;
-      return i ? `<div class="box dim" style="${st}">${p.count}</div>` : `<button class="box${c === riseCol ? ' rise' : ''}" data-col="${c}" style="${st}" aria-label="${P.name} kamyon, ${p.count} küp. Göndermek için dokun.">${p.count}</button>`;
-    };
+    const style = p => { const P = PALETTE[p.color]; return `--c:${P.css};--l:${P.lite};--s:${P.shade};--k:${P.ink}`; };
+    const cell = (p, i) => i ? `<div class="box dim" style="${style(p)}">${p.count}</div>` : `<button class="box${c === riseCol ? ' rise' : ''}" data-col="${c}" style="${style(p)}" aria-label="${PALETTE[p.color].name} kamyon, ${p.count} küp. Göndermek için dokun.">${p.count}</button>`;
+    // Dock: the next two crates as chips beside each other, then how many more.
+    if (chips) return `<div class="col">${cell(q[0], 0)}<div class="next" aria-hidden="true">${q.slice(1, 3).map(p => `<i style="${style(p)}">${p.count}</i>`).join('')}${q.length > 3 ? `<b>+${q.length - 3}</b>` : ''}</div></div>`;
     return `<div class="col">${q.slice(0, rows).map(cell).join('')}${q.length > rows ? `<div class="more">+${q.length - rows}</div>` : ''}</div>`;
   }).join('');
   if (had !== undefined) { const el = document.querySelector(`[data-col="${had}"]`); if (el) el.focus(); }
@@ -1768,7 +2018,9 @@ function fitCamera() {
   const W = viewW, H = viewH, app = $('app').getBoundingClientRect(), hud = $('progress').getBoundingClientRect().bottom - app.top, tray = $('tray').getBoundingClientRect();
   // The crate queue sits under the scene on tall screens and beside it on wide ones.
   const safe = sideTray() ? { l: 8, r: tray.left - app.left - 12, t: hud + 6, b: H - 10 } : { l: 8, r: W - 8, t: hud + 6, b: Math.max(hud + 140, tray.top - app.top - 10) }, pts = [], r = 4.9, top = levelTop + .8;
-  for (const x of [boardBounds.x0 - .9, boardBounds.x1 + .9]) for (const z of [boardBounds.z0 - .9, boardBounds.z1 + .9]) pts.push(v3(x, 0, z), v3(x, top, z));
+  // On a narrow screen the crew working the sides of the structure would otherwise be cut off at the screen edge.
+  const m = viewW < viewH ? 1.6 : .9;
+  for (const x of [boardBounds.x0 - m, boardBounds.x1 + m]) for (const z of [boardBounds.z0 - m, boardBounds.z1 + m]) pts.push(v3(x, 0, z), v3(x, top, z));
   for (const s of [-1, 1]) { const p = FRONT.clone().multiplyScalar(LANE_D + .7).addScaledVector(RIGHT, s * ((SLOTS - 1) / 2 * CRATE_GAP + 1.5)); pts.push(p, p.clone().setY(2.2)); }
   camera.aspect = W / H; camera.clearViewOffset();
   const box = d => {
@@ -1786,12 +2038,13 @@ function fitCamera() {
 function resize() {
   viewW = $('app').clientWidth || 1; viewH = $('app').clientHeight || 1; renderer.setSize(viewW, viewH, false);
   $('tray').classList.toggle('side', sideTray()); renderQueue(); fitCamera();
+  for (const s of [...slots, ...leaving]) if (s) sizeLabel(s.label);
 }
 function bindControls() {
   $('levelPicker').onclick = () => showModal({ title: 'Bölüm seç', body: `<p>${LEVELS.length} küçük macera seni bekliyor.</p><select class="level-choice" id="levelChoice" aria-label="Bölüm">${LEVELS.map((l, i) => `<option value="${i}" ${i === level ? 'selected' : ''}>${l.name}</option>`).join('')}</select>`, primary: 'Oyna', action() { const selected = Number($('levelChoice').value); closeModal(); level = selected; looped = false; buildLevel(); }, secondary: 'Vazgeç', action2: closeModal });
   $('queue').addEventListener('click', e => { const b = e.target.closest('[data-col]'); if (b) activate(+b.dataset.col); });
   $('auto').onclick = () => { auto = !auto; $('auto').classList.toggle('on', auto); $('auto').setAttribute('aria-pressed', String(auto)); if (auto) toast('Otomatik oyun açık. Arkana yaslan ve ekibi izle.'); placeHand(); };
-  $('speed').onclick = () => { speed = speed === 1 ? 2 : speed === 2 ? 3 : 1; $('speed').textContent = speed + '×'; $('speed').classList.toggle('on', speed > 1); $('speed').setAttribute('aria-label', `Hız ${speed} kat`); };
+  $('speed').onclick = () => { speed = speed === 1 ? FAST : 1; const fast = speed > 1; $('speed').textContent = fast ? '2×' : '1×'; $('speed').classList.toggle('on', fast); $('speed').setAttribute('aria-label', fast ? 'Hız 2 kat' : 'Hız 1 kat'); };
   $('sound').onclick = () => {
     muted = !muted; $('sound').setAttribute('aria-label', muted ? 'Sesi aç' : 'Sesi kapat');
     $('sound').innerHTML = muted ? '<svg viewBox="0 0 24 24"><path d="M11 5 6 9H3v6h3l5 4zM16 9.5l5 5m0-5-5 5"/></svg>' : '<svg viewBox="0 0 24 24"><path d="M11 5 6 9H3v6h3l5 4zM16 8.5a5 5 0 0 1 0 7"/></svg>';
@@ -1852,11 +2105,12 @@ function simulate(dt) {
   for (const s of slots) if (s) updateSlot(s, dt);
   for (let i = leaving.length - 1; i >= 0; i--) if (driveOff(leaving[i], dt) === Infinity) freeSlot(leaving.splice(i, 1)[0]);
   for (const w of workers) stepWorker(w, dt);
+  updateBars(dt);
   updateTrails(dt);
   for (let i = shots.length - 1; i >= 0; i--) {
     const q = shots[i]; q.t += dt; const u = Math.min(1, q.t / .3);
     if (q.m) { q.m.position.lerpVectors(q.a, q.b, u); q.m.position.y += 1.1 * 4 * u * (1 - u); q.m.rotation.set(u * 5, u * 3, 0); q.m.scale.setScalar(lerp(.8, .5, u)); }
-    if (u >= 1) { if (q.m) { q.m.visible = false; shotPool.push(q.m); } shots.splice(i, 1); deliver(q.slot); }
+    if (u >= 1) { if (q.m) { q.m.visible = false; (q.bar ? barPool : shotPool).push(q.m); } shots.splice(i, 1); deliver(q.slot, q); }
   }
   updateParticles(dt);
   if ((dogT += dt) >= .5) { dogT = 0; watchdog(); }
@@ -1868,7 +2122,8 @@ function tick(now) {
   const raw = Math.min((now - lastTime) / 1000, .05); lastTime = now;
   if (document.hidden) return;
   const k = 1 - Math.exp(-10 * raw); yaw += (tYaw - yaw) * k; pitch += (tPitch - pitch) * k; placeCamera();
-  if (!paused && !hold) for (let i = 0; i < speed; i++) simulate(raw);
+  // Fast play takes two shorter steps per frame rather than one long one, so moves and collisions stay as fine-grained.
+  if (!paused && !hold) { const n = Math.ceil(speed); for (let i = 0; i < n; i++) simulate(raw * speed / n); }
   renderer.render(scene, camera); frame++;
 }
 
@@ -1876,9 +2131,9 @@ function screenOf(p, y = .45) { tmpV.set(p.x, y, p.z).project(camera); return [M
 // Read-only diagnostics plus a render-free stepper, so whole levels can be regression-tested quickly.
 window.cubeBuddies = {
   getReturnApron: () => ({ ...returnApron }),
-  getTrails: () => ({ height: TRAIL_HEIGHT, lifetime: TRAIL_LIFE, maxLength: TRAIL_LENGTH, opacity: TRAIL_OPACITY, reduced: REDUCED, trails: workers.filter(w => w.trail).map(w => ({ id: w.id, visible: w.trail.mesh.visible, points: w.trail.vertices / 2, length: w.trail.length, strength: w.trail.strength, positions: Array.from(w.trail.positions.subarray(0, w.trail.vertices * 3)) })) }),
+  getTrails: () => ({ height: TRAIL_HEIGHT, up: trailUp.toArray(), lifetime: TRAIL_LIFE, maxLength: TRAIL_LENGTH, opacity: TRAIL_OPACITY, reduced: REDUCED, trails: workers.filter(w => w.trail).map(w => ({ id: w.id, visible: w.trail.mesh.visible, points: w.trail.vertices / 2, length: w.trail.length, strength: w.trail.strength, positions: Array.from(w.trail.positions.subarray(0, w.trail.vertices * 3)) })) }),
   getVoxels: () => blocks.filter(b => !b.gone).map(b => [b.x, b.y, b.z]),
-  getState: () => ({ level, levelCount: LEVELS.length, looped, practice: PRACTICE, total, capacity: cubes?.instanceMatrix.count, grid: LEVELS[level % LEVELS.length].gridSize, paletteSize: CATALOG.palette.length, bounds: { ...boardBounds }, collected, remaining: occ.size, carried: workers.filter(w => w.carry).length + shots.length, paused, won, auto, speed, frame, time: +clock.toFixed(2),
+  getState: () => ({ level, levelCount: LEVELS.length, looped, practice: PRACTICE, total, capacity: cubes?.instanceMatrix.count, grid: LEVELS[level % LEVELS.length].gridSize, paletteSize: CATALOG.palette.length, bounds: { ...boardBounds }, collected, remaining: occ.size, carried: workers.filter(w => w.carry).length + shots.reduce((n, q) => n + q.units, 0), bars: { total: pieces.length, lifted: pieces.filter(p => p.taken).length }, paused, won, auto, speed, frame, time: +clock.toFixed(2),
     slots: slots.map(s => s && { color: s.color, remaining: s.remaining, inFlight: s.inFlight, waiting: s.waiting, squad: s.squad.length, state: s.state, screen: screenOf(s.pos) }),
     queue: queue.map(q => q.map(p => ({ ...p }))),
     workers: workers.filter(w => w.state !== 'pool').map(w => ({ id: w.id, state: w.state, act: w.act, color: w.color, carry: w.carry, airborneReturn: !!w.airborneReturn, exitPending: !!w.exitPending, returnGround: !!w.returnGround, groundEscape: !!w.groundEscape, cell: { ...w.cell }, heading: w.heading, screen: screenOf(w.root.position, w.root.position.y + .5), position: w.root.position.toArray().map(n => +n.toFixed(3)) })),
