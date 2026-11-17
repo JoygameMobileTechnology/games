@@ -47,6 +47,8 @@ async function main() {
       assert(box.level.right <= box.tools.left, `level pill clears the buttons at ${width}px`);
       assert(box.tray.left >= 0 && box.tray.right <= width && box.tray.bottom <= height && box.tray.top >= box.progress.bottom, `crate tray fits at ${width}px`);
       assert(await page.locator('[data-col]').first().isVisible());
+      const view = (await state(page)).view;
+      assert(view.fog[0] > view.dist + 10, `fog must start behind the structure at ${width}px: ${JSON.stringify(view)}`);
     }
     // The fast button says 2× but plays at 1.7×.
     await page.locator('#speed').click();

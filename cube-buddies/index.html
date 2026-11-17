@@ -2012,6 +2012,10 @@ const viewOff = { x: 0, y: 0 };
 function placeCamera(y = yaw, p = pitch, d = camDist / zoom) {
   camTarget.set((boardBounds.x0 + boardBounds.x1) * .35 + FRONT.x * 1.4, levelTop * .28 + .4, (boardBounds.z0 + boardBounds.z1) * .35 + FRONT.z * 1.4);
   camera.position.set(camTarget.x + Math.sin(y) * Math.cos(p) * d, camTarget.y + Math.sin(p) * d, camTarget.z + Math.cos(y) * Math.cos(p) * d); camera.lookAt(camTarget);
+  // No haze over anything you can see while playing, at any zoom: fog only exists to melt the far edge of the 300×300
+  // ground into the sky when the view is tilted low. At the default tilt the top of the screen meets the ground at about
+  // 1.5 × the camera distance; the ground's edge is never nearer than d + 124.
+  scene.fog.near = Math.max(d + 85, d * 1.6); scene.fog.far = scene.fog.near + 40;
 }
 // Pull the camera back until the structure and the crate row fit between the HUD and the tray, then centre them there.
 function fitCamera() {
@@ -2139,7 +2143,7 @@ window.cubeBuddies = {
     workers: workers.filter(w => w.state !== 'pool').map(w => ({ id: w.id, state: w.state, act: w.act, color: w.color, carry: w.carry, airborneReturn: !!w.airborneReturn, exitPending: !!w.exitPending, returnGround: !!w.returnGround, groundEscape: !!w.groundEscape, cell: { ...w.cell }, heading: w.heading, screen: screenOf(w.root.position, w.root.position.y + .5), position: w.root.position.toArray().map(n => +n.toFixed(3)) })),
     // Footprint pose of every truck that is on the road or parked: [x, z, yaw]. Used by the overlap test.
     trucks: [...slots.filter(s => s && (s.state !== 'in' || s.go)), ...leaving].map(s => [s.g.position.x, s.g.position.z, s.g.rotation.y]),
-    moves: { ...moveStats }, still: crewT ? +(stillT / crewT).toFixed(3) : 0, drawCalls: renderer ? renderer.info.render.calls : 0 }),
+    view: { dist: +camera.position.distanceTo(camTarget).toFixed(1), fog: [+scene.fog.near.toFixed(1), +scene.fog.far.toFixed(1)] }, moves: { ...moveStats }, still: crewT ? +(stillT / crewT).toFixed(3) : 0, drawCalls: renderer ? renderer.info.render.calls : 0 }),
   // hold(true) stops the real-time loop so advance() is the only thing moving the simulation.
   hold(on) { hold = !!on; },
   advance(seconds, step = 1 / 30) { for (let t = 0; t < seconds - 1e-9 && !paused && $('overlay').hidden; t += step) simulate(step); },
