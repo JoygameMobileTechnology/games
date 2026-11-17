@@ -1,0 +1,47 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const vm = require('node:vm');
+const html = fs.readFileSync(require('node:path').join(__dirname, '../index.html'), 'utf8');
+const heap = html.slice(html.indexOf('class Heap {'), html.indexOf('// Dijkstra over'));
+const planner = html.slice(html.indexOf('const RETURN_CLEARANCE'), html.indexOf('let groundCache ='));
+const context = vm.createContext({});
+vm.runInContext(`const DIR4=[[1,0],[-1,0],[0,1],[0,-1]], DIAG=[[1,1],[1,-1],[-1,1],[-1,-1]], lerp=(a,b,t)=>a+(b-a)*t; ${heap}\n${planner}\nthis.create=createGroundNavigator`, context);
+const floor = (x, z) => Math.abs(x) <= 9 && Math.abs(z) <= 9;
+const point = (x, z) => ({ x, y: 0, z });
+const make = (blocks, inside = floor) => { const set = new Set(blocks.map(p => p.join(','))); return context.create((x,z)=>set.has(`${x},${z}`), inside); };
+function safePath(nav, start, goal) {
+  const route = nav.path(start, goal); assert(route?.length, 'route exists');
+  let a = start;
+  for (const b of route) { assert(nav.segment(a, b, b.escape), 'every swept segment is clear'); a = b; }
+  assert.equal(a.x, goal.x); assert.equal(a.z, goal.z); return route;
+}
+const obstacle = make([[0, 0]]);
+assert(!obstacle.clear(point(1, 0)), 'margin rejects walking against a cube face');
+assert(obstacle.clear(point(1.5, 0)), 'half-cell corridor is usable');
+assert(!obstacle.segment(point(-1.5, 0), point(0, 1.5)), 'diagonal cannot cut a buffered corner');
+const detour = safePath(obstacle, point(-3, 0), point(3, 0));
+assert(detour.length > 1); assert(detour.every(p => Math.abs(p.z) <= 2), 'local detour, not the outer perimeter');
+const corridor = [];
+for(let z=-6;z<=6;z++) corridor.push([-2,z],[2,z]);
+const internal = safePath(make(corridor), point(0,-7), point(0,7));
+assert(internal.every(p=>Math.abs(p.x)<.1), 'wide interior passage stays straight');
+const narrow=[]; for(let z=-6;z<=6;z++) narrow.push([-1,z],[1,z]);
+const around=safePath(make(narrow),point(0,-8),point(0,8));
+assert(around.some(p=>Math.abs(p.x)>=2.5), 'too-narrow passage is bypassed');
+const retreat=safePath(obstacle,point(.8,0),point(3,0));
+assert(retreat[0].escape,'ground pickup may retreat out of its existing margin');
+assert(!obstacle.segment(point(.8,0),point(-3,0),true),'escape never cuts through the cube');
+const sealed = make([[-1,0],[1,0],[0,-1],[0,1]]);
+assert.equal(sealed.path(point(0,0),point(5,0)),null,'sealed pockets do not get an unsafe fallback');
+const overhang = make([[-2,4],[-1,4],[0,4],[1,4],[2,4]]);
+safePath(overhang,point(-1.89,4),point(0,7));
+const apron = { rx:1, rz:0, fx:0, fz:1, center:0, width:4, base:0, depth:4 };
+const frontNav = context.create(()=>false, floor, apron);
+assert(!frontNav.clear(point(0,2)), 'empty front apron stays forbidden without any cubes');
+assert(!frontNav.segment(point(-4.5,1),point(4.5,1)), 'cannot cut a chord through the front apron');
+assert(!frontNav.segment(point(0,2),point(0,6),true), 'pickup retreat cannot bypass apron restrictions');
+const frontRoute = safePath(frontNav,point(-4.5,1),point(2,5));
+assert(frontRoute.some(p=>p.z>=3), 'returns go around the bow into the truck lane');
+safePath(frontNav,point(-2,-1),point(2,-1));
+console.log('PASS fixed front apron, swept ellipse corners and open rear passages');
+console.log('PASS swept corner clearance, local detours, wide interior passages, narrow gaps, safe pickup retreat and sealed pockets');
