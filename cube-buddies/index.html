@@ -204,8 +204,9 @@ const K = (x, y, z) => ((y + 1) << 12) | ((z + 32) << 6) | (x + 32);
 const solid = (x, y, z) => occ.has(K(x, y, z));
 const onTable = (x, z) => x * x + z * z <= 81 && x * FRONT.x + z * FRONT.z <= 6.2;
 const stand = (x, y, z) => y >= 0 && y < 15 && !solid(x, y, z) && (y === 0 ? onTable(x, z) : solid(x, y - 1, z));
-const DIR4 = [[1, 0], [-1, 0], [0, 1], [0, -1]], DIAG = [[1, 1], [1, -1], [-1, 1], [-1, -1]], DIR5 = [[1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, 0, -1], [0, 1, 0]];
-const exposed = b => DIR5.some(d => !solid(b.x + d[0], b.y + d[1], b.z + d[2]));
+const DIR4 = [[1, 0], [-1, 0], [0, 1], [0, -1]], DIAG = [[1, 1], [1, -1], [-1, 1], [-1, -1]];
+// A block is only up for grabs while nothing rests on it.
+const topFree = b => !solid(b.x, b.y + 1, b.z);
 const same = (a, b) => a.x === b.x && a.y === b.y && a.z === b.z;
 
 class Heap {
@@ -285,37 +286,30 @@ function explore(sx, sy, sz, goal = -1, carry = false) {
   return { dist, path(k) { if (!dist.has(k)) return null; const out = []; while (prev.has(k)) { const p = prev.get(k); out.push(p); k = p.k; } return out.reverse(); } };
 }
 
-// Where a character can be to take block b, and how it takes it from there.
+// Where a character can be to take block b. Never by jumping up at it from below: the crew climbs first and takes
+// it from above — standing on the block itself ('top') or on a neighbour of the same height ('down') — or, when
+// that is a detour, from a foothold right beside it on the block's own level ('front').
 function goalsFor(b) {
-  const out = [], topFree = !solid(b.x, b.y + 1, b.z);
+  const out = [];
+  if (!topFree(b)) return out;
   for (const [dx, dz] of DIR4) {
     const nx = b.x + dx, nz = b.z + dz;
-    if (!solid(nx, b.y, nz)) {
-      if (stand(nx, b.y, nz)) out.push({ x: nx, y: b.y, z: nz, kind: 'front', dx: -dx, dz: -dz, pen: 0 });
-      else {
-        // Open air beside the block: run or jump up from whatever is directly below and snatch it.
-        let y = b.y; while (y > 0 && !solid(nx, y - 1, nz)) y--;
-        if (stand(nx, y, nz) && b.y - y <= 11) out.push({ x: nx, y, z: nz, kind: 'snatch', dx: -dx, dz: -dz, pen: 2.5 + (b.y - y) * 1.1 });
-      }
-    } else if (topFree && stand(nx, b.y + 1, nz)) out.push({ x: nx, y: b.y + 1, z: nz, kind: 'down', dx: -dx, dz: -dz, pen: .2 });
+    if (solid(nx, b.y, nz)) { if (stand(nx, b.y + 1, nz)) out.push({ x: nx, y: b.y + 1, z: nz, kind: 'down', dx: -dx, dz: -dz, pen: .2 }); }
+    else if (stand(nx, b.y, nz)) out.push({ x: nx, y: b.y, z: nz, kind: 'front', dx: -dx, dz: -dz, pen: 3 });
   }
-  if (topFree) out.push({ x: b.x, y: b.y + 1, z: b.z, kind: 'top', dx: 0, dz: 0, pen: 1.6 });
+  out.push({ x: b.x, y: b.y + 1, z: b.z, kind: 'top', dx: 0, dz: 0, pen: 1 });
   return out;
 }
 function goalValid(job) {
   const b = job.block, g = job.goal;
-  if (b.gone) return false;
-  if (g.kind === 'warp') return true;
-  if (!stand(g.x, g.y, g.z)) return false;
-  if (g.kind === 'down') return !solid(b.x, b.y + 1, b.z);
-  if (g.kind === 'snatch') for (let y = g.y + 1; y <= b.y; y++) if (solid(g.x, y, g.z)) return false;
-  return true;
+  if (b.gone || !topFree(b)) return false;
+  return g.kind === 'warp' || stand(g.x, g.y, g.z);
 }
 function findJob(w) {
   const s = w.slot, c = w.cell, ex = explore(c.x, c.y, c.z);
   let best = null, score = Infinity, any = null;
   for (const b of blocks) {
-    if (b.gone || b.reserved || b.color !== s.color) continue;
+    if (b.gone || b.reserved || b.color !== s.color || !topFree(b)) continue;
     for (const g of goalsFor(b)) {
       const d = ex.dist.get(K(g.x, g.y, g.z));
       if (d === undefined) { any = any || { block: b, goal: g }; continue; }
@@ -733,38 +727,29 @@ function dropJob(w) {
 function startPick(w) {
   const job = w.job, b = job.block, g = job.goal;
   if (!goalValid(job)) return dropJob(w);
-  if (g.kind === 'snatch') return snatch(w, b, g);
-  const a = w.root.position.clone(); let taken = false;
-  if (g.kind === 'front' || g.kind === 'down') look(w, g.dx, g.dz);
-  count(g.kind === 'front' ? 'pull' : 'pluck');
+  // Never pull a cube out from under a team-mate: give them a moment to move on.
+  if (workers.some(o => o !== w && o.state !== 'pool' && o.cell && o.cell.x === b.x && o.cell.y === b.y + 1 && o.cell.z === b.z) && (w.waitT = (w.waitT || 0) + .12) < 1.5) { w.mv = mv(.12, w => setAnim(w, A.idle)); return; }
+  w.waitT = 0;
+  const a = w.root.position.clone(), onTop = g.x === b.x && g.z === b.z; let taken = false;
+  if (!onTop) look(w, g.dx, g.dz);
+  const side = !onTop && g.y === b.y;
+  count(onTop ? 'topPluck' : side ? 'pull' : 'pluck', w);
   w.mv = mv(.46, (w, u) => {
-    w.u = u; setAnim(w, g.kind === 'front' ? A.grabFront : A.grabDown);
+    w.u = u; setAnim(w, side ? A.grabFront : A.grabDown);
     if (!taken && u >= .45) { taken = true; takeBlock(w, b); }
-    w.root.position.y = a.y + (u > .45 ? .16 * Math.sin(Math.PI * (u - .45) / .55) : 0);
-  }, goHome);
+    if (!onTop) w.root.position.y = a.y + (u > .45 ? .16 * Math.sin(Math.PI * (u - .45) / .55) : 0);
+  }, onTop ? hopDown : goHome);
 }
-function snatch(w, b, g) {
-  const a = w.root.position.clone(), base = cellPos(w, g), dx = g.dx, dz = g.dz;
-  look(w, dx, dz);
-  if (solid(b.x, b.y - 1, b.z)) {
-    // Wall below the block: sprint up it, grab, and backflip off.
-    const wx = g.x + dx * WALL_OFF + (dx ? 0 : w.ox), wz = g.z + dz * WALL_OFF + (dz ? 0 : w.oz), top = b.y - WALL_TOP;
-    w.mv = wallrun(w, a, wx, wz, top, dx, dz, w => {
-      takeBlock(w, b); count('wallBackflip', w);
-      w.mv = air(v3(wx, top, wz), base.clone().add(tmpV.set(-dx * .22, 0, -dz * .22)), .5, { x0: -WALL_TILT, x1: REDUCED ? 0 : -TAU, land: .85, keep: true, out: 1.8, done: goHome });
-    });
-    return;
-  }
-  // Nothing to run on: a spinning super jump straight up to the floating block.
-  const top = Math.max(g.y + .25, b.y - .78 * SIZE), H = top - g.y, rise = Math.sqrt(2 * H / G), T = rise + .14;
-  count('superJump', w);
-  w.mv = mv(T, (w, u) => {
-    const t = u * T;
-    if (t < .14) { setAnim(w, A.crouch); return; }
-    const k = (t - .14) / rise; w.root.position.y = g.y + H * (1 - (1 - k) * (1 - k)); w.spinY = TAU * FLIP * smooth(k); setAnim(w, A.reach);
-  }, w => { w.spinY = 0; takeBlock(w, b); w.mv = air(w.root.position.clone(), base, .05, { x1: H > 1.3 ? TAU * FLIP : 0, land: .75, keep: true, done: goHome }); });
+// The cube came out from under the picker's own feet: hop with it and land where it used to be.
+function hopDown(w) {
+  goHome(w);
+  const c = w.cell; let y = c.y; while (y > 0 && !solid(c.x, y - 1, c.z)) y--;
+  if (!stand(c.x, y, c.z)) return;
+  const h = c.y - y; w.cell = { x: c.x, y, z: c.z };
+  w.mv = air(w.root.position.clone(), cellPos(w, w.cell), .34, { y: h === 1 && rand() < .35 ? TAU * FLIP : 0, x1: h > 1 ? TAU * FLIP : 0, land: .5 + .1 * h, keep: true });
 }
 function takeBlock(w, b) {
+  if (!topFree(b)) count('coveredTake');   // must stay at zero; the test suite checks it
   b.gone = true; b.reserved = false; hot.delete(b); occ.delete(K(b.x, b.y, b.z)); worldVer++;
   cubes.setMatrixAt(b.i, ZERO); cubes.instanceMatrix.needsUpdate = true;
   w.carry = true; w.cube.visible = true; w.root.updateWorldMatrix(true, true);
@@ -918,7 +903,7 @@ function activate(col) {
 function recall(s) {
   if (paused || won || s.state !== 'open') return;
   if (!s.waiting) { s.bump = 1; return; }
-  s.recall = true; s.waiting = false; drawLabel(s); sfx.tap(); toast('Ekip sıraya döndü. Önce yolu açacak rengi gönder.');
+  s.recall = true; s.waiting = false; drawLabel(s); sfx.tap(); toast('Ekip sıraya döndü. Önce üstteki rengi gönder.');
 }
 
 // ---------------------------------------------------------------- level
@@ -941,14 +926,14 @@ function buildLevel() {
   $('levelNo').textContent = level + 1; $('levelName').textContent = L.name;
   renderQueue(); renderHud(); fitCamera();
 }
-// Deal the crates by dry-running the level: always take a colour that is currently exposed, top blocks first.
+// Deal the crates by dry-running the level: always take a colour that has uncovered blocks, top blocks first.
 // Playing the columns left to right in that order clears the structure, so every deal is solvable.
 function makeQueue() {
-  const live = new Map(blocks.map(b => [K(b.x, b.y, b.z), b])), open = b => DIR5.some(d => !live.has(K(b.x + d[0], b.y + d[1], b.z + d[2])));
+  const live = new Map(blocks.map(b => [K(b.x, b.y, b.z), b])), open = b => !live.has(K(b.x, b.y + 1, b.z));
   const seq = []; let last = -1;
   while (live.size) {
     const n = PALETTE.map(() => 0); for (const b of live.values()) if (open(b)) n[b.color]++;
-    // Prefer a different colour from the previous crate when it has a worthwhile amount exposed.
+    // Prefer a different colour from the previous crate when it has a worthwhile amount uncovered.
     let c = -1, alt = -1;
     for (let i = 0; i < n.length; i++) { if (n[i] && (c < 0 || n[i] > n[c])) c = i; if (n[i] >= 3 && i !== last && (alt < 0 || n[i] > n[alt])) alt = i; }
     if (alt >= 0) c = alt;
@@ -1042,9 +1027,9 @@ function renderQueue(riseCol = -1) {
   if (had !== undefined) { const el = document.querySelector(`[data-col="${had}"]`); if (el) el.focus(); }
   placeHand();
 }
-// Free exposed blocks of a colour, minus what crates already on the table still need.
+// Uncovered blocks of a colour, minus what crates already on the table still need.
 function avail(color) {
-  let n = 0; for (const b of blocks) if (!b.gone && !b.reserved && b.color === color && exposed(b)) n++;
+  let n = 0; for (const b of blocks) if (!b.gone && !b.reserved && b.color === color && topFree(b)) n++;
   for (const s of slots) if (s && s.color === color && !s.recall) n -= s.remaining - s.inFlight;
   return n;
 }
@@ -1119,7 +1104,7 @@ function bindControls() {
     $('sound').innerHTML = muted ? '<svg viewBox="0 0 24 24"><path d="M11 5 6 9H3v6h3l5 4zM16 9.5l5 5m0-5-5 5"/></svg>' : '<svg viewBox="0 0 24 24"><path d="M11 5 6 9H3v6h3l5 4zM16 8.5a5 5 0 0 1 0 7"/></svg>';
     if (!muted) { unlockAudio(); sfx.tap(); }
   };
-  $('pause').onclick = () => showModal({ title: 'Mola', body: '<p>Bir kasaya dokun; ekibi o renkteki açık küpleri toplar.<br>Kasa dolunca yuvası boşalır. Yolu kapalı kasaya dokunup geri gönderebilirsin.</p><p style="margin-top:10px;font-size:13px">Sürükle: döndür · Tekerlek: yakınlaş · 1-2-3: kasa gönder</p>', primary: 'Devam et', action: closeModal });
+  $('pause').onclick = () => showModal({ title: 'Mola', body: '<p>Bir kasaya dokun; ekibi o renkteki, üstü boş küpleri toplar.<br>Kasa dolunca yuvası boşalır. Küpleri henüz kapalı olan kasaya dokunup geri gönderebilirsin.</p><p style="margin-top:10px;font-size:13px">Sürükle: döndür · Tekerlek: yakınlaş · 1-2-3: kasa gönder</p>', primary: 'Devam et', action: closeModal });
   $('restart').onclick = () => showModal({ title: 'Baştan başlayalım mı?', body: '<p>Küpler yerine döner, ekip yeniden ısınır.</p>', primary: 'Yeniden başlat', action() { closeModal(); buildLevel(); }, secondary: 'Vazgeç', action2: closeModal });
   $('modalPrimary').onclick = () => modalAction && modalAction(); $('modalSecondary').onclick = () => modalAction2 && modalAction2();
 
@@ -1164,7 +1149,7 @@ function watchdog() {
       // No column offers a useful colour: bring the nearest useful crate to the front of its column.
       for (const q of queue) { const i = q.findIndex(p => avail(p.color) > 0); if (i > 0) { q.unshift(q.splice(i, 1)[0]); jam = 0; renderQueue(); toast('Sıra karıştırıldı: işe yarar kasa öne geldi.'); break; } }
     } else if (auto) { recall(act[0]); jam = 0; }
-    else if (!jamTold) { jamTold = true; toast('Yollar kapalı! Sallanan bir kasaya dokunup sıraya geri gönder.'); }
+    else if (!jamTold) { jamTold = true; toast('Bu renklerin üstü kapalı! Sallanan bir kasaya dokunup sıraya geri gönder.'); }
   }
   placeHand();
 }
