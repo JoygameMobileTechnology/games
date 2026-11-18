@@ -1,6 +1,6 @@
 // Designs the first five levels: small structures built to show off the crew's parkour — towers far enough apart to
 // leap between, staircases of pillars to hop up and down, walls to run along — rather than solid blocks.
-// Writes them into levels/catalog.json as levels 1–5; run `npm run build:levels` afterwards to embed them.
+// Writes them into levels/catalog.json as the five levels after the pictures; run `npm run build:levels` afterwards to embed them.
 const fs = require('node:fs');
 const path = require('node:path');
 const file = path.resolve(__dirname, '../levels/catalog.json');
@@ -113,11 +113,13 @@ function deal({ gridSize: { x: W, z: D }, cells }, columns, seed) {
   return out;
 }
 
+// The picture levels (scripts/picture-levels.cjs) sit at the front of the catalog; these five follow them.
+const first = catalog.levels.filter(l => l.picture).length;
 designs.forEach((d, i) => {
-  const old = catalog.levels[i];
-  catalog.levels[i] = { ...old, name: d.name, difficulty: 0, gridSize: d.gridSize, cells: d.cells, columns: deal(d, d.columns, 7 + i * 31) };
+  const at = first + i, old = catalog.levels[at];
+  catalog.levels[at] = { ...old, name: d.name, difficulty: 0, gridSize: d.gridSize, cells: d.cells, columns: deal(d, d.columns, 7 + i * 31) };
   const n = d.cells.filter(c => c >= 0).length;
-  console.log(`${i + 1}. ${d.name}: ${d.gridSize.x}×${d.gridSize.y}×${d.gridSize.z}, ${n} cubes, ${catalog.levels[i].columns.map(c => c.length).join('+')} crates`);
+  console.log(`${at + 1}. ${d.name}: ${d.gridSize.x}×${d.gridSize.y}×${d.gridSize.z}, ${n} cubes, ${catalog.levels[at].columns.map(c => c.length).join('+')} crates`);
 });
 // The catalog keeps camera angles written as floats (-30.0); keep it that way so only levels 1–5 change.
 fs.writeFileSync(file, JSON.stringify(catalog).replace(/"cameraAngle":(-?\d+)([,}])/g, '"cameraAngle":$1.0$2') + '\n');

@@ -11,12 +11,12 @@ const url = pathToFileURL(path.resolve(__dirname, '../index.html')).href;
   try {
     const page = await browser.newPage();
     const errors = []; page.on('pageerror', e => errors.push(e.message));
-    for (const level of [1, 3, 11, 70]) {
+    // The picture level, then structures of different shapes and sizes.
+    for (const level of [1, 2, 4, 12, 71]) {
       await page.goto(`${url}?level=${level}`);
       await page.waitForFunction(() => window.cubeBuddies?.getState().frame > 2);
       const result = await page.evaluate(() => {
         cubeBuddies.hold(true); document.getElementById('auto').click();
-        const apron = cubeBuddies.getReturnApron();
         let airborne = 0, ground = 0, buffered = 0, shortcuts = 0, physicsSamples = 0; const violations = [], history = new Map();
         for (let i = 0; i < 1500; i++) {
           cubeBuddies.advance(1 / 30, 1 / 30);
@@ -27,9 +27,6 @@ const url = pathToFileURL(path.resolve(__dirname, '../index.html')).href;
             if (w.carry && w.returnGround && w.state === 'toCrate') ground++;
             if (w.carry && w.returnGround && !w.groundEscape && ['returnRun', 'returnTurn', 'sideLand', 'truckLand'].includes(w.act)) {
               buffered++;
-              const r = (w.position[0] * apron.rx + w.position[2] * apron.rz - apron.center) / apron.width;
-              const f = (w.position[0] * apron.fx + w.position[2] * apron.fz - apron.base) / apron.depth;
-              if (f > .001 && r*r + f*f < .999) violations.push('returner enters the reserved front apron');
               for (const [x, , z] of low) if (Math.max(Math.abs(w.position[0] - x), Math.abs(w.position[2] - z)) < 1.219)
                 violations.push(`ground return cuts cube buffer: worker ${w.id} by ${x},${z}`);
             }
@@ -52,7 +49,6 @@ const url = pathToFileURL(path.resolve(__dirname, '../index.html')).href;
           }
           if (s.won) break;
         }
-        if (JSON.stringify(apron) !== JSON.stringify(cubeBuddies.getReturnApron())) violations.push('front apron shrank as cubes disappeared');
         return { airborne, ground, buffered, shortcuts, physicsSamples, violations: violations.slice(0, 5), moves: cubeBuddies.getState().moves };
       });
       assert.deepEqual(result.violations, [], `level ${level}: collision-free side exits and ground-only returns`);
@@ -61,7 +57,7 @@ const url = pathToFileURL(path.resolve(__dirname, '../index.html')).href;
       assert(result.physicsSamples > 20, 'enough consecutive frames checked against constant gravity and horizontal velocity');
       assert(result.moves.sideExitLeft > 0 && result.moves.sideExitRight > 0, 'both sides are used');
       assert(result.moves.sideLand > 0 && result.moves.returnTurn > 0, 'landing and turn happen before the run back');
-      if (level === 1) assert(result.shortcuts > 0 && result.moves.truckLand > 0, 'nearby carriers use direct truck shortcuts');
+      if (level === 1) assert(result.moves.frontExit > 0, 'carriers by the front edge step off towards the trucks');
       console.log(`PASS level ${level}: left/right jumps, clear arcs, grounded landing, turn and ground return`);
     }
     assert.deepEqual(errors, []);

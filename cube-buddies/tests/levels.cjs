@@ -11,11 +11,11 @@ const chrome = process.env.CHROME_PATH || '/Applications/Google Chrome.app/Conte
 const url = pathToFileURL(path.join(root, 'index.html')).href;
 
 function validateCatalog() {
-  assert.equal(catalog.levels.length, 150);
+  assert.equal(catalog.levels.length, 151);
   assert.deepEqual(packed.palette, catalog.palette);
   assert.deepEqual(packed.progression, catalog.progression);
   let total = 0;
-  for (let i = 0; i < 150; i++) {
+  for (let i = 0; i < 151; i++) {
     const l = catalog.levels[i], p = packed.levels[i];
     const decoded = [...Buffer.from(p.cells, 'base64')].map(c => c - 1);
     const { cells, count, ...meta } = p;
@@ -27,9 +27,10 @@ function validateCatalog() {
     assert.deepEqual(packets, colors, `level ${i + 1}: counts by color`);
     assert.equal(count, colors.reduce((a, b) => a + b, 0)); total += count;
   }
-  assert.equal(total, 102765);
+  assert.equal(total, 103761);
   assert.equal(Math.max(...packed.levels.map(l => l.count)), 2008);
-  console.log('PASS all 150 complete records, 22 colors, 102765 cells, queues and metadata round-trip');
+  assert(catalog.levels[0].picture && !catalog.levels.slice(1).some(l => l.picture), 'the picture level comes first; the 150 structures follow it');
+  console.log('PASS all 151 complete records, 22 colors, 103761 cells, queues and metadata round-trip');
 }
 
 async function main() {
@@ -45,7 +46,7 @@ async function main() {
     await page.evaluate(() => cubeBuddies.hold(true));
     const loaded = await page.evaluate(() => {
       const result = [];
-      for (let i = 0; i < 150; i++) {
+      for (let i = 0; i < 151; i++) {
         document.getElementById('levelPicker').click();
         document.getElementById('levelChoice').value = i;
         document.getElementById('modalPrimary').click();
@@ -60,22 +61,20 @@ async function main() {
       assert.deepEqual(l.grid, catalog.levels[i].gridSize);
       assert.deepEqual(l.queue, catalog.levels[i].columns.map(col => col.map(p => ({ color: p.color + 5, count: p.count }))));
     });
-    console.log('PASS all 150 levels load through the picker with exact geometry counts and queue order');
+    console.log('PASS all 151 levels load through the picker with exact geometry counts and queue order');
 
     for (const [width, height] of [[320, 640], [390, 844], [768, 1024], [1440, 900]]) {
       await page.setViewportSize({ width, height });
       await page.waitForTimeout(100);
-      const b = await page.evaluate(() => {
-        const t = document.getElementById('tray').getBoundingClientRect();
-        return { left: t.left, right: t.right, bottom: t.bottom, scroll: document.documentElement.scrollWidth, columns: document.querySelectorAll('.col').length };
-      });
-      assert.equal(b.columns, 4); assert.equal(b.scroll, width);
-      assert(b.left >= 0 && b.right <= width && b.bottom <= height, `four columns fit ${width}px`);
+      // The last level loaded has four columns of waiting trucks: each head truck is a button, whole and on screen.
+      const b = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, picks: [...document.querySelectorAll('[data-col]')].map(el => { const r = el.getBoundingClientRect(); return [r.left, r.top, r.right, r.bottom]; }) }));
+      assert.equal(b.picks.length, 4); assert.equal(b.scroll, width);
+      for (const [l, t, r, bottom] of b.picks) assert(l >= 0 && r <= width && t >= 0 && bottom <= height && r - l >= 44 && bottom - t >= 44, `four columns of trucks fit ${width}px: ${[l, t, r, bottom].map(Math.round)}`);
     }
-    console.log('PASS four-column queues fit 320/390/768/1440px offline');
+    console.log('PASS four-column truck queues fit 320/390/768/1440px offline');
 
     // Different shapes, grid heights, color counts, column counts and maximum instance capacity.
-    for (const id of process.env.ALL_LEVELS === '1' ? catalog.levels.map(l => l.id) : [1, 2, 3, 11, 70, 91, 111, 150]) {
+    for (const id of process.env.ALL_LEVELS === '1' ? catalog.levels.map(l => l.id) : [1, 2, 3, 4, 12, 71, 92, 112, 151]) {
       await page.evaluate(id => {
         document.getElementById('levelPicker').click(); document.getElementById('levelChoice').value = id - 1; document.getElementById('modalPrimary').click();
         if (!cubeBuddies.getState().auto) document.getElementById('auto').click();
@@ -94,7 +93,7 @@ async function main() {
     }
     await page.evaluate(() => cubeBuddies.advance(3));
     await page.locator('#modalPrimary').click();
-    assert.equal(await page.evaluate(() => cubeBuddies.getState().level), 29, 'last level begins the repeat sequence at 30');
+    assert.equal(await page.evaluate(() => cubeBuddies.getState().level), 30, 'last level begins the repeat sequence at 31, the level that used to be 30');
     assert.deepEqual(errors, []);
   } finally { await browser.close(); }
 }

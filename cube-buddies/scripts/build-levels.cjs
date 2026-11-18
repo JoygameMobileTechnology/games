@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const root = path.resolve(__dirname, '..');
 const data = JSON.parse(fs.readFileSync(path.join(root, 'levels/catalog.json'), 'utf8'));
 assert.equal(data.version, 1);
-assert.equal(data.levels.length, 150);
+assert.equal(data.levels.length, 151);
 assert.equal(data.palette.length, 22);
 const packed = { version: data.version, palette: data.palette, progression: data.progression, levels: data.levels.map((l, i) => {
   assert.equal(l.id, i + 1);

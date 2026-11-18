@@ -45,7 +45,7 @@ const chrome = process.env.CHROME_PATH || '/Applications/Google Chrome.app/Conte
     for (const t of trails.trails.filter(t => t.visible)) for (let i=0; i<t.positions.length; i+=6) {
       const p=t.positions, dx=p[i+3]-p[i], dy=p[i+4]-p[i+1], dz=p[i+5]-p[i+2], len=Math.hypot(dx, dy, dz);
       assert(len > 0 && Math.abs((dx*ux+dy*uy+dz*uz)/len - 1) < 1e-4, 'ribbon stays upright on screen');
-      assert(len <= .5 + 1e-6, 'ribbon stays torso-height');
+      assert(len <= trails.height + 1e-6, 'ribbon stays torso-height');
     }
     await page.setViewportSize({ width: 390, height: 844 }); await page.waitForTimeout(200);
     const mobile = await page.evaluate(() => cubeBuddies.trailContrast());

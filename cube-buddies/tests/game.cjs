@@ -40,22 +40,29 @@ async function main() {
       await page.setViewportSize({ width, height });
       await page.waitForTimeout(150);
       const box = await page.evaluate(() => {
-        const r = s => document.querySelector(s).getBoundingClientRect();
-        return { scroll: document.documentElement.scrollWidth, level: r('.level'), tools: r('.tools'), tray: r('#tray'), progress: r('#progress') };
+        const r = el => { const b = (typeof el === 'string' ? document.querySelector(el) : el).getBoundingClientRect(); return { left: b.left, top: b.top, right: b.right, bottom: b.bottom }; };
+        return { scroll: document.documentElement.scrollWidth, level: r('.level'), tools: r('.tools'), progress: r('#progress'), picks: [...document.querySelectorAll('[data-col]')].map(r), counts: [...document.querySelectorAll('.num')].map(el => ({ ...r(el), size: parseFloat(getComputedStyle(el).fontSize), text: el.textContent })), tags: [...document.querySelectorAll('.tag')].map(r) };
       });
       assert.equal(box.scroll, width, `no horizontal overflow at ${width}px`);
       assert(box.level.right <= box.tools.left, `level pill clears the buttons at ${width}px`);
-      assert(box.tray.left >= 0 && box.tray.right <= width && box.tray.bottom <= height && box.tray.top >= box.progress.bottom, `crate tray fits at ${width}px`);
+      // The waiting trucks: every head truck is a whole, finger-sized button under the HUD; every shown truck has a readable count.
+      assert.equal(box.picks.length, 3, 'one button per column');
+      for (const b of box.picks) assert(b.left >= 0 && b.right <= width && b.bottom <= height && b.top >= box.progress.bottom && b.right - b.left >= 44 && b.bottom - b.top >= 44, `waiting trucks fit at ${width}px: ${JSON.stringify(b)}`);
+      assert(box.counts.length >= 3 && box.counts.every(c => c.size >= 14 && /^\d+$/.test(c.text) && c.left >= 0 && c.right <= width && c.bottom <= height), `truck counts are readable at ${width}px: ${JSON.stringify(box.counts)}`);
+      for (const t of box.tags) assert(t.left >= 0 && t.right <= width && t.top >= box.progress.bottom && t.bottom <= height, `parked truck counters fit at ${width}px`);
+      for (let i = 1; i < box.tags.length; i++) assert(box.tags[i].left >= box.tags[i - 1].right - 1, `parked truck counters do not run into each other at ${width}px`);
       assert(await page.locator('[data-col]').first().isVisible());
       const view = (await state(page)).view;
       assert(view.fog[0] > view.dist + 10, `fog must start behind the structure at ${width}px: ${JSON.stringify(view)}`);
     }
-    // The fast button says 2× but plays at 1.7×.
+    // The simulation runs at 1.7 seconds per second normally; the fast button says 2× and makes it 2.3.
+    const pace = async () => { const t0 = (await state(page)).time, w0 = Date.now(); await page.waitForTimeout(1000); return ((await state(page)).time - t0) / ((Date.now() - w0) / 1000); };
+    const normal = await pace();
+    assert(normal > 1.45 && normal < 1.95, `1× should run at about 1.7 (${normal.toFixed(2)}s per second)`);
     await page.locator('#speed').click();
     assert.equal(await page.locator('#speed').textContent(), '2×');
-    const t0 = (await state(page)).time; await page.waitForTimeout(1000);
-    const rate = (await state(page)).time - t0;
-    assert(rate > 1.4 && rate < 1.95, `2× should run at about 1.7× (${rate.toFixed(2)}s per second)`);
+    const rate = await pace();
+    assert(rate > 2.0 && rate < 2.6, `2× should run at about 2.3 (${rate.toFixed(2)}s per second)`);
     await page.locator('#speed').click();
     assert.equal((await state(page)).speed, 1, 'the button toggles back to 1×; there is no 3×');
     await page.close();
@@ -101,11 +108,11 @@ async function main() {
     assert(s.still < .1, `crew stood still ${Math.round(s.still * 100)}% of the time`);
     console.log('PASS parkour: ' + Object.entries(s.moves).map(([k, v]) => `${k} ${v}`).join(', '));
 
-    // Trucks share one lane and their bay paths cross: send them as fast as bays free up for a whole level and
-    // check, frame by frame, that no two truck footprints ever overlap.
+    // Trucks share one lane between the bays and the waiting columns: send them as fast as bays free up for a whole
+    // level and check, frame by frame, that no two truck footprints ever overlap — waiting, manoeuvring, parked or leaving.
     const lanes = await sim.evaluate(() => {
-      const T = 1.1, hw = .605 * T, z0 = -1.09 * T, z1 = 1.31 * T;
-      const box = ([x, z, th]) => { const f = [Math.sin(th), Math.cos(th)], n = [f[1], -f[0]], c = []; for (const a of [z0, z1]) for (const b of [-hw, hw]) c.push([x + f[0] * a + n[0] * b, z + f[1] * a + n[1] * b]); return { c, ax: [f, n] }; };
+      const { halfWidth, tail, nose } = cubeBuddies.getLayout().truck;
+      const box = ([x, z, th, k]) => { const f = [Math.sin(th), Math.cos(th)], n = [f[1], -f[0]], c = []; for (const a of [-tail * k, nose * k]) for (const b of [-halfWidth * k, halfWidth * k]) c.push([x + f[0] * a + n[0] * b, z + f[1] * a + n[1] * b]); return { c, ax: [f, n] }; };
       const gap = (A, B) => { let best = -Infinity; for (const ax of [...A.ax, ...B.ax]) { const a = A.c.map(c => c[0] * ax[0] + c[1] * ax[1]), b = B.c.map(c => c[0] * ax[0] + c[1] * ax[1]); best = Math.max(best, Math.min(...b) - Math.max(...a), Math.min(...a) - Math.max(...b)); } return best; };
       let min = Infinity, col = 0, s;
       for (let i = 0; i < 60 * 300; i++) {
